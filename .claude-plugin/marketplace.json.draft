@@ -1,9 +1,0 @@
-{
-  "$comment": "DRAFT — activates when the plugins/ migration lands (see docs/MIGRATION-propositions-projects.md). Renaming to marketplace.json makes this repo a Claude Code marketplace.",
-  "name": "propositions-projects",
-  "owner": { "name": "Che Cheng" },
-  "plugins": [
-    { "name": "propositions", "source": "./plugins/propositions", "description": "Author-claim ledger infrastructure for academic manuscripts: JSONL propositions, R1-R13 validator, audit chain, extraction + manuscript-QA skills" },
-    { "name": "math-tools", "source": "./plugins/math-tools", "description": "Math-only pack on top of the propositions core: sympy verification, theorem-boundary lenses" }
-  ]
-}

@@ -1,15 +1,21 @@
 {
-  "name": "propositions",
+  "name": "propositions-projects",
   "owner": {
     "name": "Che Cheng"
   },
-  "description": "Author-claim infrastructure for academic LaTeX manuscripts — propositions plugin self-hosted as a single-plugin marketplace.",
+  "description": "Umbrella marketplace for the propositions ecosystem — author-claim infrastructure for academic manuscripts (core) plus domain packs.",
   "plugins": [
     {
       "name": "propositions",
-      "source": "./",
-      "description": "Line-addressable propositions (JSONL) extracted from main.tex + R1-R13 mechanical validator + audit tooling + extraction discipline.",
-      "version": "0.1.0"
+      "source": "./plugins/propositions",
+      "description": "Author-claim ledger infrastructure: JSONL propositions, R1-R13 validator, audit chain, extraction + manuscript-QA skills (clarity-audit / proofread / manuscript-audit). Supports ledger schema ≤ 1.5.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "math-tools",
+      "source": "./plugins/math-tools",
+      "description": "Thin math-only pack on top of the propositions core (sympy verification, theorem-boundary lenses; placeholder until math-only content lands).",
+      "version": "0.0.1"
     }
   ]
 }

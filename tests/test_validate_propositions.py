@@ -11,7 +11,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-SCRIPT = REPO_ROOT / "scripts" / "validate-propositions.py"
+SCRIPT = REPO_ROOT / "scripts" / "validate-propositions.py"  # root shim (pinned contract)
+IMPL = REPO_ROOT / "plugins" / "propositions" / "scripts" / "validate-propositions.py"
 
 # Canonical UUID v7 sample used in v1.2 tests
 SAMPLE_UUID_V7 = "01910b9c-d4f0-7000-8000-0123456789ab"
@@ -759,7 +760,7 @@ def test_restatement_claim_type_is_structural_leaf_no_r3_orphan(tmp_path):
 # ---------- #103 R4 PATTERN-A framework-aware boundary-axiom detection ----------
 
 
-SMOKE_TESTS_DIR = REPO_ROOT / "manuscript" / "propositions" / "_smoke_tests"
+SMOKE_TESTS_DIR = REPO_ROOT / "tests" / "fixtures" / "_smoke_tests"
 
 
 def _run_validator_on_smoke_fixture(fixture_stem):
@@ -1703,7 +1704,7 @@ def test_validator_uses_shared_lib():
     _R9_BEGIN_RE / _R9_PROOF_TARGET_RE constants directly in
     validate-propositions.py (as the pre-#115 inline copy had), this fires.
     """
-    source = SCRIPT.read_text(encoding="utf-8")
+    source = IMPL.read_text(encoding="utf-8")
     assert "from _lib.latex_env_parser import" in source, (
         "validate-propositions.py must import shared parser from _lib; "
         "got source without expected import line"
@@ -2068,7 +2069,7 @@ def test_normalize_preserves_case_labels(tmp_path):
     # repo with `pytest propositions-plugin/tests/`, CWD is the consumer's
     # repo root, not the plugin's).
     import importlib.util
-    spec = importlib.util.spec_from_file_location("v", SCRIPT)
+    spec = importlib.util.spec_from_file_location("v", IMPL)
     v = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(v)
 

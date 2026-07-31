@@ -11,7 +11,8 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-SCRIPT = REPO_ROOT / "scripts" / "audit-theorem-boundaries.py"
+SCRIPT = REPO_ROOT / "scripts" / "audit-theorem-boundaries.py"  # root shim (pinned contract)
+IMPL = REPO_ROOT / "plugins" / "propositions" / "scripts" / "audit-theorem-boundaries.py"
 MAIN_TEX = REPO_ROOT / "manuscript" / "main.tex"
 STAGE2_THM1 = REPO_ROOT / "manuscript" / "propositions" / "_stage2" / "theorem1.jsonl"
 MAIN_JSONL = REPO_ROOT / "manuscript" / "propositions" / "main.jsonl"
@@ -181,7 +182,7 @@ def _load_audit_module():
     """Import audit-theorem-boundaries.py despite hyphenated filename."""
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("audit_theorem_boundaries", SCRIPT)
+    spec = importlib.util.spec_from_file_location("audit_theorem_boundaries", IMPL)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -190,7 +191,7 @@ def _load_audit_module():
 def _load_lib_parser():
     """Import scripts/_lib/latex_env_parser.py (shared module per #115 M-5)."""
     import sys
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    sys.path.insert(0, str(REPO_ROOT / "plugins" / "propositions" / "scripts"))
     from _lib import latex_env_parser
 
     return latex_env_parser
@@ -277,7 +278,7 @@ def test_audit_script_uses_shared_lib():
     constants directly in audit-theorem-boundaries.py (instead of importing
     them), this assertion fires.
     """
-    source = SCRIPT.read_text(encoding="utf-8")
+    source = IMPL.read_text(encoding="utf-8")
     # Must import from _lib
     assert "from _lib.latex_env_parser import" in source, (
         "audit script must import shared parser from _lib; got source without "

@@ -1,6 +1,6 @@
-# propositions
+# propositions-projects
 
-**Author-claim infrastructure for academic LaTeX manuscripts.**
+**Umbrella marketplace for the propositions ecosystem — author-claim infrastructure for academic LaTeX manuscripts.**
 
 Line-addressable propositions (JSONL) extracted from `main.tex` + R1-R13 mechanical validator + audit tooling + extraction discipline. Originally developed as the "Locke project" for `PsychQuantHsu/psychophysical_representations` and packaged as a reusable Claude Code plugin.
 
@@ -14,15 +14,41 @@ Solves three problems that LaTeX-heavy academic manuscripts run into:
 
 ## Install
 
-This repo is a **self-hosted single-plugin marketplace** — one `claude plugin marketplace add` adds both the marketplace and exposes the plugin for install.
+This repo is a **self-hosted marketplace** (`propositions-projects`) with a `plugins/` monorepo layout — the core `propositions` plugin (validator + audit chain + manuscript-QA skills) and the thin `math-tools` pack.
 
 ```bash
 # Add the marketplace from GitHub
-claude plugin marketplace add <owner>/propositions
+claude plugin marketplace add PsychQuantHsu/propositions-projects
 
-# Install the plugin
-claude plugin install propositions@propositions
+# Install the core plugin
+claude plugin install propositions@propositions-projects
 ```
+
+## Migration notes (2026-08 rename: propositions → propositions-projects)
+
+The repository and marketplace were renamed from `propositions` to `propositions-projects` when the umbrella layout landed. Verified behavior (probed 2026-08-01):
+
+- **Already registered under the old name?** No action strictly required — GitHub redirects the old repo slug, and `claude plugin marketplace update` follows it (name shown updates from the manifest). Your registration's recorded Source keeps the old slug until you re-add.
+- **Recommended one-time cleanup** (drops the redirect dependency):
+
+  ```bash
+  claude plugin marketplace remove propositions-projects
+  claude plugin marketplace add PsychQuantHsu/propositions-projects
+  ```
+
+- **Coming from the deprecated psychquant-claude-plugins `math-tools` plugin?** The four manuscript-QA skills (clarity-audit / proofread / manuscript-audit / propositions) now live in the core `propositions` plugin here. **Remove the old plugin before or right after installing the core plugin** — running both leaves two copies of the same-named skills installed:
+
+  ```bash
+  claude plugin uninstall math-tools@psychquant-claude-plugins
+  claude plugin install propositions@propositions-projects
+  ```
+
+### Coordinated changes tracked elsewhere (#2)
+
+| Where | What | When |
+|---|---|---|
+| psychquant-claude-plugins | math-tools entry → deprecation pointer to this marketplace | after core-plugin parity is announced (it is, as of this rename) |
+| downstream manuscript-repo CI | workflow `repository:` ref → `PsychQuantHsu/propositions-projects` + tag pin bump | after the vNext tag that includes retired-field support (#1) |
 
 ## Quick start
 
@@ -39,7 +65,7 @@ claude plugin install propositions@propositions
 | Layer | Lives where | Purpose |
 |-------|-------------|---------|
 | **Discipline** | `rules/` (this plugin) | per-commit sync + audit-time SOP |
-| **Tooling** | `scripts/` (this plugin) | validator + locator + audit suite |
+| **Tooling** | `plugins/propositions/scripts/` (root `scripts/` = forwarding shims for the pinned CI contract) | validator + locator + audit suite |
 | **Data** | `manuscript/propositions/main.jsonl` (your repo) | the actual propositions |
 
 ## Validator rules (R1-R13)

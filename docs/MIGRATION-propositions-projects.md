@@ -26,3 +26,16 @@ scripts/ + tests/                    # stay at root for the CI-pinned audit-chai
 
 - Per-domain plugins for prose/psych variants — those are core profiles/config.
 - Moving manuscript-side SCHEMA.md here — the spec travels with each ledger; plugins declare a supported schema range.
+
+
+## Status (2026-08-01) — steps 2–4 landed
+
+- Step 2 (layout move): done — single implementation under plugins/propositions/, root scripts/ are forwarding shims, suite 143 passed + shim smoke tests
+- Step 3 (marketplace update): done — name `propositions-projects`, two ./plugins/* entries; root plugin.json removed
+- Step 4 (repo rename): done — `gh repo rename` 2026-08-01; local remotes + docs updated
+- **D2 probe result (rename semantics, probed 2026-08-01)**: old-slug `marketplace add` works via GitHub redirect; `claude plugin marketplace update` follows the rename (name refreshes from the manifest); registered Source keeps the old slug until a one-time remove + re-add (recommended, documented in README Migration notes)
+- Step 5 (cross-repo: psychquant-claude-plugins deprecation, downstream pin bump): NOT here — coordinated via PsychQuantHsu/propositions-projects#2
+
+### vNext release-notes draft (per docs/RELEASE-FLOW.md step 5)
+
+> Pinned entry-point contract unchanged — root scripts/ paths, audit report format, and exit codes are identical for pinned consumers (root entries are byte-transparent forwarding shims into plugins/propositions/scripts/, guarded by tests/test_root_shims.py).

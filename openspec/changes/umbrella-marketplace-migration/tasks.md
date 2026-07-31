@@ -13,11 +13,11 @@
 
 ## 3. Rename 語意 probe 與遷移文件
 
-- [ ] 3.1 D2 probe：以本機對 marketplace 的既有註冊模擬「rename 後 claude plugin marketplace update 是否跟隨」（repo rename 前先以測試性 rename 或文件調研確認；不可行則於 4.1 rename 後立即實測並回填）。產出：probe 結果記入 docs/MIGRATION-propositions-projects.md 附註（跟隨 / 需 remove+re-add 二擇一）
-- [ ] 3.2 README.md 增「Migration notes」段：依 3.1 結果寫既註冊使用者的遷移指令；含 D3 撞名防護（安裝 core plugin 前先移除舊 math-tools plugin）與 coordinated-change 清單（psychquant-claude-plugins deprecation pointer、下游 pin bump 於 vNext tag 後執行——執行本身屬 #2 協調、不在本 change）。驗收：README 段落存在且與 design D2/D3 一致
+- [x] 3.1 D2 probe：以本機對 marketplace 的既有註冊模擬「rename 後 claude plugin marketplace update 是否跟隨」（repo rename 前先以測試性 rename 或文件調研確認；不可行則於 4.1 rename 後立即實測並回填）。產出：probe 結果記入 docs/MIGRATION-propositions-projects.md 附註（跟隨 / 需 remove+re-add 二擇一）
+- [x] 3.2 README.md 增「Migration notes」段：依 3.1 結果寫既註冊使用者的遷移指令；含 D3 撞名防護（安裝 core plugin 前先移除舊 math-tools plugin）與 coordinated-change 清單（psychquant-claude-plugins deprecation pointer、下游 pin bump 於 vNext tag 後執行——執行本身屬 #2 協調、不在本 change）。驗收：README 段落存在且與 design D2/D3 一致
 - [x] 3.3 [P] 建 docs/RELEASE-FLOW.md：version bump → marketplace.json 同步 → tag → push → marketplace update 驗證的有序 checklist；含「pinned entry-point contract 變更聲明」欄位（每次 release notes 必填）。驗收：文件涵蓋 plugin-release-flow spec 三條 Requirement
 
 ## 4. Repo rename 收尾與驗證
 
-- [ ] 4.1 以 gh 執行 repo rename（propositions → propositions-projects）；更新本地 remote URL、README 與 docs/MIGRATION-propositions-projects.md 內的 repo URL；3.1 若延至此步，於 rename 後立即完成 probe 並回填 3.1/3.2 的文案。驗收：git remote 指新 URL、grep 無殘留舊 URL（redirect 過渡的外部引用除外，列於 MIGRATION doc）
-- [ ] 4.2 收尾驗證：全套 pytest 綠（根層 + core 兩跑法）、spectra validate 通過、MIGRATION doc 標記步驟 2-4 完成、release notes 草稿載明「pinned entry-point contract unchanged（root shims 維持路徑契約）」。驗收：上述四項逐一確認
+- [x] 4.1 以 gh 執行 repo rename（propositions → propositions-projects）；更新本地 remote URL、README 與 docs/MIGRATION-propositions-projects.md 內的 repo URL；3.1 若延至此步，於 rename 後立即完成 probe 並回填 3.1/3.2 的文案。驗收：git remote 指新 URL、grep 無殘留舊 URL（redirect 過渡的外部引用除外，列於 MIGRATION doc）
+- [x] 4.2 收尾驗證：全套 pytest 綠（根層 + core 兩跑法）、spectra validate 通過、MIGRATION doc 標記步驟 2-4 完成、release notes 草稿載明「pinned entry-point contract unchanged（root shims 維持路徑契約）」。驗收：上述四項逐一確認

@@ -57,9 +57,13 @@ The repository and marketplace were renamed from `propositions` to `propositions
 ```bash
 # Inside your manuscript repo (with manuscript/main.tex + manuscript/propositions/main.jsonl)
 
-/propositions:validate              # R1-R13 mechanical gates
-/propositions:refresh-locations     # fix line drift after main.tex restructure
-/propositions:audit                 # full manuscript-consistency audit before submission
+/propositions:propositions       # the mechanical axis — three operations in one skill:
+                                 #   A validate      R1-R13 gates
+                                 #   B refresh       fix location drift (dry-run gated)
+                                 #   C extract       build a new / re-extracted JSONL
+/propositions:proofread          # per-prop L1-L5 semantic walk (is each claim true & faithful?)
+/propositions:manuscript-audit   # cross-artifact drift across tex / jsonl / code / bib
+/propositions:clarity-audit      # prose readability — can a human reader follow it?
 ```
 
 ## Architecture
@@ -98,29 +102,34 @@ See `docs/locke-project.md` in `PsychQuantHsu/psychophysical_representations` fo
 ## Layout
 
 ```
-propositions/
+propositions-projects/
 ├── .claude-plugin/
-│   ├── plugin.json          # Claude Code plugin manifest
-│   └── marketplace.json     # single-plugin marketplace catalog
-├── CLAUDE.md                # plugin-level instructions
+│   └── marketplace.json     # marketplace catalog (one entry: propositions)
+├── plugins/
+│   └── propositions/        # the published plugin — everything below ships to installers
+│       ├── .claude-plugin/plugin.json
+│       ├── README.md
+│       ├── skills/          # user-invocable slash commands
+│       │   ├── propositions/SKILL.md      # validate / refresh / extract
+│       │   ├── proofread/SKILL.md         # per-prop L1-L5 semantic walk
+│       │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
+│       │   └── clarity-audit/SKILL.md     # prose readability
+│       └── scripts/         # validator + audit tooling
+│           ├── validate-propositions.py
+│           ├── refresh-prop-locations.py
+│           ├── audit-theorem-boundaries.py
+│           ├── audit-{citations,symbols,code-manuscript}.py
+│           ├── run-audit.sh
+│           ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
+│           └── _lib/latex_env_parser.py
+├── CLAUDE.md                # repo-level instructions
 ├── README.md                # this file
-├── scripts/                 # validator + audit tooling
-│   ├── validate-propositions.py
-│   ├── refresh-prop-locations.py
-│   ├── audit-theorem-boundaries.py
-│   ├── audit-{citations,symbols,code-manuscript}.py
-│   ├── run-audit.sh
-│   ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
-│   └── _lib/latex_env_parser.py
+├── scripts/                 # forwarding shims into the plugin (pinned-CI entry points)
 ├── tests/                   # pytest test suite (142+ tests)
-├── skills/                  # user-invocable slash commands
-│   ├── validate/SKILL.md
-│   ├── refresh-locations/SKILL.md
-│   └── audit/SKILL.md
-├── rules/                   # discipline rules (ship with plugin)
+├── rules/                   # discipline rules
 │   ├── manuscript-jsonl-sync.md
 │   └── manuscript-consistency-audit.md
-└── docs/                    # contract docs (ship with plugin)
+└── docs/                    # contract docs
     ├── SCHEMA.md
     └── EXTRACTION-PROMPT.md
 ```

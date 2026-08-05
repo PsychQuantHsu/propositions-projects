@@ -21,3 +21,35 @@
 
 - [x] 4.1 以 gh 執行 repo rename（propositions → propositions-projects）；更新本地 remote URL、README 與 docs/MIGRATION-propositions-projects.md 內的 repo URL；3.1 若延至此步，於 rename 後立即完成 probe 並回填 3.1/3.2 的文案。驗收：git remote 指新 URL、grep 無殘留舊 URL（redirect 過渡的外部引用除外，列於 MIGRATION doc）
 - [x] 4.2 收尾驗證：全套 pytest 綠（根層 + core 兩跑法）、spectra validate 通過、MIGRATION doc 標記步驟 2-4 完成、release notes 草稿載明「pinned entry-point contract unchanged（root shims 維持路徑契約）」。驗收：上述四項逐一確認
+
+## 5. 收斂為單一 core plugin（D6；TDD：先寫 entry 實質性測試）
+
+- [ ] 5.1 新增 tests/test_marketplace_entries.py：讀 .claude-plugin/marketplace.json，對 `plugins` 陣列每個 entry 解析其 `source` 相對路徑，斷言 (a) 目錄存在、(b) 目錄下至少存在一個 `skills/*/SKILL.md` 或一個 `scripts/` 內檔案（即具備可安裝內容）、(c) 無任何 entry 的 source 為 legacy `"./"`。此時測試 RED（plugins/math-tools 為零 skill 零 script 空殼）。驗收：pytest tests/test_marketplace_entries.py 失敗且失敗訊息指名 math-tools entry
+- [ ] 5.2 移除 plugins/math-tools/ 整個目錄（manifest + README），並從 .claude-plugin/marketplace.json 的 `plugins` 陣列移除該 entry；本任務落實 spec Requirement「Umbrella marketplace manifest」與「Plugins monorepo layout with a single tool implementation」的空殼禁止條文。驗收：5.1 測試轉 GREEN；`jq '.plugins | length'` 回傳 1 且 `jq -r '.plugins[0].source'` 為 `./plugins/propositions`；根層 `pytest tests/` 全綠（既有 143 passed 不回歸）
+- [ ] 5.3 [P] 更新 README.md「Migration notes」段與 docs/MIGRATION-propositions-projects.md：把「兩個 plugin entries」敘述改為單一 core entry，並加入「`math-tools` 名稱保留給未來 sympy / Lean 內容、本 marketplace 目前不發佈該 plugin」的說明；遷移指令改為安裝後以 `propositions:<skill>` 呼叫；本任務更新 spec Requirement「Migration notes for installed users」所要求的 README 段落。驗收：`grep -n 'math-tools' README.md docs/MIGRATION-propositions-projects.md` 的每一處命中都位於 psychquant-claude-plugins deprecation 脈絡或上述保留說明，無任何一處仍描述本 repo 發佈 math-tools plugin
+- [ ] 5.4 安裝端切換驗證（R5）：以 `claude plugin marketplace add PsychQuantHsu/propositions-projects` 註冊、安裝 `propositions@propositions-projects`，並移除 psychquant-claude-plugins 的舊 math-tools plugin。驗收：`~/.claude/plugins/cache/propositions-projects/propositions/` 下存在版本目錄；該目錄內 `rules/manuscript-consistency-audit.md` 以 grep 確認含 `#103` framework-aware boundary detection 段落（證明安裝端不再是落後版）；`~/.claude/plugins/cache/psychquant-claude-plugins/math-tools/` 已不被任何已安裝 plugin 引用
+- [ ] 5.5 收尾：`spectra validate umbrella-marketplace-migration` 通過；根層 `pytest tests/` 全綠（含 5.1 新測試）；design D6 與 spec `umbrella-marketplace-layout` 的 entry 實質性條文與實際 marketplace.json 一致。驗收：三項逐一確認並記錄 pytest 通過數
+
+## Traceability（spec Requirement / design decision → 任務）
+
+Spec 依 Spectra 規範寫英文、任務依 `locale: tw` 寫中文，兩者無字面重疊，故在此顯式對應。
+
+| Spec Requirement（verbatim title） | 任務 |
+|---|---|
+| Plugins monorepo layout with a single tool implementation | 1.2、1.3、1.4、5.1、5.2 |
+| Root-level CI entry shims preserve the pinned path contract | 1.1、1.2、1.5 |
+| Umbrella marketplace manifest | 2.1、5.1、5.2 |
+| Supported ledger schema range is declared, not vendored | 2.2 |
+| Migration notes for installed users | 3.1、3.2、5.3 |
+| Versioned release with manifest synchronization | 3.3、4.2 |
+| Documented release procedure | 3.3 |
+| Downstream pin bumps are deliberate and documented | 3.2、4.2 |
+
+| Design decision | 任務 |
+|---|---|
+| D1 — 根層 CI 入口用「轉呼叫 shim」而非 symlink 或雙實體 | 1.1、1.2、1.5 |
+| D2 — marketplace rename 的既註冊使用者語意：實測後定 README 遷移文案 | 3.1、3.2、4.1 |
+| D3 — 撞名時序：先 parity、後 deprecation、most-late GA | 3.2、5.3 |
+| D4 — 改名時點：本 change 末端、單一 commit 窗口 | 4.1、4.2 |
+| D5 — schema-range 宣告位置 | 2.2 |
+| D6 — 核心 plugin 定名 `propositions`，marketplace 收斂為單一 entry | 5.1、5.2、5.3、5.5 |

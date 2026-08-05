@@ -1,9 +1,0 @@
-{
-  "name": "math-tools",
-  "version": "0.0.1",
-  "description": "Thin mathematics-only pack on top of the propositions core plugin: sympy substitution verification, theorem-boundary lenses, future Lean bridging. Placeholder manifest — math-only content arrives in a follow-up change; domain-general manuscript-QA lives in the sibling propositions plugin.",
-  "author": {
-    "name": "Che Cheng"
-  },
-  "license": "MIT"
-}

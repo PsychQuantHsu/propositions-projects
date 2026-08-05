@@ -14,7 +14,7 @@ Solves three problems that LaTeX-heavy academic manuscripts run into:
 
 ## Install
 
-This repo is a **self-hosted marketplace** (`propositions-projects`) with a `plugins/` monorepo layout — the core `propositions` plugin (validator + audit chain + manuscript-QA skills) and the thin `math-tools` pack.
+This repo is a **self-hosted marketplace** (`propositions-projects`) with a `plugins/` monorepo layout. It currently publishes exactly one plugin: the core `propositions` plugin (validator + audit chain + manuscript-QA skills). Domain packs get their own `plugins/<domain>/` directory only when domain-specific content actually lands — never as an empty placeholder.
 
 ```bash
 # Add the marketplace from GitHub
@@ -42,6 +42,8 @@ The repository and marketplace were renamed from `propositions` to `propositions
   claude plugin uninstall math-tools@psychquant-claude-plugins
   claude plugin install propositions@propositions-projects
   ```
+
+  After migrating, invoke the skills as `propositions:<skill>` — e.g. `/propositions:proofread`, `/propositions:manuscript-audit`. **This marketplace does not publish a `math-tools` plugin**; the name is reserved for genuinely math-only content (sympy substitution verification, Lean bridging) and will only appear here once such content exists.
 
 ### Coordinated changes tracked elsewhere (#2)
 

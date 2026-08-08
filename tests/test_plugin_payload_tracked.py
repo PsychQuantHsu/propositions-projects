@@ -14,6 +14,7 @@ actually contain — by judging the git index rather than the filesystem
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -174,6 +175,54 @@ def test_no_duplicate_skill_names():
         + "\n".join(
             f"  {name}: {', '.join(paths)}" for name, paths in sorted(duplicates.items())
         )
+    )
+
+
+MD_LINK = re.compile(r"\]\(([^)]+)\)")
+
+
+def _relative_link_targets(skill_md: Path) -> list[str]:
+    """Link targets that claim to be files shipped alongside this skill.
+
+    External URLs and pure anchors address nothing in the payload, so they are
+    not this test's business.
+    """
+    targets = []
+    for raw in MD_LINK.findall(skill_md.read_text(encoding="utf-8")):
+        target = raw.split()[0].strip().split("#")[0]
+        if not target or target.startswith(("http://", "https://", "mailto:")):
+            continue
+        targets.append(target)
+    return targets
+
+
+def test_shipped_skill_links_resolve_inside_the_payload():
+    """A relative link in a shipped skill must land on a file consumers get.
+
+    Skills were authored expecting `rules/` and `docs/` to sit inside the
+    plugin; the port left them at the repository root, so every `../../rules/…`
+    href in the published copy pointed at nothing. Nothing on the author's disk
+    reveals this — the files exist there, one directory up from where the
+    installed layout puts them.
+    """
+    _require_git_work_tree()
+    tracked = _tracked_paths()
+    broken: list[str] = []
+    for entry in _entries():
+        entry_dir = (REPO_ROOT / _source_rel(entry)).resolve()
+        for skill_md in sorted(entry_dir.glob("skills/*/SKILL.md")):
+            for target in _relative_link_targets(skill_md):
+                resolved = (skill_md.parent / target).resolve()
+                if not resolved.is_relative_to(entry_dir):
+                    broken.append(
+                        f"  {_rel(skill_md)} → {target} (escapes {_source_rel(entry)}/)"
+                    )
+                elif _rel(resolved) not in tracked:
+                    broken.append(f"  {_rel(skill_md)} → {target} (not in the index)")
+    assert not broken, (
+        "relative links in published skills that a consumer cannot follow — "
+        "either they point outside the installed plugin, or the target is not "
+        "tracked and so never reaches a clone:\n" + "\n".join(broken)
     )
 
 

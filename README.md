@@ -70,7 +70,7 @@ The repository and marketplace were renamed from `propositions` to `propositions
 
 | Layer | Lives where | Purpose |
 |-------|-------------|---------|
-| **Discipline** | `rules/` (this plugin) | per-commit sync + audit-time SOP |
+| **Discipline** | `plugins/propositions/rules/` (ships with the plugin) | per-commit sync + audit-time SOP |
 | **Tooling** | `plugins/propositions/scripts/` (root `scripts/` = forwarding shims for the pinned CI contract) | validator + locator + audit suite |
 | **Data** | `manuscript/propositions/main.jsonl` (your repo) | the actual propositions |
 
@@ -114,25 +114,33 @@ propositions-projects/
 │       │   ├── proofread/SKILL.md         # per-prop L1-L5 semantic walk
 │       │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
 │       │   └── clarity-audit/SKILL.md     # prose readability
-│       └── scripts/         # validator + audit tooling
-│           ├── validate-propositions.py
-│           ├── refresh-prop-locations.py
-│           ├── audit-theorem-boundaries.py
-│           ├── audit-{citations,symbols,code-manuscript}.py
-│           ├── run-audit.sh
-│           ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
-│           └── _lib/latex_env_parser.py
+│       ├── scripts/         # validator + audit tooling
+│       │   ├── validate-propositions.py
+│       │   ├── refresh-prop-locations.py
+│       │   ├── audit-theorem-boundaries.py
+│       │   ├── audit-{citations,symbols,code-manuscript}.py
+│       │   ├── run-audit.sh
+│       │   ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
+│       │   └── _lib/latex_env_parser.py
+│       ├── rules/           # discipline rules (the skills link to these)
+│       │   ├── manuscript-jsonl-sync.md
+│       │   ├── manuscript-consistency-audit.md
+│       │   └── code-and-manuscript-sync.md
+│       └── docs/
+│           └── EXTRACTION-PROMPT.md
 ├── CLAUDE.md                # repo-level instructions
 ├── README.md                # this file
 ├── scripts/                 # forwarding shims into the plugin (pinned-CI entry points)
-├── tests/                   # pytest test suite (142+ tests)
-├── rules/                   # discipline rules
-│   ├── manuscript-jsonl-sync.md
-│   └── manuscript-consistency-audit.md
-└── docs/                    # contract docs
-    ├── SCHEMA.md
-    └── EXTRACTION-PROMPT.md
+├── tests/                   # pytest test suite (150+ tests)
+└── docs/                    # repo-level docs, NOT plugin payload
+    ├── SCHEMA.md            # canonical schema; each ledger carries its own copy
+    ├── MIGRATION-propositions-projects.md
+    └── RELEASE-FLOW.md
 ```
+
+Anything a shipped skill links to has to live **inside** `plugins/propositions/` — that is
+what an installer receives. `docs/SCHEMA.md` stays at the repository root deliberately: the
+schema contract travels with each manuscript's ledger, so the plugin vendors no copy.
 
 ## Compatibility
 

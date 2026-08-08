@@ -42,13 +42,17 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 | Rule (shipped) | When applies |
 |----------------|--------------|
-| `rules/manuscript-jsonl-sync.md` | PR-time prevention: 改一邊 main.tex 該同步 jsonl |
-| `rules/manuscript-consistency-audit.md` | Audit-time detection SOP + 觸發時機 |
+| `plugins/propositions/rules/manuscript-jsonl-sync.md` | PR-time prevention: 改一邊 main.tex 該同步 jsonl |
+| `plugins/propositions/rules/manuscript-consistency-audit.md` | Audit-time detection SOP + 觸發時機 |
+| `plugins/propositions/rules/code-and-manuscript-sync.md` | Per-PR hook/CI discipline，manuscript-audit 的姊妹規則 |
 
 | Doc (shipped) | What |
 |---------------|------|
-| `docs/SCHEMA.md` | Canonical schema contract for propositions JSONL |
-| `docs/EXTRACTION-PROMPT.md` | LLM extraction discipline (餵給 Claude / GPT 抽 prop 用) |
+| `plugins/propositions/docs/EXTRACTION-PROMPT.md` | LLM extraction discipline (餵給 Claude / GPT 抽 prop 用) |
+
+`docs/SCHEMA.md`(repo 根層)是 canonical schema contract,但**刻意不 vendor 進 plugin**——
+每個 manuscript 的 ledger 自帶一份釘住自己 schema 版本的副本,spec 跟著資料走。plugin 內
+任何檔案都不應該宣稱有 vendored SCHEMA.md。
 
 ## Architecture (three layers)
 
@@ -56,6 +60,8 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 ┌─ Layer 3: Discipline ─────────────────────────────────────┐
 │  rules/manuscript-jsonl-sync.md       (per-commit)        │
 │  rules/manuscript-consistency-audit.md (audit-time SOP)   │
+│  rules/code-and-manuscript-sync.md    (per-PR hook/CI)    │
+│  (all three under plugins/propositions/ — they ship)      │
 └───────────────────────────────────────────────────────────┘
                       ↑ enforces
 ┌─ Layer 2: Validator + Tooling ────────────────────────────┐

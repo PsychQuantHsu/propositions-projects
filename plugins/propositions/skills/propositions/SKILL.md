@@ -18,7 +18,8 @@ dependency DAG), `asserts` (atomic claims), `claim_type`, and `evidence_class`. 
 owns the three **mechanical** operations on that file. The semantic question "does each cited
 prop actually imply this one" is the sister skill `/propositions:proofread`.
 
-Full schema contract: [`../../docs/SCHEMA.md`](../../docs/SCHEMA.md).
+Full schema contract: your ledger's own `SCHEMA.md` — the spec travels with the data, so
+each manuscript carries the copy pinned to its ledger version. This plugin vendors none.
 
 ## Resolve the bundled scripts
 
@@ -128,7 +129,7 @@ silent mis-write. Residual un-anchorable props need to be split, or to use a ran
 When there is no JSONL yet, or a section was rewritten enough that re-extraction beats
 patching. This is an LLM task, not a script: follow the extraction prompt at
 [`../../docs/EXTRACTION-PROMPT.md`](../../docs/EXTRACTION-PROMPT.md) against the target
-`.tex` (or a single section of it), emit the JSONL per `SCHEMA.md`, then immediately run
+`.tex` (or a single section of it), emit the JSONL per the ledger's `SCHEMA.md`, then run
 Operation A to gate the result. Extraction that has not passed the validator is not done.
 
 ## Exit codes (all scripts)
@@ -142,4 +143,4 @@ Operation A to gate the result. Extraction that has not passed the validator is 
 - `/propositions:proofread` — the L4 semantic walk (does each cited prop *imply* this one)
 - `/propositions:manuscript-audit` — cross-artifact drift (R1-R4) across tex / jsonl / code / bib
 - Rule [`../../rules/manuscript-jsonl-sync.md`](../../rules/manuscript-jsonl-sync.md) — per-commit sync discipline that prevents most R1/R13 drift
-- Schema [`../../docs/SCHEMA.md`](../../docs/SCHEMA.md) · extraction [`../../docs/EXTRACTION-PROMPT.md`](../../docs/EXTRACTION-PROMPT.md)
+- Extraction discipline [`../../docs/EXTRACTION-PROMPT.md`](../../docs/EXTRACTION-PROMPT.md) · schema contract = the ledger's own `SCHEMA.md`

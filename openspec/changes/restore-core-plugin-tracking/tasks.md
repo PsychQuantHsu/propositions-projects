@@ -18,6 +18,16 @@
 
 - [x] 4.1 收尾：根層 pytest tests/ 全綠且既有測試數不回歸（含 1.1 新測試）；spectra validate restore-core-plugin-tracking 通過；git ls-files plugins/propositions 的輸出與 design「行為」段所列的 payload 清單逐項比對一致。驗收：三項逐一確認並記錄 pytest 通過數
 
+## 5. 安裝端實測揭露的 payload 缺口（2026-08-08 追加）
+
+實際跑 `claude plugin install propositions@propositions-projects` 後檢查 cache 才發現：四個 shipped skill 內共 8 條相對連結指向 `../../rules/` 與 `../../docs/`，解析後落在 `plugins/propositions/rules|docs/`，而兩個目錄都不存在（rules/docs 留在 repo 根層，port 時沒跟著搬）。與 1.1 的 payload 測試同一缺陷類別：文件宣稱 ship、實際沒 ship，且作者磁碟上看不出來（檔案確實存在，只是位置比安裝後的 layout 高一層）。
+
+- [x] 5.1 把三個 discipline rule 與 `docs/EXTRACTION-PROMPT.md` 由 repo 根層搬進 `plugins/propositions/`（`git mv`，單一實體不留副本）。`docs/SCHEMA.md` 刻意不搬——plugin README 明載 schema 契約跟著各 manuscript 的 ledger 走、plugin 不 vendor 副本；改寫 `propositions` skill 內三處宣稱有 vendored SCHEMA.md 的措辭。驗收：`plugins/propositions/{rules,docs}/` 存在且被 git 追蹤；shipped skill 內無任何字串宣稱 plugin 帶有 SCHEMA.md 副本
+
+- [x] 5.2 新增 `test_shipped_skill_links_resolve_inside_the_payload`：對每個 marketplace entry 的 `skills/*/SKILL.md` 抽出所有相對 markdown 連結，斷言目標既落在 entry source 目錄內、又存在於 git index（外部 URL 與純 anchor 不在範圍）。驗收：測試對「連結目標未被追蹤」與「連結逃出 plugin 目錄」兩種失敗各自 FAIL 並逐條指名 skill 與連結；修正後全綠
+
+- [x] 5.3 同步 `README.md` 的 Layout／Architecture 與 `CLAUDE.md` 的 rules／docs 對照表至新位置，並寫明「shipped skill 連結的目標必須在 `plugins/propositions/` 內」這條約束與 SCHEMA.md 的例外理由。驗收：repo 內除 `openspec/`（含 archive 與 @trace provenance）外，無指向舊 `rules/` 位置的活路徑
+
 ## Traceability（spec Requirement / design decision → 任務）
 
 Spec 依 Spectra 規範寫英文、任務依 locale 設定寫中文，兩者無字面重疊，故在此顯式對應。
@@ -26,7 +36,7 @@ Spec 依 Spectra 規範寫英文、任務依 locale 設定寫中文，兩者無�
 |---|---|
 | Published plugin payload is version-controlled | 1.1、2.1、2.2、4.1 |
 | Ignore patterns for repository-root scaffolding are anchored | 1.1、2.1 |
-| Published plugin ships every documented skill | 2.2、2.3、3.2 |
+| Published plugin ships every documented skill | 2.2、2.3、3.2、5.1、5.2 |
 | A skill name has exactly one definition | 1.1、2.4 |
 
 | Design decision | 任務 |

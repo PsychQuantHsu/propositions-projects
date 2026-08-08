@@ -28,6 +28,8 @@
 
 - [x] 5.3 同步 `README.md` 的 Layout／Architecture 與 `CLAUDE.md` 的 rules／docs 對照表至新位置，並寫明「shipped skill 連結的目標必須在 `plugins/propositions/` 內」這條約束與 SCHEMA.md 的例外理由。驗收：repo 內除 `openspec/`（含 archive 與 @trace provenance）外，無指向舊 `rules/` 位置的活路徑
 
+- [x] 5.4 Bump plugin 版號 0.2.0 → 0.2.1（`plugin.json` 與 `marketplace.json` 同步），否則 `claude plugin update` 只比版號不比內容，已安裝的消費端會停在缺 rules 的舊 payload 並回報「已是最新」。新增 `test_entry_version_matches_plugin_manifest` 擋住兩份版號分岔。驗收：重跑安裝端 update 後，cache 版本目錄為 0.2.1 且內含 `rules/`
+
 ## Traceability（spec Requirement / design decision → 任務）
 
 Spec 依 Spectra 規範寫英文、任務依 locale 設定寫中文，兩者無字面重疊，故在此顯式對應。

@@ -17,10 +17,16 @@ htmlcov/
 
 # Symlink shim auto-created by tests/conftest.py to expose smoke_tests
 # fixtures at the legacy manuscript-style path; not part of source tree.
-manuscript/
+#
+# The leading slash is REQUIRED, not a style preference: a pattern without one
+# matches a directory of that name at ANY depth. The un-anchored form of the
+# rule below once swallowed the whole of plugins/propositions/ — manifest,
+# README and every skill — and `git add` skips ignored paths silently, so the
+# payload was missing from every clone with no error anywhere.
+/manuscript/
 
-
-# Defensive: prevent committing orphan symlinks/dirs auto-created by old conftest versions
-propositions/
+# Defensive: prevent committing orphan symlinks/dirs auto-created by old
+# conftest versions. Anchored for the reason spelled out above.
+/propositions/
 .spectra/
 openspec/.vector-search.db*

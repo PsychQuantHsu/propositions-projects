@@ -11,7 +11,7 @@
 **Goals**
 
 - 工具鏈單一源頭：scripts/skills 唯一實體住 `plugins/propositions/`，根層以 shim 維持 CI 入口契約
-- marketplace 升級為 umbrella（`propositions-projects`、兩個 plugin entries）
+- marketplace 升級為 umbrella 結構（`propositions-projects`、`plugins/<name>` entries），目前收斂為單一 core entry `propositions`（見 D6）
 - repo 改名 `propositions-projects`，與 marketplace / 本地目錄名對齊
 - 給跨 repo 協調動作（deprecation、pin bump）產出明確清單與時序
 
@@ -44,17 +44,35 @@
 
 `plugins/propositions/.claude-plugin/plugin.json` 的 description 內載明 supported ledger schema（≤ 1.5），並於 core plugin README 設「Schema compatibility」小節（表格：schema 版本 × validator 行為，含 v1.2+ / v1.4+ 條件規則）。不建 machine-readable 欄位（Claude plugin manifest 無此 schema 擴充點；README 表格是人讀的正確層）。
 
+### D6 — 核心 plugin 定名 `propositions`，marketplace 收斂為單一 entry
+
+scaffold 階段建了 `plugins/math-tools/`（v0.0.1、僅 manifest + README、零 skill 零 script），意圖是「日後放 math-only 內容」。實作完成後回頭檢驗：**它通過刪除測試**——刪掉不會有任何功能消失，而留著會讓遷移過來的使用者裝到一個空 plugin 並合理地判定「這東西壞了」。決定移除該目錄，marketplace 只保留 `propositions` 一個 entry。
+
+連帶確認核心 plugin 定名 `propositions`（而非沿用來源端的 `math-tools`），理由由強到弱：
+
+1. **名實相符**：移植的四個 skills（clarity-audit / proofread / manuscript-audit / propositions）皆為 domain-general manuscript-QA、無一 math-specific（本文件 Context 段已載明）。核心資產是 proposition ledger 與 `main.tex` 之間的 falsifiable 雙向對應，與數學無關。
+2. **命名即收錄邊界**：`propositions` 提供可判定的準則——不涉及 proposition ledger 的內容不進 core；`math-tools` 對任何沾邊的東西都說得通，會讓 core 逐步稀釋成雜物袋。這是本決策的主要理由，不是美學偏好。
+3. **三層座標對齊**：repo `propositions-projects` / marketplace `propositions-projects` / core plugin `propositions`。若 core 命名 `math-tools`，會產生 `propositions-projects/math-tools` 的內部矛盾。
+4. **保留名稱給真正需要的內容**：未來 sympy substitution 驗證、Lean bridging 落地時再建 `plugins/math-tools/`，屆時名稱名實相符。
+
+**接受的代價**：`propositions:proofread` 的讀感略遜於 `math-tools:proofread`（前者是資料名 + 動作名的組合）。判定為可接受——plugin 名不必與每個 skill 的動詞搭配。
+
+**否決的替代**：(a) 留空殼但標記 experimental——空 plugin 對安裝端沒有「實驗」可言，只有壞掉；(b) 把 math-tools 當 core 命名——違反上述 1、2；(c) 現在就把 sympy/Lean 內容補進去湊實——超出本 change 範圍，且該內容尚未設計。
+
 ## Risks / Trade-offs
 
 - **R1 marketplace rename 語意未實測**（D2 處置：probe 先行、雙預案文案）
 - **R2 shim 的 argv/exit-code 透明性**：shim 必須逐位元轉遞 stdout/exit code（CI gate 解析 report 依賴）；tasks 內以既有 pytest suite + 一個 shim 煙霧測試把關
 - **R3 pin 凍結窗口**：v0.1.1（舊佈局）與未來 vNext（新佈局）之間不得插入「根層 scripts 缺席」的 tag——D1 的 shim 讓根層路徑永久有效，結構上消除此風險
 - **R4 redirect 依賴**：改名後外部 pin `repository: PsychQuantHsu/propositions` 靠 redirect 存活；#2 task list 已含顯式更新，redirect 僅為過渡保險
+- **R5 安裝端 skew（實測已發生）**：maintainer 本機 `~/.claude/plugins/cache/` 內存有 psychquant-claude-plugins 的 math-tools 0.2.0–0.5.0，`propositions-projects` marketplace 未註冊，且已安裝的 `rules/manuscript-consistency-audit.md` 缺 #103 framework-aware boundary detection 段——亦即 repo 端佈局已完成，安裝端仍在跑落後版 rules。這與 proposal `Why` 所述的 CI pin skew 是同一失敗模式的另一面（CI 端 vs 安裝端）。處置：本 change 收尾加入安裝端切換驗證（tasks 5.4），把「repo 完成」與「實際可用」分開驗收
+
+
 
 ## Migration Plan
 
 1. 佈局搬移（D1）＋ pytest 全綠（根層與 core 兩跑法）
-2. manifest 升級（marketplace name + 兩 entries）＋ D5 schema-range 宣告
+2. manifest 升級（marketplace name + 單一 core entry `./plugins/propositions`；空殼 pack 依 D6 移除）＋ D5 schema-range 宣告
 3. D2 probe ＋ README Migration notes / coordinated-change 清單（含 D3 時序）
 4. D4 repo rename ＋ URL 收尾 ＋ release-flow 文件
 5. 跨 repo 執行（psychquant-claude-plugins deprecation、下游 pin bump）＝ #2 協調、不在本 change

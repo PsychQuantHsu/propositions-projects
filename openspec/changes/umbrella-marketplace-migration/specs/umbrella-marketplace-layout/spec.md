@@ -2,7 +2,7 @@
 
 ### Requirement: Plugins monorepo layout with a single tool implementation
 
-The repository SHALL host all plugin content under `plugins/<name>/` directories, with `plugins/propositions/` as the core plugin (validator scripts, audit chain, and the domain-general manuscript-QA skills) and `plugins/math-tools/` as a thin math-only pack. Each tool script SHALL have exactly one implementation, located under `plugins/propositions/scripts/`.
+The repository SHALL host all plugin content under `plugins/<name>/` directories, with `plugins/propositions/` as the core plugin (validator scripts, audit chain, and the domain-general manuscript-QA skills). Each tool script SHALL have exactly one implementation, located under `plugins/propositions/scripts/`. The repository SHALL NOT ship a plugin directory that contains no skills and no scripts.
 
 #### Scenario: Core plugin owns the toolchain
 
@@ -10,11 +10,11 @@ The repository SHALL host all plugin content under `plugins/<name>/` directories
 - **THEN** the edit occurs in exactly one file under `plugins/propositions/scripts/`
 - **AND** no second copy of that script exists elsewhere in the repository except root-level shims
 
-#### Scenario: Math pack contains only math-specific material
+#### Scenario: Domain-general content stays in the core plugin
 
-- **WHEN** a skill or script is added to `plugins/math-tools/`
-- **THEN** it is genuinely mathematics-specific (e.g. sympy verification, theorem-boundary lenses)
-- **AND** domain-general manuscript-QA content is rejected into `plugins/propositions/` instead
+- **WHEN** a new skill, rule, or script is proposed for this repository
+- **THEN** it is placed in `plugins/propositions/` unless it depends on a domain-specific toolchain (e.g. sympy substitution checking, Lean bridging)
+- **AND** a separate `plugins/<domain>/` directory is created only at the moment such domain-specific content actually lands, never as an empty placeholder
 
 ### Requirement: Root-level CI entry shims preserve the pinned path contract
 
@@ -33,12 +33,13 @@ The repository SHALL keep root-level `scripts/` entries (at minimum `run-audit.s
 
 ### Requirement: Umbrella marketplace manifest
 
-The `.claude-plugin/marketplace.json` SHALL declare the marketplace name `propositions-projects` and SHALL list one entry per plugin with `source` values pointing at `./plugins/<name>` directories. The manifest SHALL NOT retain the legacy single `"./"` entry.
+The `.claude-plugin/marketplace.json` SHALL declare the marketplace name `propositions-projects` and SHALL list one entry per plugin directory that exists under `plugins/`, with `source` values pointing at `./plugins/<name>`. The manifest SHALL NOT retain the legacy single `"./"` entry, and SHALL NOT list an entry whose target directory contains no skills and no scripts.
 
-#### Scenario: Marketplace lists both plugins
+#### Scenario: Marketplace lists the core plugin
 
 - **WHEN** a user registers the marketplace and lists available plugins
-- **THEN** `propositions` and `math-tools` both appear, each installable from its `./plugins/*` source
+- **THEN** `propositions` appears and is installable from its `./plugins/propositions` source
+- **AND** no entry resolves to a directory without installable content
 
 ### Requirement: Supported ledger schema range is declared, not vendored
 
@@ -61,5 +62,6 @@ The repository README SHALL contain a "Migration notes" section describing how e
 
 #### Scenario: math-tools user migrates without skill collisions
 
-- **WHEN** a user with the deprecated math-tools plugin installs the core propositions plugin
+- **WHEN** a user with the deprecated `math-tools` plugin from the psychquant-claude-plugins marketplace installs the core propositions plugin
 - **THEN** the Migration notes instruct removing the old plugin so that same-name skills do not coexist
+- **AND** the notes state that `math-tools` is not re-published by this marketplace, so the skills are invoked as `propositions:<skill>` after migration

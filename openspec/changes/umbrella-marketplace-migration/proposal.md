@@ -4,10 +4,11 @@
 
 ## What Changes
 
-- 本 repo 改為 `plugins/` monorepo 佈局：`plugins/propositions/`（core：validator + audit chain 入口 + 通用 manuscript-QA skills）與 `plugins/math-tools/`（薄 math-only pack）
+- 本 repo 改為 `plugins/` monorepo 佈局，唯一 plugin 為 `plugins/propositions/`（core：validator + audit chain 入口 + 通用 manuscript-QA skills）
 - 從 psychquant-claude-plugins 的 math-tools 移植四個通用 skills（clarity-audit / proofread / manuscript-audit / propositions）到 core plugin
 - 根層 `scripts/` 與 `tests/` 保留為 CI pin 的 audit-chain 入口（單一實體在 `plugins/propositions/` 內，根層以轉呼叫 shim 維持既有路徑契約）
-- **BREAKING** `.claude-plugin/marketplace.json` 原地升級：marketplace name `propositions` → `propositions-projects`；單一 `"./"` entry → 兩個 `./plugins/*` entries
+- **BREAKING** `.claude-plugin/marketplace.json` 原地升級：marketplace name `propositions` → `propositions-projects`；單一 `"./"` entry → `./plugins/propositions` entry
+- 移除 `plugins/math-tools/` v0.0.1 空殼（僅有 manifest + README、零 skill 零 script）；`math-tools` 名稱保留給未來真正 math-only 的內容（sympy 驗證、Lean bridging）
 - **BREAKING** repo 改名 `propositions` → `propositions-projects`（GitHub redirect 過渡；下游 workflow `repository:` ref 需顯式更新）
 - core plugin 宣告支援的 ledger schema 區間（≤ 1.5），不 vendoring SCHEMA.md
 - 建立 release-flow 紀律文件（version bump + marketplace.json 同步 + `claude plugin marketplace update`）
@@ -28,6 +29,6 @@
 
 - Affected specs: `umbrella-marketplace-layout`（new）、`plugin-release-flow`（new）
 - Affected code:
-  - New: plugins/propositions/.claude-plugin/plugin.json, plugins/propositions/scripts/, plugins/propositions/skills/, plugins/propositions/tests/, plugins/math-tools/.claude-plugin/plugin.json, docs/RELEASE-FLOW.md
-  - Modified: .claude-plugin/marketplace.json, .claude-plugin/plugin.json, scripts/, tests/, README.md, plugins/propositions/README.md, plugins/math-tools/README.md, docs/MIGRATION-propositions-projects.md
-  - Removed: .claude-plugin/plugin.json（單 plugin 佈局終結；根層 scripts 不刪、改為 shim）
+  - New: plugins/propositions/.claude-plugin/plugin.json, plugins/propositions/scripts/, plugins/propositions/skills/, plugins/propositions/tests/, docs/RELEASE-FLOW.md
+  - Modified: .claude-plugin/marketplace.json, scripts/, tests/, README.md, plugins/propositions/README.md, docs/MIGRATION-propositions-projects.md
+  - Removed: .claude-plugin/plugin.json（根層 single-plugin manifest 終結，改為 `plugins/` 佈局；根層 scripts 不刪、改為 shim）、plugins/math-tools/（v0.0.1 空殼整個目錄）

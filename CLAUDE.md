@@ -35,9 +35,10 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 | Skill | What |
 |-------|------|
-| `/propositions:validate` | 跑 R1-R13 mechanical validator 確認 jsonl ↔ main.tex bijection |
-| `/propositions:refresh-locations` | Windowed locator 修 `prop.location` 行號漂移 |
-| `/propositions:audit` | 跑完整 manuscript-consistency audit (R1 symbols / R2 citations / R3 code-manuscript / R4 prop-iso) |
+| `/propositions:propositions` | 機械軸,三個 operation 共一個 skill:**A** 跑 R1-R13 validator 確認 jsonl ↔ main.tex bijection、**B** windowed locator 修 `prop.location` 行號漂移(dry-run gated)、**C** 抽取新的 / 重抽 JSONL |
+| `/propositions:proofread` | 語意軸,per-prop L1-L5 walk:分解是否忠實、claim_type 是否合身、cite 是否完整且成立、evidence_class 是否一致 |
+| `/propositions:manuscript-audit` | 跨檔案軸,cross-artifact drift audit (R1 symbols / R2 citations / R3 code-manuscript / R4 prop-iso) |
+| `/propositions:clarity-audit` | 可讀性軸,散文層級的 stumble 掃描與改寫(不需要 JSONL) |
 
 | Rule (shipped) | When applies |
 |----------------|--------------|
@@ -80,17 +81,20 @@ Layers 2 + 3 are this plugin (reusable across any prop-iso manuscript).
 ## Quick start (in a user's manuscript repo)
 
 ```bash
-# 1. Validate the bijection
-/propositions:validate
+# 1. 機械軸 — Operation A 驗 bijection、B 修 location 漂移、C 抽取 JSONL
+/propositions:propositions
 
-# 2. After a main.tex restructure, refresh location fields
-/propositions:refresh-locations
+# 2. 語意軸 — per-prop L1-L5 walk(claim 是否為真、是否被 cite 蘊涵)
+/propositions:proofread
 
-# 3. Before submission, run the full audit suite
-/propositions:audit
+# 3. 跨檔案軸 — 送出前跑完整 cross-artifact drift audit
+/propositions:manuscript-audit
+
+# 4. 可讀性軸 — 散文層級 stumble 掃描(不需要 JSONL)
+/propositions:clarity-audit
 ```
 
-All three commands auto-detect `manuscript/propositions/main.jsonl` + `manuscript/main.tex` from the working tree. Pass explicit paths if your layout differs.
+四個命令都會從 working tree 自動偵測 `manuscript/propositions/main.jsonl` + `manuscript/main.tex`(clarity-audit 只需要 tex)。layout 不同時傳明確路徑。
 
 ## Validator rules (R1-R13)
 

@@ -1,6 +1,6 @@
 {
   "name": "propositions",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Author-claim infrastructure for academic LaTeX manuscripts: line-addressable propositions (JSONL), R1-R13 mechanical validator, audit chain (symbols / citations / code-manuscript / prop-iso), extraction discipline, and the domain-general manuscript-QA skills (clarity-audit, proofread, manuscript-audit). Supports propositions-ledger schema versions up to 1.5 (v1.2+/v1.4+ rules applied conditionally). Originally developed as the 'Locke project'.",
   "author": {
     "name": "Che Cheng"

@@ -178,6 +178,32 @@ def test_no_duplicate_skill_names():
     )
 
 
+def test_entry_version_matches_plugin_manifest():
+    """The catalog version and the plugin's own version must agree.
+
+    `claude plugin update` compares versions, not content: when the payload
+    changes and the version does not, every already-installed consumer silently
+    keeps the stale copy and the command reports "already at the latest
+    version". A catalog/manifest mismatch produces the same silence.
+    """
+    mismatched: list[str] = []
+    for entry in _entries():
+        manifest = REPO_ROOT / _source_rel(entry) / ".claude-plugin" / "plugin.json"
+        if not manifest.is_file():
+            continue  # test_published_manifest_is_tracked owns that failure
+        with manifest.open(encoding="utf-8") as fh:
+            plugin_version = json.load(fh).get("version")
+        if entry.get("version") != plugin_version:
+            mismatched.append(
+                f"  {entry['name']}: marketplace.json={entry.get('version')!r} "
+                f"vs {_rel(manifest)}={plugin_version!r}"
+            )
+    assert not mismatched, (
+        "marketplace entry version disagrees with the plugin's own manifest:\n"
+        + "\n".join(mismatched)
+    )
+
+
 MD_LINK = re.compile(r"\]\(([^)]+)\)")
 
 

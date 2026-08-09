@@ -8,8 +8,8 @@
     {
       "name": "propositions",
       "source": "./plugins/propositions",
-      "description": "Author-claim ledger infrastructure: JSONL propositions, R1-R13 validator, audit chain, extraction + manuscript-QA skills (clarity-audit / proofread / manuscript-audit). Supports ledger schema ≤ 1.5.",
-      "version": "0.2.1"
+      "description": "Author-claim ledger infrastructure: JSONL propositions, R1-R13 validator, audit chain, onboarding (Operation D scaffold) + extraction + manuscript-QA skills (clarity-audit / proofread / manuscript-audit). Supports ledger schema ≤ 1.6, incl. multi-file \\input manuscripts.",
+      "version": "0.3.0"
     }
   ]
 }

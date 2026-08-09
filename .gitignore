@@ -30,3 +30,4 @@ htmlcov/
 /propositions/
 .spectra/
 openspec/.vector-search.db*
+tests/fixtures/hsu-regression/

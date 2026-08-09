@@ -1155,7 +1155,11 @@ def test_r9_summary_counts_non_main_tex_skips(tmp_path):
         },
     ]
     result = run_validator(*write_fixture(tmp_path, props, tex, schema_version="1.2"))
-    assert result.returncode == 0, f"unexpected exit: {result.stdout}{result.stderr}"
+    # v1.6 (add-manuscript-onboarding): a file-qualified prefix on a sub-v1.6
+    # ledger is now an R13 FAILURE (loud upgrade hint), so exit is 1 — the R9
+    # counter contract this test locks (#116 skip transparency) is unchanged.
+    assert result.returncode == 1, f"unexpected exit: {result.stdout}{result.stderr}"
+    assert "requires schema_version >= 1.6" in result.stdout + result.stderr
     assert "[summary] R9" in result.stdout, (
         f"#116: R9 must emit a [summary] line when theorem-like envs exist.\n"
         f"stdout:\n{result.stdout}"
@@ -1199,7 +1203,10 @@ def test_r9_non_main_substring_prefix_not_miscounted(tmp_path):
         }
     ]
     result = run_validator(*write_fixture(tmp_path, props, tex, schema_version="1.2"))
-    assert result.returncode == 0, f"unexpected exit: {result.stdout}{result.stderr}"
+    # v1.6: `not_main.tex:L12` is a file-qualified prefix on a v1.2 ledger →
+    # R13 FAIL (exit 1). The #116 Path B contract this test locks — R9 must
+    # not miscount the substring-contaminated location as checked — holds.
+    assert result.returncode == 1, f"unexpected exit: {result.stdout}{result.stderr}"
     assert "skipped_non_main_tex=1" in result.stdout, (
         f"#116 Path B: a non-main.tex location containing `main.tex:` as a "
         f"substring must count as skipped_non_main_tex.\nstdout:\n{result.stdout}"

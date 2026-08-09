@@ -1,0 +1,14 @@
+{
+ "schema_version": "1.6",
+ "source": {
+  "file": "{{TEX_PATH}}",
+  "commit_sha": "{{ANCHOR_COMMIT}}",
+  "extracted_at": "(pending — Operation C not yet run)",
+  "extractor": "(pending)"
+ },
+ "coverage": {
+  "phase": "(pending — no extraction yet)",
+  "sections_extracted": [],
+  "sections_pending": ["(all — run Operation C)"]
+ }
+}

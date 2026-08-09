@@ -35,7 +35,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 
 | Skill | What |
 |-------|------|
-| `/propositions:propositions` | 機械軸,三個 operation 共一個 skill:**A** 跑 R1-R13 validator 確認 jsonl ↔ main.tex bijection、**B** windowed locator 修 `prop.location` 行號漂移(dry-run gated)、**C** 抽取新的 / 重抽 JSONL |
+| `/propositions:propositions` | 機械軸,四個 operation 共一個 skill:**A** 跑 R1-R13 validator 確認 jsonl ↔ tex bijection(v1.6 起 file-aware,支援 multi-file `\input` 樹)、**B** windowed locator 修 `prop.location` 行號漂移(dry-run gated)、**C** 抽取新的 / 重抽 JSONL、**D** onboard 無 ledger 的新稿(scaffold 釘版 SCHEMA/EXTRACTION-PROMPT + `_meta.json`,dry-run gated) |
 | `/propositions:proofread` | 語意軸,per-prop L1-L5 walk:分解是否忠實、claim_type 是否合身、cite 是否完整且成立、evidence_class 是否一致 |
 | `/propositions:manuscript-audit` | 跨檔案軸,cross-artifact drift audit (R1 symbols / R2 citations / R3 code-manuscript / R4 prop-iso) |
 | `/propositions:clarity-audit` | 可讀性軸,散文層級的 stumble 掃描與改寫(不需要 JSONL) |
@@ -87,6 +87,7 @@ Layers 2 + 3 are this plugin (reusable across any prop-iso manuscript).
 ## Quick start (in a user's manuscript repo)
 
 ```bash
+# 0. 新稿第一次採用 — Operation D scaffold ledger(之後 C 抽取、A 驗證)
 # 1. 機械軸 — Operation A 驗 bijection、B 修 location 漂移、C 抽取 JSONL
 /propositions:propositions
 
@@ -132,7 +133,7 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
 - pytest 7+ for test suite
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)
-- Schema versions: v1.0 / v1.1 / v1.2 / v1.3 — validator handles all four with backward-compat skip for v1.2-only rules (R7 / R11 / R12)
+- Schema versions: v1.0 – v1.6 — validator handles all with backward-compat skip for v1.2+-only rules (R7 / R11 / R12)；v1.4 = `retired`、v1.5 = `retired.superseded_mechanism`、v1.6 = multi-file（file-qualified location + `source.parts`）。完整版本史見 `docs/SCHEMA.md` §Versioning
 
 ## Hard rules for contributors
 

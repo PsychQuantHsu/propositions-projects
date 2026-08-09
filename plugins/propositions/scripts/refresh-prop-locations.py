@@ -28,12 +28,20 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_TEX = SCRIPT_DIR.parent / "manuscript" / "main.tex"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+from _lib.latex_env_parser import (  # noqa: E402
+    InputTreeError,
+    parse_location_v16,
+    resolve_input_tree,
+)
 
 # Windowed-locator span: each candidate window is MAX_SPAN source lines. The
 # longest range-form prop in main.jsonl spans 12 source lines; 40 gives >3x
@@ -167,11 +175,15 @@ def find_prop_span(
     return occurrences[0]
 
 
-def parse_claimed_loc(loc_str: str) -> tuple[int | None, int | None]:
-    m = re.match(r"main\.tex:L(\d+)(?:-L(\d+))?", loc_str or "")
-    if not m:
-        return None, None
-    return int(m.group(1)), int(m.group(2)) if m.group(2) else int(m.group(1))
+def parse_claimed_loc(loc_str: str) -> tuple[str | None, int | None, int | None]:
+    """v1.6-aware parse: returns (relpath_or_None, start, end).
+
+    relpath None = the main file (bare `L<n>` or a literal `main.tex:` prefix).
+    """
+    parsed = parse_location_v16(loc_str or "")
+    if parsed is None:
+        return None, None, None
+    return parsed
 
 
 def refresh_jsonl(
@@ -184,13 +196,33 @@ def refresh_jsonl(
     validator = load_validator()
     normalize = validator.normalize_for_match
 
-    tex_text = tex_path.read_text()
-    tex_lines = tex_text.split("\n")
-    # Whole-text normalized form for the R1 existence check. The windowed
-    # locator (precompute_window_norms + find_prop_span) then resolves each
-    # prop to a line span (#137).
-    normalized_tex = normalize(tex_text)
-    window_norms = precompute_window_norms(tex_lines, normalize)
+    # v1.6 multi-file: resolve the input tree; each prop anchors within the
+    # file its location names (unprefixed → the main file). Per-file locator
+    # state is built lazily so single-file repos pay nothing extra.
+    try:
+        tree = resolve_input_tree(tex_path)
+    except InputTreeError as e:
+        print(f"✗ input-tree resolution failed: {e}", file=sys.stderr)
+        raise SystemExit(2)
+    main_dir = tex_path.resolve().parent
+    file_paths: dict[str | None, Path] = {None: tex_path}
+    for part in tree[1:]:
+        rel = os.path.relpath(part, main_dir).replace(os.sep, "/")
+        file_paths[rel] = part
+
+    _locator_cache: dict[str | None, tuple[list[str], str, list[str]]] = {}
+
+    def locator_state(key: str | None) -> tuple[list[str], str, list[str]]:
+        """(tex_lines, normalized_tex, window_norms) for one corpus file."""
+        if key not in _locator_cache:
+            text = file_paths[key].read_text()
+            lines = text.split("\n")
+            _locator_cache[key] = (
+                lines,
+                normalize(text),
+                precompute_window_norms(lines, normalize),
+            )
+        return _locator_cache[key]
 
     props = []
     with jsonl_path.open() as fp:
@@ -206,7 +238,20 @@ def refresh_jsonl(
 
     for p in props:
         text = p.get("text", "")
-        claimed_start, claimed_end = parse_claimed_loc(p.get("location", ""))
+        claimed_file, claimed_start, claimed_end = parse_claimed_loc(
+            p.get("location", "")
+        )
+        if claimed_file is not None and claimed_file not in file_paths:
+            match_failed += 1
+            print(
+                f"⚠ {p['id'][:8]} ({p.get('location','?')}): location file "
+                f"not in input tree — leaving location unchanged",
+                file=sys.stderr,
+            )
+            new_lines.append(p)
+            continue
+        tex_lines, normalized_tex, window_norms = locator_state(claimed_file)
+        loc_prefix = claimed_file if claimed_file is not None else "main.tex"
         normalized_text = normalize(text)
 
         # Empty / whitespace-only prop.text: `"" in anything` is always True, so
@@ -225,7 +270,7 @@ def refresh_jsonl(
         if normalized_text not in normalized_tex:
             match_failed += 1
             print(
-                f"⚠ {p['id'][:8]} ({p.get('location','?')}): text (normalized) NOT in main.tex — leaving location unchanged",
+                f"⚠ {p['id'][:8]} ({p.get('location','?')}): text (normalized) NOT in {loc_prefix} — leaving location unchanged",
                 file=sys.stderr,
             )
             new_lines.append(p)
@@ -249,9 +294,9 @@ def refresh_jsonl(
 
         actual_start, actual_end = span
         new_loc = (
-            f"main.tex:L{actual_start}-L{actual_end}"
+            f"{loc_prefix}:L{actual_start}-L{actual_end}"
             if actual_end > actual_start
-            else f"main.tex:L{actual_start}"
+            else f"{loc_prefix}:L{actual_start}"
         )
 
         if new_loc != p.get("location", ""):

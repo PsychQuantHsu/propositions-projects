@@ -46,6 +46,7 @@ Refs PsychQuantHsu/psychophysical_representations#69
 """
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -56,10 +57,13 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _lib.latex_env_parser import (  # noqa: E402  (sys.path setup must precede)
+    InputTreeError,
     build_associated as _r9_build_associated,
     normalize_containing_block as _r9_normalize_containing_block,
     parse_envs as _r9_parse_envs_shared,
     parse_location as _r9_parse_location,
+    parse_location_v16,
+    resolve_input_tree,
 )
 
 
@@ -697,7 +701,10 @@ def check_unique_ids(props: list[dict]) -> list[tuple[str, str]]:
 
 
 def check_r9_containing_block_env_consistency(
-    props: list[dict], tex_string: str
+    props: list[dict],
+    tex_string: str,
+    corpus: dict | None = None,
+    schema_ge_16: bool = False,
 ) -> tuple[list[tuple[str, str]], int, dict[str, int]]:
     """R9: assert prop.location ⊆ env line range for theorem-like cb (#100).
 
@@ -718,13 +725,22 @@ def check_r9_containing_block_env_consistency(
     stats = {"checked": 0, "skipped_non_main_tex": 0, "skipped_malformed_loc": 0}
     if not tex_string:
         return ([], 0, stats)
+    # v1.6 corpus: {None: main_text, "<relpath>": part_text}. Single-file
+    # callers (legacy tests, audit script) omit it — behavior unchanged.
+    if corpus is None:
+        corpus = {None: tex_string}
     # #115 M-4: R9 is informational ([PASS]/[WARN]) — pass warn_on_residue=False
     # so unmatched \begin doesn't fire stderr noise that would confuse output
     # parsers. The audit-script (`audit-theorem-boundaries.py --jsonl`) keeps
     # the default True and is the loud CI-gate caller.
-    envs = _r9_parse_envs_shared(tex_string, warn_on_residue=False)
-    associated = _r9_build_associated(envs)
-    if not associated:
+    associated_by_file: dict = {}
+    env_total = 0
+    for key, text in corpus.items():
+        envs = _r9_parse_envs_shared(text, warn_on_residue=False)
+        assoc = _r9_build_associated(envs)
+        associated_by_file[key] = assoc
+        env_total += len(assoc)
+    if env_total == 0:
         return ([], 0, stats)  # DP6 silent skip when no theorem-like envs
 
     warnings: list[tuple[str, str]] = []
@@ -734,28 +750,45 @@ def check_r9_containing_block_env_consistency(
         if not cb_raw or not loc_raw:
             continue  # DP7 schema field presence is R3's job
         label = _r9_normalize_containing_block(cb_raw)
-        if label not in associated:
+        if not any(label in assoc for assoc in associated_by_file.values()):
             continue  # DP6 non-env cb (sec:*/discussion/abstract) silent skip
-        # #116: classify by a strict `main.tex:` prefix BEFORE parsing. R9 only
-        # checks main.tex locations; a non-main.tex location is skipped and
-        # counted. The prefix gate must precede _r9_parse_location() because
-        # the shared LOC_RE (in scripts/_lib/latex_env_parser.py) uses a
-        # non-anchored `.search()` — a non-main location whose string merely
-        # *contains* `main.tex:` (`not_main.tex:L12`, `chapters/main.tex:L12`)
-        # would otherwise parse via the embedded substring and be miscounted
-        # as `checked` (Codex /idd-verify #116).
-        if not loc_raw.startswith("main.tex:"):
+        # v1.6 file dispatch: parse the (possibly file-qualified) location and
+        # pick the file whose env table applies. Anchored ^…$ parse — the #116
+        # embedded-substring miscount class (`not_main.tex:L12`) cannot parse.
+        parsed = parse_location_v16(loc_raw)
+        if parsed is None:
+            # Distinguish malformed-range-with-recognized-prefix (counted as
+            # malformed per #116) from an unrecognized/foreign prefix.
+            if loc_raw.startswith("main.tex:"):
+                stats["skipped_malformed_loc"] += 1
+            else:
+                stats["skipped_non_main_tex"] += 1
+            continue
+        relpath, l_start, l_end = parsed
+        if relpath is None:
+            file_key = None
+        elif schema_ge_16 and relpath in associated_by_file:
+            file_key = relpath
+        else:
+            # Foreign prefix (not in input tree) or sub-v1.6 ledger carrying a
+            # prefix — R13 owns the loud failure; R9 keeps the #116 counter.
             stats["skipped_non_main_tex"] += 1
             continue
-        loc_range = _r9_parse_location(loc_raw)
-        if loc_range is None:
-            # has a `main.tex:` prefix but a malformed range (inverted /
-            # zero-base, rejected by _r9_parse_location per #100 Path B).
-            # Counter-only — no WARN escalation (#116 scope boundary).
-            stats["skipped_malformed_loc"] += 1
-            continue
+        associated = associated_by_file[file_key]
         stats["checked"] += 1
-        l_start, l_end = loc_range
+        if label not in associated:
+            # Label's env lives in a different file than the location points
+            # at — a cross-file boundary mismatch (only reachable multi-file).
+            pid = prop.get("id", "?")
+            warnings.append(
+                (
+                    pid,
+                    f"R9: prop containing_block={cb_raw!r} location={loc_raw} "
+                    f"points at a file with no such env (env declared in "
+                    f"another file of the input tree)",
+                )
+            )
+            continue
         allowed = associated[label]
         ok = any(
             env["begin_line"] <= l_start and l_end <= env["end_line"]
@@ -774,7 +807,7 @@ def check_r9_containing_block_env_consistency(
                     f"outside env [{allowed_str}]",
                 )
             )
-    return (warnings, len(associated), stats)
+    return (warnings, env_total, stats)
 
 
 # --------- R10: claim_type vs asserts compatibility (#90) ---------
@@ -954,9 +987,9 @@ R13_START_TOLERANCE = 2
 
 
 def _location_is_range(loc):
-    """True when `loc` is the range form `<file>:L<a>-L<b>`; False for the
-    single-line form `<file>:L<a>` (interpreted as a start-anchor)."""
-    return bool(re.search(r":L\d+-L\d+", loc or ""))
+    """True when `loc` is the range form `[<file>:]L<a>-L<b>`; False for the
+    single-line form `[<file>:]L<a>` (interpreted as a start-anchor)."""
+    return bool(re.search(r"(?:^|:)L\d+-L\d+", loc or ""))
 
 
 def _find_start_anchor(text_norm, lines, declared_start):
@@ -1002,7 +1035,7 @@ def _find_start_anchor(text_norm, lines, declared_start):
     return hits[-1]
 
 
-def check_location_anchoring(props, tex_string):
+def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False):
     """R13 location line-anchoring.
 
     For each prop whose normalized text IS present in tex_string (so R1's
@@ -1030,27 +1063,74 @@ def check_location_anchoring(props, tex_string):
     than mis-flagged as wrong-line. Props whose text is absent from .tex (an R1
     failure) are skipped silently.
 
-    Returns (warnings, unanchorable): two lists of (prop_id, msg) tuples.
+    v1.6 multi-file: `corpus` maps {None: main_text, "<relpath>": part_text};
+    a file-qualified location anchors within its named file. A prefix on a
+    sub-v1.6 ledger, or naming a file outside the input tree, is a FAILURE
+    (exit 1) — never a silent skip.
+
+    Returns (warnings, unanchorable, failures): three lists of (prop_id, msg).
     """
-    lines = tex_string.split("\n")
-    normalized_tex = normalize_for_match(tex_string)
+    if corpus is None:
+        corpus = {None: tex_string}
+    lines_by_file = {k: t.split("\n") for k, t in corpus.items()}
+    norm_by_file = {k: normalize_for_match(t) for k, t in corpus.items()}
     warnings = []
     unanchorable = []
+    failures = []
     for p in props:
         text_norm = normalize_for_match(p.get("text", ""))
         if not text_norm:
             continue  # empty text — nothing to anchor
-        if text_norm not in normalized_tex:
-            continue  # absent everywhere — an R1 failure, not R13's
         loc = p.get("location")
-        start, end = _parse_location_range(loc)
-        if start is None or start < 1 or end < start:
+        parsed_v16 = parse_location_v16(loc or "")
+        relpath = parsed_v16[0] if parsed_v16 else None
+        if relpath is not None:
+            if not schema_ge_16:
+                failures.append((
+                    p["id"],
+                    f"file-qualified location {loc!r} requires schema_version "
+                    f">= 1.6 (ledger is older) — upgrade the ledger's "
+                    f"schema_version before using file prefixes",
+                ))
+                continue
+            if relpath not in corpus:
+                failures.append((
+                    p["id"],
+                    f"location {loc!r}: file not in input tree "
+                    f"(resolved tree: "
+                    f"{', '.join(k for k in corpus if k is not None) or 'main only'})",
+                ))
+                continue
+        file_key = relpath  # None → main file
+        normalized_tex = norm_by_file[file_key]
+        lines = lines_by_file[file_key]
+        if text_norm not in normalized_tex:
+            if relpath is not None:
+                # Prefixed prop whose text is not in its named file: R1's
+                # union check may still pass (text elsewhere) — surface here.
+                warnings.append((
+                    p["id"],
+                    f"text not found in {relpath} named by location {loc} "
+                    f"(may be present elsewhere in the input tree)",
+                ))
+            elif len(corpus) > 1 and any(
+                text_norm in norm_by_file[k] for k in corpus if k is not None
+            ):
+                warnings.append((
+                    p["id"],
+                    f"text not in the main file but found in an input-tree "
+                    f"part — location {loc!r} likely needs a file prefix",
+                ))
+            # else: absent everywhere — an R1 failure, not R13's
+            continue
+        if parsed_v16 is None:
             unanchorable.append((
                 p["id"],
                 f"location missing or malformed ({loc!r}) — "
                 f"skipped from drift check",
             ))
             continue
+        _, start, end = parsed_v16
         if _location_is_range(loc):
             slice_norm = normalize_for_match("\n".join(lines[start - 1:end]))
             if text_norm not in slice_norm:
@@ -1075,7 +1155,7 @@ def check_location_anchoring(props, tex_string):
                     f"text starts at L{true_start}, declared L{start} "
                     f"(single-line start-anchor drift)",
                 ))
-    return warnings, unanchorable
+    return warnings, unanchorable, failures
 
 
 def derive_view_ordinals(jsonl_path: Path) -> list[tuple[str, str]]:
@@ -1251,6 +1331,52 @@ def main():
 
     tex_string, _ = load_tex(tex_path)
 
+    # v1.6 multi-file: resolve the \input/\include tree from the main file.
+    # Single-file manuscripts resolve to [main] and behave exactly as before.
+    try:
+        input_tree = resolve_input_tree(tex_path)
+    except InputTreeError as e:
+        print(f"✗ input-tree resolution failed: {e}", file=sys.stderr)
+        sys.exit(2)
+    main_dir = tex_path.resolve().parent
+    corpus: dict = {None: tex_string}
+    parts_rel: list[str] = []
+    for part in input_tree[1:]:
+        rel = os.path.relpath(part, main_dir).replace(os.sep, "/")
+        parts_rel.append(rel)
+        corpus[rel] = part.read_text(encoding="utf-8")
+    schema_ge_16 = _version_at_least(
+        str((data or {}).get("schema_version", "")), "1.6"
+    )
+
+    # source.parts snapshot refresh (non-authoritative; SCHEMA.md §Multi-file).
+    # Only touch the sidecar when there is something to record: multi-file
+    # trees write the resolved list; a single-file tree only clears an
+    # existing stale key. Absent key + single-file → no write (zero churn on
+    # legacy ledgers like the Hsu case).
+    if use_jsonl and meta_path is not None and meta_path.exists():
+        try:
+            meta_doc = json.loads(meta_path.read_text(encoding="utf-8"))
+            src = meta_doc.get("source")
+            if isinstance(src, dict):
+                if parts_rel:
+                    desired = parts_rel
+                    needs_write = src.get("parts") != desired
+                elif "parts" in src:
+                    desired = []
+                    needs_write = src.get("parts") != desired
+                else:
+                    needs_write = False
+                if needs_write:
+                    src["parts"] = desired
+                    meta_path.write_text(
+                        json.dumps(meta_doc, ensure_ascii=False, indent=1)
+                        + "\n",
+                        encoding="utf-8",
+                    )
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"[warn] source.parts refresh skipped: {e}", file=sys.stderr)
+
     print(f"=== validate-propositions ===")
     fmt = "JSONL" if use_jsonl else "JSON"
     print(f"{fmt}: {source_path}")
@@ -1264,7 +1390,9 @@ def main():
     all_warnings = []
 
     # R1 prop-subset-check (Phase 1 partial-bijection; full bijection awaits #77)
-    iso_errors = check_iso(props, tex_string)
+    # v1.6: matched against the union of the input tree (main + parts) —
+    # per-file location correctness is R13's job.
+    iso_errors = check_iso(props, "\n".join(corpus.values()))
     if iso_errors:
         all_errors.extend([("R1", *e) for e in iso_errors])
     else:
@@ -1326,7 +1454,7 @@ def main():
     # main.jsonl drift props tracked as #114 cleanup follow-up. Exit 0
     # preserved; future PR can escalate to ERROR after #114 cleanup.
     r9_warnings, r9_env_count, r9_stats = check_r9_containing_block_env_consistency(
-        props, tex_string
+        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16
     )
     if r9_env_count == 0:
         print("[SKIP] R9 env-consistency — no theorem-like envs in tex (or empty)")
@@ -1408,7 +1536,16 @@ def main():
     # location, or single-line text the scan window cannot anchor) surface as a
     # distinct [summary] informational line — not warnings, not exit-affecting —
     # so they are never mis-flagged as drift.
-    r13_warnings, r13_unanchorable = check_location_anchoring(props, tex_string)
+    r13_warnings, r13_unanchorable, r13_failures = check_location_anchoring(
+        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16
+    )
+    if r13_failures:
+        all_errors.extend([("R13", *f) for f in r13_failures])
+        print(
+            f"[FAIL] R13 location-anchoring — {len(r13_failures)} prop(s) "
+            f"with invalid file-qualified location (schema < 1.6 with "
+            f"prefix, or file not in input tree)"
+        )
     if r13_warnings:
         all_warnings.extend([("R13", *w) for w in r13_warnings])
         print(

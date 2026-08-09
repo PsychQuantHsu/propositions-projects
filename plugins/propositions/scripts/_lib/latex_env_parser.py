@@ -174,6 +174,142 @@ def parse_location(loc: str) -> tuple[int, int] | None:
     return start, end
 
 
+def parse_location_v16(loc: str) -> tuple[str | None, int, int] | None:
+    """Parse v1.6 file-qualified ``[<relpath>.tex:]L<a>[-L<b>]``.
+
+    Returns ``(relpath_or_None, start, end)`` — ``relpath`` is None for an
+    unprefixed location (meaning: the main file). Same malformed-range
+    rejection as :func:`parse_location`. A prefix of literally ``main.tex``
+    maps to None so pre-v1.6 ledgers keep one canonical meaning.
+    """
+    m = _LOC_V16_RE.match((loc or "").strip())
+    if not m:
+        return None
+    relpath = m.group("file")
+    start = int(m.group("start"))
+    end = int(m.group("end")) if m.group("end") else start
+    if start < 1 or end < start:
+        return None
+    if relpath in (None, "main.tex"):
+        return None, start, end
+    return relpath, start, end
+
+
+_LOC_V16_RE = re.compile(
+    r"^(?:(?P<file>[^:{}\s]+\.tex):)?L(?P<start>\d+)(?:-L(?P<end>\d+))?$"
+)
+
+# ---------------------------------------------------------------------------
+# Input-tree resolution (v1.6 multi-file manuscripts)
+# ---------------------------------------------------------------------------
+
+_INPUT_MACRO_RE = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
+_NONSTD_INPUT_RE = re.compile(r"\\(?:subimport|subfile|import)\s*\{")
+# Verbatim-like environments whose body must not be scanned for input macros.
+_VERBATIM_ENVS = ("verbatim", "Verbatim", "lstlisting", "comment", "filecontents")
+_VERB_BEGIN_RE = re.compile(r"\\begin\{(" + "|".join(_VERBATIM_ENVS) + r")\*?\}")
+_VERB_END_RE = re.compile(r"\\end\{(" + "|".join(_VERBATIM_ENVS) + r")\*?\}")
+
+MAX_INPUT_DEPTH = 3
+
+
+class InputTreeError(Exception):
+    """Loud failure for input-tree resolution (missing file / cycle / depth /
+    absolute path). Never degrade to a silent partial tree."""
+
+
+def _strip_line_comment(line: str) -> str:
+    """Drop everything from an unescaped ``%`` to end of line."""
+    out = []
+    prev = ""
+    for ch in line:
+        if ch == "%" and prev != "\\":
+            break
+        out.append(ch)
+        prev = ch
+    return "".join(out)
+
+
+def resolve_input_tree(main_path, max_depth: int = MAX_INPUT_DEPTH) -> list:
+    """Resolve the ``\\input``/``\\include`` tree from the main file.
+
+    Returns files in document order (main file first), as ``pathlib.Path``
+    objects. Targets resolve relative to the MAIN file's directory (LaTeX
+    compilation-root semantics), with ``.tex`` appended when the target has
+    no extension. Commented-out macros and verbatim-environment bodies are
+    ignored; non-standard import macros produce a warning to stderr and are
+    skipped (not silently dropped). Repeated inclusion of an already-resolved
+    file is allowed (shared preamble diamond); a file inputting itself through
+    the current descent stack raises :class:`InputTreeError` (cycle), as do
+    missing targets, absolute paths, and nesting beyond ``max_depth``.
+    """
+    from pathlib import Path
+
+    main_path = Path(main_path).resolve()
+    root_dir = main_path.parent
+    ordered: list = []
+    seen: set = set()
+
+    def visit(path, depth: int, stack: tuple) -> None:
+        if path in stack:
+            chain = " -> ".join(p.name for p in (*stack, path))
+            raise InputTreeError(f"cyclic \\input chain: {chain}")
+        if depth > max_depth:
+            raise InputTreeError(
+                f"\\input nesting exceeds max depth {max_depth} at {path}"
+            )
+        if path not in seen:
+            seen.add(path)
+            ordered.append(path)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise InputTreeError(f"cannot read {path}: {exc}") from exc
+
+        in_verbatim = False
+        for lineno, raw in enumerate(text.splitlines(), start=1):
+            if in_verbatim:
+                if _VERB_END_RE.search(raw):
+                    in_verbatim = False
+                continue
+            if _VERB_BEGIN_RE.search(raw):
+                in_verbatim = True
+                continue
+            line = _strip_line_comment(raw)
+            if _NONSTD_INPUT_RE.search(line):
+                print(
+                    f"[warn] non-standard import macro skipped at "
+                    f"{path.name}:{lineno} (\\subimport/\\subfile unsupported)",
+                    file=sys.stderr,
+                )
+                continue
+            for m in _INPUT_MACRO_RE.finditer(line):
+                target = m.group(1).strip()
+                if target.startswith("/") or target.startswith("\\\\"):
+                    raise InputTreeError(
+                        f"absolute \\input path refused at {path.name}:{lineno}: "
+                        f"{target}"
+                    )
+                rel = target if target.endswith(".tex") else target + ".tex"
+                child = (root_dir / rel).resolve()
+                if not child.is_file():
+                    raise InputTreeError(
+                        f"\\input target not found: {rel} "
+                        f"(referenced at {path.name}:{lineno})"
+                    )
+                if child in (*stack, path):
+                    chain = " -> ".join(
+                        p.name for p in (*stack, path, child)
+                    )
+                    raise InputTreeError(f"cyclic \\input chain: {chain}")
+                if child in seen:
+                    continue  # diamond re-inclusion (shared preamble) is fine
+                visit(child, depth + 1, (*stack, path))
+
+    visit(main_path, 0, ())
+    return ordered
+
+
 def build_associated(envs: list[dict]) -> dict[str, list[dict]]:
     """label -> [statement_env, ...associated_proof_envs] map.
 

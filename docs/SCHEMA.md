@@ -150,11 +150,16 @@ manuscript's argument explicit as a DAG of cite-able atomic claims (Locke's
 
 ### Versioning
 
-`_meta.json` 含 `schema_version: "1.3"`(v1.0 = pre-#77 single-file JSON;v1.1 =
+`_meta.json` 含 `schema_version: "1.6"`(v1.0 = pre-#77 single-file JSON;v1.1 =
 post-#77 JSONL + _meta sidecar + sentence_index/clause_index fields;v1.2 =
 post-`migrate-prop-id-to-stable-uuid` UUID v7 identity contract,P/C-prefix 改
 成 view-time derivation;**v1.3** = `sentence_index` / `clause_index` 移除,
-proposition ordering 改用 JSONL 檔案行序)— schema 改動要 bump version + migration note。
+proposition ordering 改用 JSONL 檔案行序;**v1.4** = `retired` 欄位新增
+(Hsu case #146/#147 材料停用追蹤;v1.4/v1.5 首次出現在 Hsu ledger 的釘住副本,
+本 canonical 於 add-manuscript-onboarding change 回收);**v1.5** =
+`retired.superseded_mechanism` 欄位新增;**v1.6** = multi-file manuscript 支援:
+`location` 允許檔名前綴(見 §Multi-file manuscripts)+ `_meta.json` 選填
+`source.parts` 快照)— schema 改動要 bump version + migration note。
 
 ## File layout
 
@@ -178,9 +183,10 @@ manuscript/propositions/
 
 ```json
 {
-  "schema_version": "1.3",
+  "schema_version": "1.6",
   "source": {
     "file": "manuscript/main.tex",
+    "parts": ["parts/part1-intro.tex", "parts/part2-theory.tex"],
     "commit_sha": "abc1234",
     "extracted_at": "2026-05-14T08:00:00+08:00",
     "extractor": "claude-opus-4-7 (manual curation)"
@@ -250,7 +256,7 @@ the validator (allow hand-written comments in fixtures).
 |-------|----------|---------|
 | `id` | ✅ | **UUID v7 string (v1.2+)**. Canonical 8-4-4-4-12 hex with version field `7` (e.g. `01910b9c-d4f0-7000-8000-0123456789ab`). Stable across renumber / insertion; cite references compare by UUID equality, not by sequential ordinal. Legacy v1.1 used `P001..PNNN` / `C001..CNNN` sequential strings; migration map at `manuscript/propositions/_migration/v1.1-to-v1.2-id-map.json` records the historical correspondence |
 | `text` | ✅ | **Verbatim** sentence/clause — bijection ground truth(grep `.tex` confirm match) |
-| `location` | ✅ | `main.tex:L<line>` — first line of sentence |
+| `location` | ✅ | `main.tex:L<line>` — first line of sentence。**v1.6+** 文法擴為 `[<relpath>.tex:]L<a>[-L<b>]`:`<relpath>` 相對於主檔(`_meta.json` `source.file`)所在目錄,指向 `\input`/`\include` 樹內的檔案(如 `parts/part2-theory.tex:L123`);無前綴時語意不變 = 主檔本身。`schema_version < 1.6` 的 ledger 出現檔名前綴 → R13 FAIL 提示先升版(禁止 silent accept) |
 | `containing_block` | ✅ | Label / section context — for grouping. **Canonical form: label-only** (`thm:<label>` / `lem:<label>` / `cor:<label>` / `sec:<label>`); typed-prefix form (`theorem:thm:<label>`) **deprecated** per #113 (2026-05-18 canonicalization). Validators (`scripts/audit-theorem-boundaries.py`, `scripts/validate-propositions.py`) normalize both forms for backward-compat with pre-2026-05-18 archive fixtures; new emissions MUST use label-only form |
 | `claim_type` | ✅ | See taxonomy below |
 | `asserts` | ✅ | 1+ atomic claims in machine-friendly form(plain text,no LaTeX). Connective / reference clauses may have empty asserts (clause-level mode only) |
@@ -260,7 +266,55 @@ the validator (allow hand-written comments in fixtures).
 | `cited_by_inferred` | ❌ | Auto-derived by validator(reverse `cites`)— **不**人工填 |
 | `scope_qualifiers` | ⚠️ | For all / there exists / subject to — for inference |
 | `evidence_class` | ⚠️ | Strength tracker |
+| `retired` | ⚠️ | Present **only** when the prop's passage is no longer in the compiled paper — see [`retired` (v1.4+)](#retired-v14) |
 | `notes` | ❌ | Free-form human note |
+
+### `retired` (v1.4+)
+
+A prop describes a passage of the manuscript. When an author disables that
+passage rather than editing it, the prop is left behind: it still names a real
+claim, but not one the paper makes any more. Deleting it would destroy the
+audit trail, and leaving it unmarked makes the ledger silently over-claim.
+`retired` is the third option — the prop stays, and says so.
+
+```json
+"retired": {
+  "since": "2026-07-29",
+  "mechanism": "comment_env",
+  "match": "exact",
+  "reason": "parked by Hsu's condensation",
+  "ref": "PsychQuantHsu/psychophysical_representations#147"
+}
+```
+
+| Key | Required | Meaning |
+|-----|----------|---------|
+| `since` | ✅ | `YYYY-MM-DD` the passage left the compiled paper |
+| `mechanism` | ✅ | How it was disabled — enum below |
+| `match` | ✅ | `exact` (prop text still string-matches the disabled source) or `by_reading` (located by reading, because the wording ALSO changed — a judgement, weaker evidence) |
+| `reason` | ✅ | One line, human-readable |
+| `ref` | ⚠️ | Issue / commit that retired it |
+| `superseded_mechanism` (v1.5+) | ⚠️ | Present when a later edit changed the disabled text's status again (e.g. `comment_env` content later deleted outright → mechanism becomes `removed`); records the prior mechanism for the audit trail |
+
+`mechanism` enum: `comment_env`(inside `\begin{comment}…\end{comment}` — R1 passes,normalize 不剝 comment 環境)/ `line_comment`(`%` 行註解 — R1 fails)/ `removed`(source 已刪 — R1 fails)。R1-visibility 不對稱是 validator artifact,正是 `retired` 記 mechanism 而非 boolean 的理由。
+
+## Multi-file manuscripts (v1.6+)
+
+主檔(`_meta.json` `source.file`)以 `\input{...}` / `\include{...}` 引入其他
+`.tex` 檔時,validator 與 refresh 從主檔遞迴解析引入樹(自動補 `.tex` 副檔名、
+跳過註解行內的巨集、深度上限 3、循環引入與缺檔 loud fail;`\subimport` /
+`\subfile` 等非標準巨集不支援,遇到 warning 列出並跳過)。
+
+**兩個座標系(刻意並存)**:
+
+| 路徑 | 相對於 | 讀者 |
+|------|--------|------|
+| prop `location` 的 `<relpath>` | 主檔所在目錄 | 與 `\input{parts/part2-theory}` 的寫法直接對得上 |
+| `_meta.json` `source.file` / `source.parts` | manuscript repo root | 不開 tex 也能定位稿件 |
+
+`source.parts`(選填,字串陣列)是 validator / Operation D 每次跑時重新解析並
+回寫的**非權威快照** — 權威永遠是 `\input` 樹的即時解析。location 檔名前綴指向
+樹外檔案 → R13 FAIL(`file not in input tree`)。
 
 ### `claim_type` taxonomy
 
@@ -367,6 +421,8 @@ The R9 implementation inlines the LaTeX env parser from `scripts/audit-theorem-b
 8. **R11 evidence-class-enum** (#119, 2026-05-18): schema enum-membership guard, symmetric to R10. Every prop's `evidence_class` MUST be a member of the canonical 5-element enum `verified | derived | hypothesized | conventional | open`. Violations emit `[FAIL] R11` with exit code 1 (FAIL severity, no WARN-as-baseline policy). Schema-gated v1.2+ (legacy v1.1 / missing `schema_version` emit `[SKIP] R11` for backward compat, same gate as R7). Before R11 the enum was defined in this file prose-only with no machine enforcement; the Phase 2 clause-level LLM extractor hallucinated out-of-enum values (`definitional`, `claim`) that slipped past R1-R10.
 
 9. **R12 claim-type-enum** (#124, 2026-05-19): schema enum-membership guard, symmetric to R11. Every prop's `claim_type` MUST be a member of the canonical 12-element enum `axiom | definition | hypothesis | claim | case_split | display_equation | restatement | commentary | example | connective | reference | scope_qualifier`. Violations emit `[FAIL] R12` with exit code 1 (FAIL severity, no WARN-as-baseline policy). Schema-gated v1.2+ (legacy v1.1 / missing `schema_version` emit `[SKIP] R12` for backward compat, same gate as R7 + R11). Before R12 the enum was defined in this file prose-only; R3's `structural_leaf_types` exemption is `claim_type`-keyed (`p.get("claim_type", "claim")`), so a hallucinated value would silently misroute orphan detection. `main.jsonl` + `_stage2/theorem1.jsonl` baselines were 100% canonical at ship time across all 12 enum members — R12 ships as pure structural prevention against future extractor drift, no data sweep needed.
+
+10. **R13 location line-anchoring** (#128/#139, backfilled to this canonical in add-manuscript-onboarding): single-line `location` must anchor the prop's normalized text at the declared line within `R13_START_TOLERANCE = 2` lines (span bound `R13_MAX_SPAN = 30`); un-anchorable props surface as informational, never guessed (windowed locator with degeneracy guard — loud `anchor_failed` over silent mis-write). **v1.6**: R13 is file-aware — a file-prefixed location anchors within the named file of the resolved input tree; prefix naming a file outside the tree → FAIL `file not in input tree`; prefix present but `schema_version < 1.6` → FAIL with upgrade hint. (Pre-v1.6 behavior — skip-with-count for non-main-tex prefixes per #116 — is retained only for ledgers below v1.6 without prefixes.)
 
 ## View-time ordinal derivation (v1.2+)
 

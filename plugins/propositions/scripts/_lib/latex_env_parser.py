@@ -37,10 +37,15 @@ from __future__ import annotations
 import re
 import sys
 
-# Synced with main.tex \newtheorem declarations (L22-L28).
-# 7 declared envs + proof. Parser must recognize all declared types or future
-# Stage 3 extraction into definition/remark/conjecture would silently bypass
-# audit (DA F1 / Codex confirmed in /idd-verify #98).
+# FALLBACK env set — used only when a manuscript declares no `\newtheorem`.
+# Callers resolve the real set per manuscript via `parse_newtheorem_declarations`
+# and pass it as `parse_envs(..., env_types=...)`; SCHEMA.md's R9 contract says
+# "declared via \newtheorem", and a hardcoded list silently skips every env a
+# manuscript names differently (`ass` / `dfn` / `ex` / `prop` — propositions-projects#10).
+# These 7 + proof are the Locke/Hsu declarations, kept as the default because a
+# manuscript with no declarations still needs *some* vocabulary.
+# Parser must recognize all declared types or extraction into an unlisted env
+# would silently bypass audit (DA F1 / Codex confirmed in /idd-verify #98).
 ENV_TYPES: tuple[str, ...] = (
     "theorem", "lemma", "proposition", "corollary",
     "definition", "remark", "conjecture",
@@ -48,6 +53,56 @@ ENV_TYPES: tuple[str, ...] = (
 )
 BEGIN_RE = re.compile(r"^\s*\\begin\{(" + "|".join(ENV_TYPES) + r")\}")
 END_RE = re.compile(r"^\s*\\end\{(" + "|".join(ENV_TYPES) + r")\}")
+
+# `\newtheorem` declaration forms (propositions-projects#10). ENV_TYPES above is a
+# FALLBACK for manuscripts that declare none; the R9 contract in SCHEMA.md is
+# "declared via \newtheorem", so callers resolve the real set per manuscript.
+#   \newtheorem{ass}{Assumption}                 plain
+#   \newtheorem{lemma}[theorem]{Lemma}           shared counter
+#   \newtheorem{theorem}{Theorem}[section]       numbered within
+#   \newtheorem*{remark}{Remark}                 unnumbered
+_NEWTHEOREM_RE = re.compile(r"\\newtheorem\*?\s*\{([^}]+)\}")
+# `proof` is an amsthm builtin, never \newtheorem-declared — always in scope.
+ALWAYS_ENV_TYPES: tuple[str, ...] = ("proof",)
+
+
+def parse_newtheorem_declarations(tex_text: str) -> tuple[str, ...]:
+    """Environment names declared by ``\\newtheorem`` in ``tex_text``.
+
+    Returns them in declaration order (deduped), with ``proof`` appended — it is
+    an ``amsthm`` builtin rather than a declared env, but R9 must see it.
+    Commented-out declarations are ignored. An empty result means "no
+    declarations here"; the caller decides whether to fall back to
+    :data:`ENV_TYPES` (do not fall back inside this function — a caller
+    scanning a multi-file tree needs to distinguish "this file declares none"
+    from "the manuscript declares none").
+    """
+    found: list[str] = []
+    for raw in tex_text.splitlines():
+        line = raw.split("%", 1)[0] if not raw.lstrip().startswith("%") else ""
+        for m in _NEWTHEOREM_RE.finditer(line):
+            name = m.group(1).strip()
+            if name and name not in found:
+                found.append(name)
+    for builtin in ALWAYS_ENV_TYPES:
+        if builtin not in found:
+            found.append(builtin)
+    return tuple(found)
+
+
+def _env_regexes(env_types: tuple[str, ...]) -> tuple[re.Pattern, re.Pattern]:
+    """Compiled (begin, end) matchers for an env-name set.
+
+    Names are regex-escaped and longest-first so a short name cannot shadow a
+    longer one sharing its prefix (e.g. ``prop`` vs ``proposition``).
+    """
+    if env_types == ENV_TYPES:
+        return BEGIN_RE, END_RE  # shipped default — reuse the module-level pair
+    alt = "|".join(re.escape(t) for t in sorted(env_types, key=len, reverse=True))
+    return (
+        re.compile(r"^\s*\\begin\{(" + alt + r")\}"),
+        re.compile(r"^\s*\\end\{(" + alt + r")\}"),
+    )
 LABEL_RE = re.compile(r"\\label\{([^}]+)\}")
 # Non-greedy `[^\]]*?` captures the FIRST `\ref` in the proof title, not the
 # last (#115 M-1 / #100 Path B fix — greedy `[^\]]*` would bind
@@ -60,7 +115,12 @@ TYPE_PREFIX_RE = re.compile(
 )
 
 
-def parse_envs(tex_text: str, *, warn_on_residue: bool = True) -> list[dict]:
+def parse_envs(
+    tex_text: str,
+    *,
+    warn_on_residue: bool = True,
+    env_types: tuple[str, ...] | None = None,
+) -> list[dict]:
     """Return ordered list of envs as ``{type, begin_line, end_line, label,
     proof_target}``.
 
@@ -79,12 +139,15 @@ def parse_envs(tex_text: str, *, warn_on_residue: bool = True) -> list[dict]:
         CI gate keeps the default so authors see warnings; validator R9
         passes ``False`` to keep its ``[PASS]/[WARN]`` line clean.
     """
+    begin_re, end_re = _env_regexes(
+        ENV_TYPES if env_types is None else tuple(env_types)
+    )
     lines = tex_text.splitlines()
     open_stack: list[dict] = []
     envs: list[dict] = []
 
     for idx, line in enumerate(lines, start=1):
-        m_begin = BEGIN_RE.match(line)
+        m_begin = begin_re.match(line)
         if m_begin:
             env_type = m_begin.group(1)
             entry: dict = {
@@ -112,7 +175,7 @@ def parse_envs(tex_text: str, *, warn_on_residue: bool = True) -> list[dict]:
                     break
             open_stack.append(entry)
             continue
-        m_end = END_RE.match(line)
+        m_end = end_re.match(line)
         if m_end:
             end_type = m_end.group(1)
             # Pop the most recent matching open

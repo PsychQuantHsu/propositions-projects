@@ -58,10 +58,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from _lib.latex_env_parser import (  # noqa: E402  (sys.path setup must precede)
     InputTreeError,
+    ENV_TYPES as _R9_DEFAULT_ENV_TYPES,
     build_associated as _r9_build_associated,
     normalize_containing_block as _r9_normalize_containing_block,
     parse_envs as _r9_parse_envs_shared,
     parse_location as _r9_parse_location,
+    parse_newtheorem_declarations,
     parse_location_v16,
     resolve_input_tree,
 )
@@ -705,6 +707,7 @@ def check_r9_containing_block_env_consistency(
     tex_string: str,
     corpus: dict | None = None,
     schema_ge_16: bool = False,
+    env_types: tuple[str, ...] | None = None,
 ) -> tuple[list[tuple[str, str]], int, dict[str, int]]:
     """R9: assert prop.location ⊆ env line range for theorem-like cb (#100).
 
@@ -736,7 +739,9 @@ def check_r9_containing_block_env_consistency(
     associated_by_file: dict = {}
     env_total = 0
     for key, text in corpus.items():
-        envs = _r9_parse_envs_shared(text, warn_on_residue=False)
+        envs = _r9_parse_envs_shared(
+            text, warn_on_residue=False, env_types=env_types
+        )
         assoc = _r9_build_associated(envs)
         associated_by_file[key] = assoc
         env_total += len(assoc)
@@ -1349,6 +1354,21 @@ def main():
         str((data or {}).get("schema_version", "")), "1.6"
     )
 
+    # R9 env vocabulary: resolve from the manuscript's own `\newtheorem`
+    # declarations across the whole input tree (SCHEMA.md R9 says "declared via
+    # \newtheorem" — a hardcoded list silently skips any env this manuscript
+    # names differently, e.g. `ass` / `dfn` / `prop`; propositions-projects#10).
+    # A manuscript declaring none falls back to the shipped default set.
+    declared: list[str] = []
+    for text in corpus.values():
+        for name in parse_newtheorem_declarations(text):
+            if name not in declared:
+                declared.append(name)
+    # `proof` alone means "no real declarations found" (it is always appended).
+    r9_env_types = (
+        tuple(declared) if set(declared) - {"proof"} else _R9_DEFAULT_ENV_TYPES
+    )
+
     # source.parts snapshot refresh (non-authoritative; SCHEMA.md §Multi-file).
     # Only touch the sidecar when there is something to record: multi-file
     # trees write the resolved list; a single-file tree only clears an
@@ -1454,7 +1474,8 @@ def main():
     # main.jsonl drift props tracked as #114 cleanup follow-up. Exit 0
     # preserved; future PR can escalate to ERROR after #114 cleanup.
     r9_warnings, r9_env_count, r9_stats = check_r9_containing_block_env_consistency(
-        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16
+        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16,
+        env_types=r9_env_types,
     )
     if r9_env_count == 0:
         print("[SKIP] R9 env-consistency — no theorem-like envs in tex (or empty)")

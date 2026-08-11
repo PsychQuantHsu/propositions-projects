@@ -2150,3 +2150,96 @@ def test_r13_ambiguous_anchor_unanchorable(tmp_path):
     assert prop_id in result.stdout, (
         f"R13 un-anchorable finding MUST name the proposition:\n{result.stdout}"
     )
+
+
+# ---------- R9 dynamic env types from \newtheorem (propositions-projects#10) ----------
+
+
+def _tex_with_custom_env() -> str:
+    """Manuscript declaring `ass`, with one out-of-boundary prop target.
+
+    Line map: L1 documentclass, L2 newtheorem{ass}, L3 begin{document},
+    L4 begin{ass}, L5 label, L6 body alpha, L7 end{ass}, L8 body beta.
+    """
+    return (
+        "\\documentclass{article}\n"          # L1
+        "\\newtheorem{ass}{Assumption}\n"     # L2
+        "\\begin{document}\n"                 # L3
+        "\\begin{ass}\n"                      # L4
+        "\\label{ass:foo}\n"                  # L5
+        "body alpha\n"                        # L6
+        "\\end{ass}\n"                        # L7
+        "body beta\n"                         # L8
+        "\\end{document}\n"                   # L9
+    )
+
+
+def test_r9_checks_props_in_newtheorem_declared_env():
+    """A prop in a manuscript-declared env (`ass`) is R9-checked, not silently skipped."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = Path(td)
+        props = [{
+            "id": "01910b9c-d4f0-7000-8aaa-0000000000a1",
+            "text": "body alpha",
+            "location": "main.tex:L6",
+            "containing_block": "ass:foo",
+            "claim_type": "claim",
+            "asserts": ["a"],
+            "cites": [],
+        }]
+        result = run_validator(
+            *write_fixture(tmp_path, props, _tex_with_custom_env(), schema_version="1.2")
+        )
+        assert "checked=1" in result.stdout, (
+            "#10: prop inside \\begin{ass} must be R9-checked once `ass` is "
+            f"resolved from \\newtheorem.\nstdout:\n{result.stdout}"
+        )
+
+
+def test_r9_warns_on_out_of_boundary_prop_in_declared_env():
+    """The silent-bypass class: out-of-env location in `ass` must WARN, not pass mutely."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = Path(td)
+        props = [{
+            "id": "01910b9c-d4f0-7000-8aaa-0000000000a2",
+            "text": "body beta",
+            "location": "main.tex:L8",       # outside \begin{ass}..\end{ass} (L4-L7)
+            "containing_block": "ass:foo",
+            "claim_type": "claim",
+            "asserts": ["b"],
+            "cites": [],
+        }]
+        result = run_validator(
+            *write_fixture(tmp_path, props, _tex_with_custom_env(), schema_version="1.2")
+        )
+        out = result.stdout + result.stderr
+        assert "R9" in out and "outside env" in out, (
+            "#10: a prop whose location escapes its declared `ass` env must surface "
+            f"an R9 warning.\nstdout:\n{result.stdout}"
+        )
+
+
+def test_r9_default_env_types_still_work_without_newtheorem():
+    """Fallback: a manuscript with no \\newtheorem still gets the shipped default set."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = Path(td)
+        tex = (
+            "\\begin{theorem}\n"      # L1
+            "\\label{thm:a}\n"        # L2
+            "body alpha\n"            # L3
+            "\\end{theorem}\n"        # L4
+        )
+        props = [{
+            "id": "01910b9c-d4f0-7000-8aaa-0000000000a3",
+            "text": "body alpha",
+            "location": "main.tex:L3",
+            "containing_block": "thm:a",
+            "claim_type": "claim",
+            "asserts": ["a"],
+            "cites": [],
+        }]
+        result = run_validator(*write_fixture(tmp_path, props, tex, schema_version="1.2"))
+        assert "checked=1" in result.stdout, result.stdout

@@ -38,6 +38,7 @@ from _lib.latex_env_parser import (  # noqa: E402  (sys.path setup must precede)
     normalize_containing_block,
     parse_envs,
     parse_location,
+    parse_newtheorem_declarations,
 )
 
 
@@ -161,9 +162,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {args.tex_path} not found", file=sys.stderr)
         return 2
     tex_text = args.tex_path.read_text(encoding="utf-8")
+    # Env vocabulary from this manuscript's own `\newtheorem` declarations;
+    # falls back to the shipped default set when it declares none
+    # (propositions-projects#10). Single-file scan here — the validator does
+    # the whole `\input` tree; a manuscript keeping its preamble in the file
+    # passed as --tex resolves identically either way.
+    declared = parse_newtheorem_declarations(tex_text)
+    env_types = tuple(declared) if set(declared) - {"proof"} else None
     # Audit script is the CI-gate caller: keep `warn_on_residue=True` (default)
     # so unmatched \begin surfaces in stderr.
-    envs = parse_envs(tex_text)
+    envs = parse_envs(tex_text, env_types=env_types)
 
     if args.jsonl is not None:
         if not args.jsonl.exists():

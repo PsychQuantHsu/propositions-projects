@@ -235,3 +235,73 @@ def test_build_associated_proximity_fallback():
     envs = parser.parse_envs(tex, warn_on_residue=False)
     assoc = parser.build_associated(envs)
     assert len(assoc["thm:foo"]) == 2  # statement + proximity-bound proof
+
+
+# ---------- \newtheorem declaration parsing (propositions-projects#10) ----------
+
+
+def test_parse_newtheorem_plain_form():
+    tex = r"\newtheorem{ass}{Assumption}" + "\n"
+    assert "ass" in parser.parse_newtheorem_declarations(tex)
+
+
+def test_parse_newtheorem_shared_counter_form():
+    """`\\newtheorem{lemma}[theorem]{Lemma}` — counter shared with theorem."""
+    tex = r"\newtheorem{lemma}[theorem]{Lemma}" + "\n"
+    assert "lemma" in parser.parse_newtheorem_declarations(tex)
+
+
+def test_parse_newtheorem_numbered_within_form():
+    """`\\newtheorem{theorem}{Theorem}[section]` — numbered within section."""
+    tex = r"\newtheorem{theorem}{Theorem}[section]" + "\n"
+    assert "theorem" in parser.parse_newtheorem_declarations(tex)
+
+
+def test_parse_newtheorem_starred_form():
+    """`\\newtheorem*{remark}{Remark}` — unnumbered variant."""
+    tex = r"\newtheorem*{remark}{Remark}" + "\n"
+    assert "remark" in parser.parse_newtheorem_declarations(tex)
+
+
+def test_parse_newtheorem_ignores_commented_declaration():
+    tex = "% \\newtheorem{ghost}{Ghost}\n\\newtheorem{ass}{Assumption}\n"
+    decls = parser.parse_newtheorem_declarations(tex)
+    assert "ass" in decls and "ghost" not in decls
+
+
+def test_parse_newtheorem_article2_declaration_set():
+    """The pilot manuscript's 8 declarations all resolve (propositions-projects#10)."""
+    tex = "\n".join([
+        r"\newtheorem{theorem}{Theorem}[section]",
+        r"\newtheorem{lemma}[theorem]{Lemma}",
+        r"\newtheorem{corollary}[theorem]{Corollary}",
+        r"\newtheorem{prop}[theorem]{Proposition}",
+        r"\newtheorem{dfn}[theorem]{Definition}",
+        r"\newtheorem{ex}[theorem]{Example}",
+        r"\newtheorem{ass}{Assumption}",
+        r"\newtheorem{remark}[theorem]{Remark}",
+    ])
+    decls = parser.parse_newtheorem_declarations(tex)
+    for name in ("theorem", "lemma", "corollary", "prop", "dfn", "ex", "ass", "remark"):
+        assert name in decls, f"{name} not resolved"
+
+
+def test_parse_envs_accepts_custom_env_types():
+    """parse_envs honors a caller-supplied env_types (dynamic R9 list)."""
+    tex = "\n".join([
+        r"\begin{ass}",
+        r"\label{ass:foo}",
+        r"body",
+        r"\end{ass}",
+    ])
+    assert parser.parse_envs(tex, warn_on_residue=False) == []          # not in default set
+    envs = parser.parse_envs(tex, warn_on_residue=False, env_types=("ass",))
+    assert len(envs) == 1
+    assert envs[0]["type"] == "ass" and envs[0]["label"] == "ass:foo"
+
+
+def test_parse_envs_default_env_types_unchanged():
+    """Backward compat: omitting env_types keeps the shipped default set."""
+    tex = "\\begin{theorem}\n\\label{thm:a}\nbody\n\\end{theorem}\n"
+    envs = parser.parse_envs(tex, warn_on_residue=False)
+    assert len(envs) == 1 and envs[0]["type"] == "theorem"

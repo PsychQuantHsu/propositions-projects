@@ -2,7 +2,7 @@
 
 Author-claim infrastructure for academic LaTeX manuscripts — the **general** layer of the propositions-projects marketplace:
 
-- **Ledger tooling** (`scripts/`): `validate-propositions.py` (R1–R13), `refresh-prop-locations.py`, audit chain (`run-audit.sh`, `audit-*.py`), shared LaTeX env parser (`scripts/_lib/`)
+- **Ledger tooling** (`scripts/`): `validate-propositions.py` (R1–R13), `refresh-prop-locations.py`, audit chain (`run-audit.sh`, `audit-*.py`), shared LaTeX env parser (`scripts/_lib/`) — R9's theorem-env vocabulary is resolved from each manuscript's own `\newtheorem` declarations (whole `\input` tree), so envs named `ass` / `dfn` / `prop` / … are checked rather than silently skipped (#10); a manuscript declaring none falls back to the shipped default set
 - **Skills** (`skills/`): `propositions` (onboard + extraction + mechanical gate + drift refresh，Operations A/B/C/D), `clarity-audit`, `proofread`, `manuscript-audit` — domain-general manuscript QA
 - **Templates** (`templates/ledger/`): Operation D 的 scaffold 骨架（README / _meta.template.json / _smoke_tests）— SCHEMA 與 EXTRACTION-PROMPT 不放模板，scaffold 時從 canonical 現拷釘版
 - Domain variation (math / psych / prose) enters as **profiles/config of this core**, not separate plugins

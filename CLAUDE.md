@@ -116,7 +116,7 @@ See `docs/SCHEMA.md` for the full contract. Summary:
 | R4 | mechanical-contradiction patterns | Two props contradict |
 | R7 | UUID v7 ID format (schema v1.2+) | Stable identity broken |
 | R8 | unique IDs | Duplicate prop |
-| R9 | `containing_block` ⊆ env line range | Theorem boundary misjudged |
+| R9 | `containing_block` ⊆ env line range（env 清單由稿件自己的 `\newtheorem` 宣告解析,非硬編碼;無宣告時 fallback 預設集）| Theorem boundary misjudged |
 | R10 | `connective`/`reference` empty `asserts` | LLM claim_type mistag |
 | R11 | `evidence_class` ∈ canonical 5-enum (v1.2+) | LLM hallucinated value |
 | R12 | `claim_type` ∈ canonical 12-enum (v1.2+) | LLM hallucinated value |

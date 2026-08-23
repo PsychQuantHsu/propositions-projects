@@ -91,13 +91,37 @@ an `artifacts` field (see § Schema extension) instead of `cites`, and asks eigh
 - **E1** — a superseded value survives in a sibling file: the manuscript says `p = .04`, the
   cover letter still says `p < .001`. Placeholder sweeps miss this because `p < .001` *looks*
   like a filled-in value.
+- **E1, second form** — the number is not stale, it was computed a different way. A manuscript
+  reported Wald confidence intervals while its own analysis script called the software's
+  default, which returns profile-likelihood intervals. Point estimates matched exactly; every
+  interval differed in the second decimal. Anyone re-running the script gets numbers that do
+  not appear in the paper. **Re-run the artifact rather than reading its log** — this is
+  invisible to any comparison that stops at the point estimate, and the fix is usually to
+  state the method, not to change the number.
 - **E2** — the text reports a median **in days**, but the dataset has no date column at all;
   the quantity is not merely unverified, it is **not computable** from the data as collected.
 - **E3** — the text cites a figure for `p < .001`; the figure, embedded in the same document,
   prints `p = 0.4` on its face and orders the groups the opposite way.
+- **E3, second form** — a correction reaches the prose and stops there. A flow diagram still
+  read *"Included in analysis (N = 100)"* after the Results section had been amended to
+  disclose that only 91 patients entered the primary model — and the amendment was made
+  *during the same audit*, one pass earlier. A figure is a sibling file that happens to sit
+  inside the document: it does not move when you edit the sentence beside it.
+- **E3, third form** — a caption promising more than the figure shows. One caption offered
+  *"screening, exclusions, and final allocation"*; the figure showed only allocation, and the
+  dataset held no screening or exclusion counts to draw. Read every caption as a set of
+  claims about what the reader will see, and check each against the rendered figure.
 - **E4** — a forest plot is drawn from hard-coded round numbers (the plotting script's own
   comment says `placeholder`), and its highlighted intervals assert significance exactly where
   the text says the interaction was not significant.
+- **E4, a trap for the auditor** — before concluding a figure is unreproducible, search the
+  **whole tree**, not the pipeline directory. One figure was briefly reported as having no
+  source; its generator sat beside the output in the figures directory, and the search had
+  covered only `scripts/` and the top-level `*.tex`. Check the file's own metadata first
+  (`pdfinfo` naming pdfTeX rather than the plotting language is a strong hint about where to
+  look). What *did* survive that correction is worth its own note: the pipeline script still
+  contained a differently-labelled version of the same figure with unfilled `XXX`
+  placeholders — dead code that would mislead the next person to re-run it.
 - **E5** — the abstract claims group A had shorter stay than group B, but the regression used
   group C as the reference and the A-vs-B contrast was never estimated: no interval, no p-value.
 - **E6** — the *title* asserts an effect that the Results section explicitly says did not reach
@@ -115,7 +139,10 @@ where **prose meets artifact**:
 
 - Abstract + Conclusions: **highest** — the compression step is where hedges get dropped (E6).
 - Results sentences carrying a number: **high** — E1/E5/E7 live here.
-- Figures and their captions: **high** — E3/E4; check the rendered figure, not the caption.
+- Figures and their captions: **high** — E3/E4; check the *rendered* figure, not the caption,
+  and re-check after every prose correction. Figures are the second place fixes go to die:
+  they are siblings that live inside the document, so they escape both the prose edit and the
+  sibling-file sweep.
 - Introduction / Discussion background: **low** — cites literature, not artifacts.
 - Sibling files (cover letter, highlights, lay summary): **high and usually unaudited** — they
   are downstream copies that fixes fail to propagate to (E1).
@@ -307,6 +334,13 @@ Two structural lessons from that pilot, both encoded above:
 2. **Every high-value finding came from a cross-model or adversarial pass, none from
    self-review.** The author-side walk reported clean each round. Budget for an independent
    reader; see `/parallel-ai-agents`.
+
+Mode B was then run against that same manuscript after six rounds of auditing had declared it
+settled. It returned three findings — one E1 (a confidence-interval method mismatch against
+the manuscript's own script) and two E3 (a flow diagram contradicting a disclosure added one
+pass earlier, and a caption promising content the data could not supply). The E3 pair is why
+figures are called out separately in the ROI list above: **a clean prose pass is not evidence
+that the figures agree with it.**
 
 **Mode A** methodology validated on `psychophysical_representations` #107 — 3 pilots: (1) a 23-prop
 theorem file surfaced 13 location-drift findings (escalated + closed); (2) a 46-prop theorem

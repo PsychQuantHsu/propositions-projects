@@ -1,7 +1,7 @@
 ---
 name: proofread
 description: >-
-  JSONL-driven per-proposition semantic walk in two modes. Mode A (derivation, L1-L5 + location): faithful decomposition, claim_type fit, cite completeness, cite validity, evidence_class consistency — for mathematics and formal proofs. Mode B (empirical, E1-E8 + location): value fidelity against analysis artifacts, computability from the dataset, figure-text agreement, figure provenance, whether the claimed contrast was actually estimated, claim strength vs test outcome, analytic vs stated sample, variable-role consistency — for clinical cohorts, experiments, surveys and simulation studies, where claims rest on data rather than on prior propositions. Use for pre-submission polish, after a large rewrite, or to validate prop-extraction quality. The semantic-correctness axis — distinct from /propositions:propositions (mechanical R1-R13 gate) and /propositions:manuscript-audit (cross-artifact drift). Not for daily micro-edits (use the validator + sync rule).
+  JSONL-driven per-proposition semantic walk in two modes. Mode A (derivation, L1-L5 + location): faithful decomposition, claim_type fit, cite completeness, cite validity, evidence_class consistency — for mathematics and formal proofs. Mode B (empirical, E1-E10 + location): value fidelity against analysis artifacts, computability from the dataset, figure-text agreement, figure provenance, whether the claimed contrast was actually estimated, claim strength vs test outcome, analytic vs stated sample, variable-role consistency, whether a composite claim holds for each component it names, and whether two exposures treated as separable are actually nested — for clinical cohorts, experiments, surveys and simulation studies, where claims rest on data rather than on prior propositions. Use for pre-submission polish, after a large rewrite, or to validate prop-extraction quality. The semantic-correctness axis — distinct from /propositions:propositions (mechanical R1-R13 gate) and /propositions:manuscript-audit (cross-artifact drift). Not for daily micro-edits (use the validator + sync rule).
 allowed-tools:
   - Read
   - Write
@@ -26,7 +26,7 @@ What a claim *rests on* differs by genre, and the wrong mode audits nothing:
 | Mode | Claims rest on | Layers | Dependency field |
 |------|----------------|--------|------------------|
 | **A — derivation** | other propositions | L1-L5 + location | `cites` (UUID → prop) |
-| **B — empirical** | data, models, figures | E1-E8 + location | `artifacts` (path → file/line) |
+| **B — empirical** | data, models, figures | E1-E10 + location | `artifacts` (path → file/line) |
 
 **Mode A** fits mathematics, formal proofs, axiomatic systems — anywhere "P1 ∧ P2 ⊨ P3" is the
 question. **Mode B** fits empirical研究 (clinical cohorts, experiments, surveys, simulation
@@ -68,7 +68,7 @@ From the dogfood pilots (below), finding density is very uneven, so coverage sho
 
 ---
 
-## Mode B — empirical claims (E1-E8)
+## Mode B — empirical claims (E1-E10)
 
 An empirical proposition's dependency is not another proposition. It is a **file**: a model
 object, a raw data table, a figure, a line range in an analysis script. Mode B therefore reads
@@ -85,6 +85,8 @@ an `artifacts` field (see § Schema extension) instead of `cites`, and asks eigh
 | **E6** | **Claim strength vs test outcome** — does the assertion's strength match what the test returned? | **LLM-required** — title/abstract/conclusion vs Results |
 | **E7** | **Analytic sample vs stated sample** — did the model actually fit the N the text claims? | ✅ — `nobs()` / `ngrps()` vs the stated cohort |
 | **E8** | **Variable role consistency** — does each variable play one role, or several incompatible ones? | ⚠️ partial — grep the variable across Methods / Results / model formulas |
+| **E9** | **Composite vs component** — a claim asserted of a composite group: does it hold for each component the sentence names? | **LLM-required** — compute the stratified marginal effect per component |
+| **E10** | **Exposure structure** — are two variables the narrative treats as separable actually nested or collinear? | ✅ — cross-tabulate every pair of binary exposures |
 
 ### What each layer catches (de-identified)
 
@@ -111,6 +113,12 @@ an `artifacts` field (see § Schema extension) instead of `cites`, and asks eigh
   *"screening, exclusions, and final allocation"*; the figure showed only allocation, and the
   dataset held no screening or exclusion counts to draw. Read every caption as a set of
   claims about what the reader will see, and check each against the rendered figure.
+- **E3, fourth form** — a *summary table* is double jeopardy: it is a sibling (fixes fail to
+  reach it) **and** an aggregator (it restates numbers owned by other tables). One manuscript's
+  "Summary of Key Findings" still carried the superseded confidence intervals for two rows
+  after the owning table had been corrected in the same audit — so the document contradicted
+  itself in the one table a reader is most likely to quote without checking the body. After
+  correcting any number, grep the whole document for it, not just the table that owns it.
 - **E4** — a forest plot is drawn from hard-coded round numbers (the plotting script's own
   comment says `placeholder`), and its highlighted intervals assert significance exactly where
   the text says the interaction was not significant.
@@ -124,10 +132,40 @@ an `artifacts` field (see § Schema extension) instead of `cites`, and asks eigh
   placeholders — dead code that would mislead the next person to re-run it.
 - **E5** — the abstract claims group A had shorter stay than group B, but the regression used
   group C as the reference and the A-vs-B contrast was never estimated: no interval, no p-value.
+- **E5, second form** — the contrast was fitted, but the text read its **sign off the
+  interaction coefficient** instead of computing the marginal effect. Under treatment
+  contrasts the interaction term is a *difference of differences*, not the effect in the
+  exposed stratum: a main effect of `-0.213` with an interaction of `+0.096` gives `-0.117`
+  in the exposed group — the same direction but **attenuated**, which a paper described as a
+  larger benefit. Compute the stratum-specific estimate with an explicit contrast vector (or
+  `emmeans::emtrends`) and read *that*; and check the factor coding rather than assuming
+  treatment contrasts.
 - **E6** — the *title* asserts an effect that the Results section explicitly says did not reach
   significance; elsewhere `p = .058` is treated as established.
 - **E7** — the cohort is 100, but the primary model fitted 91 and a secondary model 78, and the
   manuscript discloses neither.
+- **E7, second form** — the analysis set shrank because of a **covariate**, not the outcome.
+  A Methods section read *"baseline data were complete for … length of stay"* — true of the
+  outcome, and the length-of-stay model still fitted 91 of 100, because it adjusted for a
+  baseline marker missing in nine. The sentence is not false; it answers a different question
+  than the one the reader is asking. **Never take a stated N from prose — read
+  `nrow(model.frame(m))` for every model**, and list each analytic sample separately, because
+  models with different adjustment sets have different Ns.
+- **E9** — a claim true of a composite, false for a component it names. *"Patients with X or Y
+  showed greater benefit"* held for the composite and for Y, and **reversed for X**: the
+  composite estimate was driven entirely by the Y-without-X patients. Nothing was numerically
+  wrong; the sentence simply distributed a composite result over two named components. For
+  every claim of the form *"patients with A or B …"*, compute the estimate separately for A
+  and for B before letting the sentence stand.
+- **E10** — two exposures the narrative treats as separable turn out to be nested. In one
+  cohort the cross-tabulation of two binary risk factors had an **empty cell**: every patient
+  positive for the first was also positive for the second. Consequences: the "A or B"
+  composite was numerically identical to B alone; two subgroup models presented as independent
+  tests were one nested inside the other; and a coefficient labelled as the effect of A was
+  really a contrast *within* B. No individual number is wrong, and no prose reading surfaces
+  it — **only cross-tabulating the exposures against each other does**. Worth checking whether
+  the data-cleaning code defines a category the data never populate; that is strong evidence
+  the nesting is a property of the cohort rather than a processing artifact.
 - **E8** — one variable is simultaneously an Outcome Measure (abstract), a baseline
   characteristic (Table 1), an adjustment covariate (a regression), and a dependent variable
   (another table). Its coefficient is then read causally in both directions.
@@ -147,9 +185,27 @@ where **prose meets artifact**:
 - Sibling files (cover letter, highlights, lay summary): **high and usually unaudited** — they
   are downstream copies that fixes fail to propagate to (E1).
 
+- Summary / "key findings" tables: **high** — they are siblings *and* aggregators (E3 fourth
+  form). Grep every corrected number across the whole document, not just its owning table.
+- Any sentence of the form *"patients with A or B …"*: **high** — E9/E10 live only here, and
+  neither is visible to a reading pass.
+
 → **Artifact-first coverage**: enumerate the analysis artifacts, walk every claim that reads
 from one, then sweep sibling files for stale copies. Walking the manuscript front-to-back
 spends the first several pages at ~0% yield.
+
+→ **Watch for claims whose support is not a saved artifact.** Two shapes recur: a headline
+estimate whose only trace is a *log file* (the model was fitted but never serialised, so
+nothing in the repo regenerates it), and a saved model that no sentence cites (dead weight
+that misleads the next person to re-run the pipeline). Both are worth listing explicitly —
+the first is a reproducibility gap the authors will be asked about, the second is a cleanup.
+
+→ **Report coverage as a number, not as a verdict.** "Is it clean?" should be answered with a
+measured fraction: count the numeric tokens in the document, then say how many were recomputed
+from an artifact, how many were only checked for internal arithmetic, and how many are
+unverifiable in principle (no raw data in the repo). A walk that recomputed 12% and said
+"looks fine" and a walk that recomputed 90% are different claims; only the number distinguishes
+them, and stating it usually reveals that the untouched surface is where the errors are.
 
 ### Schema extension for Mode B
 
@@ -203,7 +259,7 @@ with no trace.
 A walk on a JSONL that fails R1/R7/R8 wastes effort — fix mechanical drift first.
 
 Then settle the mode (§ Pick the mode first). Announce it: *"Mode B (empirical) — claims rest
-on artifacts, walking E1-E8."* Running the wrong mode yields a clean report that means nothing.
+on artifacts, walking E1-E10."* Running the wrong mode yields a clean report that means nothing.
 
 **Mode B also needs an artifact inventory before Step 1.** Enumerate what the claims can be
 checked against, and confirm each is re-runnable:
@@ -341,6 +397,29 @@ the manuscript's own script) and two E3 (a flow diagram contradicting a disclosu
 pass earlier, and a caption promising content the data could not supply). The E3 pair is why
 figures are called out separately in the ROI list above: **a clean prose pass is not evidence
 that the figures agree with it.**
+
+A third pass added an **adversarial** leg alongside the self-review: three independent
+reviewers (statistical, provenance, hostile-peer-reviewer) run against the same manuscript,
+after a full cell-by-cell recomputation of every model-derived number had already been done by
+the author-side walk. The recomputation confirmed 189 model tokens and 120 arithmetic tokens
+and found four disclosure gaps — but the **heaviest** finding of the round came from the
+hostile reviewer: a subgroup claim whose point estimate ran the opposite way for one of the two
+exposures the sentence named (E9), which the recomputation had passed over because every
+individual number in it was correct. That is the second independent confirmation of lesson 2
+above, and the reason E9 and E10 exist as layers at all.
+
+Two cautions the same round produced:
+
+3. **Verify the adversary too.** One reviewer comment asserted that denser measurement sampling
+   produces a *steeper* apparent decline per measurement occasion. It is the reverse — a
+   per-occasion slope is the per-day slope times the days per occasion, so denser sampling
+   *flattens* it. The claim was refuted from the data before any edit was made. An adversarial
+   pass raises the hit rate; it does not license accepting its output unchecked.
+4. **The auditor's own fixes need auditing.** Three of the round's findings were introduced or
+   missed by the *previous* audit round — a figure line written one pass earlier, a summary
+   table not updated alongside the table it summarises, and a table note that became untrue the
+   moment two of its nine rows were corrected. Re-audit what you just changed, in the same
+   pass, against the artifact rather than against your intent.
 
 **Mode A** methodology validated on `psychophysical_representations` #107 — 3 pilots: (1) a 23-prop
 theorem file surfaced 13 location-drift findings (escalated + closed); (2) a 46-prop theorem

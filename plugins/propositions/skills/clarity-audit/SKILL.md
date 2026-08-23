@@ -40,7 +40,7 @@ Don't confuse it with its siblings — they answer different questions:
 | Skill | Question it answers | Driven by |
 |-------|--------------------|-----------|
 | `propositions` | Are the claims extracted atomically, with a valid dependency DAG? | JSONL + R1-R8 |
-| `proofread` | Is each proposition true, faithful, correctly typed, and supported by what it rests on? | JSONL, per-prop — L1-L5 (derivation) or E1-E8 (empirical) |
+| `proofread` | Is each proposition true, faithful, correctly typed, and supported by what it rests on? | JSONL, per-prop — L1-L5 (derivation) or E1-E10 (empirical) |
 | `manuscript-audit` | Do main.tex / jsonl / code / bib stay consistent with each other? | cross-artifact R1-R4 |
 | **`clarity-audit`** (this) | **Can a human reader follow the prose?** | **free-form, no JSONL needed** |
 

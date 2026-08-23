@@ -366,6 +366,36 @@ Produce the evidence and the options; do not decide.
 
 Commit with a cross-link to the `.proofread` ledger entry.
 
+## What a clean walk does and does not establish
+
+Mode B is one audit mode among three, and the three have **no overlap in what they guarantee**.
+Running one and reporting "clean" overstates the result by exactly the size of the other two's
+coverage.
+
+| Mode | What it does | Guarantees | Cannot see |
+|---|---|---|---|
+| **Recomputation** (this skill's E1/E5/E7) | Re-fit the artifacts, diff every number against the prose | The printed numbers match the artifacts they claim to come from | Whether the artifact is the *right* one, and whether the specification behind it is defensible |
+| **Provenance tracing** | Classify every number by whether a script in the repo regenerates it | Which numbers survive a reviewer's request for code, and which cannot be reproduced at all | Nothing about correctness — a fully reproducible number can still be the wrong analysis |
+| **Adversarial review** | Attack the reasoning, not the arithmetic | Design flaws, unsupported inferences, specification dependence | Its own errors — an adversarial pass can and does get things backwards |
+
+A single audit's yield is a poor proxy for the manuscript's state. One session ran all three
+against the same manuscript: the recomputation confirmed every model-derived number and found
+four **disclosure** gaps; the provenance trace found **zero** conflicting values but four
+numbers with no generating code, two of which had propagated into four separate files; the
+adversarial pass found a **submission-blocking** result that neither of the others could reach
+— the primary finding held at `p = .04` as published and lost significance under three
+defensible alternative specifications, because every number in the published specification was
+correct.
+
+Two practical consequences:
+
+- **Say which mode you ran.** "The manuscript is clean" is not a claim any single mode
+  supports. "Every model-derived number reproduces; specification robustness not assessed" is.
+- **Order them by cost, not by yield.** Recomputation is cheap and mechanical; provenance
+  tracing is cheap and mostly mechanical; adversarial review is expensive and needs an
+  independent model. Run the cheap two first so the expensive one is not spent re-deriving
+  arithmetic — but do not let the cheap two's clean report stand in for the third.
+
 ## When NOT to use
 
 - Daily micro-edit → the R1-R13 validator + sync rule is cheaper

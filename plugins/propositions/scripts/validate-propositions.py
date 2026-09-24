@@ -334,27 +334,33 @@ def check_iso(props, tex_string):
 # --------- R1.5: surjective coverage (section-level, Phase 1) ---------
 
 
-def _parse_location_range(loc):
-    """Parse 'main.tex:L<start>-L<end>' or 'main.tex:L<line>' → (start, end).
-
-    Returns (None, None) when unparseable (caller treats as no coverage).
-    """
-    m = re.match(r"[^:]+:L(\d+)(?:-L(\d+))?", loc or "")
-    if not m:
-        return None, None
-    start = int(m.group(1))
-    end = int(m.group(2)) if m.group(2) else start
-    return start, end
+_R15_SECTION_RE = re.compile(r"^\\section\*?(?:\[[^\]]*\])?\{")
+_R15_INPUT_RE = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
 
 
-def check_surjective_coverage(props, tex_string):
+def _r15_strip_comment(line):
+    """Drop a LaTeX line comment (an unescaped ``%`` and everything after)."""
+    return re.sub(r"(?<!\\)%.*", "", line)
+
+
+def check_surjective_coverage(props, corpus):
     """R1.5 surjective coverage at top-level section granularity.
 
-    Find every top-level section command in tex; for each section [start, end]
-    check that at least one prop's location overlaps the range. Sections with
-    zero props → warning. Errors are NOT raised (Phase 1 heterogeneous-
-    granularity prototype may legitimately under-extract some sections —
-    see #77).
+    Find every top-level section command; for each section check that at least
+    one prop covers it. Sections with zero props → warning. Errors are NOT
+    raised (Phase 1 heterogeneous-granularity prototype may legitimately
+    under-extract some sections — see #77).
+
+    ``corpus`` maps a file key to its text: ``None`` is the main file and every
+    other key is the ``\\input`` target's path relative to the main file's
+    directory — the same keys v1.6 ``location`` prefixes use. A plain string is
+    accepted as a single-file manuscript.
+
+    A prop covers a section only when it sits in the SAME file and its line
+    range overlaps the section (#13: the old check ignored the file and could
+    not parse unprefixed v1.6 main-file locations, so it erred both ways). A
+    file ``\\input`` inside a section contributes its content up to its own
+    first ``\\section`` to that section, recursively.
 
     Matches all top-level section variants:
         \\section{Title}              standard
@@ -364,40 +370,58 @@ def check_surjective_coverage(props, tex_string):
 
     Returns (errors, warnings) where errors is always empty in Phase 1.
     """
-    section_pattern = re.compile(r"^\\section\*?(?:\[[^\]]*\])?\{", re.MULTILINE)
-    sections = []
-    lines = tex_string.split("\n")
-    section_starts = [
-        i + 1
-        for i, line in enumerate(lines)
-        if section_pattern.match(line)
-    ]
-    if not section_starts:
-        return [], []
-    total_lines = len(lines)
-    for idx, start in enumerate(section_starts):
-        end = (
-            section_starts[idx + 1] - 1
-            if idx + 1 < len(section_starts)
-            else total_lines
-        )
-        title = lines[start - 1].strip()[:80]
-        sections.append((start, end, title))
+    if isinstance(corpus, str):
+        corpus = {None: corpus}
+    lines_by_file = {key: text.split("\n") for key, text in corpus.items()}
+
+    spans_by_file = {}
+    for p in props:
+        parsed = parse_location_v16(p.get("location") or "")
+        if parsed is None:
+            continue
+        key, p_start, p_end = parsed
+        spans_by_file.setdefault(key, []).append((p_start, p_end))
+
+    def section_starts(key):
+        return [i + 1 for i, line in enumerate(lines_by_file[key])
+                if _R15_SECTION_RE.match(line)]
+
+    def inputs_in(key, start, end):
+        found = []
+        for lineno in range(start, end + 1):
+            line = _r15_strip_comment(lines_by_file[key][lineno - 1])
+            for target in _R15_INPUT_RE.findall(line):
+                target = target.strip()
+                if not target.endswith(".tex"):
+                    target += ".tex"
+                if target in lines_by_file:
+                    found.append(target)
+        return found
+
+    def covered(key, start, end, seen):
+        if any(s <= end and e >= start for s, e in spans_by_file.get(key, [])):
+            return True
+        for child in inputs_in(key, start, end):
+            if child in seen:
+                continue
+            starts = section_starts(child)
+            head_end = (starts[0] - 1) if starts else len(lines_by_file[child])
+            if head_end >= 1 and covered(child, 1, head_end, seen | {child}):
+                return True
+        return False
 
     warnings = []
-    for start, end, title in sections:
-        covered = False
-        for p in props:
-            p_start, p_end = _parse_location_range(p.get("location"))
-            if p_start is None:
+    for key, lines in lines_by_file.items():
+        starts = section_starts(key)
+        for idx, start in enumerate(starts):
+            end = starts[idx + 1] - 1 if idx + 1 < len(starts) else len(lines)
+            if covered(key, start, end, {key}):
                 continue
-            if p_start <= end and p_end >= start:
-                covered = True
-                break
-        if not covered:
+            title = lines[start - 1].strip()[:80]
+            where = f"L{start}" if key is None else f"{key}:L{start}"
             warnings.append((
-                f"section:L{start}",
-                f"no prop covers section (L{start}-{end}): {title}",
+                f"section:{where}",
+                f"no prop covers section ({where}-{end}): {title}",
             ))
     return [], warnings
 
@@ -1419,7 +1443,7 @@ def main():
         print("[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)")
 
     # R1.5 surjective coverage at top-level section granularity
-    surj_errors, surj_warnings = check_surjective_coverage(props, tex_string)
+    surj_errors, surj_warnings = check_surjective_coverage(props, corpus)
     if surj_errors:
         all_errors.extend([("R1.5", *e) for e in surj_errors])
     elif surj_warnings:

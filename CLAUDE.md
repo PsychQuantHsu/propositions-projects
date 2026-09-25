@@ -49,6 +49,9 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | Doc (shipped) | What |
 |---------------|------|
 | `plugins/propositions/docs/EXTRACTION-PROMPT.md` | LLM extraction discipline (餵給 Claude / GPT 抽 prop 用) |
+| `plugins/propositions/scripts/validate-verification.py`、`proofread-to-verification.py` + `docs/VERIFICATION.md` | 驗證紀錄 sidecar（`verification.jsonl`）：帳冊只當索引，proofread／Lean／CAS 等方法的判定記在旁邊；轉換只認完整 proposition id（#12） |
+
+同一個 marketplace 另有第二個 plugin `plugins/tschema-check/`（#4）：文件對外部來源的忠實度查核，validator 自帶、不 import 本 plugin（安裝後 plugin 彼此隔離）。
 
 `docs/SCHEMA.md`(repo 根層)是 canonical schema contract,但**刻意不 vendor 進 plugin**——
 每個 manuscript 的 ledger 自帶一份釘住自己 schema 版本的副本,spec 跟著資料走。plugin 內

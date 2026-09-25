@@ -22,4 +22,4 @@ Each manuscript's ledger carries its own `SCHEMA.md` (the spec travels with the 
 | v1.5 | Adds `retired.superseded_mechanism` (recorded, not validated) |
 | v1.6 | Multi-file manuscripts: file-qualified `location` prefixes (`parts/foo.tex:L123`, resolved against the `\input`/`\include` tree), optional `_meta.json` `source.parts` snapshot; R1/R9/R13 become file-aware. Prefix on a sub-v1.6 ledger → R13 FAIL with upgrade hint |
 
-**Supported range: up to 1.5.** Newer schema versions than this table may validate incompletely; check the release notes before bumping a ledger's schema.
+**Supported range: up to 1.6.** Newer schema versions than this table may validate incompletely; check the release notes before bumping a ledger's schema.

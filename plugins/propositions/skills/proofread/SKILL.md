@@ -127,3 +127,4 @@ the ROI numbers above.
 - `/propositions:propositions` — the mechanical R1-R13 gate this walk assumes has passed
 - `/propositions:manuscript-audit` — cross-doc R1-R4 drift
 - Rule [`../../rules/manuscript-jsonl-sync.md`](../../rules/manuscript-jsonl-sync.md) — sync discipline for L1/L3/L4 fixes
+- [`../../docs/VERIFICATION.md`](../../docs/VERIFICATION.md) — record walk results as `method=proofread` verdicts via `scripts/proofread-to-verification.py`

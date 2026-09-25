@@ -67,14 +67,24 @@ The validator SHALL list every proposition for which one method's latest record 
 
 ### Requirement: Proofread checklist conversion
 
-`proofread-to-verification.py` SHALL read a `.proofread/<file>.md` checklist and the ledger, and SHALL emit one `method=proofread` record per checklist line of the form `- [<mark>] **P<seq>** \`<uuid-prefix>\` ...`. The mapping SHALL be `[x]` to `supported`, `[~]` to `partial`, `[-]` to `not_attempted`; `[ ]` lines SHALL be skipped. The `<uuid-prefix>` SHALL be resolved to a full ledger `id`; a prefix that matches no id or more than one id SHALL cause a non-zero exit naming the line, and no records SHALL be written. `evidence_ref` SHALL be the checklist path with the line number.
+`proofread-to-verification.py` SHALL read a `.proofread/<file>.md` checklist and the ledger, and SHALL emit one `method=proofread` record per checklist line of the form `- [<mark>] **P<seq>** \`<uuid-prefix>\` ... — "<text snippet>" ...`. The mapping SHALL be `[x]` to `supported`, `[~]` to `partial`, `[-]` to `not_attempted`; `[ ]` lines SHALL be skipped. Each line SHALL be resolved to exactly one ledger `id` by narrowing, in order: ids starting with `<uuid-prefix>`; among those, props whose whitespace-collapsed `text` starts with the snippet (always applied when a snippet is present); if still more than one, the prop whose view ordinal equals `P<seq>`. A line left with more than one candidate SHALL cause a non-zero exit naming the line with no records written. A line left with no candidate SHALL do the same by default; with `--allow-unmatched` it SHALL be skipped and listed on stderr instead. `evidence_ref` SHALL be the checklist path with the line number.
 
 #### Scenario: Clean walk becomes supported
 
-- **WHEN** a checklist line is `- [x] **P012** \`019e2fbe\` [claim] ...` and the prefix resolves uniquely
+- **WHEN** a checklist line is `- [x] **P012** \`019e2fbe\` [claim] ... — "Suppose ..."` and it resolves to one ledger id
 - **THEN** the output contains a record with that full `prop_id`, `method` `proofread`, `status` `supported`, and `evidence_ref` pointing at that checklist line
 
-#### Scenario: Ambiguous prefix aborts
+#### Scenario: Shared UUIDv7 prefix resolved by snippet
 
-- **WHEN** a checklist prefix matches two ledger ids
-- **THEN** the script exits non-zero, names the line, and writes no output
+- **WHEN** two ledger ids share the checklist's 8-character prefix but only one prop's text starts with the line's snippet
+- **THEN** the line resolves to that prop
+
+#### Scenario: Ambiguous line aborts
+
+- **WHEN** after prefix, snippet and ordinal a line still matches two ledger ids
+- **THEN** the script exits non-zero, names the line, and writes no output, with or without `--allow-unmatched`
+
+#### Scenario: Rewritten text is skipped only on request
+
+- **WHEN** a line's snippet matches no ledger prop because the text was rewritten after the checklist was generated
+- **THEN** the script exits non-zero by default, and with `--allow-unmatched` skips that line, lists it on stderr, and writes the remaining records

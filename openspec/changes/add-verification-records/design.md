@@ -40,7 +40,13 @@ propositions 帳冊（`main.jsonl`）把稿件拆成命題，每筆有 UUIDv7 `i
 
 ### Proofread checklist conversion by uuid prefix
 
-proofread checklist 每行形如 ``- [x] **P012** `019e2fbe` [claim] @L10-L12 — "…"``。`uuid_short` 是 id 的前綴，轉換腳本用它對帳冊做前綴比對；查無或多於一筆即整批失敗、不輸出任何紀錄（全有或全無），因為錯接到別的命題比少一筆紀錄危險。對應：`[x]`→`supported`、`[~]`→`partial`、`[-]`→`not_attempted`、`[ ]` 略過。`evidence_ref` 為 `<checklist 路徑>:L<行號>`。`[~]` 對應 `partial` 而非 `refuted`：proofread 的 finding 多半是帳冊拆解或引用的瑕疵，不等於命題為假。
+proofread checklist 每行形如 ``- [x] **P012** `019e2fbe` [claim] @L10-L12 — "…"``。原設計只用 `uuid_short` 前綴解析；**對真實帳冊實跑後推翻**：UUIDv7 的前段是時間戳，同一批抽取的命題共用前 8 碼（實測一份 364 筆的帳冊中，245 筆共用同一前綴），前綴幾乎總是不唯一。
+
+改為依序縮小：id 前綴 → 行內引號中的文字片段（空白正規化後比對 `text` 開頭，只要有片段就一律套用）→ `P{seq}` view ordinal。片段排在 ordinal 前，因為 ordinal 在帳冊增刪命題後會整批位移，片段不會。片段一律套用（即使前綴已唯一），因為文字改寫後的舊判定不應記成現行判定。
+
+兩種失敗分開處理：縮小後仍多於一筆 → 一律整批失敗（錯接到別的命題比少一筆紀錄危險）；一筆都沒有（文字在 checklist 產生後改寫、或命題重抽換了 id）→ 預設整批失敗，`--allow-unmatched` 時略過並列在 stderr，因為它不可能錯接。實測一份 2026-08 的舊 checklist：46 行中 45 行因帳冊重抽而無對應，其中 11 行的文字仍在、但已換成新 id——依文字轉移判定到新 id 並不安全（新命題的 asserts／cites 可能不同），所以不做。
+
+對應：`[x]`→`supported`、`[~]`→`partial`、`[-]`→`not_attempted`、`[ ]` 略過。`evidence_ref` 為 `<checklist 路徑>:L<行號>`。`[~]` 對應 `partial` 而非 `refuted`：proofread 的 finding 多半是帳冊拆解或引用的瑕疵，不等於命題為假。
 
 proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢查（拆解忠實、claim_type、引用完整、引用推得出、evidence_class、location）都通過，是對帳冊條目與論證鏈的檢查，不是形式證明。
 
@@ -56,8 +62,8 @@ proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢
 
 **proofread-to-verification.py**
 
-- 呼叫：`proofread-to-verification.py --checklist <.proofread/x.md> --ledger <main.jsonl> [--checked-at YYYY-MM-DD] [--checker NAME]`，JSONL 寫到 stdout。`--checked-at` 預設為今天（臺北時間）。
-- 任一行前綴查無或不唯一：exit 1，stderr 列出每個問題行號，stdout 不寫任何東西。
+- 呼叫：`proofread-to-verification.py --checklist <.proofread/x.md> --ledger <main.jsonl> [--checked-at YYYY-MM-DD] [--checker NAME] [--allow-unmatched]`，JSONL 寫到 stdout。`--checked-at` 預設為今天（臺北時間）。
+- 任一行縮小後仍不唯一：exit 1，stderr 列出行號，stdout 不寫任何東西。任一行無對應：預設同上；`--allow-unmatched` 時略過並在 stderr 列出。
 - 不符合 checklist 行格式的行（標題、Findings 表格）一律忽略。
 
 **文件**：`plugins/propositions/docs/VERIFICATION.md` 寫格式、兩張詞彙表、V1–V6、不一致定義、proofread 的 `supported` 語意、其他方法如何接入（寫一筆紀錄、跑 validator）。proofread SKILL.md 只加一行指向轉換腳本；plugin README 加一行指向 VERIFICATION.md。
@@ -68,7 +74,8 @@ proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢
 
 ## Risks / Trade-offs
 
-- [uuid_short 過短導致前綴撞號] → 不唯一即整批失敗並列出行號；使用者可改用較長前綴重產 checklist。
+- [uuid_short 前綴在 UUIDv7 帳冊上幾乎必撞] → 以文字片段與 ordinal 縮小；仍不唯一即整批失敗並列出行號。
+- [舊 checklist 大量無對應] → 預設失敗提醒重做 proofread；`--allow-unmatched` 只轉仍對得上的行。
 - [proofread 的 `supported` 被誤讀為形式證明] → VERIFICATION.md 明寫其語意；不一致報告列出方法名，讀者看得到是哪種證據。
 - [`evidence_ref` 只檢查存在，指向的檔案可能已不存在] → 第一版接受此限制；各方法接入時可加自己的證據檢查（例如 Lean 常數是否存在）。
 - [PR #11 同時修改 proofread SKILL.md] → 本 change 只加一行交叉連結，衝突時手動合併成本低。

@@ -67,21 +67,21 @@ The validator SHALL list every proposition for which one method's latest record 
 
 ### Requirement: Proofread checklist conversion
 
-`proofread-to-verification.py` SHALL read a `.proofread/<file>.md` checklist and the ledger, and SHALL emit one `method=proofread` record per checklist line of the form `- [<mark>] **P<seq>** \`<uuid-prefix>\` ... — "<text snippet>" ...`. The mapping SHALL be `[x]` or `[X]` to `supported`, `[~]` to `partial`, `[-]` to `not_attempted`; `[ ]` lines SHALL be skipped; any other mark SHALL cause a non-zero exit naming the line. Each walked line SHALL carry a quoted text snippet after a dash (em dash, en dash or hyphen; straight or curly quotes); a walked line without one SHALL cause a non-zero exit naming the line. When the backticked id is a full UUID, the line SHALL resolve to that ledger `id` only if that prop's whitespace-collapsed `text` starts with the snippet. When it is a shorter prefix, the line SHALL resolve only if the snippet is not truncated (no trailing ellipsis) and exactly one prop whose `id` starts with the prefix has a whitespace-collapsed `text` equal to the snippet; a short prefix with a truncated snippet SHALL be treated as unresolvable. The view ordinal `P<seq>` SHALL NOT be used to resolve a line. A line with more than one candidate SHALL cause a non-zero exit naming the line with no records written. A line with no candidate, or an unresolvable short-prefix line, SHALL do the same by default; with `--allow-unmatched` it SHALL be skipped and listed on stderr instead. `evidence_ref` SHALL be the checklist path with the line number.
+`proofread-to-verification.py` SHALL read a `.proofread/<file>.md` checklist and the ledger, and SHALL emit one `method=proofread` record per checklist line of the form `- [<mark>] **P<seq>** \`<uuid-prefix>\` ... — "<text snippet>" ...`. The mapping SHALL be `[x]` or `[X]` to `supported`, `[~]` to `partial`, `[-]` to `not_attempted`; `[ ]` lines SHALL be skipped; any other mark SHALL cause a non-zero exit naming the line. Each walked line SHALL carry a quoted text snippet after a dash (em dash, en dash or hyphen; straight or curly quotes); a walked line without one SHALL cause a non-zero exit naming the line. A line SHALL resolve only when its backticked id is a full UUID present in the ledger and that prop's whitespace-collapsed `text` starts with the snippet. A line whose backticked id is shorter than a full UUID SHALL NOT be resolved by any means. The view ordinal `P<seq>` SHALL NOT be used to resolve a line. A line with more than one candidate SHALL cause a non-zero exit naming the line with no records written. A line with no candidate, or a line with only a short id prefix, SHALL do the same by default; with `--allow-unmatched` it SHALL be skipped and listed on stderr instead. `evidence_ref` SHALL be the checklist path with the line number.
 
 #### Scenario: Clean walk becomes supported
 
 - **WHEN** a checklist line is `- [x] **P012** \`019e2fbe\` [claim] ... — "Suppose ..."` and it resolves to one ledger id
 - **THEN** the output contains a record with that full `prop_id`, `method` `proofread`, `status` `supported`, and `evidence_ref` pointing at that checklist line
 
-#### Scenario: Short prefix with truncated snippet is never guessed
+#### Scenario: Short prefix is never resolved
 
-- **WHEN** a line carries only an 8-character prefix and a truncated snippet, and one ledger prop sharing the prefix starts with those words
+- **WHEN** a line carries only an 8-character prefix, even with a snippet equal to one ledger prop's whole text
 - **THEN** the line is not resolved; the script reports that the checklist must be regenerated with full ids
 
 #### Scenario: Ambiguous line aborts
 
-- **WHEN** a short-prefix line's untruncated snippet equals the whole text of two ledger props sharing that prefix
+- **WHEN** the line's full id appears on two ledger props whose texts both start with the snippet
 - **THEN** the script exits non-zero, names the line, and writes no output, with or without `--allow-unmatched`
 
 #### Scenario: Position never decides

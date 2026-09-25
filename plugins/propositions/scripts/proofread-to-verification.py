@@ -9,16 +9,15 @@ emits one `method=proofread` record per walked line, as JSONL on stdout:
     - [-] ...                                          → status not_attempted
     - [ ] ...                                          → skipped (not walked yet)
 
-Identity comes from the backticked id, never from a guess. A FULL UUID
-resolves to exactly that proposition (and its text must still start with the
-quoted snippet, so a verdict on rewritten text is not recorded as current). A
-short id prefix resolves only when the quoted snippet is untruncated and equals
-one proposition's whole text: a truncated snippet names opening words, and
-after a rewrite another proposition sharing the prefix and those words would
-take the verdict. A walked line without a snippet, an unknown mark, or a line
-matching more than one proposition aborts: nothing is written and the exit
+Identity comes only from the full proposition id in backticks (the proofread
+skill writes it), and that proposition's text must still start with the quoted
+snippet, so a verdict on rewritten text is not recorded as current. A short id
+prefix is never resolved: every content-based fallback (ordinal, prefix plus
+snippet, prefix plus whole text) was shown to hand a verdict to another
+proposition after the ledger changed. A walked line without a snippet, an
+unknown mark, or an unresolvable line aborts: nothing is written and the exit
 code is 1 — attaching a verdict to the wrong proposition is worse than
-missing one. Generate checklists with full ids.
+missing one.
 
 A checklist generated before the manuscript was rewritten has lines whose text
 no longer exists, and an old checklist may carry only short id prefixes;
@@ -88,27 +87,23 @@ def _snippet(line: str) -> tuple[str | None, bool]:
 def _resolve(line: str, prefix: str, ledger) -> tuple[list[str], str | None]:
     """Find this line's proposition. Returns (ids, problem).
 
-    Identity comes from the id, never from a guess. Two cases resolve:
-
-    - the backticked id is a FULL UUID: exactly that ledger id, and its text
-      must still start with the snippet (a verdict on rewritten text is stale);
-    - the id is only a prefix: accepted only when the snippet is NOT truncated
-      and equals one proposition's whole text. A truncated snippet names the
-      opening words, not the proposition — after a rewrite, another proposition
-      sharing the prefix and those words would silently take the verdict.
-
-    Anything else returns no ids (the caller treats it as unresolved).
+    Identity comes only from a FULL UUID in backticks: that exact ledger id,
+    whose text must still start with the snippet (a verdict on rewritten text
+    is stale). A short prefix is never resolved. Every content-based fallback
+    tried before — view ordinal, prefix + truncated snippet, prefix + whole
+    text — was shown to hand the verdict to another proposition after the
+    ledger changed, because matching content says what a proposition says now,
+    not which proposition the reviewer walked.
     """
-    snip, truncated = _snippet(line)
+    snip, _ = _snippet(line)
     if snip is None:
         return [], "has no quoted text snippet to confirm which proposition it means"
-    texts = {p["id"]: _collapse(p.get("text")) for p in ledger if isinstance(p.get("id"), str)}
-    if _FULL_ID_RE.match(prefix):
-        return [i for i in texts if i.lower() == prefix and texts[i].startswith(snip)], None
-    if truncated:
-        return [], (f"gives only an id prefix and a truncated snippet, which cannot identify a "
-                    f"proposition safely; regenerate the checklist with full ids")
-    return [i for i, t in texts.items() if i.lower().startswith(prefix) and t == snip], None
+    if not _FULL_ID_RE.match(prefix):
+        return [], ("gives only an id prefix, which cannot identify a proposition; "
+                    "regenerate the checklist with full ids")
+    return [p["id"] for p in ledger
+            if isinstance(p.get("id"), str) and p["id"].lower() == prefix
+            and _collapse(p.get("text")).startswith(snip)], None
 
 
 def convert(text: str, checklist_ref: str, ledger, checked_at: str,

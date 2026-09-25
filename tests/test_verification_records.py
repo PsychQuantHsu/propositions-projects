@@ -240,16 +240,13 @@ def test_short_prefix_with_truncated_snippet_is_never_guessed():
     assert records == [] and problems == [] and skipped
 
 
-def test_short_prefix_with_whole_text_resolves():
+def test_short_prefix_is_never_resolved_even_with_whole_text():
+    # verify #12 round 3: the walked proposition was rewritten and a sibling
+    # sharing the prefix now holds its old text; whole-text equality picked
+    # the sibling. Content says what a proposition says now, not which one
+    # the reviewer walked.
     records, problems, _ = convert(line("x", "01910b9c", "Second, define the operator T."))
-    assert problems == [] and [r["prop_id"] for r in records] == [ID_B]
-
-
-def test_short_prefix_whole_text_shared_by_two_aborts():
-    twins = [{"id": ID_A, "text": "Same text."}, {"id": ID_B, "text": "Same text."}]
-    records, problems, _ = convert(line("x", "01910b9c", "Same text."), ledger=twins,
-                                   allow_unmatched=True)
-    assert records == [] and problems
+    assert records == [] and problems and "full ids" in problems[0]
 
 
 def test_reviewer_note_after_the_snippet_does_not_break_resolution():
@@ -341,3 +338,11 @@ def test_bom_on_the_sidecar_is_tolerated(tmp_path):
     sidecar, ledger = write(tmp_path, [rec()])
     sidecar.write_bytes(b"\xef\xbb\xbf" + sidecar.read_bytes())
     assert run_validate(sidecar, ledger).returncode == 0
+
+
+def test_full_id_duplicated_in_the_ledger_aborts():
+    dup = [{"id": ID_A, "text": "First claim holds for all n."},
+           {"id": ID_A, "text": "First claim holds, restated."}]
+    records, problems, _ = convert(line("x", ID_A, "First claim holds…"), ledger=dup,
+                                   allow_unmatched=True)
+    assert records == [] and problems

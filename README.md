@@ -14,7 +14,7 @@ Solves three problems that LaTeX-heavy academic manuscripts run into:
 
 ## Install
 
-This repo is a **self-hosted marketplace** (`propositions-projects`) with a `plugins/` monorepo layout. It currently publishes exactly one plugin: the core `propositions` plugin (validator + audit chain + manuscript-QA skills). Domain packs get their own `plugins/<domain>/` directory only when domain-specific content actually lands — never as an empty placeholder.
+This repo is a **self-hosted marketplace** (`propositions-projects`) with a `plugins/` monorepo layout. It publishes two plugins: the core `propositions` plugin (validator + audit chain + manuscript-QA skills) and `tschema-check` (source-fidelity review of a document against the external material it was written from — R1 generalized from the manuscript itself to an outside source). Domain packs get their own `plugins/<domain>/` directory only when domain-specific content actually lands — never as an empty placeholder.
 
 ```bash
 # Add the marketplace from GitHub
@@ -22,6 +22,9 @@ claude plugin marketplace add PsychQuantHsu/propositions-projects
 
 # Install the core plugin
 claude plugin install propositions@propositions-projects
+
+# Source-fidelity review (minutes vs transcript, notes vs recording)
+claude plugin install tschema-check@propositions-projects
 ```
 
 ## Migration notes (2026-08 rename: propositions → propositions-projects)
@@ -104,30 +107,35 @@ See `docs/locke-project.md` in `PsychQuantHsu/psychophysical_representations` fo
 ```
 propositions-projects/
 ├── .claude-plugin/
-│   └── marketplace.json     # marketplace catalog (one entry: propositions)
+│   └── marketplace.json     # marketplace catalog (propositions, tschema-check)
 ├── plugins/
-│   └── propositions/        # the published plugin — everything below ships to installers
+│   ├── propositions/        # the published plugin — everything below ships to installers
+│   │   ├── .claude-plugin/plugin.json
+│   │   ├── README.md
+│   │   ├── skills/          # user-invocable slash commands
+│   │   │   ├── propositions/SKILL.md      # validate / refresh / extract
+│   │   │   ├── proofread/SKILL.md         # per-prop L1-L5 semantic walk
+│   │   │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
+│   │   │   └── clarity-audit/SKILL.md     # prose readability
+│   │   ├── scripts/         # validator + audit tooling
+│   │   │   ├── validate-propositions.py
+│   │   │   ├── refresh-prop-locations.py
+│   │   │   ├── audit-theorem-boundaries.py
+│   │   │   ├── audit-{citations,symbols,code-manuscript}.py
+│   │   │   ├── run-audit.sh
+│   │   │   ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
+│   │   │   └── _lib/latex_env_parser.py
+│   │   ├── rules/           # discipline rules (the skills link to these)
+│   │   │   ├── manuscript-jsonl-sync.md
+│   │   │   ├── manuscript-consistency-audit.md
+│   │   │   └── code-and-manuscript-sync.md
+│   │   └── docs/
+│   │       └── EXTRACTION-PROMPT.md
+│   └── tschema-check/       # source-fidelity review (migrated from truth-conditions, #4)
 │       ├── .claude-plugin/plugin.json
-│       ├── README.md
-│       ├── skills/          # user-invocable slash commands
-│       │   ├── propositions/SKILL.md      # validate / refresh / extract
-│       │   ├── proofread/SKILL.md         # per-prop L1-L5 semantic walk
-│       │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
-│       │   └── clarity-audit/SKILL.md     # prose readability
-│       ├── scripts/         # validator + audit tooling
-│       │   ├── validate-propositions.py
-│       │   ├── refresh-prop-locations.py
-│       │   ├── audit-theorem-boundaries.py
-│       │   ├── audit-{citations,symbols,code-manuscript}.py
-│       │   ├── run-audit.sh
-│       │   ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
-│       │   └── _lib/latex_env_parser.py
-│       ├── rules/           # discipline rules (the skills link to these)
-│       │   ├── manuscript-jsonl-sync.md
-│       │   ├── manuscript-consistency-audit.md
-│       │   └── code-and-manuscript-sync.md
-│       └── docs/
-│           └── EXTRACTION-PROMPT.md
+│       ├── skills/tschema-check/SKILL.md
+│       ├── scripts/validate-tschema.py
+│       └── docs/SCHEMA.md
 ├── CLAUDE.md                # repo-level instructions
 ├── README.md                # this file
 ├── scripts/                 # forwarding shims into the plugin (pinned-CI entry points)

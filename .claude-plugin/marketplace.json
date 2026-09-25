@@ -10,6 +10,12 @@
       "source": "./plugins/propositions",
       "description": "Author-claim ledger infrastructure: JSONL propositions, R1-R13 validator, audit chain, onboarding (Operation D scaffold) + extraction + manuscript-QA skills (clarity-audit / proofread / manuscript-audit). Supports ledger schema ≤ 1.6, incl. multi-file \\input manuscripts.",
       "version": "0.3.0"
+    },
+    {
+      "name": "tschema-check",
+      "source": "./plugins/tschema-check",
+      "description": "Source-fidelity review for documents written from source material: three-layer method (sentence truth conditions, relations, logic) plus a validator that checks statements against the document and quoted evidence against the external source.",
+      "version": "0.1.0"
     }
   ]
 }

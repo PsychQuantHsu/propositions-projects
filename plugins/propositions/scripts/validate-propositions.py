@@ -45,6 +45,7 @@ Checks:
 Refs PsychQuantHsu/psychophysical_representations#69
 """
 import argparse
+import bisect
 import json
 import os
 import posixpath
@@ -417,44 +418,73 @@ def check_surjective_coverage(props, corpus, main_name=None):
     lines_by_file = {key: text.split("\n") for key, text in corpus.items()}
     sub_keys = {k for k in lines_by_file if k is not None}
 
-    covered_lines = {}
+    spans = {}          # file -> sorted, merged [start, end] line ranges
     for p in props:
         parsed = _r15_prop_key(p.get("location") or "", sub_keys, main_name)
         if parsed is None:
             continue
         key, p_start, p_end = parsed
-        covered_lines.setdefault(key, set()).update(range(p_start, p_end + 1))
+        spans.setdefault(key, []).append((p_start, p_end))
+    for key, ranges in spans.items():
+        ranges.sort()
+        merged = [list(ranges[0])]
+        for a, b in ranges[1:]:
+            if a <= merged[-1][1] + 1:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        spans[key] = merged
+    span_starts = {key: [a for a, _ in ranges] for key, ranges in spans.items()}
 
-    order = []          # flattened (file, line, is_section_line)
+    def is_covered(key, line):
+        ranges = spans.get(key)
+        if not ranges:
+            return False
+        i = bisect.bisect_right(span_starts[key], line) - 1
+        return i >= 0 and ranges[i][1] >= line
+
+    order = []          # flattened (file, line, kind); kind: "line" | "section" | "break"
     expanded = set()
 
     def walk(key):
         expanded.add(key)
         in_verbatim = False
         for lineno, raw in enumerate(lines_by_file[key], start=1):
+            line = _strip_line_comment(raw)
             if in_verbatim:
-                order.append((key, lineno, False))
-                if _VERB_END_RE.search(raw):
+                order.append((key, lineno, "line"))
+                if _VERB_END_RE.search(line):
                     in_verbatim = False
                 continue
-            if _VERB_BEGIN_RE.search(raw):
-                order.append((key, lineno, False))
-                in_verbatim = True
+            begin = _VERB_BEGIN_RE.search(line)
+            if begin:
+                order.append((key, lineno, "line"))
+                in_verbatim = not _VERB_END_RE.search(line, begin.end())
                 continue
-            line = _strip_line_comment(raw)
-            order.append((key, lineno, bool(_R15_SECTION_RE.match(line))))
+            order.append((key, lineno,
+                          "section" if _R15_SECTION_RE.match(line) else "line"))
             for target in _R15_INPUT_RE.findall(line):
                 child = _r15_input_key(target)
                 if child in lines_by_file and child not in expanded:
                     walk(child)
 
-    walk(None if None in lines_by_file else next(iter(lines_by_file)))
+    # Main file first, in document order. A corpus file the walk never reached
+    # (an \input spelled through a symlink, a caller without a main key) is
+    # still checked, appended on its own — never silently dropped. A "break"
+    # before it keeps its section-less head out of the previous section.
+    for key in sorted(lines_by_file, key=lambda k: (k is not None, k or "")):
+        if key not in expanded:
+            if order:
+                order.append((None, 0, "break"))
+            walk(key)
 
-    heads = [i for i, (_, _, is_sec) in enumerate(order) if is_sec]
+    heads = [i for i, (_, _, kind) in enumerate(order) if kind != "line"]
     warnings = []
     for n, head in enumerate(heads):
+        if order[head][2] == "break":
+            continue
         stop = heads[n + 1] if n + 1 < len(heads) else len(order)
-        if any(line in covered_lines.get(key, ()) for key, line, _ in order[head:stop]):
+        if any(is_covered(key, line) for key, line, _ in order[head:stop]):
             continue
         key, start, _ = order[head]
         title = lines_by_file[key][start - 1].strip()[:80]

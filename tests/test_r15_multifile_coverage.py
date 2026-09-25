@@ -140,3 +140,37 @@ def test_input_inside_verbatim_is_ignored():
     corpus = {None: "\\section{A}\n\\begin{verbatim}\n\\input{b}\n\\end{verbatim}\n", "b.tex": "B.\n"}
     w = warned([{"location": "b.tex:L1"}], corpus)
     assert "section:L1" in w
+
+
+# ---- verify round 2 (#13): nothing may drop out of the walk silently ----
+
+def test_corpus_file_the_walk_never_reaches_is_still_checked():
+    # e.g. \input through a symlink: the resolver keys the real path.
+    corpus = {None: "\\section{A}\n\\input{link/a}\n", "real/a.tex": "\\section{Hidden}\n"}
+    assert "section:real/a.tex:L1" in warned([], corpus)
+
+
+def test_corpus_without_main_key_checks_every_file():
+    w = warned([], {"b.tex": "\\section{X}\n", "a.tex": "\\section{Y}\n"})
+    assert {"section:b.tex:L1", "section:a.tex:L1"} <= w
+
+
+def test_commented_begin_verbatim_does_not_hide_later_sections():
+    w = warned([], {None: "\\section{A}\n% \\begin{verbatim}\n\\section{B}\n\\section{C}\n"})
+    assert {"section:L1", "section:L3", "section:L4"} <= w
+
+
+def test_one_line_verbatim_closes_on_the_same_line():
+    w = warned([], {None: "\\section{A}\n\\begin{verbatim}x\\end{verbatim}\n\\section{B}\n"})
+    assert "section:L3" in w
+
+
+def test_empty_corpus_has_no_sections():
+    assert warned([], {}) == set()
+
+
+def test_huge_location_range_is_cheap():
+    import time
+    t = time.time()
+    warned([{"location": "L1-L50000000"}], {None: "\\section{A}\nx\n"})
+    assert time.time() - t < 0.5

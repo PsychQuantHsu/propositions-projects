@@ -42,11 +42,13 @@ propositions 帳冊（`main.jsonl`）把稿件拆成命題，每筆有 UUIDv7 `i
 
 proofread checklist 每行形如 ``- [x] **P012** `019e2fbe` [claim] @L10-L12 — "…"``。原設計只用 `uuid_short` 前綴解析；**對真實帳冊實跑後推翻**：UUIDv7 的前段是時間戳，同一批抽取的命題共用前 8 碼（實測一份 364 筆的帳冊中，245 筆共用同一前綴），前綴幾乎總是不唯一。
 
-改為依序縮小：id 前綴 → 行內引號中的文字片段（空白正規化後比對 `text` 開頭，只要有片段就一律套用）→ `P{seq}` view ordinal。片段排在 ordinal 前，因為 ordinal 在帳冊增刪命題後會整批位移，片段不會。片段一律套用（即使前綴已唯一），因為文字改寫後的舊判定不應記成現行判定。
+改為：一行只有在 id 前綴與行內引號中的文字片段（空白正規化後比對 `text` 開頭）**同時**指向唯一一筆命題時才解析。片段是必要條件：抽不到片段的行整批失敗，不退化成別的比對方式。
+
+**view ordinal（`P{seq}`）不用來解析。** 初版曾以 ordinal 在片段之後破同分；verify 以實例證明，片段抽取失敗（行尾加了審查者註記）時程式會退化成純 ordinal 比對，而帳冊增刪後 ordinal 已位移，判定就安靜地接到另一筆命題，exit 0。ordinal 唯一能救的情況（兩筆命題開頭 80 字相同）恰恰也是它最容易接錯的情況，所以拿掉；那種行改為整批失敗，由人處理。實測一份 364 筆帳冊、從現行帳冊產生的 40 行 checklist，不用 ordinal 仍全數解析。
 
 兩種失敗分開處理：縮小後仍多於一筆 → 一律整批失敗（錯接到別的命題比少一筆紀錄危險）；一筆都沒有（文字在 checklist 產生後改寫、或命題重抽換了 id）→ 預設整批失敗，`--allow-unmatched` 時略過並列在 stderr，因為它不可能錯接。實測一份 2026-08 的舊 checklist：46 行中 45 行因帳冊重抽而無對應，其中 11 行的文字仍在、但已換成新 id——依文字轉移判定到新 id 並不安全（新命題的 asserts／cites 可能不同），所以不做。
 
-對應：`[x]`→`supported`、`[~]`→`partial`、`[-]`→`not_attempted`、`[ ]` 略過。`evidence_ref` 為 `<checklist 路徑>:L<行號>`。`[~]` 對應 `partial` 而非 `refuted`：proofread 的 finding 多半是帳冊拆解或引用的瑕疵，不等於命題為假。
+對應：`[x]`／`[X]`→`supported`、`[~]`→`partial`、`[-]`→`not_attempted`、`[ ]` 略過。`evidence_ref` 為 `<checklist 路徑>:L<行號>`。`[~]` 對應 `partial` 而非 `refuted`：proofread 的 finding 多半是帳冊拆解或引用的瑕疵，不等於命題為假。
 
 proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢查（拆解忠實、claim_type、引用完整、引用推得出、evidence_class、location）都通過，是對帳冊條目與論證鏈的檢查，不是形式證明。
 
@@ -62,7 +64,7 @@ proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢
 
 **proofread-to-verification.py**
 
-- 呼叫：`proofread-to-verification.py --checklist <.proofread/x.md> --ledger <main.jsonl> [--checked-at YYYY-MM-DD] [--checker NAME] [--allow-unmatched]`，JSONL 寫到 stdout。`--checked-at` 預設為今天（臺北時間）。
+- 呼叫：`proofread-to-verification.py --checklist <.proofread/x.md> --ledger <main.jsonl> [--checked-at YYYY-MM-DD] [--checker NAME] [--allow-unmatched]`，JSONL 寫到 stdout。`--checked-at` 預設為今天（臺北時間），且與 validator 的 V4 用同一條規則（恰為 `YYYY-MM-DD`），不合即 exit 2。
 - 任一行縮小後仍不唯一：exit 1，stderr 列出行號，stdout 不寫任何東西。任一行無對應：預設同上；`--allow-unmatched` 時略過並在 stderr 列出。
 - 不符合 checklist 行格式的行（標題、Findings 表格）一律忽略。
 
@@ -74,7 +76,7 @@ proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢
 
 ## Risks / Trade-offs
 
-- [uuid_short 前綴在 UUIDv7 帳冊上幾乎必撞] → 以文字片段與 ordinal 縮小；仍不唯一即整批失敗並列出行號。
+- [uuid_short 前綴在 UUIDv7 帳冊上幾乎必撞] → 以必要的文字片段縮小；仍不唯一即整批失敗並列出行號，永不以位置猜。
 - [舊 checklist 大量無對應] → 預設失敗提醒重做 proofread；`--allow-unmatched` 只轉仍對得上的行。
 - [proofread 的 `supported` 被誤讀為形式證明] → VERIFICATION.md 明寫其語意；不一致報告列出方法名，讀者看得到是哪種證據。
 - [`evidence_ref` 只檢查存在，指向的檔案可能已不存在] → 第一版接受此限制；各方法接入時可加自己的證據檢查（例如 Lean 常數是否存在）。

@@ -9,11 +9,13 @@ emits one `method=proofread` record per walked line, as JSONL on stdout:
     - [-] ...                                          → status not_attempted
     - [ ] ...                                          → skipped (not walked yet)
 
-Each line is resolved to one ledger proposition by its backticked id prefix,
-then its quoted text snippet, then its ``P{seq}`` view ordinal (UUIDv7 ids
-minted together share their leading characters, so the prefix alone is often
-ambiguous). If any line still matches no proposition or more than one, nothing
-is written and the exit code is 1 — attaching a verdict to the wrong
+Each line is resolved to one ledger proposition only when its backticked id
+prefix AND its quoted text snippet agree on exactly one (UUIDv7 ids minted
+together share their leading characters, so the prefix alone is often
+ambiguous; the view ordinal is never used, because it shifts when the ledger
+changes). A walked line without a quoted snippet, an unknown mark, or a line
+matching more than one proposition aborts: nothing is written and the exit
+code is 1 — attaching a verdict to the wrong
 proposition is worse than missing one. Every other line (headings, the Findings table) is ignored.
 
 `supported` from proofread means the six reading checks passed (see
@@ -45,8 +47,10 @@ _LINE_RE = re.compile(r"^\s*-\s*\[(?P<mark>.)\]\s*\*\*P\d+\*\*\s*`(?P<prefix>[0-
 TAIPEI = datetime.timezone(datetime.timedelta(hours=8))
 
 
-_SNIPPET_RE = re.compile(r'\u2014\s*"(?P<snip>.*)"\s*\(asserts')
-_ORDINAL_RE = re.compile(r"\*\*(?P<ord>P\d+)\*\*")
+# The quoted text after the dash: em/en dash or hyphen, straight or curly
+# quotes. Anything after the closing quote (asserts counts, a reviewer's note)
+# is ignored.
+_SNIPPET_RE = re.compile(r'[\u2014\u2013-]\s*["\u201c](?P<snip>.+?)["\u201d](?=[^"\u201d]*$)')
 
 
 def _load_validator():
@@ -57,8 +61,19 @@ def _load_validator():
     return module
 
 
-def _collapse(text: str) -> str:
-    return " ".join(text.split())
+def _is_date(value) -> bool:
+    """Same rule as validate-verification.py's V4: exactly YYYY-MM-DD."""
+    if not (isinstance(value, str) and len(value) == 10):
+        return False
+    try:
+        datetime.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _collapse(text) -> str:
+    return " ".join(text.split()) if isinstance(text, str) else ""
 
 
 def _snippet(line: str) -> str | None:
@@ -72,35 +87,27 @@ def _snippet(line: str) -> str | None:
     return _collapse(snip) or None
 
 
-def _resolve(line: str, prefix: str, ledger, ordinals) -> tuple[list[str], str]:
-    """Narrow the ledger to this line's proposition. Returns (ids, stage).
+def _resolve(line: str, prefix: str, ledger) -> tuple[list[str], str | None]:
+    """Narrow the ledger to this line's proposition. Returns (ids, problem).
 
     UUIDv7 ids minted in one batch share their leading timestamp, so the
-    checklist's short prefix is often ambiguous. Narrow in order: id prefix,
-    then the quoted text snippet, then the view ordinal (``P{seq}``). The
-    ordinal comes last because it shifts whenever the ledger gains or loses a
-    proposition; the snippet survives that.
+    checklist's short prefix is often ambiguous. A line resolves only when its
+    id prefix AND its quoted text snippet agree on exactly one proposition.
+    The snippet is mandatory: without it a line could only be matched by
+    position, and a position-only match is how a verdict lands on the wrong
+    proposition after the ledger changes. The view ordinal is never used.
     """
-    ids = [p["id"] for p in ledger if p["id"].lower().startswith(prefix)]
     snip = _snippet(line)
-    if snip is not None:
-        # Always applied, even to a unique prefix: a verdict on text that has
-        # since been rewritten must not be recorded as current.
-        texts = {p["id"]: _collapse(p.get("text", "")) for p in ledger}
-        ids = [i for i in ids if texts[i].startswith(snip)]
-    if len(ids) <= 1:
-        return ids, "text snippet" if snip is not None else "prefix"
-    m = _ORDINAL_RE.search(line)
-    if ordinals and m:
-        narrowed = [i for i in ids if ordinals.get(i) == m.group("ord")]
-        if narrowed:
-            return narrowed, "ordinal"
-    return ids, "ordinal"
+    if snip is None:
+        return [], "has no quoted text snippet to confirm which proposition it means"
+    ids = [p["id"] for p in ledger
+           if isinstance(p.get("id"), str) and p["id"].lower().startswith(prefix)
+           and _collapse(p.get("text")).startswith(snip)]
+    return ids, None
 
 
 def convert(text: str, checklist_ref: str, ledger, checked_at: str,
-            checker: str | None = None, ordinals: dict[str, str] | None = None,
-            allow_unmatched: bool = False):
+            checker: str | None = None, allow_unmatched: bool = False):
     """Return (records, problems, skipped). Records are empty whenever problems exist.
 
     A line matching NO proposition (its text was rewritten or removed since the
@@ -108,9 +115,7 @@ def convert(text: str, checklist_ref: str, ledger, checked_at: str,
     it is listed in ``skipped`` instead — it cannot attach a verdict to the
     wrong proposition. A line matching SEVERAL is always a problem.
 
-    ``ledger`` is the list of ledger props (``id`` and ``text`` are read);
-    ``ordinals`` maps id to its view ordinal (``P001``…), used only to break
-    ties the prefix and text snippet leave.
+    ``ledger`` is the list of ledger props (``id`` and ``text`` are read).
     """
     records, problems, skipped = [], [], []
     for lineno, line in enumerate(text.splitlines(), 1):
@@ -122,13 +127,16 @@ def convert(text: str, checklist_ref: str, ledger, checked_at: str,
             problems.append(f"L{lineno}: unknown checklist mark [{m.group('mark')}]")
             continue
         prefix = m.group("prefix").lower()
-        matches, stage = _resolve(line, prefix, ledger, ordinals)
+        matches, why = _resolve(line, prefix, ledger)
+        if why is not None:
+            problems.append(f"L{lineno}: {why}")
+            continue
         if not matches and allow_unmatched:
             skipped.append(f"L{lineno}: prefix `{prefix}` matches no ledger proposition")
             continue
         if len(matches) != 1:
             what = ("matches no ledger proposition" if not matches
-                    else f"still matches {len(matches)} propositions after the {stage}")
+                    else f"and its text snippet still match {len(matches)} propositions")
             problems.append(f"L{lineno}: prefix `{prefix}` {what}")
             continue
         record = {"prop_id": matches[0], "method": "proofread", "status": status,
@@ -150,16 +158,15 @@ def main(argv=None) -> int:
                          "checklist was generated; ambiguous lines still abort")
     args = ap.parse_args(argv)
     try:
-        datetime.date.fromisoformat(args.checked_at)
-        text = args.checklist.read_text(encoding="utf-8")
-        validator = _load_validator()
-        _, ledger, _ = validator.load_props_jsonl(args.ledger)
-        ordinals = {uid: disp for disp, uid in validator.derive_view_ordinals(args.ledger)}
+        if not _is_date(args.checked_at):
+            raise ValueError(f"--checked-at {args.checked_at!r} is not a YYYY-MM-DD date")
+        text = args.checklist.read_text(encoding="utf-8-sig")
+        _, ledger, _ = _load_validator().load_props_jsonl(args.ledger)
     except (OSError, ValueError) as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 2
     records, problems, skipped = convert(text, str(args.checklist), ledger,
-                                         args.checked_at, args.checker, ordinals,
+                                         args.checked_at, args.checker,
                                          args.allow_unmatched)
     for sk in skipped:
         print(f"⚠ {args.checklist} {sk} — skipped", file=sys.stderr)

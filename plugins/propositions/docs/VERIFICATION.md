@@ -120,19 +120,23 @@ python3 plugins/propositions/scripts/proofread-to-verification.py \
   --checker "your name" >> manuscript/propositions/verification.jsonl
 ```
 
-Checklist marks map to `[x]` → `supported`, `[~]` → `partial`, `[-]` →
-`not_attempted`; unwalked `[ ]` lines are skipped. `evidence_ref` is the
-checklist path and line. `--checked-at` defaults to today in Taipei time
-(UTC+8).
+Checklist marks map to `[x]` (or `[X]`) → `supported`, `[~]` → `partial`, `[-]`
+→ `not_attempted`; unwalked `[ ]` lines are skipped, and any other mark aborts
+the run. `evidence_ref` is the checklist path and line. `--checked-at` defaults
+to today in Taipei time (UTC+8) and must be exactly `YYYY-MM-DD`, the same rule
+as V4.
 
-Each line is resolved to one ledger proposition by narrowing: the backticked id
-prefix, then the quoted text snippet, then the `P{seq}` view ordinal. The prefix
-alone is not enough, because UUIDv7 ids minted in one extraction batch share
-their leading timestamp characters. The snippet is always compared, so a verdict
-made on text that has since been rewritten is not recorded as current.
+A line resolves to a proposition only when its backticked id prefix **and** its
+quoted text snippet (after the dash; straight or curly quotes) agree on exactly
+one. The prefix alone is not enough, because UUIDv7 ids minted in one
+extraction batch share their leading timestamp characters. The snippet is
+required, and it is compared even when the prefix is unique, so a verdict made
+on text that has since been rewritten is never recorded as current. The `P{seq}`
+ordinal is **never** used: it shifts when the ledger gains or loses a
+proposition, and matching by position is how a verdict lands on the wrong one.
 
-- A line that still matches **more than one** proposition aborts the run; nothing
-  is written.
+- A walked line with no quoted snippet, an unknown mark, or **more than one**
+  matching proposition aborts the run; nothing is written.
 - A line that matches **none** (the text was rewritten, or the ledger was
   re-extracted and the proposition got a new id) aborts by default. With
   `--allow-unmatched` it is skipped and listed on stderr, and the rest are

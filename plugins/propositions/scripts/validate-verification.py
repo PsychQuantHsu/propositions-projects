@@ -56,7 +56,7 @@ def _load_ledger_ids(ledger_path: Path) -> set[str]:
 def load_records(path: Path) -> list[tuple[int, dict | None, str | None]]:
     """(line number, record or None, parse error or None) per non-blank line."""
     out = []
-    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
         if not raw.strip():
             continue
         try:
@@ -92,6 +92,9 @@ def _check_one(lineno: int, r: dict, ledger_ids: set[str]) -> list[tuple[str, in
     missing = [k for k in REQUIRED_KEYS if k not in r]
     if missing:
         return [("V1", lineno, f"missing required key(s): {', '.join(missing)}")]
+    non_str = [k for k in (*REQUIRED_KEYS, "evidence_ref") if k in r and not isinstance(r[k], str)]
+    if non_str:
+        return [("V1", lineno, f"field(s) must be strings: {', '.join(non_str)}")]
     errors = []
     if r["prop_id"] not in ledger_ids:
         errors.append(("V2", lineno, f"prop_id {r['prop_id']!r} is not an id in the ledger"))

@@ -67,7 +67,7 @@ The validator SHALL list every proposition for which one method's latest record 
 
 ### Requirement: Proofread checklist conversion
 
-`proofread-to-verification.py` SHALL read a `.proofread/<file>.md` checklist and the ledger, and SHALL emit one `method=proofread` record per checklist line of the form `- [<mark>] **P<seq>** \`<uuid-prefix>\` ... — "<text snippet>" ...`. The mapping SHALL be `[x]` to `supported`, `[~]` to `partial`, `[-]` to `not_attempted`; `[ ]` lines SHALL be skipped. Each line SHALL be resolved to exactly one ledger `id` by narrowing, in order: ids starting with `<uuid-prefix>`; among those, props whose whitespace-collapsed `text` starts with the snippet (always applied when a snippet is present); if still more than one, the prop whose view ordinal equals `P<seq>`. A line left with more than one candidate SHALL cause a non-zero exit naming the line with no records written. A line left with no candidate SHALL do the same by default; with `--allow-unmatched` it SHALL be skipped and listed on stderr instead. `evidence_ref` SHALL be the checklist path with the line number.
+`proofread-to-verification.py` SHALL read a `.proofread/<file>.md` checklist and the ledger, and SHALL emit one `method=proofread` record per checklist line of the form `- [<mark>] **P<seq>** \`<uuid-prefix>\` ... — "<text snippet>" ...`. The mapping SHALL be `[x]` or `[X]` to `supported`, `[~]` to `partial`, `[-]` to `not_attempted`; `[ ]` lines SHALL be skipped; any other mark SHALL cause a non-zero exit naming the line. Each walked line SHALL carry a quoted text snippet after a dash (em dash, en dash or hyphen; straight or curly quotes); a walked line without one SHALL cause a non-zero exit naming the line. A line SHALL resolve only when exactly one ledger prop has an `id` starting with `<uuid-prefix>` and a whitespace-collapsed `text` starting with the snippet. The view ordinal `P<seq>` SHALL NOT be used to resolve a line. A line with more than one candidate SHALL cause a non-zero exit naming the line with no records written. A line with no candidate SHALL do the same by default; with `--allow-unmatched` it SHALL be skipped and listed on stderr instead. `evidence_ref` SHALL be the checklist path with the line number.
 
 #### Scenario: Clean walk becomes supported
 
@@ -81,8 +81,13 @@ The validator SHALL list every proposition for which one method's latest record 
 
 #### Scenario: Ambiguous line aborts
 
-- **WHEN** after prefix, snippet and ordinal a line still matches two ledger ids
+- **WHEN** two ledger props share the line's id prefix and both texts start with its snippet
 - **THEN** the script exits non-zero, names the line, and writes no output, with or without `--allow-unmatched`
+
+#### Scenario: Position never decides
+
+- **WHEN** a line's snippet cannot be read, or two candidates remain and the line's `P<seq>` matches one of them
+- **THEN** the script exits non-zero and writes no output; it does not pick a candidate by ordinal
 
 #### Scenario: Rewritten text is skipped only on request
 

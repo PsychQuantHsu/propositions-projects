@@ -546,7 +546,7 @@ python3 scripts/migrate-json-to-jsonl.py <input.json> [--delete-input]
 |---------|---------------------|----------|
 | JSON 改了某 prop `text` 但對應 `.tex` 不再含該字串 | ✅ R1 報「`text` not found in .tex (location=…)」 | Author 確認哪邊正確;`.tex` 是 source of truth → 改回 prop 或更新 `.tex` |
 | `.tex` 刪某段但 JSON 留 prop 指向該段 | ✅ R1 (normalize 後 substring miss) | Author 刪 prop + 注意 `cites: [P037]` 的 down-stream props |
-| `.tex` 整個 top-level section 沒被任何 prop 覆蓋 | ✅ R1.5 報「no prop covers section (Lstart-end): title」(warning,不 fail exit) | Author 為該 section 加 ≥1 prop |
+| `.tex` 整個 top-level section 沒被任何 prop 覆蓋 | ✅ R1.5 報「no prop covers section at [<relpath>.tex:]L<n>: title」(warning,不 fail exit;section 範圍依 `\input` 展開後的文件順序計算) | Author 為該 section 加 ≥1 prop |
 | `.tex` 加 1 句新 claim 在已 covered 的 section 內(prop 未更新)| ❌ Phase 1 miss (因 R1.5 只看 section-level coverage, R1 只看 prop⊆tex 不看 tex⊆∪props 的 sentence-level)| 等 Phase 2 clause-level surjective scan,或 author 自己人工 audit 該 section |
 | 兩 props `text` 都 substring-match 同 `.tex` 段(injectivity 違反)| ❌ Phase 1 miss (R1 substring match 不 enforce injective)| 等 Phase 2 — clause-level granularity 後 substring match 等價 verbatim,injective 自動成立 |
 | Connective / reference / transition 沒被 prop 標 `claim_type` | ❌ Phase 1 miss (extraction 階段未 commit 到 clause-level) | 等 Phase 2 — clause-level extraction 會強制標 |

@@ -45,9 +45,11 @@ Checks:
 Refs PsychQuantHsu/psychophysical_representations#69
 """
 import argparse
+import bisect
 import datetime
 import json
 import os
+import posixpath
 import re
 import sys
 from pathlib import Path
@@ -67,6 +69,9 @@ from _lib.latex_env_parser import (  # noqa: E402  (sys.path setup must precede)
     parse_newtheorem_declarations,
     parse_location_v16,
     resolve_input_tree,
+    _strip_line_comment,
+    _VERB_BEGIN_RE,
+    _VERB_END_RE,
 )
 
 
@@ -432,27 +437,71 @@ def check_iso(props, tex_string):
 # --------- R1.5: surjective coverage (section-level, Phase 1) ---------
 
 
-def _parse_location_range(loc):
-    """Parse 'main.tex:L<start>-L<end>' or 'main.tex:L<line>' → (start, end).
+_R15_SECTION_RE = re.compile(r"^\\section\*?(?:\[[^\]]*\])?\{")
+_R15_INPUT_RE = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
+_R15_LOC_PREFIX_RE = re.compile(r"^\s*([^:{}\s]+\.tex):L\d")
 
-    Returns (None, None) when unparseable (caller treats as no coverage).
+
+def _r15_input_key(target):
+    """Normalize an ``\\input`` target the way corpus keys are built.
+
+    Corpus keys are ``os.path.relpath`` of the resolved file against the main
+    file's directory, so ``./parts/b`` and ``parts/x/../b`` must both become
+    ``parts/b.tex``.
     """
-    m = re.match(r"[^:]+:L(\d+)(?:-L(\d+))?", loc or "")
-    if not m:
-        return None, None
-    start = int(m.group(1))
-    end = int(m.group(2)) if m.group(2) else start
-    return start, end
+    target = target.strip()
+    if not target.endswith(".tex"):
+        target += ".tex"
+    return posixpath.normpath(target)
 
 
-def check_surjective_coverage(props, tex_string):
+def _r15_prop_key(loc, sub_keys, main_name):
+    """Which corpus file a prop's location points at, or ``...`` if unparseable.
+
+    ``parse_location_v16`` maps a literal ``main.tex:`` prefix to the main file
+    (pre-v1.6 ledgers). Two cases need the corpus to decide:
+
+    - the main file is named something else (``thesis.tex``) and a legacy
+      ledger prefixes that name → still the main file;
+    - a SUB-file is itself called ``main.tex`` → the prefix means that
+      sub-file, not the main file.
+    """
+    parsed = parse_location_v16(loc)
+    if parsed is None:
+        return None
+    key, start, end = parsed
+    raw = _R15_LOC_PREFIX_RE.match(loc)
+    raw = posixpath.normpath(raw.group(1)) if raw else None
+    if raw is not None and raw in sub_keys:
+        key = raw
+    elif raw is not None and raw == main_name:
+        key = None
+    return key, start, end
+
+
+def check_surjective_coverage(props, corpus, main_name=None):
     """R1.5 surjective coverage at top-level section granularity.
 
-    Find every top-level section command in tex; for each section [start, end]
-    check that at least one prop's location overlaps the range. Sections with
-    zero props → warning. Errors are NOT raised (Phase 1 heterogeneous-
-    granularity prototype may legitimately under-extract some sections —
-    see #77).
+    Find every top-level section command; for each section check that at least
+    one prop covers it. Sections with zero props → warning. Errors are NOT
+    raised (Phase 1 heterogeneous-granularity prototype may legitimately
+    under-extract some sections — see #77).
+
+    ``corpus`` maps a file key to its text: ``None`` is the main file and every
+    other key is the ``\\input`` target's path relative to the main file's
+    directory — the same keys v1.6 ``location`` prefixes use. A plain string is
+    accepted as a single-file manuscript. ``main_name`` is the main file's
+    basename, so a legacy prefix naming it resolves to the main file.
+
+    Sections are found in DOCUMENT ORDER (#13): the input tree is flattened
+    into a sequence of ``(file, line)`` positions, expanding each ``\\input``
+    where it occurs, and a section runs from its ``\\section`` line to the
+    position before the next one — wherever that is. So parent text after an
+    ``\\input`` whose child opens a section belongs to the child's last
+    section, exactly as in the compiled paper. A prop covers a section when it
+    points at one of the section's positions in the SAME file. Commented-out
+    lines and verbatim bodies never open a section or expand an ``\\input``;
+    a file already expanded is not expanded again (as the resolver does).
 
     Matches all top-level section variants:
         \\section{Title}              standard
@@ -462,43 +511,87 @@ def check_surjective_coverage(props, tex_string):
 
     Returns (errors, warnings) where errors is always empty in Phase 1.
     """
-    section_pattern = re.compile(r"^\\section\*?(?:\[[^\]]*\])?\{", re.MULTILINE)
-    sections = []
-    lines = tex_string.split("\n")
-    section_starts = [
-        i + 1
-        for i, line in enumerate(lines)
-        if section_pattern.match(line)
-    ]
-    if not section_starts:
-        return [], []
-    total_lines = len(lines)
-    for idx, start in enumerate(section_starts):
-        end = (
-            section_starts[idx + 1] - 1
-            if idx + 1 < len(section_starts)
-            else total_lines
-        )
-        title = lines[start - 1].strip()[:80]
-        sections.append((start, end, title))
+    if isinstance(corpus, str):
+        corpus = {None: corpus}
+    lines_by_file = {key: text.split("\n") for key, text in corpus.items()}
+    sub_keys = {k for k in lines_by_file if k is not None}
 
-    warnings = []
-    for start, end, title in sections:
-        covered = False
-        for p in props:
-            p_start, p_end = _parse_location_range(p.get("location"))
-            if p_start is None:
+    spans = {}          # file -> sorted, merged [start, end] line ranges
+    for p in props:
+        parsed = _r15_prop_key(p.get("location") or "", sub_keys, main_name)
+        if parsed is None:
+            continue
+        key, p_start, p_end = parsed
+        spans.setdefault(key, []).append((p_start, p_end))
+    for key, ranges in spans.items():
+        ranges.sort()
+        merged = [list(ranges[0])]
+        for a, b in ranges[1:]:
+            if a <= merged[-1][1] + 1:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        spans[key] = merged
+    span_starts = {key: [a for a, _ in ranges] for key, ranges in spans.items()}
+
+    def is_covered(key, line):
+        ranges = spans.get(key)
+        if not ranges:
+            return False
+        i = bisect.bisect_right(span_starts[key], line) - 1
+        return i >= 0 and ranges[i][1] >= line
+
+    order = []          # flattened (file, line, kind); kind: "line" | "section" | "break"
+    expanded = set()
+
+    def walk(key):
+        expanded.add(key)
+        in_verbatim = False
+        for lineno, raw in enumerate(lines_by_file[key], start=1):
+            line = _strip_line_comment(raw)
+            if in_verbatim:
+                order.append((key, lineno, "line"))
+                if _VERB_END_RE.search(line):
+                    in_verbatim = False
                 continue
-            if p_start <= end and p_end >= start:
-                covered = True
-                break
-        if not covered:
-            warnings.append((
-                f"section:L{start}",
-                f"no prop covers section (L{start}-{end}): {title}",
-            ))
-    return [], warnings
+            begin = _VERB_BEGIN_RE.search(line)
+            if begin:
+                order.append((key, lineno, "line"))
+                in_verbatim = not _VERB_END_RE.search(line, begin.end())
+                continue
+            order.append((key, lineno,
+                          "section" if _R15_SECTION_RE.match(line) else "line"))
+            for target in _R15_INPUT_RE.findall(line):
+                child = _r15_input_key(target)
+                if child in lines_by_file and child not in expanded:
+                    walk(child)
 
+    # Main file first, in document order. A corpus file the walk never reached
+    # (an \input spelled through a symlink, a caller without a main key) is
+    # still checked, appended on its own — never silently dropped. A "break"
+    # before it keeps its section-less head out of the previous section.
+    for key in sorted(lines_by_file, key=lambda k: (k is not None, k or "")):
+        if key not in expanded:
+            if order:
+                order.append((None, 0, "break"))
+            walk(key)
+
+    heads = [i for i, (_, _, kind) in enumerate(order) if kind != "line"]
+    warnings = []
+    for n, head in enumerate(heads):
+        if order[head][2] == "break":
+            continue
+        stop = heads[n + 1] if n + 1 < len(heads) else len(order)
+        if any(is_covered(key, line) for key, line, _ in order[head:stop]):
+            continue
+        key, start, _ = order[head]
+        title = lines_by_file[key][start - 1].strip()[:80]
+        where = f"L{start}" if key is None else f"{key}:L{start}"
+        warnings.append((
+            f"section:{where}",
+            f"no prop covers section at {where}: {title}",
+        ))
+    return [], warnings
 
 # --------- R2: cite resolve ---------
 
@@ -1528,7 +1621,7 @@ def main():
     all_warnings.extend([("R1", *w) for w in iso_warnings])
 
     # R1.5 surjective coverage at top-level section granularity
-    surj_errors, surj_warnings = check_surjective_coverage(props, tex_string)
+    surj_errors, surj_warnings = check_surjective_coverage(props, corpus, main_name=tex_path.name)
     if surj_errors:
         all_errors.extend([("R1.5", *e) for e in surj_errors])
     elif surj_warnings:

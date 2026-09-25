@@ -305,6 +305,39 @@ def normalize_for_match(s: str) -> str:
 # --------- R1: prop-subset-check (Phase 1 partial-bijection) ---------
 
 
+# `retired` (schema v1.4+, SCHEMA.md): how a disabled passage is disabled decides
+# whether R1 can still see its text. Only these two hide it from R1.
+RETIRED_MECHANISMS = ("comment_env", "line_comment", "removed")
+RETIRED_ABSENT_MECHANISMS = ("line_comment", "removed")
+RETIRED_REQUIRED_KEYS = ("since", "mechanism", "match", "reason")
+
+
+def retired_problem(p):
+    """Return None for a well-formed `retired` block (or none at all), else why not.
+
+    A malformed block must never buy an exemption from R1, so callers treat a
+    non-None result exactly as if the prop were live (#1).
+    """
+    block = p.get("retired")
+    if block is None:
+        return None
+    if not isinstance(block, dict):
+        return "`retired` must be an object"
+    missing = [k for k in RETIRED_REQUIRED_KEYS if not block.get(k)]
+    if missing:
+        return f"`retired` missing required key(s): {', '.join(missing)}"
+    if block["mechanism"] not in RETIRED_MECHANISMS:
+        return (f"`retired.mechanism` {block['mechanism']!r} not in "
+                f"{'/'.join(RETIRED_MECHANISMS)}")
+    return None
+
+
+def retired_expected_absent(p):
+    """True when a well-formed `retired` block says R1 cannot see this text."""
+    return (retired_problem(p) is None and p.get("retired") is not None
+            and p["retired"]["mechanism"] in RETIRED_ABSENT_MECHANISMS)
+
+
 def check_iso(props, tex_string):
     """R1 prop-subset-check (Phase 1 partial-bijection).
 
@@ -317,18 +350,46 @@ def check_iso(props, tex_string):
     ≥1 prop covering it — surjectivity) is checked in R1.5. Full bijection
     contract awaits Phase 2 clause-level re-extraction (see issue #77).
 
-    Returns list of (prop_id, error_msg) tuples.
+    `retired` (v1.4+, #1): a well-formed block with mechanism `line_comment` or
+    `removed` makes the absence EXPECTED — reported in `retired_absent`, not in
+    `errors`. `comment_env` text is still in the source, so it is checked like a
+    live prop and still blocks if it vanished. A malformed block is an error and
+    grants no exemption.
+
+    Returns (errors, retired_absent, warnings), each a list of (prop_id, msg).
     """
-    errors = []
+    errors, retired_absent, warnings = [], [], []
     normalized_tex = normalize_for_match(tex_string)
     for p in props:
+        loc = p.get("location", "?")
+        problem = retired_problem(p)
         text_norm = normalize_for_match(p["text"])
-        if text_norm not in normalized_tex:
-            errors.append((
-                p["id"],
-                f"text not found in .tex (location={p.get('location', '?')})"
-            ))
-    return errors
+        # An empty normalized text (e.g. a prop whose text is itself a `%`
+        # comment line) is a substring of anything — never evidence of presence.
+        present = bool(text_norm) and text_norm in normalized_tex
+        if problem is not None:
+            if not present:
+                errors.append((p["id"], f"text not found in .tex (location={loc}); "
+                               f"{problem} — no retired exemption applied"))
+            else:
+                warnings.append((p["id"], f"{problem} (text present, so R1 passes)"))
+            continue
+        if retired_expected_absent(p):
+            mech = p["retired"]["mechanism"]
+            if present:
+                warnings.append((p["id"], f"retired as {mech} but its text is still in "
+                                 f"the .tex — stale retirement marker? (location={loc})"))
+            else:
+                retired_absent.append((p["id"], f"retired ({mech}, since "
+                                       f"{p['retired']['since']}): text expected absent"))
+            continue
+        if not text_norm:
+            warnings.append((p["id"], f"text normalizes to empty (e.g. a %-comment "
+                             f"line), so R1 cannot check it (location={loc})"))
+            continue
+        if not present:
+            errors.append((p["id"], f"text not found in .tex (location={loc})"))
+    return errors, retired_absent, warnings
 
 
 # --------- R1.5: surjective coverage (section-level, Phase 1) ---------
@@ -1086,6 +1147,8 @@ def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False)
         text_norm = normalize_for_match(p.get("text", ""))
         if not text_norm:
             continue  # empty text — nothing to anchor
+        if retired_expected_absent(p):
+            continue  # disabled passage: its text is expected to be gone (#1)
         loc = p.get("location")
         parsed_v16 = parse_location_v16(loc or "")
         relpath = parsed_v16[0] if parsed_v16 else None
@@ -1412,11 +1475,17 @@ def main():
     # R1 prop-subset-check (Phase 1 partial-bijection; full bijection awaits #77)
     # v1.6: matched against the union of the input tree (main + parts) —
     # per-file location correctness is R13's job.
-    iso_errors = check_iso(props, "\n".join(corpus.values()))
+    iso_errors, iso_retired, iso_warnings = check_iso(props, "\n".join(corpus.values()))
     if iso_errors:
         all_errors.extend([("R1", *e) for e in iso_errors])
     else:
         print("[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)")
+    if iso_retired:
+        print(f"[INFO] R1 retired — {len(iso_retired)} prop(s) expected-absent "
+              f"(retired as line_comment/removed); not counted as errors")
+        for pid, msg in iso_retired:
+            print(f"  [R1-retired] {pid}: {msg}")
+    all_warnings.extend([("R1", *w) for w in iso_warnings])
 
     # R1.5 surjective coverage at top-level section granularity
     surj_errors, surj_warnings = check_surjective_coverage(props, tex_string)

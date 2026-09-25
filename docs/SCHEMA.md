@@ -298,6 +298,8 @@ audit trail, and leaving it unmarked makes the ledger silently over-claim.
 
 `mechanism` enum: `comment_env`(inside `\begin{comment}…\end{comment}` — R1 passes,normalize 不剝 comment 環境)/ `line_comment`(`%` 行註解 — R1 fails)/ `removed`(source 已刪 — R1 fails)。R1-visibility 不對稱是 validator artifact,正是 `retired` 記 mechanism 而非 boolean 的理由。
 
+**Validator 行為(#1)**:mechanism 為 `line_comment` / `removed` 且格式完整的 `retired`,其原文缺席列為 **expected-absent**(R1 另行報告、不計錯誤;R13 略過錨定);原文其實仍在時發 warning(退役標記可能過時)。`comment_env` 照常檢查,原文消失仍擋。`retired` 缺必填欄位或 mechanism 不在列舉內 → 不給任何豁免。另:命題 `text` 若本身就是 `%` 註解行,正規化後為空字串,過去會空洞地通過 R1;現在現役命題會收到 warning,退役命題歸為 expected-absent。
+
 ## Multi-file manuscripts (v1.6+)
 
 主檔(`_meta.json` `source.file`)以 `\input{...}` / `\include{...}` 引入其他

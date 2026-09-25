@@ -43,7 +43,7 @@
 
 ## Implementation Contract
 
-**Behavior**：`python3 plugins/tschema-check/scripts/validate-tschema.py --records <tschema.jsonl> --document <被檢文件>` 逐行檢查紀錄，輸出 `[T<n>] L<line>: <message>`，接著按 `source_locator.type` 列出「T4 查核 N 筆／未機械查核 M 筆」，最後 `=== N ERROR(s) ===` 或 `✓ ALL TSCHEMA CHECKS PASSED`。
+**Behavior**：`python3 plugins/tschema-check/scripts/validate-tschema.py --records <tschema.jsonl> --document <被檢文件>` 逐行檢查紀錄，輸出 `[T<n>] L<line>: <message>`，接著按 `source_locator.type` 列出「T4 查核 N 筆／未機械查核 M 筆」，最後 `=== N ERROR(s) ===` 或 `✓ NO ERRORS — N of M claim(s) checked against their source`（結尾一律寫出覆蓋率，不印無條件的 PASS）。
 
 **檢查**：T1 形狀與列舉（error）；T2 `text` 不在被檢文件（error）；T3 `text` 不在 `location` 指定行（warning）；T4 `evidence` 不在 `source_locator.path` 來源檔、或來源檔不存在（error）；T5 `attested` 缺 `evidence` 或 `source_locator`（error）；T6 關係／邏輯紀錄指不到陳述（error）；T7 被檢文件含查證失敗字句（warning）。`path` 相對於 `tschema.jsonl` 所在目錄解析。
 

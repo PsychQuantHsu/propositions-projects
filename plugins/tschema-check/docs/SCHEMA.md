@@ -76,13 +76,13 @@ python3 plugins/tschema-check/scripts/validate-tschema.py --records tschema.json
 | T2 | error | Claim `text` is not in the checked document | R1 (substring) |
 | T3 | warning | Claim `text` is not within the lines its `location` names, or `location` is past the end of the document | R13 (line anchoring) |
 | T4 | error | `evidence` is not in the file at `source_locator.path`; that file cannot be read (missing, outside the records directory, not a regular file, over 50 MB); a `path` is named but no `evidence` quoted; or `evidence` is shorter than 4 characters after normalization | R1 generalized to an external source |
-| T5 | error | An `attested` claim has no `evidence` or no `source_locator` | — |
+| T5 | error / warning | Error: an `attested` claim has no `evidence` or no `source_locator`. Warning: an `attested` claim whose source has no local `path`, so its evidence was never compared | — |
 | T6 | error | A relation `pair` or logic `target` does not name claims in this file | — |
 | T7 | warning | A document line contains 未能查得, 未能確認, 因錄音不清 or 無從查證 (`%` comments are skipped only when the document is `.tex`; in Markdown `%` is a percentage) | — |
 
 **Matching.** Both sides are NFKC-normalized and every whitespace character is removed, so a sentence wrapped across lines still matches and full-width punctuation equals half-width. For `.srt` sources, `-->` timing lines and the cue number directly above each are removed first, so a quote spanning two cues matches; a spoken number on its own subtitle line is kept. NFKC folds full-width forms, which is the intent; it also folds CJK compatibility ideographs, a rare case where two visibly different characters compare equal. Evidence shorter than 4 characters is rejected: a quote that short is found in almost any source by chance.
 
-**Coverage summary.** The validator prints, per source type, how many claims were checked against their source and how many were not, split into "no local path" and "no evidence"; claims with no `source_locator` at all are counted under `(no source named)`. Nothing unchecked is counted as passed, and there is never one merged pass rate.
+**Coverage summary.** The validator prints, per source type, how many claims were checked against their source and how many were not, split into "no local path" and "no evidence"; claims with no `source_locator` at all are counted under `(no source named)`. Nothing unchecked is counted as passed, and there is never one merged pass rate. The closing line states coverage — `✓ NO ERRORS — N of M claim(s) checked against their source` — rather than a bare pass, so a run where nothing was checkable does not read like a verified one. `.vtt` sources are not special-cased; convert them to `.srt` or plain text.
 
 Files are read as UTF-8 (a leading BOM is fine). Convert `.docx` / `.pdf` documents to text first.
 

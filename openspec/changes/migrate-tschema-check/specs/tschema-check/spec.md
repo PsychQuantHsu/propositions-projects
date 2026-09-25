@@ -62,7 +62,7 @@ For every claim record whose `source_locator` has a `path`, the validator SHALL 
 
 ### Requirement: Attested claims carry their evidence
 
-A claim with `source_support` `attested` SHALL have a non-empty `evidence` and a `source_locator`; otherwise the validator SHALL report T5 (error).
+A claim with `source_support` `attested` SHALL have a non-empty `evidence` and a `source_locator`; otherwise the validator SHALL report T5 (error). An `attested` claim whose `source_locator` has no `path` SHALL be reported as T5 (warning), since its evidence was never compared with the source.
 
 #### Scenario: Attested without evidence
 
@@ -89,7 +89,7 @@ The validator SHALL report T7 (warning) for each line of the checked document th
 
 ### Requirement: Per-source-type summary and exit codes
 
-The validator SHALL print, per `source_locator.type`, how many claims were machine-checked by T4 and how many were not (split into no local path and no evidence), SHALL count claims with no `source_locator` under a separate "(no source named)" line, and SHALL NOT print a single merged pass rate. It SHALL exit 0 with no errors, 1 with at least one error, and 2 on usage or I/O errors.
+The validator SHALL print, per `source_locator.type`, how many claims were machine-checked by T4 and how many were not (split into no local path and no evidence), SHALL count claims with no `source_locator` under a separate "(no source named)" line, and SHALL NOT print a single merged pass rate. The final line SHALL state how many claims were checked against their source out of how many named a source, rather than an unconditional pass. It SHALL exit 0 with no errors, 1 with at least one error, and 2 on usage or I/O errors.
 
 #### Scenario: Mixed source types reported separately
 

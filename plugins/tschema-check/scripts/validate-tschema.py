@@ -256,12 +256,14 @@ def check(records, document: str, base_dir: Path, latex: bool = False):
         bucket = summary.setdefault(loc["type"], {"checked": 0, "no path": 0, "no evidence": 0})
         if "path" not in loc:
             bucket["no path"] += 1
+            if r["source_support"] == "attested":
+                warnings.append(("T5", lineno, "attested, but its source has no local path, so the "
+                                 "evidence was never compared with the source"))
             continue
         if not evidence.strip():
             bucket["no evidence"] += 1
             errors.append(("T4", lineno, f"names source file {loc['path']!r} but quotes no evidence to check"))
             continue
-        bucket["checked"] += 1
         if len(normalize(evidence)) < MIN_EVIDENCE_CHARS:
             errors.append(("T4", lineno, f"evidence is shorter than {MIN_EVIDENCE_CHARS} characters, "
                            f"too short to show it came from the source"))
@@ -270,8 +272,10 @@ def check(records, document: str, base_dir: Path, latex: bool = False):
         if source is None:
             errors.append(("T4", lineno, f"source file {loc['path']!r} cannot be read (missing, outside "
                            f"the records directory, not a regular file, or over the size limit)"))
-        elif normalize(evidence) not in source:
-            errors.append(("T4", lineno, f"evidence not found in source {loc['path']!r}"))
+        else:
+            bucket["checked"] += 1
+            if normalize(evidence) not in source:
+                errors.append(("T4", lineno, f"evidence not found in source {loc['path']!r}"))
 
     for n, line in enumerate(doc_lines, 1):
         body = _strip_percent_comment(line) if latex else line
@@ -311,7 +315,9 @@ def main(argv=None) -> int:
     if errors:
         print(f"=== {len(errors)} ERROR(s) ===")
         return 1
-    print("✓ ALL TSCHEMA CHECKS PASSED")
+    checked = sum(c["checked"] for c in summary.values())
+    total = sum(sum(c.values()) for c in summary.values())
+    print(f"✓ NO ERRORS — {checked} of {total} claim(s) checked against their source")
     return 0
 
 

@@ -298,3 +298,18 @@ def test_schema_doc_lists_every_vocabulary_value():
               *vt.LOCATOR_TYPES, *vt.RELATIONS)
     for value in values:
         assert f"`{value}`" in doc, value
+
+
+def test_attested_without_local_path_is_visible(tmp_path):
+    # verify #4 round 2: an attested claim nobody could check must not read
+    # like a verified run.
+    loc = {"type": "email", "ref": "2026-09-01 來信"}
+    r = run(tmp_path, [claim(source_locator=loc, evidence="完全捏造的一句話")])
+    assert r.returncode == 0 and "[T5]" in found(r)
+    assert "0 of 1 claim(s) checked" in r.stdout and "ALL TSCHEMA CHECKS PASSED" not in r.stdout
+
+
+def test_unreadable_source_is_not_counted_as_checked(tmp_path):
+    loc = {"type": "transcript", "ref": "x", "path": "sources/nope.srt"}
+    r = run(tmp_path, [claim(source_locator=loc)])
+    assert "0 checked against the source" in r.stdout

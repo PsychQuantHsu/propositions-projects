@@ -59,7 +59,7 @@ For each prop in `manuscript/propositions/main.jsonl`, emit one line, grouped by
 `containing_block`:
 
 ```markdown
-- [ ] **P{seq}** `{uuid_short}` [{claim_type}] @L{start}-L{end} — "{first 80 chars of text}…" (asserts: {N}, cites: {N})
+- [ ] **P{seq}** `{uuid}` [{claim_type}] @L{start}-L{end} — "{first 80 chars of text}…" (asserts: {N}, cites: {N})
 ```
 
 Add a git-blame hyperlink per line for the audit trail.
@@ -127,3 +127,4 @@ the ROI numbers above.
 - `/propositions:propositions` — the mechanical R1-R13 gate this walk assumes has passed
 - `/propositions:manuscript-audit` — cross-doc R1-R4 drift
 - Rule [`../../rules/manuscript-jsonl-sync.md`](../../rules/manuscript-jsonl-sync.md) — sync discipline for L1/L3/L4 fixes
+- [`../../docs/VERIFICATION.md`](../../docs/VERIFICATION.md) — record walk results as `method=proofread` verdicts via `scripts/proofread-to-verification.py`

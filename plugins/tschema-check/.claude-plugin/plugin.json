@@ -1,0 +1,9 @@
+{
+  "name": "tschema-check",
+  "version": "0.1.0",
+  "description": "Source-fidelity review for documents written from source material (minutes, interview notes, drafts): three layers (sentence truth conditions, relations, logic) with the principle 'stay semantically close to the original', plus a validator that checks recorded statements against the document and quoted evidence against the external source (R1 generalized to external sources).",
+  "author": {
+    "name": "Che Cheng"
+  },
+  "license": "MIT"
+}

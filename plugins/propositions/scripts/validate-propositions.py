@@ -45,8 +45,11 @@ Checks:
 Refs PsychQuantHsu/psychophysical_representations#69
 """
 import argparse
+import bisect
+import datetime
 import json
 import os
+import posixpath
 import re
 import sys
 from pathlib import Path
@@ -66,6 +69,9 @@ from _lib.latex_env_parser import (  # noqa: E402  (sys.path setup must precede)
     parse_newtheorem_declarations,
     parse_location_v16,
     resolve_input_tree,
+    _strip_line_comment,
+    _VERB_BEGIN_RE,
+    _VERB_END_RE,
 )
 
 
@@ -305,6 +311,71 @@ def normalize_for_match(s: str) -> str:
 # --------- R1: prop-subset-check (Phase 1 partial-bijection) ---------
 
 
+# `retired` (schema v1.4+, SCHEMA.md): how a disabled passage is disabled decides
+# whether R1 can still see its text. Only these two hide it from R1.
+RETIRED_MECHANISMS = ("comment_env", "line_comment", "removed")
+RETIRED_ABSENT_MECHANISMS = ("line_comment", "removed")
+RETIRED_MATCH_VALUES = ("exact", "by_reading")
+RETIRED_REQUIRED_KEYS = ("since", "mechanism", "match", "reason")
+_RETIRED_SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_COMMENT_LEAD_RE = re.compile(r"^[ \t]*%+", re.MULTILINE)
+
+
+def _is_calendar_date(text):
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
+def retired_problem(p):
+    """Return None for a well-formed `retired` block (or none at all), else why not.
+
+    A malformed block must never buy an exemption from R1, so callers treat a
+    non-None result exactly as if the prop were live (#1). Well-formed means
+    every documented format holds (SCHEMA.md `retired`), not just that the keys
+    are truthy: `since` is a YYYY-MM-DD string, `mechanism` and `match` are in
+    their enums, `reason` is a non-blank string.
+    """
+    block = p.get("retired")
+    if block is None:
+        return None
+    if not isinstance(block, dict):
+        return "`retired` must be an object"
+    missing = [k for k in RETIRED_REQUIRED_KEYS if k not in block]
+    if missing:
+        return f"`retired` missing required key(s): {', '.join(missing)}"
+    since, mech, match, reason = (block[k] for k in RETIRED_REQUIRED_KEYS)
+    if not (isinstance(since, str) and _RETIRED_SINCE_RE.match(since)
+            and _is_calendar_date(since)):
+        return f"`retired.since` {since!r} is not a YYYY-MM-DD date"
+    if not (isinstance(mech, str) and mech in RETIRED_MECHANISMS):
+        return f"`retired.mechanism` {mech!r} not in {'/'.join(RETIRED_MECHANISMS)}"
+    if not (isinstance(match, str) and match in RETIRED_MATCH_VALUES):
+        return f"`retired.match` {match!r} not in {'/'.join(RETIRED_MATCH_VALUES)}"
+    if not (isinstance(reason, str) and reason.strip()):
+        return "`retired.reason` must be a non-blank string"
+    return None
+
+
+def retired_expected_absent(p):
+    """True when a well-formed `retired` block says R1 cannot see this text."""
+    return (retired_problem(p) is None and p.get("retired") is not None
+            and p["retired"]["mechanism"] in RETIRED_ABSENT_MECHANISMS)
+
+
+def _uncommented_norm(text):
+    """Normalized text with each line's leading ``%`` removed.
+
+    A ledger may store a %-disabled line WITH its ``%`` (and trailing newline);
+    normalize_for_match then erases it entirely. Stripping the markers first
+    recovers the words, so R1 can tell "still commented out" (absent from the
+    comment-stripped .tex) from "restored as live text" (present).
+    """
+    return normalize_for_match(_COMMENT_LEAD_RE.sub("", text))
+
+
 def check_iso(props, tex_string):
     """R1 prop-subset-check (Phase 1 partial-bijection).
 
@@ -317,44 +388,120 @@ def check_iso(props, tex_string):
     ≥1 prop covering it — surjectivity) is checked in R1.5. Full bijection
     contract awaits Phase 2 clause-level re-extraction (see issue #77).
 
-    Returns list of (prop_id, error_msg) tuples.
+    Text that normalizes to empty (a stored ``%`` comment line) is compared by
+    its uncommented words instead — "" is a substring of anything, so it is
+    never evidence of presence. Text with no words at all is an error.
+
+    `retired` (v1.4+, #1): a well-formed block with mechanism `line_comment` or
+    `removed` makes the absence EXPECTED — reported in `retired_absent`, not in
+    `errors`; if the words are back in the live .tex, that is a stale marker
+    (warning). `comment_env` text is still in the source, so it is checked like
+    a live prop and still blocks if it vanished. A malformed block grants no
+    exemption: absent text is an error, present text a warning.
+
+    Returns (errors, retired_absent, warnings), each a list of (prop_id, msg).
     """
-    errors = []
+    errors, retired_absent, warnings = [], [], []
     normalized_tex = normalize_for_match(tex_string)
     for p in props:
-        text_norm = normalize_for_match(p["text"])
-        if text_norm not in normalized_tex:
-            errors.append((
-                p["id"],
-                f"text not found in .tex (location={p.get('location', '?')})"
-            ))
-    return errors
+        loc = p.get("location", "?")
+        problem = retired_problem(p)
+        text_norm = normalize_for_match(p["text"]) or _uncommented_norm(p["text"])
+        present = bool(text_norm) and text_norm in normalized_tex
+        if retired_expected_absent(p):
+            mech = p["retired"]["mechanism"]
+            restored = _uncommented_norm(p["text"])
+            if restored and restored in normalized_tex:
+                warnings.append((p["id"], f"retired as {mech} but its text is live in "
+                                 f"the .tex — stale retirement marker? (location={loc})"))
+            else:
+                retired_absent.append((p["id"], f"retired ({mech}, since "
+                                       f"{p['retired']['since']}): text expected absent"))
+            continue
+        if not text_norm:
+            errors.append((p["id"], f"prop text is empty after normalization, so R1 "
+                           f"cannot check it (location={loc})"))
+            continue
+        if problem is not None:
+            if not present:
+                errors.append((p["id"], f"text not found in .tex (location={loc}); "
+                               f"{problem} — no retired exemption applied"))
+            else:
+                warnings.append((p["id"], f"{problem} (text present, so R1 passes)"))
+            continue
+        if not present:
+            errors.append((p["id"], f"text not found in .tex (location={loc})"))
+    return errors, retired_absent, warnings
 
 
 # --------- R1.5: surjective coverage (section-level, Phase 1) ---------
 
 
-def _parse_location_range(loc):
-    """Parse 'main.tex:L<start>-L<end>' or 'main.tex:L<line>' → (start, end).
+_R15_SECTION_RE = re.compile(r"^\\section\*?(?:\[[^\]]*\])?\{")
+_R15_INPUT_RE = re.compile(r"\\(?:input|include)\s*\{([^}]+)\}")
+_R15_LOC_PREFIX_RE = re.compile(r"^\s*([^:{}\s]+\.tex):L\d")
 
-    Returns (None, None) when unparseable (caller treats as no coverage).
+
+def _r15_input_key(target):
+    """Normalize an ``\\input`` target the way corpus keys are built.
+
+    Corpus keys are ``os.path.relpath`` of the resolved file against the main
+    file's directory, so ``./parts/b`` and ``parts/x/../b`` must both become
+    ``parts/b.tex``.
     """
-    m = re.match(r"[^:]+:L(\d+)(?:-L(\d+))?", loc or "")
-    if not m:
-        return None, None
-    start = int(m.group(1))
-    end = int(m.group(2)) if m.group(2) else start
-    return start, end
+    target = target.strip()
+    if not target.endswith(".tex"):
+        target += ".tex"
+    return posixpath.normpath(target)
 
 
-def check_surjective_coverage(props, tex_string):
+def _r15_prop_key(loc, sub_keys, main_name):
+    """Which corpus file a prop's location points at, or ``...`` if unparseable.
+
+    ``parse_location_v16`` maps a literal ``main.tex:`` prefix to the main file
+    (pre-v1.6 ledgers). Two cases need the corpus to decide:
+
+    - the main file is named something else (``thesis.tex``) and a legacy
+      ledger prefixes that name → still the main file;
+    - a SUB-file is itself called ``main.tex`` → the prefix means that
+      sub-file, not the main file.
+    """
+    parsed = parse_location_v16(loc)
+    if parsed is None:
+        return None
+    key, start, end = parsed
+    raw = _R15_LOC_PREFIX_RE.match(loc)
+    raw = posixpath.normpath(raw.group(1)) if raw else None
+    if raw is not None and raw in sub_keys:
+        key = raw
+    elif raw is not None and raw == main_name:
+        key = None
+    return key, start, end
+
+
+def check_surjective_coverage(props, corpus, main_name=None):
     """R1.5 surjective coverage at top-level section granularity.
 
-    Find every top-level section command in tex; for each section [start, end]
-    check that at least one prop's location overlaps the range. Sections with
-    zero props → warning. Errors are NOT raised (Phase 1 heterogeneous-
-    granularity prototype may legitimately under-extract some sections —
-    see #77).
+    Find every top-level section command; for each section check that at least
+    one prop covers it. Sections with zero props → warning. Errors are NOT
+    raised (Phase 1 heterogeneous-granularity prototype may legitimately
+    under-extract some sections — see #77).
+
+    ``corpus`` maps a file key to its text: ``None`` is the main file and every
+    other key is the ``\\input`` target's path relative to the main file's
+    directory — the same keys v1.6 ``location`` prefixes use. A plain string is
+    accepted as a single-file manuscript. ``main_name`` is the main file's
+    basename, so a legacy prefix naming it resolves to the main file.
+
+    Sections are found in DOCUMENT ORDER (#13): the input tree is flattened
+    into a sequence of ``(file, line)`` positions, expanding each ``\\input``
+    where it occurs, and a section runs from its ``\\section`` line to the
+    position before the next one — wherever that is. So parent text after an
+    ``\\input`` whose child opens a section belongs to the child's last
+    section, exactly as in the compiled paper. A prop covers a section when it
+    points at one of the section's positions in the SAME file. Commented-out
+    lines and verbatim bodies never open a section or expand an ``\\input``;
+    a file already expanded is not expanded again (as the resolver does).
 
     Matches all top-level section variants:
         \\section{Title}              standard
@@ -364,43 +511,87 @@ def check_surjective_coverage(props, tex_string):
 
     Returns (errors, warnings) where errors is always empty in Phase 1.
     """
-    section_pattern = re.compile(r"^\\section\*?(?:\[[^\]]*\])?\{", re.MULTILINE)
-    sections = []
-    lines = tex_string.split("\n")
-    section_starts = [
-        i + 1
-        for i, line in enumerate(lines)
-        if section_pattern.match(line)
-    ]
-    if not section_starts:
-        return [], []
-    total_lines = len(lines)
-    for idx, start in enumerate(section_starts):
-        end = (
-            section_starts[idx + 1] - 1
-            if idx + 1 < len(section_starts)
-            else total_lines
-        )
-        title = lines[start - 1].strip()[:80]
-        sections.append((start, end, title))
+    if isinstance(corpus, str):
+        corpus = {None: corpus}
+    lines_by_file = {key: text.split("\n") for key, text in corpus.items()}
+    sub_keys = {k for k in lines_by_file if k is not None}
 
-    warnings = []
-    for start, end, title in sections:
-        covered = False
-        for p in props:
-            p_start, p_end = _parse_location_range(p.get("location"))
-            if p_start is None:
+    spans = {}          # file -> sorted, merged [start, end] line ranges
+    for p in props:
+        parsed = _r15_prop_key(p.get("location") or "", sub_keys, main_name)
+        if parsed is None:
+            continue
+        key, p_start, p_end = parsed
+        spans.setdefault(key, []).append((p_start, p_end))
+    for key, ranges in spans.items():
+        ranges.sort()
+        merged = [list(ranges[0])]
+        for a, b in ranges[1:]:
+            if a <= merged[-1][1] + 1:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        spans[key] = merged
+    span_starts = {key: [a for a, _ in ranges] for key, ranges in spans.items()}
+
+    def is_covered(key, line):
+        ranges = spans.get(key)
+        if not ranges:
+            return False
+        i = bisect.bisect_right(span_starts[key], line) - 1
+        return i >= 0 and ranges[i][1] >= line
+
+    order = []          # flattened (file, line, kind); kind: "line" | "section" | "break"
+    expanded = set()
+
+    def walk(key):
+        expanded.add(key)
+        in_verbatim = False
+        for lineno, raw in enumerate(lines_by_file[key], start=1):
+            line = _strip_line_comment(raw)
+            if in_verbatim:
+                order.append((key, lineno, "line"))
+                if _VERB_END_RE.search(line):
+                    in_verbatim = False
                 continue
-            if p_start <= end and p_end >= start:
-                covered = True
-                break
-        if not covered:
-            warnings.append((
-                f"section:L{start}",
-                f"no prop covers section (L{start}-{end}): {title}",
-            ))
-    return [], warnings
+            begin = _VERB_BEGIN_RE.search(line)
+            if begin:
+                order.append((key, lineno, "line"))
+                in_verbatim = not _VERB_END_RE.search(line, begin.end())
+                continue
+            order.append((key, lineno,
+                          "section" if _R15_SECTION_RE.match(line) else "line"))
+            for target in _R15_INPUT_RE.findall(line):
+                child = _r15_input_key(target)
+                if child in lines_by_file and child not in expanded:
+                    walk(child)
 
+    # Main file first, in document order. A corpus file the walk never reached
+    # (an \input spelled through a symlink, a caller without a main key) is
+    # still checked, appended on its own — never silently dropped. A "break"
+    # before it keeps its section-less head out of the previous section.
+    for key in sorted(lines_by_file, key=lambda k: (k is not None, k or "")):
+        if key not in expanded:
+            if order:
+                order.append((None, 0, "break"))
+            walk(key)
+
+    heads = [i for i, (_, _, kind) in enumerate(order) if kind != "line"]
+    warnings = []
+    for n, head in enumerate(heads):
+        if order[head][2] == "break":
+            continue
+        stop = heads[n + 1] if n + 1 < len(heads) else len(order)
+        if any(is_covered(key, line) for key, line, _ in order[head:stop]):
+            continue
+        key, start, _ = order[head]
+        title = lines_by_file[key][start - 1].strip()[:80]
+        where = f"L{start}" if key is None else f"{key}:L{start}"
+        warnings.append((
+            f"section:{where}",
+            f"no prop covers section at {where}: {title}",
+        ))
+    return [], warnings
 
 # --------- R2: cite resolve ---------
 
@@ -1040,7 +1231,8 @@ def _find_start_anchor(text_norm, lines, declared_start):
     return hits[-1]
 
 
-def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False):
+def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False,
+                             expected_absent_ids=frozenset()):
     """R13 location line-anchoring.
 
     For each prop whose normalized text IS present in tex_string (so R1's
@@ -1086,6 +1278,8 @@ def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False)
         text_norm = normalize_for_match(p.get("text", ""))
         if not text_norm:
             continue  # empty text — nothing to anchor
+        if p.get("id") in expected_absent_ids:
+            continue  # disabled passage: its text is expected to be gone (#1)
         loc = p.get("location")
         parsed_v16 = parse_location_v16(loc or "")
         relpath = parsed_v16[0] if parsed_v16 else None
@@ -1412,14 +1606,22 @@ def main():
     # R1 prop-subset-check (Phase 1 partial-bijection; full bijection awaits #77)
     # v1.6: matched against the union of the input tree (main + parts) —
     # per-file location correctness is R13's job.
-    iso_errors = check_iso(props, "\n".join(corpus.values()))
+    iso_errors, iso_retired, iso_warnings = check_iso(props, "\n".join(corpus.values()))
     if iso_errors:
         all_errors.extend([("R1", *e) for e in iso_errors])
     else:
-        print("[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)")
+        print("[PASS] R1 prop-subset-check — all prop.text found in .tex"
+              + (f" except {len(iso_retired)} retired prop(s) listed below" if iso_retired else "")
+              + " (Phase 1; see #77 for full bijection)")
+    if iso_retired:
+        print(f"[INFO] R1 retired — {len(iso_retired)} prop(s) expected-absent "
+              f"(retired as line_comment/removed); not counted as errors")
+        for pid, msg in iso_retired:
+            print(f"  [R1-retired] {pid}: {msg}")
+    all_warnings.extend([("R1", *w) for w in iso_warnings])
 
     # R1.5 surjective coverage at top-level section granularity
-    surj_errors, surj_warnings = check_surjective_coverage(props, tex_string)
+    surj_errors, surj_warnings = check_surjective_coverage(props, corpus, main_name=tex_path.name)
     if surj_errors:
         all_errors.extend([("R1.5", *e) for e in surj_errors])
     elif surj_warnings:
@@ -1558,7 +1760,8 @@ def main():
     # distinct [summary] informational line — not warnings, not exit-affecting —
     # so they are never mis-flagged as drift.
     r13_warnings, r13_unanchorable, r13_failures = check_location_anchoring(
-        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16
+        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16,
+        expected_absent_ids=frozenset(pid for pid, _ in iso_retired),
     )
     if r13_failures:
         all_errors.extend([("R13", *f) for f in r13_failures])

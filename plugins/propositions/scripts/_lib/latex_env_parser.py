@@ -282,15 +282,17 @@ class InputTreeError(Exception):
 
 
 def _strip_line_comment(line: str) -> str:
-    """Drop everything from an unescaped ``%`` to end of line."""
-    out = []
-    prev = ""
-    for ch in line:
-        if ch == "%" and prev != "\\":
-            break
-        out.append(ch)
-        prev = ch
-    return "".join(out)
+    """Drop everything from an unescaped ``%`` to end of line.
+
+    ``%`` is escaped only by an ODD run of backslashes: ``\\%`` is a literal
+    percent, but ``\\\\%`` is a line break followed by a comment.
+    """
+    run = 0
+    for i, ch in enumerate(line):
+        if ch == "%" and run % 2 == 0:
+            return line[:i]
+        run = run + 1 if ch == "\\" else 0
+    return line
 
 
 def resolve_input_tree(main_path, max_depth: int = MAX_INPUT_DEPTH) -> list:

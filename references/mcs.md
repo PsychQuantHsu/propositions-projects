@@ -4,7 +4,7 @@ This directory may contain `mcs.pdf` — a local-only copy of Lehman / Leighton 
 
 ## Status
 
-`mcs.pdf` is **git-ignored** (see [`../.gitignore`](../.gitignore)). Marketplace installs of this plugin do NOT bundle the PDF — only this pointer file is shipped.
+`mcs.pdf` and its text extraction `mcs.txt` are **git-ignored** (see [`../.gitignore`](../.gitignore)) and stay local. Marketplace installs of this plugin do NOT bundle the PDF — only this pointer file is shipped.
 
 If you want the PDF locally:
 

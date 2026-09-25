@@ -194,3 +194,9 @@ def test_malformed_values_buy_no_exemption():
         errors, retired_absent, _ = vp.check_iso(props, TEX)
         assert [e[0] for e in errors] == ["a"], override
         assert retired_absent == [], override
+
+
+def test_impossible_since_date_buys_no_exemption():
+    block = {**retired("removed"), "since": "2026-13-45"}
+    errors, retired_absent, _ = vp.check_iso([prop("a", "Gone sentence.", retired=block)], TEX)
+    assert [e[0] for e in errors] == ["a"] and retired_absent == []

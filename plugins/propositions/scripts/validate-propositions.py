@@ -45,6 +45,7 @@ Checks:
 Refs PsychQuantHsu/psychophysical_representations#69
 """
 import argparse
+import datetime
 import json
 import os
 import re
@@ -315,6 +316,14 @@ _RETIRED_SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _COMMENT_LEAD_RE = re.compile(r"^[ \t]*%+", re.MULTILINE)
 
 
+def _is_calendar_date(text):
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
 def retired_problem(p):
     """Return None for a well-formed `retired` block (or none at all), else why not.
 
@@ -333,8 +342,9 @@ def retired_problem(p):
     if missing:
         return f"`retired` missing required key(s): {', '.join(missing)}"
     since, mech, match, reason = (block[k] for k in RETIRED_REQUIRED_KEYS)
-    if not (isinstance(since, str) and _RETIRED_SINCE_RE.match(since)):
-        return f"`retired.since` {since!r} is not a YYYY-MM-DD string"
+    if not (isinstance(since, str) and _RETIRED_SINCE_RE.match(since)
+            and _is_calendar_date(since)):
+        return f"`retired.since` {since!r} is not a YYYY-MM-DD date"
     if not (isinstance(mech, str) and mech in RETIRED_MECHANISMS):
         return f"`retired.mechanism` {mech!r} not in {'/'.join(RETIRED_MECHANISMS)}"
     if not (isinstance(match, str) and match in RETIRED_MATCH_VALUES):
@@ -1507,7 +1517,9 @@ def main():
     if iso_errors:
         all_errors.extend([("R1", *e) for e in iso_errors])
     else:
-        print("[PASS] R1 prop-subset-check — all prop.text found in .tex, except retired props reported below (Phase 1; see #77 for full bijection)" if iso_retired else "[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)")
+        print("[PASS] R1 prop-subset-check — all prop.text found in .tex"
+              + (f" except {len(iso_retired)} retired prop(s) listed below" if iso_retired else "")
+              + " (Phase 1; see #77 for full bijection)")
     if iso_retired:
         print(f"[INFO] R1 retired — {len(iso_retired)} prop(s) expected-absent "
               f"(retired as line_comment/removed); not counted as errors")

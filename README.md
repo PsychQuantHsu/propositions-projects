@@ -133,6 +133,7 @@ propositions-projects/
 │   │       └── EXTRACTION-PROMPT.md
 │   └── tschema-check/       # source-fidelity review (migrated from truth-conditions, #4)
 │       ├── .claude-plugin/plugin.json
+│       ├── README.md
 │       ├── skills/tschema-check/SKILL.md
 │       ├── scripts/validate-tschema.py
 │       └── docs/SCHEMA.md

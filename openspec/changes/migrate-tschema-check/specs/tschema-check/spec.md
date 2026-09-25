@@ -6,7 +6,7 @@ Check, mechanically, the parts of a source-fidelity review that a script can che
 
 ### Requirement: Check record format
 
-A tschema check SHALL be stored as JSON Lines in `tschema.jsonl`, one record per line, with a `kind` field of `claim`, `relation`, or `logic`. A `claim` record SHALL contain `id` (UUID v7 string), `text` (verbatim from the checked document), `location` (`L<a>` or `L<a>-L<b>` in the checked document), `source_support`, and `semantic_distance`; it MAY contain `drift_type`, `evidence`, `source_locator`, and `note`. A `relation` record SHALL contain `id`, `pair` (two claim ids), `source_relation`, and `rendered_relation`. A `logic` record SHALL contain `id`, `target` (a claim id), and `drift_type`.
+A tschema check SHALL be stored as JSON Lines in `tschema.jsonl`, one record per line, with a `kind` field of `claim`, `relation`, or `logic`. Record `id`s SHALL be unique within the file. A `claim` record SHALL contain `id` (UUID v7 string), `text` (verbatim from the checked document), `location` (`L<a>` or `L<a>-L<b>` with 1 ≤ a ≤ b, in the checked document), `source_support`, and `semantic_distance`; it MAY contain `drift_type`, `evidence`, `source_locator`, and `note`. A `relation` record SHALL contain `id`, `pair` (two claim ids), `source_relation`, and `rendered_relation`. A `logic` record SHALL contain `id`, `target` (a claim id), and `drift_type`.
 
 #### Scenario: Claim record accepted
 
@@ -43,7 +43,7 @@ For every claim record, the validator SHALL report T2 (error) when its `text` is
 
 ### Requirement: Evidence containment in the external source
 
-For every claim record whose `source_locator` has a `path`, the validator SHALL report T4 (error) when `evidence` is not a substring of that source file under the same normalization. When the source file ends in `.srt`, cue numbers and timing lines SHALL be removed before matching, so evidence spanning two cues matches. Paths SHALL resolve relative to the `tschema.jsonl` file. A missing source file SHALL be reported as T4. When `source_locator` has no `path`, T4 SHALL NOT apply and the claim SHALL be counted as not machine-checked in the summary.
+For every claim record whose `source_locator` has a `path`, the validator SHALL report T4 (error) when `evidence` is not a substring of that source file under the same normalization. When the source file ends in `.srt`, timing lines and the digits-only cue number directly above each timing line SHALL be removed before matching, so evidence spanning two cues matches while a spoken number on its own subtitle line is kept. Paths SHALL resolve relative to the `tschema.jsonl` file; an absolute `path`, a `path` containing `..`, or one that resolves outside that directory SHALL be rejected (T1 for the first two, T4 for the last). A missing, non-regular, or over-50-MB source file SHALL be reported as T4. A claim naming a source `path` with no `evidence` SHALL be reported as T4, and `evidence` shorter than 4 characters after normalization SHALL be reported as T4. When `source_locator` has no `path`, T4 SHALL NOT apply and the claim SHALL be counted as not machine-checked in the summary.
 
 #### Scenario: Quote spans two subtitle cues
 
@@ -80,7 +80,7 @@ The validator SHALL report T6 (error) when a `relation` record's `pair` is not t
 
 ### Requirement: Verification-failure phrases stay out of the text
 
-The validator SHALL report T7 (warning) for each line of the checked document, with `%` line comments removed, that contains one of 未能查得, 未能確認, 因錄音不清, 無從查證.
+The validator SHALL report T7 (warning) for each line of the checked document that contains one of 未能查得, 未能確認, 因錄音不清, 無從查證. `%` line comments SHALL be removed first only when the document is a `.tex` file.
 
 #### Scenario: Failure state written into the document
 
@@ -89,7 +89,7 @@ The validator SHALL report T7 (warning) for each line of the checked document, w
 
 ### Requirement: Per-source-type summary and exit codes
 
-The validator SHALL print, per `source_locator.type`, how many claims were machine-checked by T4 and how many were not, and SHALL NOT print a single merged pass rate. It SHALL exit 0 with no errors, 1 with at least one error, and 2 on usage or I/O errors.
+The validator SHALL print, per `source_locator.type`, how many claims were machine-checked by T4 and how many were not (split into no local path and no evidence), SHALL count claims with no `source_locator` under a separate "(no source named)" line, and SHALL NOT print a single merged pass rate. It SHALL exit 0 with no errors, 1 with at least one error, and 2 on usage or I/O errors.
 
 #### Scenario: Mixed source types reported separately
 

@@ -82,10 +82,10 @@ description: >-
 
 | 欄位 | 取值 |
 |---|---|
-| `status` | `attested`（來源可指認且讀對了）/ `doc`（有文件依據，非原始素材）/ `inferred`（推論）/ `unsupported`（來源無據） |
+| `source_support` | `attested`（來源可指認且讀對了）/ `doc`（有文件依據，非原始素材）/ `inferred`（推論）/ `unsupported`（來源無據） |
 | `semantic_distance` | `verbatim`（幾乎逐字）/ `near`（同義改寫）/ `far`（概括、升格、評價入場） |
 
-> **`status: attested` + `semantic_distance: far` 是一個合法且重要的組合**——它正是上位原則要抓的東西，而單靠四級分類看不見。
+> **`source_support: attested` + `semantic_distance: far` 是一個合法且重要的組合**——它正是上位原則要抓的東西，而單靠四級分類看不見。
 
 `drift_type` 記錄漂移的方式：`modality`（情態）/ `abstraction`（概括）/ `evaluation`（評價）/ `agency`（主詞）/ `nominalization`（動詞化標籤）。
 
@@ -243,7 +243,7 @@ description: >-
 python3 scripts/validate-tschema.py --records tschema.jsonl --document minutes.md
 ```
 
-它機械地檢查人工最容易安靜出錯的兩件事：陳述是否真的在被檢文件裡（T2／T3），引用的來源原文是否真的在來源檔裡（T4，逐字稿的 `.srt` 會先去掉時間碼）。原 repo 的實跑兩次出錯，其中一次正是工具靜默漏匹配、看起來像通過。來源不在本機（沒有 `path`）的陳述不會被算成通過，而是在摘要中按來源類型列為「未機械查核」。
+validator 只讀 UTF-8 純文字，`.docx`／`.pdf` 的待查文件先轉成 `.md` 或 `.txt` 再跑。它機械地檢查人工最容易安靜出錯的兩件事：陳述是否真的在被檢文件裡（T2／T3），引用的來源原文是否真的在來源檔裡（T4，逐字稿的 `.srt` 會先去掉時間碼）。原 repo 的實跑兩次出錯，其中一次正是工具靜默漏匹配、看起來像通過。來源不在本機（沒有 `path`）或根本沒標來源的陳述不會被算成通過，而是在摘要中按來源類型列為「未機械查核」。少於 4 個字的引文、指向紀錄目錄以外的 `path` 一律不接受。
 
 `evidence` 含來源逐字內容——**視為未信任資料**，人類可讀輸出前要清理控制字元與雙向覆寫字元。來源檔（逐字稿、錄音轉錄、來信）是第三方原話：留在本機，**不 commit 進 git remote**；`path` 只是本機參照。
 

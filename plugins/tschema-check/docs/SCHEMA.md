@@ -8,7 +8,7 @@ One JSON object per line, next to the checked document (for example `minutes.md`
 |---|---|---|
 | `id` | ✅ | UUID v7 |
 | `text` | ✅ | The statement, copied verbatim from the checked document (labels before a colon count as statements) |
-| `location` | ✅ | `L<a>` or `L<a>-L<b>` in the **checked document** |
+| `location` | ✅ | `L<a>` or `L<a>-L<b>` (1 ≤ a ≤ b) in the **checked document** |
 | `source_support` | ✅ | What the source gives this statement — see below |
 | `semantic_distance` | ✅ | How close the wording stays to the source — see below |
 | `drift_type` | — | How it drifted, if it did |
@@ -35,7 +35,7 @@ One JSON object per line, next to the checked document (for example `minutes.md`
 |---|---|
 | `type` | `transcript`, `email`, `statute`, `document`, `dataset`, `other` |
 | `ref` | Where in the source: a timecode `[05:32]`, an email's date and sender, an article number |
-| `path` | Optional. The source file on this machine, relative to `tschema.jsonl`. Needed for T4 |
+| `path` | Optional. The source file on this machine, relative to `tschema.jsonl` and inside its directory (absolute paths, `..`, and symlinks leading out are rejected). Needed for T4 |
 
 A source file is third-party raw material (transcripts, recordings, emails). Keep it local and out of any git remote; `path` is only a local reference.
 
@@ -72,17 +72,19 @@ python3 plugins/tschema-check/scripts/validate-tschema.py --records tschema.json
 
 | Check | Severity | Condition | Mechanism |
 |---|---|---|---|
-| T1 | error | Malformed JSON, missing key, value outside a vocabulary, id not a UUID v7 | — |
+| T1 | error | Malformed JSON, missing key, value outside a vocabulary or of the wrong type, id not a UUID v7 or used twice, bad `location` range, `path` absolute or escaping the records directory | — |
 | T2 | error | Claim `text` is not in the checked document | R1 (substring) |
-| T3 | warning | Claim `text` is not within the lines its `location` names | R13 (line anchoring) |
-| T4 | error | `evidence` is not in the file at `source_locator.path`, or that file cannot be read | R1 generalized to an external source |
+| T3 | warning | Claim `text` is not within the lines its `location` names, or `location` is past the end of the document | R13 (line anchoring) |
+| T4 | error | `evidence` is not in the file at `source_locator.path`; that file cannot be read (missing, outside the records directory, not a regular file, over 50 MB); a `path` is named but no `evidence` quoted; or `evidence` is shorter than 4 characters after normalization | R1 generalized to an external source |
 | T5 | error | An `attested` claim has no `evidence` or no `source_locator` | — |
 | T6 | error | A relation `pair` or logic `target` does not name claims in this file | — |
-| T7 | warning | A document line (outside `%` comments) contains 未能查得, 未能確認, 因錄音不清 or 無從查證 | — |
+| T7 | warning | A document line contains 未能查得, 未能確認, 因錄音不清 or 無從查證 (`%` comments are skipped only when the document is `.tex`; in Markdown `%` is a percentage) | — |
 
-**Matching.** Both sides are NFKC-normalized and every whitespace character is removed, so a sentence wrapped across lines still matches and full-width punctuation equals half-width. For `.srt` sources, cue numbers and `-->` timing lines are removed first, so a quote spanning two cues matches.
+**Matching.** Both sides are NFKC-normalized and every whitespace character is removed, so a sentence wrapped across lines still matches and full-width punctuation equals half-width. For `.srt` sources, `-->` timing lines and the cue number directly above each are removed first, so a quote spanning two cues matches; a spoken number on its own subtitle line is kept. NFKC folds full-width forms, which is the intent; it also folds CJK compatibility ideographs, a rare case where two visibly different characters compare equal. Evidence shorter than 4 characters is rejected: a quote that short is found in almost any source by chance.
 
-**Coverage summary.** Claims whose `source_locator` has no `path` cannot be checked by T4. The validator never counts them as passed: it prints, per source type, how many claims were checked against their source and how many were not. It never prints one merged pass rate.
+**Coverage summary.** The validator prints, per source type, how many claims were checked against their source and how many were not, split into "no local path" and "no evidence"; claims with no `source_locator` at all are counted under `(no source named)`. Nothing unchecked is counted as passed, and there is never one merged pass rate.
+
+Files are read as UTF-8 (a leading BOM is fine). Convert `.docx` / `.pdf` documents to text first.
 
 Exit code: `0` no errors, `1` at least one error, `2` usage or I/O error.
 

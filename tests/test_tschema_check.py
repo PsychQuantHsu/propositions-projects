@@ -189,9 +189,97 @@ def test_failure_state_in_document_warns(tmp_path):
     assert r.returncode == 0 and "[T7] L6" in r.stdout
 
 
-def test_commented_failure_phrase_is_ignored(tmp_path):
-    doc = DOC + "% 未能查得出處，待補\n"
-    assert "[T7]" not in found(run(tmp_path, [claim()], doc=doc))
+def test_percent_in_markdown_is_ordinary_text(tmp_path):
+    # verify #4: in a Markdown minute a `%` is a percentage, not a comment, and
+    # stripping from it hid the very phrase T7 exists to catch.
+    doc = DOC + "- 尚有 50% 的項目因錄音不清未能確認。\n"
+    assert "[T7] L6" in run(tmp_path, [claim()], doc=doc).stdout
+
+
+def test_latex_comment_is_ignored_in_tex_documents(tmp_path):
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "meeting.srt").write_text(SRT, encoding="utf-8")
+    d = tmp_path / "minutes.tex"
+    d.write_text(DOC + "% 未能查得出處，待補\n", encoding="utf-8")
+    rec = tmp_path / "tschema.jsonl"
+    rec.write_text(json.dumps(claim(), ensure_ascii=False) + "\n", encoding="utf-8")
+    r = subprocess.run([sys.executable, str(SCRIPT), "--records", str(rec), "--document", str(d)],
+                       capture_output=True, text=True)
+    assert "[T7]" not in r.stdout
+
+
+# ---- verify round 1 (#4) ----
+
+def test_absolute_or_escaping_path_is_rejected(tmp_path):
+    for bad in ("/etc/passwd", "../../etc/passwd", "sources/../../x.srt"):
+        loc = {"type": "other", "ref": "x", "path": bad}
+        r = run(tmp_path, [claim(source_locator=loc)])
+        assert r.returncode == 1 and "[T1]" in found(r), bad
+
+
+def test_symlink_out_of_the_records_directory_is_not_read(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.srt"
+    outside.write_text(SRT, encoding="utf-8")
+    (tmp_path / "sources").mkdir(exist_ok=True)
+    (tmp_path / "sources" / "link.srt").symlink_to(outside)
+    loc = {"type": "transcript", "ref": "[05:30]", "path": "sources/link.srt"}
+    r = run(tmp_path, [claim(source_locator=loc)])
+    assert r.returncode == 1 and "[T4]" in found(r)
+
+
+def test_spoken_number_on_its_own_cue_line_is_kept():
+    srt = "1\n00:00:01,000 --> 00:00:02,000\n他在\n\n2\n00:00:02,000 --> 00:00:03,000\n1996\n\n3\n00:00:03,000 --> 00:00:04,000\n年成立公司\n"
+    assert vt.normalize("他在1996年成立公司") in vt.normalize(vt.strip_srt(srt))
+    assert vt.normalize("他在年成立公司") not in vt.normalize(vt.strip_srt(srt))
+
+
+def test_too_short_evidence_is_t4(tmp_path):
+    r = run(tmp_path, [claim(evidence="資料")])
+    assert r.returncode == 1 and "[T4]" in found(r)
+
+
+def test_path_without_evidence_is_t4_even_when_not_attested(tmp_path):
+    loc = {"type": "transcript", "ref": "[05:30]", "path": "sources/meeting.srt"}
+    r = run(tmp_path, [claim(support="doc", source_locator=loc)])
+    assert r.returncode == 1 and "[T4]" in found(r)
+
+
+def test_claims_naming_no_source_appear_in_the_summary(tmp_path):
+    r = run(tmp_path, [claim(support="inferred")])
+    assert any("(no source named)" in l and "1 not machine-checked" in l for l in r.stdout.splitlines())
+
+
+def test_unhashable_pair_or_target_is_t1_not_a_crash(tmp_path):
+    rel = {"kind": "relation", "id": ID3, "pair": [[ID1], {}], "source_relation": "causal",
+           "rendered_relation": "none"}
+    lg = {"kind": "logic", "id": "01920000-0000-7000-8000-000000000004", "target": [ID1],
+          "drift_type": "tautology"}
+    r = run(tmp_path, [claim(), rel, lg])
+    assert r.returncode == 1 and "Traceback" not in r.stderr and "[T1]" in found(r)
+
+
+def test_duplicate_id_is_t1(tmp_path):
+    r = run(tmp_path, [claim(), claim()])
+    assert r.returncode == 1 and "[T1] L2" in r.stdout
+
+
+def test_bad_location_ranges_are_t1(tmp_path):
+    for bad in ("L0", "L5-L3"):
+        assert "[T1]" in found(run(tmp_path, [claim(location=bad)])), bad
+
+
+def test_location_beyond_document_is_named(tmp_path):
+    r = run(tmp_path, [claim(location="L90")])
+    assert "beyond the end" in r.stdout
+
+
+def test_bom_on_records_is_tolerated(tmp_path):
+    r = run(tmp_path, [claim()])
+    rec = tmp_path / "tschema.jsonl"
+    rec.write_bytes(b"\xef\xbb\xbf" + rec.read_bytes())
+    r = subprocess.run([sys.executable, str(SCRIPT), "--records", str(rec),
+                        "--document", str(tmp_path / "minutes.md")], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout
 
 
 # ---- Exit codes ----

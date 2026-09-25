@@ -98,8 +98,19 @@ def test_r13_skips_expected_absent_retired_props():
     props = [prop("a", "Gone.", loc="parts/x.tex:L1", retired=retired("removed"))]
     corpus = {None: TEX, "parts/x.tex": "Other text.\n"}
     warnings, unanchorable, failures = vp.check_location_anchoring(
-        props, TEX, corpus=corpus, schema_ge_16=True)
+        props, TEX, corpus=corpus, schema_ge_16=True, expected_absent_ids={"a"})
     assert warnings == [] and failures == []
+
+
+def test_r13_does_not_skip_a_retired_prop_r1_did_not_confirm_absent():
+    # A `retired` marker alone must not buy an R13 skip: only ids R1 found
+    # actually absent do. Here the blocking prefix check must still fire.
+    props = [prop("a", "Live sentence stays.", loc="parts/x.tex:L1",
+                  retired=retired("removed"))]
+    corpus = {None: TEX, "parts/x.tex": "Other text.\n"}
+    _, _, failures = vp.check_location_anchoring(props, TEX, corpus=corpus,
+                                                 schema_ge_16=False)
+    assert [f[0] for f in failures] == ["a"]
 
 
 def _run(tmp_path, props):
@@ -135,19 +146,51 @@ def test_end_to_end_live_absence_still_fails(tmp_path):
     assert r.returncode == 1
 
 
-def test_comment_line_text_retired_is_expected_absent_not_stale():
-    # Real-world shape: the ledger stored the %-disabled line WITH its `%`, so the
-    # text normalizes to empty — and "" is a substring of anything. It must be
-    # classified as expected-absent, not as a stale marker (#1).
-    props = [prop("a", "%This assumption is local.", retired=retired("line_comment"))]
-    errors, retired_absent, warnings = vp.check_iso(props, TEX + "%This assumption is local.\n")
+COMMENTED = "%This assumption is local.\n"  # real ledger shape: `%` + trailing newline
+
+
+def test_comment_line_text_retired_is_expected_absent_while_still_commented():
+    props = [prop("a", COMMENTED, retired=retired("line_comment"))]
+    errors, retired_absent, warnings = vp.check_iso(props, TEX + COMMENTED)
     assert errors == [] and warnings == []
     assert [r[0] for r in retired_absent] == ["a"]
 
 
-def test_live_text_normalizing_to_empty_warns_instead_of_vacuous_pass():
-    props = [prop("a", "%Only a comment.\n")]  # same shape as real ledgers: trailing newline
-    errors, retired_absent, warnings = vp.check_iso(props, TEX)
-    assert errors == [] and retired_absent == []
-    assert [w[0] for w in warnings] == ["a"]
-    assert "empty" in warnings[0][1]
+def test_restored_comment_line_is_a_stale_marker_in_both_stored_shapes():
+    # The author un-commented the line: the claim is back in the paper, so the
+    # `retired` marker is stale — for text stored with or without the newline.
+    for text in (COMMENTED, COMMENTED.rstrip("\n")):
+        props = [prop("a", text, retired=retired("line_comment"))]
+        errors, retired_absent, warnings = vp.check_iso(
+            props, TEX + "This assumption is local.\n")
+        assert errors == [] and retired_absent == [], text
+        assert [w[0] for w in warnings] == ["a"], text
+
+
+def test_live_commented_text_absent_from_the_paper_is_an_error():
+    errors, retired_absent, warnings = vp.check_iso([prop("a", "%Only a comment.\n")], TEX)
+    assert [e[0] for e in errors] == ["a"] and retired_absent == [] and warnings == []
+
+
+def test_comment_env_commented_text_that_vanished_still_blocks():
+    props = [prop("a", "%Only a comment.\n", retired=retired("comment_env"))]
+    errors, retired_absent, _ = vp.check_iso(props, "")
+    assert [e[0] for e in errors] == ["a"] and retired_absent == []
+
+
+def test_text_with_no_words_is_an_error():
+    errors, _, _ = vp.check_iso([prop("a", "%\n")], TEX)
+    assert [e[0] for e in errors] == ["a"]
+    assert "empty" in errors[0][1]
+
+
+def test_malformed_values_buy_no_exemption():
+    bad = [dict(since=[1]), dict(since="2026/07/29"), dict(match="bogus"),
+           dict(match=1), dict(reason="   "), dict(reason=["x"]),
+           dict(mechanism="Removed"), dict(mechanism=["removed"])]
+    for override in bad:
+        block = {**retired("removed"), **override}
+        props = [prop("a", "Gone sentence.", retired=block)]
+        errors, retired_absent, _ = vp.check_iso(props, TEX)
+        assert [e[0] for e in errors] == ["a"], override
+        assert retired_absent == [], override

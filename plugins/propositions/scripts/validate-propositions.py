@@ -309,26 +309,38 @@ def normalize_for_match(s: str) -> str:
 # whether R1 can still see its text. Only these two hide it from R1.
 RETIRED_MECHANISMS = ("comment_env", "line_comment", "removed")
 RETIRED_ABSENT_MECHANISMS = ("line_comment", "removed")
+RETIRED_MATCH_VALUES = ("exact", "by_reading")
 RETIRED_REQUIRED_KEYS = ("since", "mechanism", "match", "reason")
+_RETIRED_SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_COMMENT_LEAD_RE = re.compile(r"^[ \t]*%+", re.MULTILINE)
 
 
 def retired_problem(p):
     """Return None for a well-formed `retired` block (or none at all), else why not.
 
     A malformed block must never buy an exemption from R1, so callers treat a
-    non-None result exactly as if the prop were live (#1).
+    non-None result exactly as if the prop were live (#1). Well-formed means
+    every documented format holds (SCHEMA.md `retired`), not just that the keys
+    are truthy: `since` is a YYYY-MM-DD string, `mechanism` and `match` are in
+    their enums, `reason` is a non-blank string.
     """
     block = p.get("retired")
     if block is None:
         return None
     if not isinstance(block, dict):
         return "`retired` must be an object"
-    missing = [k for k in RETIRED_REQUIRED_KEYS if not block.get(k)]
+    missing = [k for k in RETIRED_REQUIRED_KEYS if k not in block]
     if missing:
         return f"`retired` missing required key(s): {', '.join(missing)}"
-    if block["mechanism"] not in RETIRED_MECHANISMS:
-        return (f"`retired.mechanism` {block['mechanism']!r} not in "
-                f"{'/'.join(RETIRED_MECHANISMS)}")
+    since, mech, match, reason = (block[k] for k in RETIRED_REQUIRED_KEYS)
+    if not (isinstance(since, str) and _RETIRED_SINCE_RE.match(since)):
+        return f"`retired.since` {since!r} is not a YYYY-MM-DD string"
+    if not (isinstance(mech, str) and mech in RETIRED_MECHANISMS):
+        return f"`retired.mechanism` {mech!r} not in {'/'.join(RETIRED_MECHANISMS)}"
+    if not (isinstance(match, str) and match in RETIRED_MATCH_VALUES):
+        return f"`retired.match` {match!r} not in {'/'.join(RETIRED_MATCH_VALUES)}"
+    if not (isinstance(reason, str) and reason.strip()):
+        return "`retired.reason` must be a non-blank string"
     return None
 
 
@@ -336,6 +348,17 @@ def retired_expected_absent(p):
     """True when a well-formed `retired` block says R1 cannot see this text."""
     return (retired_problem(p) is None and p.get("retired") is not None
             and p["retired"]["mechanism"] in RETIRED_ABSENT_MECHANISMS)
+
+
+def _uncommented_norm(text):
+    """Normalized text with each line's leading ``%`` removed.
+
+    A ledger may store a %-disabled line WITH its ``%`` (and trailing newline);
+    normalize_for_match then erases it entirely. Stripping the markers first
+    recovers the words, so R1 can tell "still commented out" (absent from the
+    comment-stripped .tex) from "restored as live text" (present).
+    """
+    return normalize_for_match(_COMMENT_LEAD_RE.sub("", text))
 
 
 def check_iso(props, tex_string):
@@ -350,11 +373,16 @@ def check_iso(props, tex_string):
     ≥1 prop covering it — surjectivity) is checked in R1.5. Full bijection
     contract awaits Phase 2 clause-level re-extraction (see issue #77).
 
+    Text that normalizes to empty (a stored ``%`` comment line) is compared by
+    its uncommented words instead — "" is a substring of anything, so it is
+    never evidence of presence. Text with no words at all is an error.
+
     `retired` (v1.4+, #1): a well-formed block with mechanism `line_comment` or
     `removed` makes the absence EXPECTED — reported in `retired_absent`, not in
-    `errors`. `comment_env` text is still in the source, so it is checked like a
-    live prop and still blocks if it vanished. A malformed block is an error and
-    grants no exemption.
+    `errors`; if the words are back in the live .tex, that is a stale marker
+    (warning). `comment_env` text is still in the source, so it is checked like
+    a live prop and still blocks if it vanished. A malformed block grants no
+    exemption: absent text is an error, present text a warning.
 
     Returns (errors, retired_absent, warnings), each a list of (prop_id, msg).
     """
@@ -363,29 +391,28 @@ def check_iso(props, tex_string):
     for p in props:
         loc = p.get("location", "?")
         problem = retired_problem(p)
-        text_norm = normalize_for_match(p["text"])
-        # An empty normalized text (e.g. a prop whose text is itself a `%`
-        # comment line) is a substring of anything — never evidence of presence.
+        text_norm = normalize_for_match(p["text"]) or _uncommented_norm(p["text"])
         present = bool(text_norm) and text_norm in normalized_tex
-        if problem is not None:
-            if not present:
-                errors.append((p["id"], f"text not found in .tex (location={loc}); "
-                               f"{problem} — no retired exemption applied"))
-            else:
-                warnings.append((p["id"], f"{problem} (text present, so R1 passes)"))
-            continue
         if retired_expected_absent(p):
             mech = p["retired"]["mechanism"]
-            if present:
-                warnings.append((p["id"], f"retired as {mech} but its text is still in "
+            restored = _uncommented_norm(p["text"])
+            if restored and restored in normalized_tex:
+                warnings.append((p["id"], f"retired as {mech} but its text is live in "
                                  f"the .tex — stale retirement marker? (location={loc})"))
             else:
                 retired_absent.append((p["id"], f"retired ({mech}, since "
                                        f"{p['retired']['since']}): text expected absent"))
             continue
         if not text_norm:
-            warnings.append((p["id"], f"text normalizes to empty (e.g. a %-comment "
-                             f"line), so R1 cannot check it (location={loc})"))
+            errors.append((p["id"], f"prop text is empty after normalization, so R1 "
+                           f"cannot check it (location={loc})"))
+            continue
+        if problem is not None:
+            if not present:
+                errors.append((p["id"], f"text not found in .tex (location={loc}); "
+                               f"{problem} — no retired exemption applied"))
+            else:
+                warnings.append((p["id"], f"{problem} (text present, so R1 passes)"))
             continue
         if not present:
             errors.append((p["id"], f"text not found in .tex (location={loc})"))
@@ -1101,7 +1128,8 @@ def _find_start_anchor(text_norm, lines, declared_start):
     return hits[-1]
 
 
-def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False):
+def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False,
+                             expected_absent_ids=frozenset()):
     """R13 location line-anchoring.
 
     For each prop whose normalized text IS present in tex_string (so R1's
@@ -1147,7 +1175,7 @@ def check_location_anchoring(props, tex_string, corpus=None, schema_ge_16=False)
         text_norm = normalize_for_match(p.get("text", ""))
         if not text_norm:
             continue  # empty text — nothing to anchor
-        if retired_expected_absent(p):
+        if p.get("id") in expected_absent_ids:
             continue  # disabled passage: its text is expected to be gone (#1)
         loc = p.get("location")
         parsed_v16 = parse_location_v16(loc or "")
@@ -1479,7 +1507,7 @@ def main():
     if iso_errors:
         all_errors.extend([("R1", *e) for e in iso_errors])
     else:
-        print("[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)")
+        print("[PASS] R1 prop-subset-check — all prop.text found in .tex, except retired props reported below (Phase 1; see #77 for full bijection)" if iso_retired else "[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)")
     if iso_retired:
         print(f"[INFO] R1 retired — {len(iso_retired)} prop(s) expected-absent "
               f"(retired as line_comment/removed); not counted as errors")
@@ -1627,7 +1655,8 @@ def main():
     # distinct [summary] informational line — not warnings, not exit-affecting —
     # so they are never mis-flagged as drift.
     r13_warnings, r13_unanchorable, r13_failures = check_location_anchoring(
-        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16
+        props, tex_string, corpus=corpus, schema_ge_16=schema_ge_16,
+        expected_absent_ids=frozenset(pid for pid, _ in iso_retired),
     )
     if r13_failures:
         all_errors.extend([("R13", *f) for f in r13_failures])

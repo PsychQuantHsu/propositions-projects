@@ -31,3 +31,11 @@ htmlcov/
 .spectra/
 openspec/.vector-search.db*
 tests/fixtures/hsu-regression/
+
+# LLVM coverage artifacts
+*.profraw
+
+# Third-party reference material stays local; references/mcs.md is the tracked
+# pointer (#3). Anchored for the same reason as /manuscript/ above.
+/references/mcs.pdf
+/references/mcs.txt

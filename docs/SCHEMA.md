@@ -298,6 +298,8 @@ audit trail, and leaving it unmarked makes the ledger silently over-claim.
 
 `mechanism` enum: `comment_env`(inside `\begin{comment}…\end{comment}` — R1 passes,normalize 不剝 comment 環境)/ `line_comment`(`%` 行註解 — R1 fails)/ `removed`(source 已刪 — R1 fails)。R1-visibility 不對稱是 validator artifact,正是 `retired` 記 mechanism 而非 boolean 的理由。
 
+**Validator 行為(#1)**:mechanism 為 `line_comment` / `removed` 且格式完整的 `retired`,其原文缺席列為 **expected-absent**(R1 以 `[R1-retired]` 另行報告、不計錯誤;R13 只略過 R1 確認缺席的命題);若原文(去掉行首 `%` 後)又以正文出現在 `.tex`,發 warning(退役標記可能過時)。`comment_env` 照常檢查,原文消失仍擋。**格式完整**指每個欄位都合乎上表:`since` 是存在的 `YYYY-MM-DD` 日期、`mechanism` 與 `match` 在列舉內、`reason` 為非空字串;任一不合 → 不給任何豁免(原文缺席即 error,原文仍在則 warning)。命題 `text` 若以 `%` 註解行儲存,正規化後為空,R1 改以去掉 `%` 後的字詞比對:現役或 `comment_env` 命題的字詞不在正文 → **error**(過去空洞地通過);完全沒有字詞的 `text` 也是 error。
+
 ## Multi-file manuscripts (v1.6+)
 
 主檔(`_meta.json` `source.file`)以 `\input{...}` / `\include{...}` 引入其他
@@ -544,7 +546,7 @@ python3 scripts/migrate-json-to-jsonl.py <input.json> [--delete-input]
 |---------|---------------------|----------|
 | JSON 改了某 prop `text` 但對應 `.tex` 不再含該字串 | ✅ R1 報「`text` not found in .tex (location=…)」 | Author 確認哪邊正確;`.tex` 是 source of truth → 改回 prop 或更新 `.tex` |
 | `.tex` 刪某段但 JSON 留 prop 指向該段 | ✅ R1 (normalize 後 substring miss) | Author 刪 prop + 注意 `cites: [P037]` 的 down-stream props |
-| `.tex` 整個 top-level section 沒被任何 prop 覆蓋 | ✅ R1.5 報「no prop covers section (Lstart-end): title」(warning,不 fail exit) | Author 為該 section 加 ≥1 prop |
+| `.tex` 整個 top-level section 沒被任何 prop 覆蓋 | ✅ R1.5 報「no prop covers section at [<relpath>.tex:]L<n>: title」(warning,不 fail exit;section 範圍依 `\input` 展開後的文件順序計算) | Author 為該 section 加 ≥1 prop |
 | `.tex` 加 1 句新 claim 在已 covered 的 section 內(prop 未更新)| ❌ Phase 1 miss (因 R1.5 只看 section-level coverage, R1 只看 prop⊆tex 不看 tex⊆∪props 的 sentence-level)| 等 Phase 2 clause-level surjective scan,或 author 自己人工 audit 該 section |
 | 兩 props `text` 都 substring-match 同 `.tex` 段(injectivity 違反)| ❌ Phase 1 miss (R1 substring match 不 enforce injective)| 等 Phase 2 — clause-level granularity 後 substring match 等價 verbatim,injective 自動成立 |
 | Connective / reference / transition 沒被 prop 標 `claim_type` | ❌ Phase 1 miss (extraction 階段未 commit 到 clause-level) | 等 Phase 2 — clause-level extraction 會強制標 |

@@ -12,7 +12,7 @@
 ## 3. 文件與交叉連結
 
 - [x] 3.1 撰寫 `plugins/propositions/docs/VERIFICATION.md`：說明 Sidecar verification.jsonl next to the ledger 的格式、Open method vocabulary with x- prefix 的兩張詞彙表、V1–V6、不一致定義、proofread 的 `supported` 只代表六項閱讀檢查通過（非形式證明）、其他方法如何接入。驗證：人工核對文件中每個列舉值與 validator 常數一致（測試斷言 VERIFICATION.md 內含每個 method／status 字面值）
-- [x] 3.2 proofread SKILL.md 只加一行指向 `proofread-to-verification.py` 與 VERIFICATION.md，plugin README 加一行指向 VERIFICATION.md；驗證：`git diff --stat` 顯示 SKILL.md 僅 +1 行，README 僅新增指向行
+- [x] 3.2 proofread SKILL.md 加一行指向 `proofread-to-verification.py` 與 VERIFICATION.md、checklist 模板 id 欄改為完整 UUID，plugin README 加一行指向 VERIFICATION.md；驗證：`git diff --stat` 顯示 SKILL.md 僅改 2 行，README 僅新增指向行
 
 ## 4. 整合驗證
 

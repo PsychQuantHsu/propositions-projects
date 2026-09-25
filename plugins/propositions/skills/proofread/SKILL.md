@@ -59,7 +59,7 @@ For each prop in `manuscript/propositions/main.jsonl`, emit one line, grouped by
 `containing_block`:
 
 ```markdown
-- [ ] **P{seq}** `{uuid_short}` [{claim_type}] @L{start}-L{end} — "{first 80 chars of text}…" (asserts: {N}, cites: {N})
+- [ ] **P{seq}** `{uuid}` [{claim_type}] @L{start}-L{end} — "{first 80 chars of text}…" (asserts: {N}, cites: {N})
 ```
 
 Add a git-blame hyperlink per line for the audit trail.

@@ -4,31 +4,26 @@
 Reads a `.proofread/<file>.md` checklist produced by the proofread skill and
 emits one `method=proofread` record per walked line, as JSONL on stdout:
 
-    - [x] **P012** `019e2fbe` [claim] @L10-L12 — "…"   → status supported
+    - [x] **P012** `019e2fbe-c7f3-…` [claim] @L10-L12 — "…"   → status supported
     - [~] ...                                          → status partial
     - [-] ...                                          → status not_attempted
     - [ ] ...                                          → skipped (not walked yet)
 
-Each line is resolved to one ledger proposition only when its backticked id
-prefix AND its quoted text snippet agree on exactly one (UUIDv7 ids minted
-together share their leading characters, so the prefix alone is often
-ambiguous; the view ordinal is never used, because it shifts when the ledger
-changes). A walked line without a quoted snippet, an unknown mark, or a line
+Identity comes from the backticked id, never from a guess. A FULL UUID
+resolves to exactly that proposition (and its text must still start with the
+quoted snippet, so a verdict on rewritten text is not recorded as current). A
+short id prefix resolves only when the quoted snippet is untruncated and equals
+one proposition's whole text: a truncated snippet names opening words, and
+after a rewrite another proposition sharing the prefix and those words would
+take the verdict. A walked line without a snippet, an unknown mark, or a line
 matching more than one proposition aborts: nothing is written and the exit
-code is 1 — attaching a verdict to the wrong
-proposition is worse than missing one. Every other line (headings, the Findings table) is ignored.
-
-`supported` from proofread means the six reading checks passed (see
-docs/VERIFICATION.md); it is not a formal proof.
-
-Usage:
-    python3 proofread-to-verification.py --checklist .proofread/main.md \\
-        --ledger manuscript/propositions/main.jsonl [--checked-at YYYY-MM-DD] [--checker NAME] \\
-        >> manuscript/propositions/verification.jsonl
+code is 1 — attaching a verdict to the wrong proposition is worse than
+missing one. Generate checklists with full ids.
 
 A checklist generated before the manuscript was rewritten has lines whose text
-no longer exists; ``--allow-unmatched`` skips those (listing them on stderr)
-instead of aborting. Ambiguous lines abort regardless.
+no longer exists, and an old checklist may carry only short id prefixes;
+``--allow-unmatched`` skips both kinds (listing them on stderr) instead of
+aborting. Ambiguous lines abort regardless.
 
 Exit code: 0 ok, 1 unresolved line, 2 usage or I/O error.
 """
@@ -43,14 +38,16 @@ import sys
 from pathlib import Path
 
 MARK_TO_STATUS = {"x": "supported", "X": "supported", "~": "partial", "-": "not_attempted"}
-_LINE_RE = re.compile(r"^\s*-\s*\[(?P<mark>.)\]\s*\*\*P\d+\*\*\s*`(?P<prefix>[0-9a-fA-F-]+)`")
+_LINE_RE = re.compile(r"^\s*-\s*\[(?P<mark>.)\]\s*\*\*[PC]\d+\*\*\s*`(?P<prefix>[0-9a-fA-F-]+)`")
 TAIPEI = datetime.timezone(datetime.timedelta(hours=8))
 
 
 # The quoted text after the dash: em/en dash or hyphen, straight or curly
-# quotes. Anything after the closing quote (asserts counts, a reviewer's note)
-# is ignored.
-_SNIPPET_RE = re.compile(r'[\u2014\u2013-]\s*["\u201c](?P<snip>.+?)["\u201d](?=[^"\u201d]*$)')
+# quotes. The snippet ends at the first closing quote that is followed by the
+# `(asserts …)` tail, a `[` note, or the end of the line; anything after it is
+# ignored.
+_SNIPPET_RE = re.compile(r'[\u2014\u2013-]\s*["\u201c](?P<snip>.+?)["\u201d]\s*(?=\(|\[|$)')
+_FULL_ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 def _load_validator():
@@ -76,34 +73,42 @@ def _collapse(text) -> str:
     return " ".join(text.split()) if isinstance(text, str) else ""
 
 
-def _snippet(line: str) -> str | None:
+def _snippet(line: str) -> tuple[str | None, bool]:
+    """(collapsed snippet, whether it was truncated with an ellipsis)."""
     m = _SNIPPET_RE.search(line)
     if not m:
-        return None
-    snip = m.group("snip")
+        return None, False
+    snip, truncated = m.group("snip"), False
     for tail in ("\u2026", "..."):
         if snip.endswith(tail):
-            snip = snip[: -len(tail)]
-    return _collapse(snip) or None
+            snip, truncated = snip[: -len(tail)], True
+    return (_collapse(snip) or None), truncated
 
 
 def _resolve(line: str, prefix: str, ledger) -> tuple[list[str], str | None]:
-    """Narrow the ledger to this line's proposition. Returns (ids, problem).
+    """Find this line's proposition. Returns (ids, problem).
 
-    UUIDv7 ids minted in one batch share their leading timestamp, so the
-    checklist's short prefix is often ambiguous. A line resolves only when its
-    id prefix AND its quoted text snippet agree on exactly one proposition.
-    The snippet is mandatory: without it a line could only be matched by
-    position, and a position-only match is how a verdict lands on the wrong
-    proposition after the ledger changes. The view ordinal is never used.
+    Identity comes from the id, never from a guess. Two cases resolve:
+
+    - the backticked id is a FULL UUID: exactly that ledger id, and its text
+      must still start with the snippet (a verdict on rewritten text is stale);
+    - the id is only a prefix: accepted only when the snippet is NOT truncated
+      and equals one proposition's whole text. A truncated snippet names the
+      opening words, not the proposition — after a rewrite, another proposition
+      sharing the prefix and those words would silently take the verdict.
+
+    Anything else returns no ids (the caller treats it as unresolved).
     """
-    snip = _snippet(line)
+    snip, truncated = _snippet(line)
     if snip is None:
         return [], "has no quoted text snippet to confirm which proposition it means"
-    ids = [p["id"] for p in ledger
-           if isinstance(p.get("id"), str) and p["id"].lower().startswith(prefix)
-           and _collapse(p.get("text")).startswith(snip)]
-    return ids, None
+    texts = {p["id"]: _collapse(p.get("text")) for p in ledger if isinstance(p.get("id"), str)}
+    if _FULL_ID_RE.match(prefix):
+        return [i for i in texts if i.lower() == prefix and texts[i].startswith(snip)], None
+    if truncated:
+        return [], (f"gives only an id prefix and a truncated snippet, which cannot identify a "
+                    f"proposition safely; regenerate the checklist with full ids")
+    return [i for i, t in texts.items() if i.lower().startswith(prefix) and t == snip], None
 
 
 def convert(text: str, checklist_ref: str, ledger, checked_at: str,
@@ -128,8 +133,11 @@ def convert(text: str, checklist_ref: str, ledger, checked_at: str,
             continue
         prefix = m.group("prefix").lower()
         matches, why = _resolve(line, prefix, ledger)
-        if why is not None:
+        if why is not None and not (allow_unmatched and "regenerate" in why):
             problems.append(f"L{lineno}: {why}")
+            continue
+        if why is not None:
+            skipped.append(f"L{lineno}: {why}")
             continue
         if not matches and allow_unmatched:
             skipped.append(f"L{lineno}: prefix `{prefix}` matches no ledger proposition")

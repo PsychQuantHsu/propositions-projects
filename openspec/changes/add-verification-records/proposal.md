@@ -8,7 +8,7 @@ propositions 帳冊只負責把稿件拆成命題索引，本身不驗證任何�
 - 新增 `validate-verification.py`：檢查紀錄的形狀、命題 id 能在帳冊找到、列舉值、日期、證據指向、重複紀錄，並列出同一命題被不同方法判得不一致的清單。
 - 新增 `proofread-to-verification.py`：把 proofread 的 `.proofread/<file>.md` checklist 轉成 `method=proofread` 的紀錄。
 - 新增 `docs/VERIFICATION.md`：格式、method 與 status 詞彙、各方法如何接入。
-- proofread SKILL 加一行交叉連結，指向轉換腳本。
+- proofread SKILL 加一行交叉連結指向轉換腳本，並把 checklist 模板的 id 欄改為完整 UUID（短前綴不足以識別命題）。
 - 帳冊 schema（`docs/SCHEMA.md`、`main.jsonl`）**不變**。
 
 ## Non-Goals

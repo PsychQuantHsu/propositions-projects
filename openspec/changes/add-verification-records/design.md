@@ -2,7 +2,7 @@
 
 propositions 帳冊（`main.jsonl`）把稿件拆成命題，每筆有 UUIDv7 `id`、逐字 `text`、`cites` DAG。帳冊本身只管「稿件說了什麼」，不管「說的對不對」。目前做雙重驗證的稿件只能在 repo 外另開對照表，欄位寫死一種方法（例如 `lean_ref`、`lean_status`），加第二種方法就得改表頭。proofread skill 已經在做逐條閱讀，但結果只留在 `.proofread/<file>.md` 的 checkbox，機器讀不到。
 
-限制：帳冊 schema 不動（使用者裁決 1）；PR #11 正在改 proofread SKILL.md，本 change 只能對它加一行，避免衝突。
+限制：帳冊 schema 不動（使用者裁決 1）；PR #11 正在改 proofread SKILL.md，本 change 對它只改兩行（交叉連結、checklist 模板的 id 欄改為完整 UUID），把衝突面壓到最小。
 
 ## Goals / Non-Goals
 
@@ -42,9 +42,13 @@ propositions 帳冊（`main.jsonl`）把稿件拆成命題，每筆有 UUIDv7 `i
 
 proofread checklist 每行形如 ``- [x] **P012** `019e2fbe` [claim] @L10-L12 — "…"``。原設計只用 `uuid_short` 前綴解析；**對真實帳冊實跑後推翻**：UUIDv7 的前段是時間戳，同一批抽取的命題共用前 8 碼（實測一份 364 筆的帳冊中，245 筆共用同一前綴），前綴幾乎總是不唯一。
 
-改為：一行只有在 id 前綴與行內引號中的文字片段（空白正規化後比對 `text` 開頭）**同時**指向唯一一筆命題時才解析。片段是必要條件：抽不到片段的行整批失敗，不退化成別的比對方式。
+**身分只來自 id，不來自比對。** verify 兩輪各找到一種錯接：第一輪是片段抽取失敗後退化成 ordinal；第二輪是截斷片段（約 80 字）只描述開頭，原命題改寫消失後，另一筆同前綴、開頭相同的命題就被當成它。兩者都是 exit 0、無警告。所以：
 
-**view ordinal（`P{seq}`）不用來解析。** 初版曾以 ordinal 在片段之後破同分；verify 以實例證明，片段抽取失敗（行尾加了審查者註記）時程式會退化成純 ordinal 比對，而帳冊增刪後 ordinal 已位移，判定就安靜地接到另一筆命題，exit 0。ordinal 唯一能救的情況（兩筆命題開頭 80 字相同）恰恰也是它最容易接錯的情況，所以拿掉；那種行改為整批失敗，由人處理。實測一份 364 筆帳冊、從現行帳冊產生的 40 行 checklist，不用 ordinal 仍全數解析。
+- proofread checklist 模板改為寫**完整 UUID**（SKILL.md 一行）。完整 id 直接對到該命題，且其文字仍須以片段開頭（擋改寫後的舊判定）。
+- 只有短前綴的舊 checklist：片段未截斷且等於某命題全文時才接受；截斷片段一律視為無法安全識別，提示以完整 id 重產。
+- view ordinal 不用來解析：帳冊增刪後它會整批位移。
+
+實測一份 364 筆帳冊：以完整 id 重產的 40 行 checklist 全數解析（32 筆紀錄），舊的短前綴 checklist 則被拒並附原因。
 
 兩種失敗分開處理：縮小後仍多於一筆 → 一律整批失敗（錯接到別的命題比少一筆紀錄危險）；一筆都沒有（文字在 checklist 產生後改寫、或命題重抽換了 id）→ 預設整批失敗，`--allow-unmatched` 時略過並列在 stderr，因為它不可能錯接。實測一份 2026-08 的舊 checklist：46 行中 45 行因帳冊重抽而無對應，其中 11 行的文字仍在、但已換成新 id——依文字轉移判定到新 id 並不安全（新命題的 asserts／cites 可能不同），所以不做。
 
@@ -76,8 +80,8 @@ proofread 的 `supported` 語意要在文件寫清楚：它代表六項閱讀檢
 
 ## Risks / Trade-offs
 
-- [uuid_short 前綴在 UUIDv7 帳冊上幾乎必撞] → 以必要的文字片段縮小；仍不唯一即整批失敗並列出行號，永不以位置猜。
+- [uuid_short 前綴在 UUIDv7 帳冊上幾乎必撞、截斷片段不構成身分] → checklist 改寫完整 id；短前綴只在片段等於全文時接受，否則拒絕，永不猜。
 - [舊 checklist 大量無對應] → 預設失敗提醒重做 proofread；`--allow-unmatched` 只轉仍對得上的行。
 - [proofread 的 `supported` 被誤讀為形式證明] → VERIFICATION.md 明寫其語意；不一致報告列出方法名，讀者看得到是哪種證據。
 - [`evidence_ref` 只檢查存在，指向的檔案可能已不存在] → 第一版接受此限制；各方法接入時可加自己的證據檢查（例如 Lean 常數是否存在）。
-- [PR #11 同時修改 proofread SKILL.md] → 本 change 只加一行交叉連結，衝突時手動合併成本低。
+- [PR #11 同時修改 proofread SKILL.md] → 本 change 只改兩行，衝突時手動合併成本低。

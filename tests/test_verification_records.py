@@ -185,13 +185,13 @@ def test_unresolved_is_not_a_disagreement():
 
 # ---- Proofread checklist conversion ----
 
-CHECKLIST = """# Proofread — main.tex
+CHECKLIST = f"""# Proofread — main.tex
 
 ## sec:intro
 
-- [x] **P001** `01910b9c-d4f0-7000` [claim] @L10-L12 — "First claim holds…" (asserts: 1, cites: 0)
-- [~] **P002** `01910b9c-d4f0-7001` [definition] @L14-L15 — "Second, define…" (asserts: 2, cites: 1)
-- [-] **P003** `0192aaaa` [remark] @L20-L20 — "Third remark on notation..." (asserts: 0, cites: 0)
+- [x] **P001** `{ID_A}` [claim] @L10-L12 — "First claim holds…" (asserts: 1, cites: 0)
+- [~] **P002** `{ID_B}` [definition] @L14-L15 — "Second, define…" (asserts: 2, cites: 1)
+- [-] **P003** `{ID_C}` [remark] @L20-L20 — "Third remark on notation..." (asserts: 0, cites: 0)
 - [ ] **P004** `0192aaaa` [remark] @L21-L21 — "Unwalked…" (asserts: 0, cites: 0)
 
 ## Findings
@@ -202,9 +202,17 @@ CHECKLIST = """# Proofread — main.tex
 """
 
 
+def line(mark, pid, snippet, tail=" (asserts: 1, cites: 0)"):
+    return f'- [{mark}] **P001** `{pid}` [claim] @L1-L1 — "{snippet}"{tail}\n'
+
+
+def convert(text, ledger=LEDGER, **kw):
+    return pv.convert(text, "c.md", ledger, checked_at="2026-09-25", **kw)
+
+
 def test_checklist_marks_map_to_statuses():
     records, problems, _ = pv.convert(CHECKLIST, ".proofread/main.md", LEDGER,
-                                   checked_at="2026-09-25", checker="che")
+                                      checked_at="2026-09-25", checker="che")
     assert problems == []
     got = [(r["prop_id"], r["status"], r["evidence_ref"]) for r in records]
     assert got == [(ID_A, "supported", ".proofread/main.md:L5"),
@@ -214,47 +222,59 @@ def test_checklist_marks_map_to_statuses():
                and r["checker"] == "che" for r in records)
 
 
-def test_shared_uuidv7_prefix_is_resolved_by_the_text_snippet():
-    # UUIDv7 ids minted in one batch share their leading timestamp, so the
-    # 8-hex `uuid_short` alone is ambiguous on real ledgers.
-    text = ('- [x] **P002** `01910b9c` [definition] @L1-L1 — "Second, define..." (asserts: 1, cites: 0)\n'
-            '- [x] **P001** `01910b9c` [claim] @L2-L2 — "First claim..." (asserts: 1, cites: 0)\n')
-    records, problems, _ = pv.convert(text, "c.md", LEDGER, checked_at="2026-09-25")
-    assert problems == []
-    assert [r["prop_id"] for r in records] == [ID_B, ID_A]
+def test_full_id_with_rewritten_text_is_unmatched():
+    records, problems, _ = convert(line("x", ID_A, "Rewritten claim..."))
+    assert records == [] and problems
+    records, problems, skipped = convert(line("x", ID_A, "Rewritten claim..."), allow_unmatched=True)
+    assert records == [] and problems == [] and len(skipped) == 1
 
 
-def test_same_prefix_and_snippet_aborts_never_guesses_by_position():
-    # The ordinal is never a tiebreak: it shifts when the ledger changes, and
-    # a position-only match is how a verdict lands on the wrong proposition.
-    twins = [{"id": ID_A, "text": "Same start, then A."},
-             {"id": ID_B, "text": "Same start, then B."}]
-    text = '- [x] **P002** `01910b9c` [claim] @L1-L1 — "Same start..." (asserts: 1, cites: 0)\n'
-    records, problems, _ = pv.convert(text, "c.md", twins, checked_at="2026-09-25")
+def test_short_prefix_with_truncated_snippet_is_never_guessed():
+    # verify #12 round 2: the reviewed proposition was rewritten away, and
+    # another one sharing the prefix happens to start with the same words.
+    ledger = [{"id": ID_B, "text": "Foo bard is a different claim entirely."}]
+    records, problems, _ = convert(line("x", "01910b9c", "Foo bar…"), ledger=ledger)
+    assert records == [] and problems and "full ids" in problems[0]
+    records, problems, skipped = convert(line("x", "01910b9c", "Foo bar…"), ledger=ledger,
+                                         allow_unmatched=True)
+    assert records == [] and problems == [] and skipped
+
+
+def test_short_prefix_with_whole_text_resolves():
+    records, problems, _ = convert(line("x", "01910b9c", "Second, define the operator T."))
+    assert problems == [] and [r["prop_id"] for r in records] == [ID_B]
+
+
+def test_short_prefix_whole_text_shared_by_two_aborts():
+    twins = [{"id": ID_A, "text": "Same text."}, {"id": ID_B, "text": "Same text."}]
+    records, problems, _ = convert(line("x", "01910b9c", "Same text."), ledger=twins,
+                                   allow_unmatched=True)
     assert records == [] and problems
 
 
 def test_reviewer_note_after_the_snippet_does_not_break_resolution():
-    # verify #12 CRITICAL PoC: a line without the `(asserts` tail used to lose
-    # its snippet and fall back to the ordinal, attaching the verdict to the
-    # other proposition. The snippet is now read regardless of what follows.
     ledger = [{"id": ID_A, "text": "Alpha claim about convergence rate."},
               {"id": ID_B, "text": "Beta remark about a completely different notation."}]
-    text = '- [x] **P002** `01910b9c` [claim] @L10-L12 — "Alpha claim about convergence" [see finding #3]\n'
-    records, problems, _ = pv.convert(text, "c.md", ledger, checked_at="2026-09-25")
+    text = f'- [x] **P002** `{ID_A}` [claim] @L10-L12 — "Alpha claim about convergence" [see finding #3]\n'
+    records, problems, _ = convert(text, ledger=ledger)
+    assert problems == [] and [r["prop_id"] for r in records] == [ID_A]
+
+
+def test_quoted_reviewer_note_does_not_swallow_the_snippet():
+    text = line("x", ID_A, "First claim holds…", tail=' (asserts: 1, cites: 0) — reviewer: "looks fine"')
+    records, problems, _ = convert(text)
     assert problems == [] and [r["prop_id"] for r in records] == [ID_A]
 
 
 def test_walked_line_without_a_snippet_aborts():
-    text = "- [x] **P001** `01910b9c-d4f0-7000` [claim] @L10-L12\n"
-    records, problems, _ = pv.convert(text, "c.md", LEDGER, checked_at="2026-09-25",
-                                      allow_unmatched=True)
+    text = f"- [x] **P001** `{ID_A}` [claim] @L10-L12\n"
+    records, problems, _ = convert(text, allow_unmatched=True)
     assert records == [] and problems and "snippet" in problems[0]
 
 
 def test_curly_quotes_and_en_dash_are_read():
-    text = "- [x] **P001** `01910b9c` [claim] @L1-L1 \u2013 \u201cFirst claim holds\u2026\u201d (asserts: 1, cites: 0)\n"
-    records, problems, _ = pv.convert(text, "c.md", LEDGER, checked_at="2026-09-25")
+    text = f"- [x] **P001** `{ID_A}` [claim] @L1-L1 \u2013 \u201cFirst claim holds\u2026\u201d (asserts: 1, cites: 0)\n"
+    records, problems, _ = convert(text)
     assert problems == [] and [r["prop_id"] for r in records] == [ID_A]
 
 
@@ -262,6 +282,20 @@ def test_ledger_prop_with_null_text_does_not_crash():
     ledger = LEDGER + [{"id": "0192bbbb-0000-7000-8000-000000000000", "text": None}]
     records, problems, _ = pv.convert(CHECKLIST, "c.md", ledger, checked_at="2026-09-25")
     assert problems == [] and len(records) == 3
+
+
+def test_ambiguous_or_unidentifiable_line_writes_nothing(tmp_path):
+    checklist = tmp_path / "c.md"
+    checklist.write_text(line("x", "01910b9c", "First claim…"))
+    _, ledger = write(tmp_path, [])
+    r = subprocess.run([sys.executable, str(CONVERT), "--checklist", str(checklist),
+                        "--ledger", str(ledger)], capture_output=True, text=True)
+    assert r.returncode == 1 and r.stdout == "" and "L1" in r.stderr
+
+
+def test_unknown_id_aborts():
+    records, problems, _ = convert(line("x", "deadbeef-0000-7000-8000-000000000000", "First claim..."))
+    assert records == [] and problems
 
 
 def test_checked_at_must_be_the_dashed_form(tmp_path):
@@ -272,33 +306,6 @@ def test_checked_at_must_be_the_dashed_form(tmp_path):
                         "--ledger", str(ledger), "--checked-at", "20260925"],
                        capture_output=True, text=True)
     assert r.returncode == 2 and r.stdout == ""
-
-
-def test_ambiguous_line_aborts_with_no_output(tmp_path):
-    twins = [{"id": ID_A, "text": "Same start, then A."},
-             {"id": ID_B, "text": "Same start, then B."}]
-    text = '- [x] **P009** `01910b9c` [claim] @L1-L1 — "Same start..." (asserts: 1, cites: 0)\n'
-    records, problems, _ = pv.convert(text, "c.md", twins, checked_at="2026-09-25")
-    assert records == [] and len(problems) == 1 and "L1" in problems[0]
-    checklist = tmp_path / "c.md"
-    checklist.write_text(text)
-    _, ledger = write(tmp_path, [], ledger=twins)
-    r = subprocess.run([sys.executable, str(CONVERT), "--checklist", str(checklist),
-                        "--ledger", str(ledger)], capture_output=True, text=True)
-    assert r.returncode == 1 and r.stdout == "" and "L1" in r.stderr
-
-
-def test_unknown_prefix_aborts():
-    text = '- [x] **P001** `deadbeef` [claim] @L1-L1 — "First claim..." (asserts: 1, cites: 0)\n'
-    records, problems, _ = pv.convert(text, "c.md", LEDGER, checked_at="2026-09-25")
-    assert records == [] and problems
-
-
-def test_snippet_that_matches_no_candidate_aborts():
-    # Right prefix, but the text changed since the checklist was generated.
-    text = '- [x] **P001** `01910b9c-d4f0-7000` [claim] @L1-L1 — "Rewritten claim..." (asserts: 1, cites: 0)\n'
-    records, problems, _ = pv.convert(text, "c.md", LEDGER, checked_at="2026-09-25")
-    assert records == [] and problems
 
 
 def test_converted_output_passes_the_validator(tmp_path):
@@ -320,21 +327,6 @@ def test_verification_doc_lists_every_vocabulary_value():
     doc = (REPO_ROOT / "plugins" / "propositions" / "docs" / "VERIFICATION.md").read_text()
     for value in (*vv.METHODS, *vv.STATUSES, "x-"):
         assert f"`{value}`" in doc, value
-
-
-def test_allow_unmatched_skips_rewritten_text_but_not_ambiguity():
-    stale = '- [x] **P001** `01910b9c-d4f0-7000` [claim] @L1-L1 — "Rewritten claim..." (asserts: 1, cites: 0)\n'
-    ok = '- [x] **P002** `01910b9c` [definition] @L2-L2 — "Second, define..." (asserts: 1, cites: 0)\n'
-    records, problems, skipped = pv.convert(stale + ok, "c.md", LEDGER,
-                                            checked_at="2026-09-25", allow_unmatched=True)
-    assert problems == [] and [r["prop_id"] for r in records] == [ID_B]
-    assert len(skipped) == 1 and "L1" in skipped[0]
-    twins = [{"id": ID_A, "text": "Same start, then A."},
-             {"id": ID_B, "text": "Same start, then B."}]
-    amb = '- [x] **P009** `01910b9c` [claim] @L1-L1 — "Same start..." (asserts: 1, cites: 0)\n'
-    records, problems, _ = pv.convert(amb, "c.md", twins, checked_at="2026-09-25",
-                                      allow_unmatched=True)
-    assert records == [] and problems
 
 
 def test_non_string_fields_are_v1_not_a_crash(tmp_path):

@@ -126,21 +126,27 @@ the run. `evidence_ref` is the checklist path and line. `--checked-at` defaults
 to today in Taipei time (UTC+8) and must be exactly `YYYY-MM-DD`, the same rule
 as V4.
 
-A line resolves to a proposition only when its backticked id prefix **and** its
-quoted text snippet (after the dash; straight or curly quotes) agree on exactly
-one. The prefix alone is not enough, because UUIDv7 ids minted in one
-extraction batch share their leading timestamp characters. The snippet is
-required, and it is compared even when the prefix is unique, so a verdict made
-on text that has since been rewritten is never recorded as current. The `P{seq}`
-ordinal is **never** used: it shifts when the ledger gains or loses a
-proposition, and matching by position is how a verdict lands on the wrong one.
+Identity comes from the id in backticks, never from a guess. The proofread
+skill writes the **full** proposition id there.
+
+- A full id resolves to exactly that proposition, and its text must still start
+  with the quoted snippet (straight or curly quotes, after the dash). The
+  snippet check means a verdict made on text that has since been rewritten is
+  not recorded as current.
+- A short id prefix (older checklists) resolves only when the snippet is not
+  truncated and equals one proposition's whole text. A truncated snippet names
+  the opening words, not the proposition: UUIDv7 ids minted in one extraction
+  batch share their leading characters, so after a rewrite another proposition
+  with the same prefix and the same opening words would take the verdict.
+  Anything else is reported with "regenerate the checklist with full ids".
+- The `P{seq}` ordinal is never used; it shifts when the ledger changes.
 
 - A walked line with no quoted snippet, an unknown mark, or **more than one**
   matching proposition aborts the run; nothing is written.
 - A line that matches **none** (the text was rewritten, or the ledger was
-  re-extracted and the proposition got a new id) aborts by default. With
-  `--allow-unmatched` it is skipped and listed on stderr, and the rest are
-  written. A verdict is never moved to a new id by text alone: a re-extracted
+  re-extracted and the proposition got a new id), or a short-prefix line that
+  cannot be identified safely, aborts by default. With `--allow-unmatched` it
+  is skipped and listed on stderr, and the rest are written. A verdict is never moved to a new id by text alone: a re-extracted
   proposition may have different asserts and cites, so re-walk it instead.
 
 ### Other methods

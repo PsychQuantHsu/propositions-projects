@@ -1,7 +1,7 @@
 # Proposition ledger 的定位：AI 可讀性、Lean、與證明表徵
 
 > 2026-07-07 設計討論筆記。起點是 PT-JSONL 提案
-> (`~/Library/CloudStorage/Dropbox/che_workspace/orthogonal_projects/imports/proposition_world_model_proposal.md`)
+> (未公開的設計提案 `proposition_world_model_proposal.md`,原檔在維護者本機,不收進本 repo)
 > 對本 plugin 的改善啟發,一路收束到 proposition ledger 在「形式化光譜」上的定位。
 > 性質是討論紀錄 + 定位論述,**不是 normative contract**(那是 SCHEMA.md 的工作)。
 > 文末的 backlog 是候選改動,尚未立 Spectra change。

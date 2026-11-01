@@ -49,5 +49,26 @@ Cheng, C., Lay, K.-L., Hsu, Y.-F., & Tsai, Y.-M. (2021). Can Likert scales predi
 
 ### 在本專案的用途
 
-1. **empirical profile 的範例稿件**。`add-extract-skill` 的 pilot 與 eval 是在這篇的早期草稿上跑的（帳冊與結果都留在 repo 外）。之後重做改以期刊版為準（#26 Clarity Surface 第 5 列）。
+1. **empirical profile 的範例稿件**。`add-extract-skill` 的 pilot 與 eval 是在這篇的早期草稿上跑的。2026-11-02 起，期刊版全文已有完整帳冊與結構附檔（見下一節），之後的 eval 與示範以它為準。帳冊與附檔都留在作者的私有稿件 repo。
 2. **寫作轉移的 worked example**（#26：已知 prop_t，prop_{t+1} 該寫什麼）。§3.3 是「觀察 → 對立假設 → 推導出的預測 → 檢定 → 詮釋 → 修正模型」的完整示範，每一步都有連接詞標出和前一句的關係。
+
+### 期刊版的文章結構（worked example，2026-11-02）
+
+Spectra change `add-article-construction-model` 以期刊版全文做了一次完整的 worked example。帳冊與兩個結構附檔放在作者的私有稿件 repo，這裡只記數字。
+
+- **帳冊**：294 個 proposition（摘要 14、第 1 節 133、第 2–4 節 147）。文末聲明與附錄問卷不屬於論證，不抽取。
+- **相鄰關係**：consequence 59、specification 51、continue 50、addition 43、contrast 19、shift 19、sequence 16、instance 11、reason 10、return 10、restatement 5、start 1。12 個值全部用上。
+- **承諾**：32 個。setup 4、question 3、aim 5、plan 7、announcement 7、hypothesis 2、future_work 4。研究問題、目的、假設、章節計畫、近距離承諾全部兌現，只有 4 個未來研究依設計保持開著。
+- **章節**：11 節。「3. Results」開頭那段講信賴區間、檢定與軟體，角色是 `method`；§1.1 雖然在引言底下，角色是 `formal_setup`。
+- **詞彙缺口**：帳冊從摘要開始，原本 9 個章節角色都不適合摘要。依設計停下來問使用者，結果是加入第 10 個角色 `abstract`：只能是第一節，節內的 proposition 不開承諾，避免和正文開出的承諾重複計算。
+
+**下一步模式的檢驗**：把帳冊截在三個位置，用 `structure-state.py` 取「最該推進的承諾」，和期刊版實際的下一句比對。
+
+| 切點 | 最該推進的承諾 | 實際的下一句 |
+|---|---|---|
+| §1.1 結尾（“which we now describe”） | 該 announcement | 下一節第一句（`shift`）就兌現它，相符 |
+| §3.2 結尾 | 引言宣告的下一個章節計畫 | §3.3 第一句（`shift`）就兌現它，相符 |
+| §3.3 中段（“We now examine an alternative explanation.”） | 該 announcement | 先報出相關個案的人數，兩句之後才提出那個解釋並兌現，部分相符 |
+
+兩個章節交界處，下一節第一句做的事正好是狀態查詢排第一的事。§3.3 內部則是先鋪陳解釋所需的事實，再兌現承諾；所以下一步模式提出的候選，要容許「為開著的承諾鋪陳事實」這一類。
+

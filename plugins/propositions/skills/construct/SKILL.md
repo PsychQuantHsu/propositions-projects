@@ -222,7 +222,10 @@ Each candidate states:
 - **Is**: the expected `claim_type` (and `evidence_class` for an empirical ledger).
 - **Sentence**: one draft sentence, marked as a suggestion.
 
-If an `announcement` is open, the first candidate keeps it. Never invent results, numbers or
+If an `announcement` is open, the first candidate keeps it — or, when keeping it needs facts the
+draft has not stated yet, lays those facts down and says which announcement it prepares (the
+worked example in `docs/REFERENCE-MANUSCRIPTS.md` keeps an announcement two propositions
+later, after a factual setup). Never invent results, numbers or
 citations in a draft sentence: write a placeholder such as `[result of the test]`.
 
 ### N5 — Leave every file untouched

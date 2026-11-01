@@ -37,6 +37,17 @@ Operation D          extract → A             日常節奏             送審�
 **Worked example（Hsu case）**：全稿 Phase 1 抽出 342 條（後成長至 364）；thm:eta-s
 一節另做 Phase 2 clause-level 細化（81 條）。逐節分批讓單節失敗不影響已完成的節。
 
+## 階段 1.5 — 文章結構（`/propositions:construct`，帳冊完整之後）
+
+帳冊說每一句主張什麼；文章結構說整篇怎麼蓋起來：文章向讀者開了哪些承諾（研究問題、目的、
+假設、宣告的章節計畫、「We now examine …」）、每一節的角色、每一句和上一句的關係。標註模式把
+這三層存成帳冊旁的 `structure.json`／`discourse.jsonl`（不改帳冊），用 `validate-structure.py`
+（S1–S6）檢查：承諾先開後兌現、完整的文章不欠帳。格式與詞彙見 [`STRUCTURE.md`](STRUCTURE.md)。
+
+寫稿途中用下一步模式：`structure-state.py --at end` 依緊迫程度列出還沒兌現的承諾，skill 據此
+提出至多三個候選下一句（推進哪個承諾、用什麼關係接上），不寫入任何檔案。草稿還沒寫主旨時
+用 `--partial`。
+
 ## 階段 2 — 日常節奏（每次改 tex）
 
 1. 改完 tex → **Operation A**。R1 fail = 措辭真的變了 → 更新 `prop.text`（verbatim）；

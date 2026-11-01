@@ -1,0 +1,32 @@
+{
+  "structure_version": "1.0",
+  "thesis": [
+    "019a3c5e-7a00-7000-8000-000000000009"
+  ],
+  "sections": [
+    {
+      "id": "sec-introduction",
+      "heading": "Introduction",
+      "role": "introduction",
+      "first_prop": "019a3c5e-7a00-7000-8000-000000000001"
+    },
+    {
+      "id": "sec-method",
+      "heading": "Method",
+      "role": "method",
+      "first_prop": "019a3c5e-7a00-7000-8000-000000000007"
+    },
+    {
+      "id": "sec-results",
+      "heading": "Results",
+      "role": "results",
+      "first_prop": "019a3c5e-7a00-7000-8000-000000000008"
+    },
+    {
+      "id": "sec-discussion",
+      "heading": "Discussion",
+      "role": "discussion",
+      "first_prop": "019a3c5e-7a00-7000-8000-00000000000b"
+    }
+  ]
+}

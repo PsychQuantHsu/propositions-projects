@@ -209,7 +209,10 @@ them, and stating it usually reveals that the untouched surface is where the err
 
 ### Schema extension for Mode B
 
-Mode B needs two additions. Both are **additive** — a Mode A ledger stays valid.
+Mode B needs two additions. Both are **additive** — a Mode A ledger stays valid. A ledger
+that uses the new values must declare `"profile": "empirical"` with `schema_version` 1.7 in
+its `_meta.json`; under the default profile the validator's R11/R12 reject them (SCHEMA.md
+§Profiles (v1.7+)). `/propositions:extract` writes empirical ledgers with this vocabulary.
 
 ```jsonc
 {
@@ -220,7 +223,7 @@ Mode B needs two additions. Both are **additive** — a Mode A ledger stays vali
       "recheck": "Rscript -e '...'" }     // re-runnable command
   ],
   "claim_type":     "result",             // NEW: result | interpretation
-  "evidence_class": "tested"              // NEW: measured | tested | descriptive | not_computable
+  "evidence_class": "tested"              // NEW: measured | tested | descriptive | not_computable | external
 }
 ```
 
@@ -241,6 +244,7 @@ New `evidence_class` values — note that all five existing values (`verified`, 
 | `tested` | Supported by a named test, with the statistic reported |
 | `descriptive` | Reported without inferential support (no test was performed) |
 | `not_computable` | The quantity cannot be produced from the dataset as collected (an E2 failure, recorded rather than silently dropped) |
+| `external` | Support lies outside this paper: the works cited in the sentence, or, when nothing is cited, the field's common knowledge. Whether a citation is present is read from the text (`\cite` commands), not recorded separately. These props have no artifact to re-run, so E1–E8 do not apply; check them as references instead |
 
 `not_computable` is deliberately a first-class value: an E2 finding is the most consequential
 thing this mode detects, and it should survive in the ledger rather than becoming a deletion

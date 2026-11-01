@@ -150,7 +150,7 @@ manuscript's argument explicit as a DAG of cite-able atomic claims (Locke's
 
 ### Versioning
 
-`_meta.json` 含 `schema_version: "1.6"`(v1.0 = pre-#77 single-file JSON;v1.1 =
+`_meta.json` 含 `schema_version: "1.7"`(v1.0 = pre-#77 single-file JSON;v1.1 =
 post-#77 JSONL + _meta sidecar + sentence_index/clause_index fields;v1.2 =
 post-`migrate-prop-id-to-stable-uuid` UUID v7 identity contract,P/C-prefix 改
 成 view-time derivation;**v1.3** = `sentence_index` / `clause_index` 移除,
@@ -159,7 +159,7 @@ proposition ordering 改用 JSONL 檔案行序;**v1.4** = `retired` 欄位新增
 本 canonical 於 add-manuscript-onboarding change 回收);**v1.5** =
 `retired.superseded_mechanism` 欄位新增;**v1.6** = multi-file manuscript 支援:
 `location` 允許檔名前綴(見 §Multi-file manuscripts)+ `_meta.json` 選填
-`source.parts` 快照)— schema 改動要 bump version + migration note。
+`source.parts` 快照);**v1.7** = `_meta.json` 選填 `profile`(`default` | `empirical`),決定 R11/R12 接受的詞彙(見 §Profiles (v1.7+))— schema 改動要 bump version + migration note。
 
 ## File layout
 
@@ -183,7 +183,8 @@ manuscript/propositions/
 
 ```json
 {
-  "schema_version": "1.6",
+  "schema_version": "1.7",
+  "profile": "default",  // optional (v1.7+) — default | empirical; absent = default. See §Profiles (v1.7+)
   "source": {
     "file": "manuscript/main.tex",
     "parts": ["parts/part1-intro.tex", "parts/part2-theory.tex"],
@@ -220,6 +221,7 @@ the validator (allow hand-written comments in fixtures).
   "containing_block": "sec:setup / lem:affine-bijection / thm:eta-s / discussion / footnote-3 / etc.",
 
   "claim_type": "axiom | definition | hypothesis | claim | case_split | display_equation | restatement | commentary | example | connective | reference | scope_qualifier",
+  // profile empirical (v1.7+) also accepts: result | interpretation
 
   "asserts": [
     "human-readable atomic claim",
@@ -239,6 +241,7 @@ the validator (allow hand-written comments in fixtures).
   },
 
   "evidence_class": "verified | derived | hypothesized | conventional | open",
+  // profile empirical (v1.7+) also accepts: measured | tested | descriptive | not_computable | external
 
   "notes": "optional human note (not used by validator)"
 }
@@ -332,6 +335,8 @@ audit trail, and leaving it unmarked makes the ledger silently over-claim.
 | `connective` (Phase 2 clause-level only) | Pure linguistic connector, no propositional content | "Hence," / "Therefore," / "In particular," |
 | `reference` (Phase 2 clause-level only) | Pure cross-reference / citation | "(Section~\\ref{sec:setup})" / "\\citep{DobleHsu2020}" |
 | `scope_qualifier` (Phase 2 clause-level only) | Subordinate scope/quantifier attaching to parent | "for every $s \\in S$" |
+| `result` (profile `empirical` only, v1.7+) | An empirical finding read off a data or model artifact | "Recall was 0.62, 95\\% CI [0.58, 0.66]." |
+| `interpretation` (profile `empirical` only, v1.7+) | What the authors read *into* a result | "These values suggest that the delay effect is robust." |
 
 Phase 2 additions (`connective` / `reference` / `scope_qualifier`) are only
 used when extraction runs in clause-level mode. Heterogeneous Phase 1 mode
@@ -389,6 +394,34 @@ applies to `axiom`, `definition`, `commentary`.
 | `hypothesized` | Assumed (theorem / lemma hypothesis) |
 | `conventional` | Definitional choice (Section 1 conventions) |
 | `open` | Future-work / unproved |
+| `measured` (profile `empirical` only, v1.7+) | A value read directly from data or model output |
+| `tested` (profile `empirical` only, v1.7+) | Supported by a named test, with the statistic reported |
+| `descriptive` (profile `empirical` only, v1.7+) | Reported without inferential support (no test was performed) |
+| `not_computable` (profile `empirical` only, v1.7+) | The quantity cannot be produced from the dataset as collected |
+| `external` (profile `empirical` only, v1.7+) | Support lies outside this paper: the works cited in the sentence, or, when nothing is cited, the field's common knowledge. Whether a citation is present is read from the text (`\cite` commands), not recorded separately |
+
+The five `empirical` values are defined together with proofread Mode B (`plugins/propositions/skills/proofread/SKILL.md`, §Schema extension for Mode B); the two tables must change together.
+
+## Profiles (v1.7+)
+
+A profile names the vocabulary a ledger uses for `claim_type` and `evidence_class`. It lives in the ledger's own `_meta.json`, so the ledger stays self-describing (same principle as the pinned `SCHEMA.md` copy).
+
+- **Field**: top-level string `profile` in `_meta.json`. Absent = `default`.
+- **Accepted values (closed list — only these two; do not infer a profile from a similar-looking value)**: `default`, `empirical`. Adding a profile is a schema change: update this section, bump the version, and change the validator in the same change.
+- **Schema gate**: a ledger that declares `profile` MUST have `schema_version` ≥ 1.7. Declaring it under an older version is an error (exit 1); the validator does **not** fall back to the default vocabulary.
+- **Unknown value**: error naming the value and the accepted set (exit 1).
+- **Output**: the validator prints `[INFO] profile: <value>` only when `_meta.json` declares `profile`. Ledgers without the field produce exactly the pre-v1.7 output.
+
+| Profile | `claim_type` accepted (R12) | `evidence_class` accepted (R11) |
+|---------|-----------------------------|---------------------------------|
+| `default` | axiom, definition, hypothesis, claim, case_split, display_equation, restatement, commentary, example, connective, reference, scope_qualifier | verified, derived, hypothesized, conventional, open |
+| `empirical` | the `default` set plus result, interpretation | the `default` set plus measured, tested, descriptive, not_computable, external |
+
+`empirical` is a superset: empirical manuscripts still contain definitions, hypotheses, commentary and cross-references, and one concept keeps one definition across profiles.
+
+**Migration**: to adopt `empirical`, set `"schema_version": "1.7"` and `"profile": "empirical"` in `_meta.json`. Existing ledgers need no change.
+
+**Why this exists** (propositions-projects#24): proofread Mode B defined the empirical vocabulary, but R11/R12 were closed enums, so any ledger written with Mode B values failed the validator. The `external` value was added after a pilot extraction of an empirical manuscript: every proposition that fit no existing value was a claim whose support lies outside the paper.
 
 ## Validator rules (machinable)
 
@@ -418,9 +451,9 @@ The R9 implementation inlines the LaTeX env parser from `scripts/audit-theorem-b
 
 7. **R10 claim-type-asserts** (#90, 2026-05-18): Phase 2 LLM mistag guard. For every prop whose `claim_type` is `connective` or `reference`, the `asserts` array MUST be empty (those types are pure structural glue per Stage 2 schema). `scope_qualifier` is intentionally **exempt** — those props typically carry 1 short assert documenting the scope (e.g. `"scope: for every s in S"`). Violations emit `[FAIL] R10` with exit code 1 (FAIL severity, no WARN-as-baseline policy — `main.jsonl` + `_stage2/theorem1.jsonl` baselines were clean at ship time, so any violation signals a real mistag to fix). R3's `structural_leaf_types` exemption from the orphan check is `claim_type`-keyed and runs orthogonally; R10 catches content-bearing props that would otherwise slip past R1 + R3 due to the mistag.
 
-8. **R11 evidence-class-enum** (#119, 2026-05-18): schema enum-membership guard, symmetric to R10. Every prop's `evidence_class` MUST be a member of the canonical 5-element enum `verified | derived | hypothesized | conventional | open`. Violations emit `[FAIL] R11` with exit code 1 (FAIL severity, no WARN-as-baseline policy). Schema-gated v1.2+ (legacy v1.1 / missing `schema_version` emit `[SKIP] R11` for backward compat, same gate as R7). Before R11 the enum was defined in this file prose-only with no machine enforcement; the Phase 2 clause-level LLM extractor hallucinated out-of-enum values (`definitional`, `claim`) that slipped past R1-R10.
+8. **R11 evidence-class-enum** (#119, 2026-05-18): schema enum-membership guard, symmetric to R10. Every prop's `evidence_class` MUST be a member of the declared profile's set (§Profiles (v1.7+)); under `default` that is the canonical 5-element enum `verified | derived | hypothesized | conventional | open`. Props without `evidence_class` are not checked. Violations emit `[FAIL] R11` with exit code 1 (FAIL severity, no WARN-as-baseline policy). Schema-gated v1.2+ (legacy v1.1 / missing `schema_version` emit `[SKIP] R11` for backward compat, same gate as R7). Before R11 the enum was defined in this file prose-only with no machine enforcement; the Phase 2 clause-level LLM extractor hallucinated out-of-enum values (`definitional`, `claim`) that slipped past R1-R10.
 
-9. **R12 claim-type-enum** (#124, 2026-05-19): schema enum-membership guard, symmetric to R11. Every prop's `claim_type` MUST be a member of the canonical 12-element enum `axiom | definition | hypothesis | claim | case_split | display_equation | restatement | commentary | example | connective | reference | scope_qualifier`. Violations emit `[FAIL] R12` with exit code 1 (FAIL severity, no WARN-as-baseline policy). Schema-gated v1.2+ (legacy v1.1 / missing `schema_version` emit `[SKIP] R12` for backward compat, same gate as R7 + R11). Before R12 the enum was defined in this file prose-only; R3's `structural_leaf_types` exemption is `claim_type`-keyed (`p.get("claim_type", "claim")`), so a hallucinated value would silently misroute orphan detection. `main.jsonl` + `_stage2/theorem1.jsonl` baselines were 100% canonical at ship time across all 12 enum members — R12 ships as pure structural prevention against future extractor drift, no data sweep needed.
+9. **R12 claim-type-enum** (#124, 2026-05-19): schema enum-membership guard, symmetric to R11. Every prop's `claim_type` MUST be a member of the declared profile's set (§Profiles (v1.7+)); under `default` that is the canonical 12-element enum `axiom | definition | hypothesis | claim | case_split | display_equation | restatement | commentary | example | connective | reference | scope_qualifier`. Violations emit `[FAIL] R12` with exit code 1 (FAIL severity, no WARN-as-baseline policy). Schema-gated v1.2+ (legacy v1.1 / missing `schema_version` emit `[SKIP] R12` for backward compat, same gate as R7 + R11). Before R12 the enum was defined in this file prose-only; R3's `structural_leaf_types` exemption is `claim_type`-keyed (`p.get("claim_type", "claim")`), so a hallucinated value would silently misroute orphan detection. `main.jsonl` + `_stage2/theorem1.jsonl` baselines were 100% canonical at ship time across all 12 enum members — R12 ships as pure structural prevention against future extractor drift, no data sweep needed.
 
 10. **R13 location line-anchoring** (#128/#139, backfilled to this canonical in add-manuscript-onboarding): single-line `location` must anchor the prop's normalized text at the declared line within `R13_START_TOLERANCE = 2` lines (span bound `R13_MAX_SPAN = 30`); un-anchorable props surface as informational, never guessed (windowed locator with degeneracy guard — loud `anchor_failed` over silent mis-write). **v1.6**: R13 is file-aware — a file-prefixed location anchors within the named file of the resolved input tree; prefix naming a file outside the tree → FAIL `file not in input tree`; prefix present but `schema_version < 1.6` → FAIL with upgrade hint. (Pre-v1.6 behavior — skip-with-count for non-main-tex prefixes per #116 — is retained only for ledgers below v1.6 without prefixes.)
 

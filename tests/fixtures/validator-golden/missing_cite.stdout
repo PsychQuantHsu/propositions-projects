@@ -1,0 +1,26 @@
+=== validate-propositions ===
+JSONL: tests/fixtures/_smoke_tests/missing_cite.jsonl
+Meta: tests/fixtures/_smoke_tests/missing_cite_meta.json
+TeX:  tests/fixtures/_smoke_tests/missing_cite.tex
+Props: 1
+
+[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)
+[PASS] R1.5 surjective coverage — every top-level section has ≥1 prop
+[PASS] R3 DAG — no cycles
+[PASS] R4 mechanical-contradiction — no known pattern violations
+[PASS] R7 id-format — every prop.id is canonical UUID v7, no parallel id field
+[PASS] R8 unique-ids — every prop.id is unique within file
+[SKIP] R9 env-consistency — no theorem-like envs in tex (or empty)
+[PASS] R10 claim-type-asserts — connective/reference props all have empty asserts (scope_qualifier exempt)
+[PASS] R11 evidence-class-enum — all props use a canonical evidence_class (verified/derived/hypothesized/conventional/open)
+[PASS] R12 claim-type-enum — all props use a canonical claim_type (12-element enum per SCHEMA.md)
+[FAIL] R13 location-anchoring — 1 prop(s) with invalid file-qualified location (schema < 1.6 with prefix, or file not in input tree)
+[PASS] R13 location-anchoring — no location drift detected
+
+=== 1 WARNING(s) ===
+  [R3] P001 (01910b9c-d4f0-7042-8000-0000000000aa): orphan: not cited by any other prop (claim_type=claim)
+
+=== 2 ERROR(s) ===
+  [R2] P001 (01910b9c-d4f0-7042-8000-0000000000aa): cites missing UUID 01910b9c-d4f0-7999-8000-00000000bbbb
+  [R13] P001 (01910b9c-d4f0-7042-8000-0000000000aa): file-qualified location 'smoke_tests/missing_cite.tex:L1' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+

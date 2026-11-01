@@ -9,7 +9,7 @@
 ## 全景
 
 ```
-Operation D          Operation C → A         日常節奏             送審前            大改版
+Operation D          extract → A             日常節奏             送審前            大改版
 ┌──────────┐        ┌──────────────┐      ┌──────────────┐    ┌───────────┐    ┌─────────────┐
 │ scaffold │───────▶│ 首次抽取+驗證 │─────▶│ 改tex→A→B修位 │──▶│ 三軸 audit │──▶│ re-anchor   │──▶(回日常)
 │ ledger   │        │ (逐節可分批)  │      │  (每次改動)   │    │           │    │ (新base採用) │
@@ -28,9 +28,10 @@ Operation D          Operation C → A         日常節奏             送審�
 - **multi-file 直接支援**（schema v1.6）：`_meta.json` 記主檔，`\input` 樹自動解析；
   prop 用 `parts/part2-theory.tex:L123` 形式的 file-qualified location。
 
-## 階段 1 — 首次抽取（Operation C → A）
+## 階段 1 — 首次抽取（`/propositions:extract` → A）
 
-依釘版 EXTRACTION-PROMPT 對主檔（或逐節分批）抽取 JSONL，**每批都以 Operation A 收尾**
+用 `/propositions:extract` 依釘版 EXTRACTION-PROMPT 對主檔逐節分批抽取（每批先過覆蓋檢查，
+再對合併後的副本跑 validator，確認 diff 才寫入帳冊），**每批都以 Operation A 收尾**
 ——沒過 validator 的抽取不算完成。
 
 **Worked example（Hsu case）**：全稿 Phase 1 抽出 342 條（後成長至 364）；thm:eta-s
@@ -57,7 +58,8 @@ co-author 給了重寫版、或自己大重構時，**不重抽全部**——走
 
 1. 採用新 base（tex 換成新版）。
 2. **Operation B 大範圍 re-anchor**：能靠 windowed locator 自動遷移的先遷。
-3. 真的改寫過的節 → **Operation C 重抽該節**；消失的段落 → prop 標 `retired`
+3. 真的改寫過的節 → 先把該節的舊 prop 標 `retired`，再**用 `/propositions:extract` 重抽**
+   （它會略過 retired 的 prop；沒標的話，它會因範圍內已有 prop 而停下）；消失的段落 → prop 標 `retired`
    （v1.4+ 欄位：`mechanism` / `match` / `reason`——留 audit trail，不刪 prop）。
 4. Operation A 全綠 + `_meta.json` 更新錨定 commit。
 
@@ -90,7 +92,7 @@ slope-matching（由 smoothness 取代、僅 Theorem 4 用）？」流程：
 
 | 反模式 | 正解 |
 |--------|------|
-| 抽取沒過 validator 就當完成 | Operation C 的定義含 A 閘門 |
+| 抽取沒過 validator 就當完成 | `/propositions:extract` 以 A 閘門收尾，沒過不算完成 |
 | R13 WARN 用手改行號 | Operation B（windowed locator + dry-run），手改必漂 |
 | 大改版重抽全部 | re-anchor 優先（#147:299/374 靠 relocate，只重抽 60） |
 | 段落停用就刪 prop | `retired` 欄位——刪除毀 audit trail |

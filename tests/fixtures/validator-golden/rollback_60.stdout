@@ -1,0 +1,29 @@
+=== validate-propositions ===
+JSONL: tests/fixtures/_smoke_tests/rollback_60.jsonl
+Meta: tests/fixtures/_smoke_tests/rollback_60_meta.json
+TeX:  tests/fixtures/_smoke_tests/rollback_60.tex
+Props: 4
+
+[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)
+[PASS] R1.5 surjective coverage — every top-level section has ≥1 prop
+[PASS] R2 cite-resolve — all cites resolve
+[PASS] R3 DAG — no cycles
+[PASS] R8 unique-ids — every prop.id is unique within file
+[SKIP] R9 env-consistency — no theorem-like envs in tex (or empty)
+[PASS] R10 claim-type-asserts — connective/reference props all have empty asserts (scope_qualifier exempt)
+[PASS] R11 evidence-class-enum — all props use a canonical evidence_class (verified/derived/hypothesized/conventional/open)
+[PASS] R12 claim-type-enum — all props use a canonical claim_type (12-element enum per SCHEMA.md)
+[FAIL] R13 location-anchoring — 4 prop(s) with invalid file-qualified location (schema < 1.6 with prefix, or file not in input tree)
+[PASS] R13 location-anchoring — no location drift detected
+
+=== 9 ERROR(s) ===
+  [R4] PATTERN-A: boundary axiom η(1,s)=s + hypothesis η=f(s) + 'f may be any' claim → contradiction: boundary forces f=id (Iverson framework)
+  [R7] P001 (P030): id field 'P030' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R7] P002 (P200): id field 'P200' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R7] P003 (P230): id field 'P230' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R7] P004 (P240): id field 'P240' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R13] P001 (P030): file-qualified location 'smoke_tests/rollback_60.tex:L1' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+  [R13] P002 (P200): file-qualified location 'smoke_tests/rollback_60.tex:L2' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+  [R13] P003 (P230): file-qualified location 'smoke_tests/rollback_60.tex:L3' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+  [R13] P004 (P240): file-qualified location 'smoke_tests/rollback_60.tex:L4' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+

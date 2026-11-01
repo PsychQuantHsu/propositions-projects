@@ -59,6 +59,7 @@ from collections import defaultdict
 # _lib, so cross-cwd invocation resolves `_lib` relative to the script.
 sys.path.insert(0, str(Path(__file__).parent))
 
+from _lib.normalize import normalize_for_match  # noqa: E402,F401  (re-exported)
 from _lib.latex_env_parser import (  # noqa: E402  (sys.path setup must precede)
     InputTreeError,
     ENV_TYPES as _R9_DEFAULT_ENV_TYPES,
@@ -177,135 +178,9 @@ def load_tex(tex_path: Path):
     return text, text.splitlines()
 
 
-def normalize_for_match(s: str) -> str:
-    """Whitespace-collapsed string for verbatim comparison.
-
-    LaTeX has \n line wraps that don't affect semantics. Collapse runs of
-    whitespace (incl. newlines) to single spaces so a prop.text that's
-    a single-line copy matches a multi-line .tex sentence.
-
-    Math delimiter equivalence: \\[ \\] / \\begin{equation}...\\end{equation}
-    / $ $ / $$ $$ all represent math mode and prop authors may use either
-    when transcribing. Normalize all to canonical inline `$` for matching.
-    Also strip `\\quad`, `\\,`, `\\;` and similar spacing macros and
-    `\\text{...}` wrappers commonly used in display math that don't appear
-    when prop.text uses inline form.
-    """
-    # 1. Strip ALL math-mode delimiters (display + inline) — math content stays
-    #    but delimiter placement (which differs between prop's inline form and
-    #    .tex's display form) is normalized out.
-    s = re.sub(r"\\\[", " ", s)
-    s = re.sub(r"\\\]", " ", s)
-    s = re.sub(r"\\begin\{equation\*?\}", " ", s)
-    s = re.sub(r"\\end\{equation\*?\}", " ", s)
-    s = re.sub(r"\$\$", " ", s)
-    s = re.sub(r"\$", " ", s)
-    # 2. Strip math-mode spacing macros: \quad, \qquad, \,, \;, \!, \:
-    s = re.sub(r"\\quad\b", " ", s)
-    s = re.sub(r"\\qquad\b", " ", s)
-    s = re.sub(r"\\[,;!:]", " ", s)
-    # 3. Inline `\text{X}` → just X (literal text without macro)
-    s = re.sub(r"\\text\{([^}]*)\}", r"\1", s)
-    # 3a. Strip structural macros (paragraph / section / subsection / textbf):
-    #     `\paragraph{Affine.}` → `Affine`, etc. Prop text often uses bare
-    #     label form ("Affine:") while .tex uses paragraph form. Normalize
-    #     both to plain content. Also strip trailing `.` in label form.
-    s = re.sub(r"\\paragraph\{([^}]*?)\.?\}", r"\1", s)
-    s = re.sub(r"\\subsection\{([^}]*)\}", r"\1", s)
-    s = re.sub(r"\\section\*?\{([^}]*)\}", r"\1", s)
-    s = re.sub(r"\\textbf\{([^}]*?)\.?\}", r"\1", s)
-    s = re.sub(r"\\emph\{([^}]*)\}", r"\1", s)
-    s = re.sub(r"\\textit\{([^}]*)\}", r"\1", s)
-    # 3a.1. Strip LaTeX line comments `% ... <newline>` — these never
-    #       appear in prop.text but pollute .tex normalized form.
-    s = re.sub(r"%[^\n]*\n", "\n", s)
-    # 3a.2. Strip `\item` / `\noindent` markers — list/section structure.
-    s = re.sub(r"\\item\b\s*", "", s)
-    s = re.sub(r"\\noindent\b\s*", "", s)
-    # 3a.3. Strip `\begin{...}` / `\end{...}` environment markers (after
-    #       the equation versions handled above). Other envs (itemize,
-    #       enumerate, lemma, theorem, proof, align*) are scaffolding.
-    s = re.sub(r"\\begin\{(itemize|enumerate|center|tabular|lemma|theorem|proof|abstract|document|align|gather|cases)\*?\}(?:\[[^\]]*\])?", "", s)
-    s = re.sub(r"\\end\{(itemize|enumerate|center|tabular|lemma|theorem|proof|abstract|document|align|gather|cases)\*?\}", "", s)
-    # 3a.3.1. Strip align-environment markers: `&=` → `=`, `\\` line cont,
-    #         `&` alone → space.
-    s = re.sub(r"&\s*=", "=", s)
-    s = re.sub(r"\\\\\s*", " ", s)
-    s = re.sub(r"\s&\s", " ", s)
-    # 3a.4. (removed #140) Used to strip `Case (X)` / `Sub-case (X)` /
-    #       `Note row N:` labels under the assumption that they only appeared
-    #       prop-side as AI extraction artifacts. The Theorem-1 staging
-    #       revision introduced 24+ literal `Case (X)` and `Sub-case (X)`
-    #       occurrences directly into main.tex (formal case introductions
-    #       like `\emph{Case (A): both $\rho$ and ...}`, inline narrative
-    #       references, etc.), so stripping symmetrically from both sides
-    #       removed meaningful content and collapsed short props like
-    #       `"This is Case (D)."` to the degenerate fragment `"This is."`
-    #       — the root cause behind #139's R13 false-positive that the
-    #       degeneracy guard in `_find_start_anchor` had to defend against.
-    #       Removed entirely; empirical run on the live 342-prop main.jsonl
-    #       confirms zero R1/R3/R13 regressions and the #139 un-anchorable
-    #       informational disappears (prop now anchors correctly).
-    # 3a.5. Strip a leading "label: " pattern (single hyphenated word followed
-    #       by colon-space). Prop text often writes "Log-root: u(y) = ..." but
-    #       .tex (post `\textbf{}` strip) gives "Log-root u(y) = ...". Apply
-    #       only at logical sentence starts (beginning of string or right after
-    #       a period+space). Conservative: single hyphenated word only.
-    s = re.sub(r"(^|\.\s+)([A-Za-z][\w\-]{2,30}):\s+(?=[A-Za-z\\])", r"\1\2 ", s)
-    # 3a.6. Also strip multi-word labels with σ/ρ macros for case_split props:
-    #       "σ-constant + log u, v: u = ..." → "σ-constant + log u, v u = ..."
-    #       Targeted pattern: starts with σ/ρ unicode or backslash-sigma/rho,
-    #       allows commas + words + spaces, ends at `:` before letter/macro.
-    s = re.sub(r"(^|\.\s+)([σρ\\][\w\-, +\\σρ]{3,80}?):\s+(?=[a-zA-Z\\])", r"\1\2 ", s)
-    # 3b. Strip `\citep[...]{X}` / `\citet[...]{X}` argument bracket
-    #     (rare cases where prop omits the optional arg)
-    # (Skip — both sides should preserve verbatim. Only strip if needed.)
-    # 3c. Strip `\,` followed by punctuation collapse from step 5
-    # 4. Final whitespace collapse (also handles double-spaces from delimiter strip)
-    s = re.sub(r"\s+", " ", s.strip())
-    # 5. Collapse space-before-punctuation (handles cases like `$ \pi $.` vs `\pi.`
-    #    where stripping inline-$ leaves space, but display-$ end has none)
-    s = re.sub(r"\s+([.,;:])", r"\1", s)
-    # 6. Unicode Greek → LaTeX command. Some props author the Unicode char
-    #    directly (σ, ρ, λ, ...) while .tex always uses LaTeX commands
-    #    ($\sigma$, $\rho$, ...). Normalize both to the LaTeX form.
-    greek_map = {
-        # Greek lowercase
-        "α": r"\alpha", "β": r"\beta", "γ": r"\gamma", "δ": r"\delta",
-        "ε": r"\varepsilon", "ζ": r"\zeta", "η": r"\eta", "θ": r"\theta",
-        "ι": r"\iota", "κ": r"\kappa", "λ": r"\lambda", "μ": r"\mu",
-        "ν": r"\nu", "ξ": r"\xi", "π": r"\pi", "ρ": r"\rho",
-        "σ": r"\sigma", "τ": r"\tau", "υ": r"\upsilon", "φ": r"\varphi",
-        "χ": r"\chi", "ψ": r"\psi", "ω": r"\omega",
-        # Greek uppercase
-        "Γ": r"\Gamma", "Δ": r"\Delta", "Θ": r"\Theta", "Λ": r"\Lambda",
-        "Ξ": r"\Xi", "Π": r"\Pi", "Σ": r"\Sigma", "Φ": r"\Phi",
-        "Ψ": r"\Psi", "Ω": r"\Omega",
-        # Math relations
-        "≠": r"\neq", "≤": r"\leq", "≥": r"\geq", "≡": r"\equiv",
-        "≈": r"\approx", "∼": r"\sim",
-        # Set operators
-        "∈": r"\in", "∉": r"\notin", "⊂": r"\subset", "⊃": r"\supset",
-        "⊆": r"\subseteq", "⊇": r"\supseteq", "∪": r"\cup", "∩": r"\cap",
-        "∅": r"\emptyset",
-        # Arrows
-        "→": r"\to", "←": r"\leftarrow", "↔": r"\leftrightarrow",
-        "⇒": r"\Rightarrow", "⇐": r"\Leftarrow", "⇔": r"\Leftrightarrow",
-        "↦": r"\mapsto",
-        # Math constants
-        "∞": r"\infty", "∂": r"\partial", "∇": r"\nabla",
-        # Other operators
-        "⋅": r"\cdot", "×": r"\times", "∘": r"\circ",
-        "±": r"\pm", "∓": r"\mp", "·": r"\cdot",
-    }
-    for unicode_ch, latex_cmd in greek_map.items():
-        # Replace unicode → latex command + space (mimics `$\sigma$` → `\sigma `)
-        # Use lookahead to avoid double-spacing if next char is already space
-        s = s.replace(unicode_ch, latex_cmd + " ")
-    # Re-collapse whitespace after greek mapping (introduces extra spaces)
-    s = re.sub(r"\s+", " ", s).strip()
-    s = re.sub(r"\s+([.,;:])", r"\1", s)
-    return s
+# normalize_for_match lives in _lib/normalize.py (one ordered step table
+# shared with the extraction coverage check; Spectra change add-extract-skill).
+# It is imported above and stays available as validator.normalize_for_match.
 
 
 # --------- R1: prop-subset-check (Phase 1 partial-bijection) ---------
@@ -1061,21 +936,23 @@ def check_r10_claim_type_asserts_consistency(
 # hallucinated out-of-enum values (`definitional`, `claim`) that slipped
 # past R1-R10. Schema-gated v1.2+ (mirrors R7) for legacy backward-compat.
 
-_R11_ALLOWED_EVIDENCE_CLASS = frozenset(
-    {"verified", "derived", "hypothesized", "conventional", "open"}
+_R11_DEFAULT_EVIDENCE_CLASSES = (
+    "verified", "derived", "hypothesized", "conventional", "open",
 )
+_R11_ALLOWED_EVIDENCE_CLASS = frozenset(_R11_DEFAULT_EVIDENCE_CLASSES)
 
 
 def check_r11_evidence_class_enum(
-    data: dict | None, props: list[dict]
+    data: dict | None, props: list[dict], profile: str = "default"
 ) -> tuple[bool, list[tuple[str, str]]]:
     """R11 v1.2+ evidence_class enum membership check (#119).
 
     Returns (skipped, errors). When the schema_version in `data` (read from
     _meta.json) is less than 1.2 or absent, the check is skipped. Under v1.2+
     every prop's `evidence_class` MUST be a member of the canonical enum
-    (`verified | derived | hypothesized | conventional | open`). FAIL severity
-    (exit 1) — symmetric to R10, no WARN-as-baseline policy.
+    (`verified | derived | hypothesized | conventional | open`), or of the
+    declared profile's set (schema v1.7+). FAIL severity (exit 1) — symmetric
+    to R10, no WARN-as-baseline policy.
     """
     schema_version = (data or {}).get("schema_version") or ""
     if not schema_version or not _version_at_least(schema_version, "1.2"):
@@ -1089,13 +966,14 @@ def check_r11_evidence_class_enum(
         if "evidence_class" not in prop:
             continue
         ec = prop.get("evidence_class")
-        if ec not in _R11_ALLOWED_EVIDENCE_CLASS:
+        allowed = PROFILE_VOCABULARIES[profile]["evidence_class"]
+        if ec not in allowed:
             pid = prop.get("id", "?")
             errors.append(
                 (
                     pid,
-                    f"R11: evidence_class={ec!r} is not in the canonical enum "
-                    "{verified, derived, hypothesized, conventional, open}",
+                    f"R11: evidence_class={ec!r} is not in the "
+                    f"{_enum_label(profile)} {_enum_text(allowed)}",
                 )
             )
     return False, errors
@@ -1111,26 +989,79 @@ def check_r11_evidence_class_enum(
 # documented for evidence_class) would mis-route R3's structural_leaf_types
 # exemption silently. Schema-gated v1.2+ (mirrors R7 + R11).
 
-_R12_ALLOWED_CLAIM_TYPE = frozenset(
-    {
-        "axiom",
-        "definition",
-        "hypothesis",
-        "claim",
-        "case_split",
-        "display_equation",
-        "restatement",
-        "commentary",
-        "example",
-        "connective",
-        "reference",
-        "scope_qualifier",
-    }
+_R12_DEFAULT_CLAIM_TYPES = (
+    "axiom", "definition", "hypothesis", "claim", "case_split",
+    "display_equation", "restatement", "commentary", "example",
+    "connective", "reference", "scope_qualifier",
 )
+_R12_ALLOWED_CLAIM_TYPE = frozenset(_R12_DEFAULT_CLAIM_TYPES)
+
+
+# --------- Ledger profiles (schema v1.7, propositions-projects#24) ---------
+#
+# A ledger declares `profile` in `_meta.json`; the profile selects the R11 /
+# R12 vocabularies. `default` is the pre-v1.7 vocabulary. `empirical` is a
+# superset: the proofread Mode B values plus `external` (support outside the
+# paper), added after a pilot extraction of an empirical manuscript. The
+# profile list is closed — a value that merely resembles an accepted one is
+# an error, never inferred. See SCHEMA.md §Profiles (v1.7+).
+
+PROFILE_MIN_SCHEMA = "1.7"
+PROFILE_VOCABULARIES: dict[str, dict[str, tuple[str, ...]]] = {
+    "default": {
+        "claim_type": _R12_DEFAULT_CLAIM_TYPES,
+        "evidence_class": _R11_DEFAULT_EVIDENCE_CLASSES,
+    },
+    "empirical": {
+        "claim_type": _R12_DEFAULT_CLAIM_TYPES + ("result", "interpretation"),
+        "evidence_class": _R11_DEFAULT_EVIDENCE_CLASSES
+        + ("measured", "tested", "descriptive", "not_computable", "external"),
+    },
+}
+ACCEPTED_PROFILES = tuple(PROFILE_VOCABULARIES)
+
+
+def resolve_profile(data: dict | None) -> tuple[str | None, bool, str | None]:
+    """Read the ledger profile from `_meta.json` data.
+
+    Returns (profile, declared, error):
+    - field absent → ("default", False, None)
+    - valid declaration under schema ≥ 1.7 → (<name>, True, None)
+    - anything else → (None, True, <message>); callers must not fall back to
+      the default vocabulary, because a typo would then validate silently.
+    """
+    data = data or {}
+    if "profile" not in data:
+        return "default", False, None
+    value = data["profile"]
+    accepted = "{" + ", ".join(ACCEPTED_PROFILES) + "}"
+    if not isinstance(value, str) or value not in PROFILE_VOCABULARIES:
+        return None, True, (
+            f"profile={value!r} is not an accepted ledger profile; accepted: "
+            f"{accepted} (SCHEMA.md §Profiles (v1.7+))"
+        )
+    schema_version = str(data.get("schema_version") or "")
+    if not schema_version or not _version_at_least(schema_version, PROFILE_MIN_SCHEMA):
+        return None, True, (
+            f"profile={value!r} is declared but schema_version is "
+            f"{schema_version or '(missing)'}; declaring a profile requires "
+            f"schema_version >= {PROFILE_MIN_SCHEMA} — raise schema_version first"
+        )
+    return value, True, None
+
+
+def _enum_text(values: tuple[str, ...]) -> str:
+    return "{" + ", ".join(values) + "}"
+
+
+def _enum_label(profile: str) -> str:
+    # `default` keeps the exact pre-v1.7 wording so undeclared ledgers see
+    # byte-identical output.
+    return "canonical enum" if profile == "default" else f"enum of profile {profile!r}"
 
 
 def check_r12_claim_type_enum(
-    data: dict | None, props: list[dict]
+    data: dict | None, props: list[dict], profile: str = "default"
 ) -> tuple[bool, list[tuple[str, str]]]:
     """R12 v1.2+ claim_type enum membership check (#124).
 
@@ -1139,8 +1070,9 @@ def check_r12_claim_type_enum(
     every prop's `claim_type` MUST be a member of the canonical 12-element
     enum (`axiom | definition | hypothesis | claim | case_split |
     display_equation | restatement | commentary | example | connective |
-    reference | scope_qualifier`). FAIL severity (exit 1) — symmetric to R10
-    + R11, no WARN-as-baseline policy.
+    reference | scope_qualifier`), or of the declared profile's set (schema
+    v1.7+). FAIL severity (exit 1) — symmetric to R10 + R11, no
+    WARN-as-baseline policy.
     """
     schema_version = (data or {}).get("schema_version") or ""
     if not schema_version or not _version_at_least(schema_version, "1.2"):
@@ -1154,15 +1086,14 @@ def check_r12_claim_type_enum(
         if "claim_type" not in prop:
             continue
         ct = prop.get("claim_type")
-        if ct not in _R12_ALLOWED_CLAIM_TYPE:
+        allowed = PROFILE_VOCABULARIES[profile]["claim_type"]
+        if ct not in allowed:
             pid = prop.get("id", "?")
             errors.append(
                 (
                     pid,
-                    f"R12: claim_type={ct!r} is not in the canonical enum "
-                    "{axiom, definition, hypothesis, claim, case_split, "
-                    "display_equation, restatement, commentary, example, "
-                    "connective, reference, scope_qualifier}",
+                    f"R12: claim_type={ct!r} is not in the "
+                    f"{_enum_label(profile)} {_enum_text(allowed)}",
                 )
             )
     return False, errors
@@ -1601,6 +1532,15 @@ def main():
     print()
 
     all_errors = []
+
+    # Ledger profile (schema v1.7). Announced only when declared, so ledgers
+    # without the field keep byte-identical output.
+    profile, profile_declared, profile_error = resolve_profile(data)
+    if profile_error:
+        all_errors.append(("PROFILE", "_meta.json", profile_error))
+        print(f"[FAIL] profile — {profile_error}")
+    elif profile_declared:
+        print(f"[INFO] profile: {profile}")
     all_warnings = []
 
     # R1 prop-subset-check (Phase 1 partial-bijection; full bijection awaits #77)
@@ -1720,36 +1660,56 @@ def main():
 
     # R11 evidence_class enum membership (#119)
     # Schema-gated v1.2+ (mirrors R7). FAIL severity — symmetric to R10.
-    r11_skipped, r11_errors = check_r11_evidence_class_enum(data, props)
+    if profile is None:
+        r11_skipped, r11_errors = True, []
+    else:
+        r11_skipped, r11_errors = check_r11_evidence_class_enum(data, props, profile)
     if r11_errors:
         all_errors.extend([("R11", *e) for e in r11_errors])
         print(
             f"[FAIL] R11 evidence-class-enum — {len(r11_errors)} prop(s) "
             f"carry a non-canonical evidence_class value"
         )
+    elif profile is None:
+        print("[SKIP] R11 evidence-class-enum — ledger profile is invalid (see profile error)")
     elif r11_skipped:
         print("[SKIP] R11 evidence-class-enum — schema_version < 1.2 (backward compat)")
-    else:
+    elif profile == "default":
         print(
             "[PASS] R11 evidence-class-enum — all props use a canonical "
             "evidence_class (verified/derived/hypothesized/conventional/open)"
         )
+    else:
+        print(
+            f"[PASS] R11 evidence-class-enum — all props use an evidence_class "
+            f"of profile {profile!r}"
+        )
 
     # R12 claim_type enum membership (#124)
     # Schema-gated v1.2+ (mirrors R7 + R11). FAIL severity — symmetric to R10 + R11.
-    r12_skipped, r12_errors = check_r12_claim_type_enum(data, props)
+    if profile is None:
+        r12_skipped, r12_errors = True, []
+    else:
+        r12_skipped, r12_errors = check_r12_claim_type_enum(data, props, profile)
     if r12_errors:
         all_errors.extend([("R12", *e) for e in r12_errors])
         print(
             f"[FAIL] R12 claim-type-enum — {len(r12_errors)} prop(s) "
             f"carry a non-canonical claim_type value"
         )
+    elif profile is None:
+        print("[SKIP] R12 claim-type-enum — ledger profile is invalid (see profile error)")
     elif r12_skipped:
         print("[SKIP] R12 claim-type-enum — schema_version < 1.2 (backward compat)")
-    else:
+    elif profile == "default":
         print(
             "[PASS] R12 claim-type-enum — all props use a canonical claim_type "
             "(12-element enum per SCHEMA.md)"
+        )
+    else:
+        print(
+            f"[PASS] R12 claim-type-enum — all props use a claim_type "
+            f"of profile {profile!r}"
         )
 
     # R13 location line-anchoring (verify-tex-prop-correspondence)

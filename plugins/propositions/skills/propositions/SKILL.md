@@ -1,7 +1,7 @@
 ---
 name: propositions
 description: >-
-  Run the R1-R13 mechanical validator on a propositions JSONL side-file (prop↔tex subset match, cite DAG, UUID v7 uniqueness, claim_type/evidence_class enums, file-aware location anchoring incl. multi-file \input trees); fix location-field drift (refresh-prop-locations.py, dry-run gated); extract a new JSONL; or onboard a manuscript that has no ledger yet (Operation D scaffold: pinned SCHEMA/EXTRACTION-PROMPT copies + _meta.json + smoke-test skeleton, dry-run gated). Use when adopting the propositions workflow on a new .tex, starting/re-extracting a propositions file, running the mechanical gate before an audit or submission, or when the R13 location-drift WARN spikes after editing the tex. The mechanical axis — NOT the L4 semantic walk (/propositions:proofread) or cross-doc drift (/propositions:manuscript-audit).
+  Run the R1-R13 mechanical validator on a propositions JSONL side-file (prop↔tex subset match, cite DAG, UUID v7 uniqueness, claim_type/evidence_class enums, file-aware location anchoring incl. multi-file \input trees); fix location-field drift (refresh-prop-locations.py, dry-run gated); or onboard a manuscript that has no ledger yet (Operation D scaffold: pinned SCHEMA/EXTRACTION-PROMPT copies + _meta.json + smoke-test skeleton, dry-run gated). Use when adopting the propositions workflow on a new .tex (scaffolding the ledger), running the mechanical gate before an audit or submission, or when the R13 location-drift WARN spikes after editing the tex. The mechanical axis — NOT splitting manuscript text into propositions (that is /propositions:extract), the L4 semantic walk (/propositions:proofread), or cross-doc drift (/propositions:manuscript-audit).
 allowed-tools:
   - Read
   - Write
@@ -15,7 +15,8 @@ allowed-tools:
 A propositions JSONL is a structural side-file: each declarative unit of `main.tex` becomes
 one atomic prop carrying `text` (verbatim), `location` (line range), `cites` (internal UUID
 dependency DAG), `asserts` (atomic claims), `claim_type`, and `evidence_class`. This skill
-owns the four **mechanical** operations on that file (validate / refresh / extract / onboard). The semantic question "does each cited
+owns the **mechanical** operations on that file (validate / refresh / onboard); extraction —
+Operation C — is its own skill, `/propositions:extract`. The semantic question "does each cited
 prop actually imply this one" is the sister skill `/propositions:proofread`.
 
 Full schema contract: your ledger's own `SCHEMA.md` — the spec travels with the data, so
@@ -92,7 +93,7 @@ real implication" — that needs the L4 walk in `/propositions:proofread`.
 | R2 dangling | a cited UUID was deleted — strip the dead cite | inline edit (scenario 4) |
 | R3 cycle | circular dependency in a newly added prop | escalate — structural error |
 | R4 pattern | boundary-axiom contradiction | escalate to an `audit-finding` issue |
-| R7 / R8 / R10-R12 | schema violation | re-extract the affected section (Operation C) |
+| R7 / R8 / R10-R12 | schema violation | re-extract the affected section (`/propositions:extract`) |
 
 ## Operation B — Refresh location drift
 
@@ -124,18 +125,18 @@ returns `anchor_failed` rather than guessing — any uncertainty is a loud failu
 silent mis-write. Residual un-anchorable props need to be split, or to use a range-form
 `Lx-Ly` location.
 
-## Operation C — Extract a new / re-extracted JSONL
+## Operation C — Extract (moved to `/propositions:extract`)
 
-When there is no JSONL yet, or a section was rewritten enough that re-extraction beats
-patching. This is an LLM task, not a script: follow the extraction prompt at
-[`../../docs/EXTRACTION-PROMPT.md`](../../docs/EXTRACTION-PROMPT.md) against the target
-`.tex` (or a single section of it), emit the JSONL per the ledger's `SCHEMA.md`, then run
-Operation A to gate the result. Extraction that has not passed the validator is not done.
+Extracting propositions from a paragraph, section or theorem is its own skill,
+`/propositions:extract`: it stages the model's output outside the ledger, replaces temporary
+ids with UUID v7, checks that nothing in the line range was left out, validates a merged copy,
+and writes the ledger only after the user confirms the diff. It ends with this skill's
+Operation A as the gate.
 
 ## Operation D — Onboard a manuscript that has no ledger yet
 
 When the target repo has a `.tex` manuscript but no `propositions/` ledger anywhere.
-D scaffolds the ledger layout; extraction stays with Operation C (large LLM job kept
+D scaffolds the ledger layout; extraction is `/propositions:extract` (a large LLM job kept
 separate so an extraction failure never pollutes a clean scaffold).
 
 **Flow (dry-run gated — never write into a user's repo unconfirmed):**
@@ -146,23 +147,31 @@ separate so an extraction failure never pollutes a clean scaffold).
 2. **Pick the ledger placement layer.** Default: a `propositions/` directory in a
    *stable* location one level above version-churning directories — e.g. for
    `manuscript/<paper>/05xx-2026/main_new.tex`, propose `manuscript/<paper>/propositions/`.
-   Version-dir rotation later is an Operation B/C re-anchor, not a ledger move.
-3. **Refuse to overwrite.** If the chosen layer already contains `main.jsonl` or
-   `_meta.json`, abort and point at Operations A/B/C instead.
-4. **Dry-run listing.** Print every file that would be created with its target path:
+   Version-dir rotation later is an Operation B re-anchor (or a re-extraction with
+   `/propositions:extract`), not a ledger move.
+3. **Pick the ledger profile.** Ask the user (AskUserQuestion) which profile the manuscript
+   uses — offer exactly `default` (mathematical manuscripts: theorems, derivations) and
+   `empirical` (data-based manuscripts, e.g. psychology: Method / Results). The profile
+   decides which `claim_type` / `evidence_class` values the validator accepts (SCHEMA.md
+   §Profiles (v1.7+)); a mathematical manuscript keeps `default`.
+4. **Refuse to overwrite.** If the chosen layer already contains `main.jsonl` or
+   `_meta.json`, abort and point at Operation A, Operation B or `/propositions:extract` instead.
+5. **Dry-run listing.** Print every file that would be created with its target path:
    `README.md`, `SCHEMA.md`, `EXTRACTION-PROMPT.md`, `_meta.json`, `_smoke_tests/README.md`.
-   Then **AskUserQuestion**: apply / abort. On abort, write nothing.
-5. **Scaffold on confirm.**
+   Include the chosen profile in the listing. Then **AskUserQuestion**: apply / abort. On
+   abort, write nothing.
+6. **Scaffold on confirm.**
    - Copy templates from [`../../templates/ledger/`](../../templates/ledger/README.md), filling
      `{{TEX_PATH}}` (main file, relative to repo root), `{{ANCHOR_COMMIT}}`
-     (`git -C <repo> rev-parse --short HEAD`), `{{SCAFFOLD_DATE}}`, `{{LEDGER_DIR}}`.
+     (`git -C <repo> rev-parse --short HEAD`), `{{SCAFFOLD_DATE}}`, `{{LEDGER_DIR}}`,
+     `{{PROFILE}}` (`default` or `empirical`; the template is schema 1.7).
    - Copy **pinned snapshots** of the canonical contracts *at scaffold time*:
      `docs/SCHEMA.md` → ledger `SCHEMA.md`, `docs/EXTRACTION-PROMPT.md` → ledger
      `EXTRACTION-PROMPT.md`. The templates directory deliberately carries no copy of
      either — the pin is taken live from the canonical files so it can never lag them.
-6. **Hand off.** Report the created files, then name the next steps with the resolved
-   paths filled in: Operation C (extract per the pinned prompt, section-by-section is
-   fine) followed by Operation A (the gate). D itself never extracts.
+7. **Hand off.** Report the created files, then name the next step with the resolved
+   `--jsonl` and `--tex` paths filled in: `/propositions:extract` (section by section is
+   fine), which ends with Operation A as the validator gate. D itself never extracts.
 
 The full adoption arc — what day-to-day looks like after onboarding, pre-submission
 cadence, new-draft re-anchoring, co-author correspondence — is in
@@ -177,6 +186,7 @@ short version.
 
 ## Cross-link
 
+- `/propositions:extract` — turn a paragraph / section / theorem into propositions (Operation C)
 - `/propositions:proofread` — the L4 semantic walk (does each cited prop *imply* this one)
 - `/propositions:manuscript-audit` — cross-artifact drift (R1-R4) across tex / jsonl / code / bib
 - Rule [`../../rules/manuscript-jsonl-sync.md`](../../rules/manuscript-jsonl-sync.md) — per-commit sync discipline that prevents most R1/R13 drift

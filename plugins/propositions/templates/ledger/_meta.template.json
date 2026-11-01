@@ -1,14 +1,15 @@
 {
- "schema_version": "1.6",
+ "schema_version": "1.7",
+ "profile": "{{PROFILE}}",
  "source": {
   "file": "{{TEX_PATH}}",
   "commit_sha": "{{ANCHOR_COMMIT}}",
-  "extracted_at": "(pending — Operation C not yet run)",
+  "extracted_at": "(pending — /propositions:extract not yet run)",
   "extractor": "(pending)"
  },
  "coverage": {
   "phase": "(pending — no extraction yet)",
   "sections_extracted": [],
-  "sections_pending": ["(all — run Operation C)"]
+  "sections_pending": ["(all — run /propositions:extract)"]
  }
 }

@@ -1,0 +1,34 @@
+=== validate-propositions ===
+JSONL: tests/fixtures/_smoke_tests/rollback_60_real.jsonl
+Meta: tests/fixtures/_smoke_tests/rollback_60_real_meta.json
+TeX:  tests/fixtures/_smoke_tests/rollback_60_real.tex
+Props: 4
+
+[PASS] R1 prop-subset-check — all prop.text found in .tex (Phase 1; see #77 for full bijection)
+[PASS] R1.5 surjective coverage — every top-level section has ≥1 prop
+[PASS] R2 cite-resolve — all cites resolve
+[PASS] R3 DAG — no cycles
+[PASS] R8 unique-ids — every prop.id is unique within file
+[PASS] R9 env-consistency — all props within their declared theorem-like env boundaries (1 envs checked)
+[summary] R9 — checked=0 skipped_non_main_tex=1 skipped_malformed_loc=0
+[PASS] R10 claim-type-asserts — connective/reference props all have empty asserts (scope_qualifier exempt)
+[FAIL] R11 evidence-class-enum — 4 prop(s) carry a non-canonical evidence_class value
+[PASS] R12 claim-type-enum — all props use a canonical claim_type (12-element enum per SCHEMA.md)
+[FAIL] R13 location-anchoring — 4 prop(s) with invalid file-qualified location (schema < 1.6 with prefix, or file not in input tree)
+[PASS] R13 location-anchoring — no location drift detected
+
+=== 13 ERROR(s) ===
+  [R4] PATTERN-A: boundary axiom η(1,s)=s + hypothesis η=f(s) + 'f may be any' claim → contradiction: boundary forces f=id (Iverson framework)
+  [R7] P003 (P001): id field 'P001' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R7] P004 (P002): id field 'P002' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R7] P001 (P003): id field 'P003' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R7] P002 (P004): id field 'P004' is not a canonical UUID v7 (schema v1.2+ requires lowercased 8-4-4-4-12 hex with version field `7`)
+  [R11] P003 (P001): R11: evidence_class='definitional' is not in the canonical enum {verified, derived, hypothesized, conventional, open}
+  [R11] P004 (P002): R11: evidence_class='stipulation' is not in the canonical enum {verified, derived, hypothesized, conventional, open}
+  [R11] P001 (P003): R11: evidence_class='claim' is not in the canonical enum {verified, derived, hypothesized, conventional, open}
+  [R11] P002 (P004): R11: evidence_class='claim' is not in the canonical enum {verified, derived, hypothesized, conventional, open}
+  [R13] P003 (P001): file-qualified location 'rollback_60_real.tex:L8-L10' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+  [R13] P004 (P002): file-qualified location 'rollback_60_real.tex:L17-L20' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+  [R13] P001 (P003): file-qualified location 'rollback_60_real.tex:L26-L27' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+  [R13] P002 (P004): file-qualified location 'rollback_60_real.tex:L31-L32' requires schema_version >= 1.6 (ledger is older) — upgrade the ledger's schema_version before using file prefixes
+

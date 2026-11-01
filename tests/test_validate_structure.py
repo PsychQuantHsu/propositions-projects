@@ -417,3 +417,62 @@ def test_sidecars_do_not_change_validate_propositions_output(tmp_path):
     a, b = _validate_props(with_sidecars), _validate_props(without)
     assert a.stdout == b.stdout
     assert a.returncode == b.returncode == 0
+
+
+# ---------- Vocabulary documents match the validator's constants (task 4.1) ----------
+
+import importlib.util  # noqa: E402
+import re  # noqa: E402
+
+DOCS = {
+    "STRUCTURE.md": REPO_ROOT / "plugins" / "propositions" / "docs" / "STRUCTURE.md",
+    "vocabulary.md": REPO_ROOT / "plugins" / "propositions" / "skills" / "construct" / "references" / "vocabulary.md",
+}
+VOCAB_HEADINGS = {"RELATIONS": "Relations (12)", "KINDS": "Commitment kinds (7)", "ROLES": "Section roles (9)"}
+
+
+def _validator_module():
+    spec = importlib.util.spec_from_file_location("validate_structure_consts", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _table_values(text: str, heading: str) -> list[str]:
+    """First-column backticked values of the table under the heading that ends with `heading`."""
+    lines = text.splitlines()
+    start = next(i for i, l in enumerate(lines) if l.startswith("#") and l.rstrip().endswith(heading))
+    values = []
+    for line in lines[start + 1:]:
+        if line.startswith("#"):
+            break
+        m = re.match(r"^\|\s*`([^`]+)`\s*\|", line)
+        if m:
+            values.append(m.group(1))
+    return values
+
+
+@pytest.mark.parametrize("doc", list(DOCS), ids=list(DOCS))
+@pytest.mark.parametrize("const", list(VOCAB_HEADINGS), ids=list(VOCAB_HEADINGS))
+def test_vocabulary_documents_match_validator_constants(doc, const):
+    expected = list(getattr(_validator_module(), const))
+    assert _table_values(DOCS[doc].read_text(encoding="utf-8"), VOCAB_HEADINGS[const]) == expected
+
+
+# ---------- Partial drafts may not have stated their thesis yet (found while doing task 4.3) ----------
+
+
+def test_s5_partial_draft_without_thesis_passes(tmp_path):
+    result = run(write_case(tmp_path, 4, thesis=[]), "--partial")
+    assert status(result.stdout, "S5") == "PASS", result.stdout
+    assert any("[INFO]" in l and "thesis" in l for l in result.stdout.splitlines()), result.stdout
+    assert result.returncode == 0
+
+
+def test_s6_still_runs_when_only_the_thesis_is_wrong(tmp_path):
+    recs = with_changes(12, {5: {"opens": [{"id": "c-ann-1", "kind": "announcement"}]}, 11: {"discharges": ["c-ann-1"]}})
+    result = run(write_case(tmp_path, 12, recs, sections=FOUR_SECTIONS, thesis=[]))
+    assert status(result.stdout, "S5") == "FAIL"
+    assert status(result.stdout, "S6") == "WARN"
+    assert "not evaluated" not in result.stdout

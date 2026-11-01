@@ -85,7 +85,8 @@ def compute_state(ledger: Path, structure_path: Path, discourse_path: Path, at: 
         raise vs.InputError(f"--at {at} is not a non-retired ledger proposition")
 
     warnings: list[str] = []
-    plan = vs.check_s5(structure, positions, vs.Report())
+    # partial=True: whether the thesis is stated yet does not bear on which section t is in.
+    plan = vs.check_s5(structure, positions, vs.Report(), partial=True)
     section = None
     if plan:
         sid = plan[vs.section_index(plan, t)][0]

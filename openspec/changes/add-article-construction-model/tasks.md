@@ -18,10 +18,11 @@
 
 ## 4. propositions:construct skill
 
-- [ ] 4.1 [P] 寫 `plugins/propositions/skills/construct/references/vocabulary.md`：三套詞彙的標註指南（每個值怎麼判斷、優先序、範例），並加一個測試確認 vocabulary.md 列出的值集合與兩個腳本內的常數完全相同。驗證：`pytest tests/test_validate_structure.py -k vocabulary` 通過。
-- [ ] 4.2 寫 `plugins/propositions/skills/construct/SKILL.md` 的標註模式，落實 Annotation starts from a validated, fully covered ledger 與 Annotation writes sidecars only after validation and confirmation：先跑 `validate-propositions.py` 與 `check-extraction-coverage.py`，不通過就停下並轉介 `propositions:extract`；附檔先寫在帳冊目錄以外的暫存處，`validate-structure.py` 結束碼 0 後列出摘要（各關係數量、每個承諾的開出與兌現位置、章節與角色），使用者確認後才寫入；全程不改 `main.jsonl`。驗證：在合成帳冊上照 SKILL.md 實走一次，暫存檔在帳冊目錄外、validator 結束碼 0、`main.jsonl` 的 sha256 前後相同。
-- [ ] 4.3 在 SKILL.md 寫下一步模式，落實 Next mode proposes at most three candidates without writing：跑 `validate-structure.py --partial` 與 `structure-state.py --at end`，說明目前章節角色與排序後的未兌現承諾，提出至多 3 個候選下一句，每個候選寫明推進哪個承諾（或為什麼該 `shift`）、用什麼關係與連接詞、預期的 `claim_type`。驗證：把合成帳冊截到第 7 個 prop 實走一次，第一個候選兌現開著的 announcement，稿件、`main.jsonl` 與兩個附檔的 sha256 前後相同。
-- [ ] 4.4 寫 construct 的 description，落實 Construction requests route to the construct skill，並檢查 `propositions:extract` 與 `propositions:propositions` 的 description 沒有宣稱建構類請求。驗證：比照 add-extract-skill 的觸發測試，10 句建構類請求與 10 句抽取類請求各跑一次，記錄第一個工具呼叫，建構類命中 `propositions:construct`、抽取類命中 `propositions:extract` 的比例寫進 tasks 完成紀錄。
+- [x] 4.1 [P] 寫 `plugins/propositions/skills/construct/references/vocabulary.md`：三套詞彙的標註指南（每個值怎麼判斷、優先序、範例），並加一個測試確認 vocabulary.md 列出的值集合與兩個腳本內的常數完全相同。驗證：`pytest tests/test_validate_structure.py -k vocabulary` 通過。
+- [x] 4.2 寫 `plugins/propositions/skills/construct/SKILL.md` 的標註模式，落實 Annotation starts from a validated, fully covered ledger 與 Annotation writes sidecars only after validation and confirmation：先跑 `validate-propositions.py` 與 `check-extraction-coverage.py`，不通過就停下並轉介 `propositions:extract`；附檔先寫在帳冊目錄以外的暫存處，`validate-structure.py` 結束碼 0 後列出摘要（各關係數量、每個承諾的開出與兌現位置、章節與角色），使用者確認後才寫入；全程不改 `main.jsonl`。驗證：在合成帳冊上照 SKILL.md 實走一次，暫存檔在帳冊目錄外、validator 結束碼 0、`main.jsonl` 的 sha256 前後相同。
+- [x] 4.3 在 SKILL.md 寫下一步模式，落實 Next mode proposes at most three candidates without writing：跑 `validate-structure.py --partial` 與 `structure-state.py --at end`，說明目前章節角色與排序後的未兌現承諾，提出至多 3 個候選下一句，每個候選寫明推進哪個承諾（或為什麼該 `shift`）、用什麼關係與連接詞、預期的 `claim_type`。驗證：把合成帳冊截到第 10 個 prop（announcement 在第 10 個開出、尚未兌現）實走一次，第一個候選兌現開著的 announcement，稿件、`main.jsonl` 與兩個附檔的 sha256 前後相同。
+- [x] 4.4 寫 construct 的 description，落實 Construction requests route to the construct skill，並檢查 `propositions:extract` 與 `propositions:propositions` 的 description 沒有宣稱建構類請求。驗證：比照 add-extract-skill 的觸發測試，10 句建構類請求與 10 句抽取類請求各跑一次，記錄第一個工具呼叫，建構類命中 `propositions:construct`、抽取類命中 `propositions:extract` 的比例寫進 tasks 完成紀錄。
+  - 完成紀錄（2026-11-02，claude-opus-5-5，每句 1 次，嚴格＝第 1 個工具呼叫、寬鬆＝前 4 個內；量測資料存在 repo 外）：抽取類三輪皆 10/10 命中 extract（嚴格 9–10/10），沒有一句被 construct 搶走。建構類：空目錄兩輪嚴格 0/10、1/10，寬鬆 4/10、4/10；有帳冊的專案嚴格 0/10、寬鬆 6/10（問下一句與標註結構 6/6，檢查承諾是否兌現 0/4，模型改為直接讀稿）。description 改寫一輪（先寫它回答的兩個問題、補口語說法）。已知限制：稽核類請求的觸發偏弱，待使用者決定是否跑 description 最佳化迴圈。
 
 ## 5. 範例稿件 worked example（私有 repo）
 

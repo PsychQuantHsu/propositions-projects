@@ -199,3 +199,9 @@ def test_fixture_end_state():
     assert [c["id"] for c in report["future_work"]] == ["c-fw-interval"]
     assert report["thesis_seen"] is True
     assert report["section"]["role"] == "discussion"
+
+
+def test_state_reports_the_section_for_a_draft_without_thesis(tmp_path):
+    report = state(write_case(tmp_path, 10, sections=SECTIONS, thesis=[]), pid(5))
+    assert report["section"]["id"] == "sec-2"
+    assert report["thesis_seen"] is False

@@ -115,12 +115,17 @@ Rule S4 SHALL report as an error every commitment of kind `question`, `aim`, `hy
 
 ### Requirement: The section plan follows ledger order
 
-`structure.json` SHALL contain `structure_version`, a non-empty `thesis` list of proposition UUIDs, and a `sections` list in reading order whose entries each have a unique `id`, a `heading`, a `role` that is exactly one of these nine and no other: `introduction`, `background`, `formal_setup`, `method`, `results`, `proofs`, `discussion`, `conclusion`, `appendix`, and a `first_prop` UUID. Rule S5 SHALL enforce that every `first_prop` and `thesis` entry names a non-retired ledger proposition, that `first_prop` values strictly increase in ledger order, and that the first section starts at the first non-retired proposition. A section SHALL extend from its `first_prop` up to, not including, the next section's `first_prop`.
+`structure.json` SHALL contain `structure_version`, a non-empty `thesis` list of proposition UUIDs, and a `sections` list in reading order whose entries each have a unique `id`, a `heading`, a `role` that is exactly one of these nine and no other: `introduction`, `background`, `formal_setup`, `method`, `results`, `proofs`, `discussion`, `conclusion`, `appendix`, and a `first_prop` UUID. Rule S5 SHALL enforce that every `first_prop` and `thesis` entry names a non-retired ledger proposition, that `first_prop` values strictly increase in ledger order, and that the first section starts at the first non-retired proposition. A section SHALL extend from its `first_prop` up to, not including, the next section's `first_prop`. With `--partial`, an empty `thesis` SHALL be reported as information instead of an error, because a draft in progress often has not stated its thesis yet. An error in `thesis` or `structure_version` SHALL NOT stop S6 or the state query from using a section list that is itself valid.
 
 #### Scenario: Sections out of order fail S5
 
 - **WHEN** the second section's `first_prop` comes before the first section's `first_prop` in ledger order
 - **THEN** S5 fails and names both sections
+
+#### Scenario: A draft without its thesis passes with partial
+
+- **WHEN** `thesis` is an empty list and the validator runs with `--partial`
+- **THEN** S5 reports the missing thesis as information and does not fail
 
 #### Scenario: An unlisted role fails S5
 

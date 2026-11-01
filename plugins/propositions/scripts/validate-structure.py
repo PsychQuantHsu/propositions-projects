@@ -306,20 +306,28 @@ def check_s4(commitments: dict[str, Commitment], partial: bool, report: Report) 
 # ---------- S5 / S6 ----------
 
 
-def check_s5(structure: dict, positions: dict[str, int], report: Report) -> list[tuple[str, int]]:
-    """Validate the plan; return [(section id, first position)] when usable for S6, else []."""
-    ok = True
+def check_s5(structure: dict, positions: dict[str, int], report: Report, partial: bool = False) -> list[tuple[str, int]]:
+    """Validate the plan; return [(section id, first position)] when the section list is usable, else [].
 
-    def err(message: str) -> None:
-        nonlocal ok
-        ok = False
+    Errors in `thesis` or `structure_version` fail S5 but do not make a valid
+    section list unusable for S6 and the state query. With `partial`, an empty
+    thesis is information: a draft often has not stated its thesis yet.
+    """
+    sections_ok = True
+
+    def err(message: str, about_sections: bool = False) -> None:
+        nonlocal sections_ok
+        if about_sections:
+            sections_ok = False
         report.add("S5", Problem("error", message))
 
     version = structure.get("structure_version")
     if version not in STRUCTURE_VERSIONS:
         err(f"structure_version {version!r} not in {vocab(STRUCTURE_VERSIONS)}")
     thesis = structure.get("thesis")
-    if not isinstance(thesis, list) or not thesis:
+    if thesis == [] and partial:
+        report.add("S5", Problem("info", "thesis not stated yet (empty list)"))
+    elif not isinstance(thesis, list) or not thesis:
         err("thesis must be a non-empty list of proposition ids")
     else:
         for tid in thesis:
@@ -327,37 +335,37 @@ def check_s5(structure: dict, positions: dict[str, int], report: Report) -> list
                 err(f"thesis entry {tid!r} is not a non-retired ledger proposition")
     sections = structure.get("sections")
     if not isinstance(sections, list) or not sections:
-        err("sections must be a non-empty list")
+        err("sections must be a non-empty list", about_sections=True)
         return []
     plan: list[tuple[str, int]] = []
     ids: set[str] = set()
     for i, sec in enumerate(sections, 1):
         if not isinstance(sec, dict):
-            err(f"section {i} is not an object")
+            err(f"section {i} is not an object", about_sections=True)
             continue
         sid, heading, role, first = sec.get("id"), sec.get("heading"), sec.get("role"), sec.get("first_prop")
         if not isinstance(sid, str) or not sid:
-            err(f"section {i} has no string `id`")
+            err(f"section {i} has no string `id`", about_sections=True)
             continue
         if sid in ids:
-            err(f"duplicate section id `{sid}`")
+            err(f"duplicate section id `{sid}`", about_sections=True)
         ids.add(sid)
         if not isinstance(heading, str) or not heading.strip():
-            err(f"section `{sid}` has no heading")
+            err(f"section `{sid}` has no heading", about_sections=True)
         if not isinstance(role, str) or role not in ROLES:
-            err(f"section `{sid}` role {role!r} not in {vocab(ROLES)}")
+            err(f"section `{sid}` role {role!r} not in {vocab(ROLES)}", about_sections=True)
         if not isinstance(first, str) or first not in positions:
-            err(f"section `{sid}` first_prop {first!r} is not a non-retired ledger proposition")
+            err(f"section `{sid}` first_prop {first!r} is not a non-retired ledger proposition", about_sections=True)
             continue
         plan.append((sid, positions[first]))
     for (prev_id, prev_pos), (sid, pos) in zip(plan, plan[1:]):
         if pos <= prev_pos:
-            err(f"sections `{prev_id}` (#{prev_pos}) and `{sid}` (#{pos}) are out of ledger order")
+            err(f"sections `{prev_id}` (#{prev_pos}) and `{sid}` (#{pos}) are out of ledger order", about_sections=True)
     if not positions:
-        err("the ledger has no non-retired propositions")
+        err("the ledger has no non-retired propositions", about_sections=True)
     elif plan and plan[0][1] != 1:
-        err(f"the first section `{plan[0][0]}` starts at #{plan[0][1]}, not at the first proposition")
-    return plan if ok else []
+        err(f"the first section `{plan[0][0]}` starts at #{plan[0][1]}, not at the first proposition", about_sections=True)
+    return plan if sections_ok else []
 
 
 def section_index(plan: list[tuple[str, int]], position: int) -> int:
@@ -404,7 +412,7 @@ def validate(ledger: Path, structure_path: Path, discourse_path: Path, partial: 
     check_s2(records, positions, report)
     commitments = check_s3(records, report)
     check_s4(commitments, partial, report)
-    plan = check_s5(structure, positions, report)
+    plan = check_s5(structure, positions, report, partial)
     check_s6(commitments, plan, report)
     return report
 

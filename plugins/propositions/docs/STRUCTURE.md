@@ -294,10 +294,15 @@ error: a file is missing, unreadable or not valid JSON (the message names the
 file, or the line of `discourse.jsonl`). Both sidecars are required; a missing
 one is exit `2`.
 
-**Unfinished drafts.** A draft in progress always has open commitments. With
-`--partial`, S4 lists undischarged commitments, `setup` included, as
-information instead of errors or warnings, so the draft can pass. Every other
-rule applies unchanged.
+**Unfinished drafts.** A draft in progress always has open commitments, and it
+often has not stated its thesis yet. With `--partial`, S4 lists undischarged
+commitments, `setup` included, as information instead of errors or warnings,
+and S5 reports an empty `thesis` as information, so the draft can pass. Every
+other check applies unchanged.
+
+An error in `thesis` or `structure_version` fails S5 but does not stop S6 or the
+state query from using a section list that is itself valid; only an invalid
+section list does that (S6 then says it was not evaluated).
 
 ## State query
 

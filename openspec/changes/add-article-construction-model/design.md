@@ -170,7 +170,7 @@ prop_{t+1} 由三層決定，三層分開記錄：
   - S2：`relation` 屬 12 值；`start` 恰在第一筆；`return` 的 `refers_to` 指向更早的 prop；其他關係不得有 `refers_to`。
   - S3：承諾 `id` 格式正確且唯一、`kind` 屬 7 種；每個 `discharges` 的 id 由更早的 prop 開出；`future_work` 不得被兌現。
   - S4：`future_work` 與 `setup` 以外的承諾至少被兌現一次（錯誤）；`setup` 未兌現是警告；`--partial` 時兩者都降為資訊。
-  - S5：`structure.json` 形狀正確、`role` 屬 9 值、節 `id` 唯一、`first_prop` 存在且依帳冊順序嚴格遞增、第一節從第一個 prop 開始、`thesis` 非空且都存在。
+  - S5：`structure.json` 形狀正確、`role` 屬 9 值、節 `id` 唯一、`first_prop` 存在且依帳冊順序嚴格遞增、第一節從第一個 prop 開始、`thesis` 非空且都存在。`--partial` 時空的 `thesis` 降為資訊（草稿常常還沒寫出主旨）；`thesis` 或版本號有誤不影響章節清單本身被 S6 與狀態查詢使用。
   - S6：`announcement` 的第一次兌現不在開出的那一節或下一節時，給警告。
 - 輸出：每條規則一行 `[PASS]`／`[FAIL]`／`[WARN]`，再列出逐筆問題（帶 prop 序號與 id）。
 - 結束碼：0 沒有錯誤（可有警告）；1 有錯誤；2 輸入錯誤（檔案不存在、JSON 無法解析、帳冊讀不到）。

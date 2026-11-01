@@ -115,7 +115,7 @@ Rule S4 SHALL report as an error every commitment of kind `question`, `aim`, `hy
 
 ### Requirement: The section plan follows ledger order
 
-`structure.json` SHALL contain `structure_version`, a non-empty `thesis` list of proposition UUIDs, and a `sections` list in reading order whose entries each have a unique `id`, a `heading`, a `role` that is exactly one of these nine and no other: `introduction`, `background`, `formal_setup`, `method`, `results`, `proofs`, `discussion`, `conclusion`, `appendix`, and a `first_prop` UUID. Rule S5 SHALL enforce that every `first_prop` and `thesis` entry names a non-retired ledger proposition, that `first_prop` values strictly increase in ledger order, and that the first section starts at the first non-retired proposition. A section SHALL extend from its `first_prop` up to, not including, the next section's `first_prop`. With `--partial`, an empty `thesis` SHALL be reported as information instead of an error, because a draft in progress often has not stated its thesis yet. An error in `thesis` or `structure_version` SHALL NOT stop S6 or the state query from using a section list that is itself valid.
+`structure.json` SHALL contain `structure_version`, a non-empty `thesis` list of proposition UUIDs, and a `sections` list in reading order whose entries each have a unique `id`, a `heading`, a `role` that is exactly one of these ten and no other: `abstract`, `introduction`, `background`, `formal_setup`, `method`, `results`, `proofs`, `discussion`, `conclusion`, `appendix`, and a `first_prop` UUID. Rule S5 SHALL enforce that every `first_prop` and `thesis` entry names a non-retired ledger proposition, that `first_prop` values strictly increase in ledger order, and that the first section starts at the first non-retired proposition. A section with role `abstract` SHALL be the first entry, and no record inside it SHALL open a commitment. A section SHALL extend from its `first_prop` up to, not including, the next section's `first_prop`. With `--partial`, an empty `thesis` SHALL be reported as information instead of an error, because a draft in progress often has not stated its thesis yet. An error in `thesis` or `structure_version` SHALL NOT stop S6 or the state query from using a section list that is itself valid.
 
 #### Scenario: Sections out of order fail S5
 
@@ -130,7 +130,17 @@ Rule S4 SHALL report as an error every commitment of kind `question`, `aim`, `hy
 #### Scenario: An unlisted role fails S5
 
 - **WHEN** a section has `role` set to `literature`
-- **THEN** S5 fails and the report lists the nine permitted roles
+- **THEN** S5 fails and the report lists the ten permitted roles
+
+#### Scenario: The abstract opens no commitments
+
+- **WHEN** the first section has role `abstract` and a record inside it opens `c-aim-1`
+- **THEN** S5 fails for that record
+
+#### Scenario: The abstract must come first
+
+- **WHEN** a section with role `abstract` is not the first entry
+- **THEN** S5 fails and names that section
 
 ### Requirement: Announcements are kept nearby
 

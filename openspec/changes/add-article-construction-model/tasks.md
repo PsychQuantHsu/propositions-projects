@@ -27,10 +27,10 @@
 ## 5. 範例稿件 worked example（私有 repo）
 
 - [x] 5.1 依決策「Worked example 放在 article1 umbrella，不放 Overleaf」，在 article1 umbrella 的 `propositions/` 以 Operation D 建立帳冊骨架（profile `empirical`、schema 1.7、`source.file` 指向 submodule 的 `manuscript/main.tex`）。完成時：骨架在 umbrella repo，submodule（Overleaf）沒有新增任何檔案。驗證：`git -C` umbrella 的 status 只出現 `propositions/`，submodule 的 status 是乾淨的；`validate-propositions.py` 對骨架結束碼 0。
-- [ ] 5.2 用 `propositions:extract` 抽取摘要與第 1 節（含 1.1、1.2）。驗證：`check-extraction-coverage.py` 對這些行範圍回報 0 段未覆蓋，`validate-propositions.py` 結束碼 0。
-- [ ] 5.3 用 `propositions:extract` 抽取第 2、3、4 節。文末聲明（Declaration of competing interest、CRediT author statement）與附錄的問卷題目不抽取：它們不屬於論證，9 個章節角色也沒有對應值；在 `_meta.json` 的 coverage 註明排除範圍與理由。驗證：同 5.2，涵蓋到第 4 節結尾。
-- [ ] 5.4 依決策「先完成標註再做下一步建議」，用 construct 的標註模式替完整帳冊建立附檔。完成時：`validate-structure.py`（非 partial）結束碼 0；標註中遇到詞彙不夠用的地方逐一記錄；若需要新的詞彙值，停下來向使用者提出，不自行加值（詞彙變更等於 spec 變更）。驗證：validator 實跑結果與詞彙缺口清單。
-- [ ] 5.5 在三個切點（§1.1 結尾、§3.2 結尾、§3.3 中段）把帳冊截斷，跑下一步模式，將候選與期刊版實際的下一句比對（推進的承諾是否相同、關係是否相同）。驗證：比對表寫進 worked example 報告，三個切點各一列。
+- [x] 5.2 用 `propositions:extract` 抽取摘要與第 1 節（含 1.1、1.2）。驗證：`check-extraction-coverage.py` 對這些行範圍回報 0 段未覆蓋，`validate-propositions.py` 結束碼 0。
+- [x] 5.3 用 `propositions:extract` 抽取第 2、3、4 節。文末聲明（Declaration of competing interest、CRediT author statement）與附錄的問卷題目不抽取：它們不屬於論證，9 個章節角色也沒有對應值；在 `_meta.json` 的 coverage 註明排除範圍與理由。驗證：同 5.2，涵蓋到第 4 節結尾。
+- [x] 5.4 依決策「先完成標註再做下一步建議」，用 construct 的標註模式替完整帳冊建立附檔。完成時：`validate-structure.py`（非 partial）結束碼 0；標註中遇到詞彙不夠用的地方逐一記錄；若需要新的詞彙值，停下來向使用者提出，不自行加值（詞彙變更等於 spec 變更）。驗證：validator 實跑結果與詞彙缺口清單。
+- [x] 5.5 在三個切點（§1.1 結尾、§3.2 結尾、§3.3 中段）把帳冊截斷，跑下一步模式，將候選與期刊版實際的下一句比對（推進的承諾是否相同、關係是否相同）。驗證：比對表寫進 worked example 報告，三個切點各一列。
 - [ ] 5.6 把彙總寫進 `docs/REFERENCE-MANUSCRIPTS.md`：prop 數、各關係分布、各種承諾數量與是否全部兌現、三個切點的比對結果。完成時：只含數字與短的連接詞片段，沒有帳冊內容、本機路徑或 Overleaf 專案編號。驗證：隱私自審，以及 `grep` 確認沒有 `/Users/`、`~/`、`overleaf.com`。
 
 ## 6. 文件、版本與收尾

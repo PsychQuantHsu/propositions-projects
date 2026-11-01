@@ -9,7 +9,7 @@
 - 新增帳冊旁的兩個附檔（sidecar），不改 `main.jsonl` 的 schema，比照 `verification.jsonl` 的先例：
   - `structure.json`：文章層次，記錄章節計畫（每節的標題、角色、第一個 prop）與全文主旨所在的 prop。
   - `discourse.jsonl`：每個 prop 一筆，依帳冊閱讀順序排列，記錄它和前一個 prop 的關係、它開出的承諾、它兌現的承諾。
-- 三個封閉詞彙：相鄰關係（12 個值）、承諾種類（7 個值）、章節角色（9 個值）。
+- 三個封閉詞彙：相鄰關係（12 個值）、承諾種類（7 個值）、章節角色（10 個值，含 worked example 標註時經使用者同意加入的 `abstract`）。
 - 新增 validator `validate-structure.py`，S1–S6 規則：附檔涵蓋每個 prop 且順序一致、詞彙合法、承諾先開後兌現、每個承諾在文末前都被兌現（`future_work` 除外）、章節計畫與帳冊順序一致、近距離承諾在同一節內兌現。
 - 新增狀態查詢 `structure-state.py`：給定位置 t，回報目前所在章節與角色、尚未兌現的承諾（依緊迫程度排序）、上一個關係，作為「prop_{t+1} 可以做什麼」的機械答案。
 - 新增 skill `propositions:construct`，兩種模式：

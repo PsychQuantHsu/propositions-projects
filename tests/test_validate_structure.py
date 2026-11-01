@@ -30,7 +30,7 @@ RELATIONS = (
     "start, shift, continue, restatement, specification, instance, addition, "
     "contrast, reason, consequence, sequence, return"
 )
-ROLES = "introduction, background, formal_setup, method, results, proofs, discussion, conclusion, appendix"
+ROLES = "abstract, introduction, background, formal_setup, method, results, proofs, discussion, conclusion, appendix"
 
 
 def run(ledger: Path, *flags: str) -> subprocess.CompletedProcess:
@@ -256,7 +256,7 @@ def test_s5_sections_out_of_order_fail(tmp_path):
     assert any("sec-2" in l and "sec-3" in l for l in s5), result.stdout
 
 
-def test_s5_unlisted_role_lists_the_nine_roles(tmp_path):
+def test_s5_unlisted_role_lists_the_ten_roles(tmp_path):
     sections = [{"id": "sec-1", "heading": "Literature", "role": "literature", "first": 1}]
     result = run(write_case(tmp_path, 3, sections=sections))
     assert status(result.stdout, "S5") == "FAIL"
@@ -428,7 +428,7 @@ DOCS = {
     "STRUCTURE.md": REPO_ROOT / "plugins" / "propositions" / "docs" / "STRUCTURE.md",
     "vocabulary.md": REPO_ROOT / "plugins" / "propositions" / "skills" / "construct" / "references" / "vocabulary.md",
 }
-VOCAB_HEADINGS = {"RELATIONS": "Relations (12)", "KINDS": "Commitment kinds (7)", "ROLES": "Section roles (9)"}
+VOCAB_HEADINGS = {"RELATIONS": "Relations (12)", "KINDS": "Commitment kinds (7)", "ROLES": "Section roles (10)"}
 
 
 def _validator_module():
@@ -476,3 +476,40 @@ def test_s6_still_runs_when_only_the_thesis_is_wrong(tmp_path):
     assert status(result.stdout, "S5") == "FAIL"
     assert status(result.stdout, "S6") == "WARN"
     assert "not evaluated" not in result.stdout
+
+
+# ---------- The abstract role (user decision 2026-11-02: add `abstract`, first section only, opens nothing) ----------
+
+ABSTRACT_FIRST = [
+    {"id": "sec-abstract", "heading": "Abstract", "role": "abstract", "first": 1},
+    {"id": "sec-1", "heading": "Introduction", "role": "introduction", "first": 4},
+]
+
+
+def test_s5_abstract_as_first_section_passes(tmp_path):
+    result = run(write_case(tmp_path, 6, sections=ABSTRACT_FIRST))
+    assert status(result.stdout, "S5") == "PASS", result.stdout
+
+
+def test_s5_abstract_after_another_section_fails(tmp_path):
+    sections = [
+        {"id": "sec-1", "heading": "Introduction", "role": "introduction", "first": 1},
+        {"id": "sec-abstract", "heading": "Abstract", "role": "abstract", "first": 4},
+    ]
+    result = run(write_case(tmp_path, 6, sections=sections))
+    assert status(result.stdout, "S5") == "FAIL"
+    assert any(l.lstrip().startswith("[S5]") and "sec-abstract" in l for l in result.stdout.splitlines()), result.stdout
+
+
+def test_s5_abstract_may_not_open_commitments(tmp_path):
+    recs = with_changes(6, {2: {"opens": [{"id": "c-aim-1", "kind": "aim"}]}, 5: {"discharges": ["c-aim-1"]}})
+    result = run(write_case(tmp_path, 6, recs, sections=ABSTRACT_FIRST))
+    assert status(result.stdout, "S5") == "FAIL"
+    assert any(l.lstrip().startswith("[S5]") and "#2 " in l and "c-aim-1" in l for l in result.stdout.splitlines()), result.stdout
+
+
+def test_s5_body_commitments_are_unaffected_by_the_abstract_rule(tmp_path):
+    # Commitments opened in the body are untouched by the abstract rule.
+    recs = with_changes(6, {4: {"opens": [{"id": "c-aim-1", "kind": "aim"}]}, 6: {"discharges": ["c-aim-1"]}})
+    result = run(write_case(tmp_path, 6, recs, sections=ABSTRACT_FIRST))
+    assert status(result.stdout, "S5") == "PASS", result.stdout

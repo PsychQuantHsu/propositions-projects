@@ -71,14 +71,15 @@ rejection both count), the first proposition of the announced part, the first
 use of the setup. A proposition never discharges a commitment it opens itself.
 `future_work` is never discharged.
 
-## Section roles (9)
+## Section roles (10)
 
-These are the only 9 values; do not infer a new value from resemblance to a
+These are the only 10 values; do not infer a new value from resemblance to a
 listed one. A role says what the section does, not where it sits: a subsection
 of the introduction that defines notation is `formal_setup`.
 
 | Role | Ask | Not this when |
 |---|---|---|
+| `abstract` | Does it summarise the aims and findings in advance, before the introduction? Then it is the first section, and its propositions open no commitments (the body opens and keeps them) | It is the opening of the introduction proper — `introduction` |
 | `introduction` | Does it pose the problem, argue its importance and the gap, and announce the aims or plan? | It is a standalone review of prior work — `background` |
 | `background` | Is it a standalone section on prior literature and theory? | The review is part of the introduction's argument for the gap |
 | `formal_setup` | Does it fix notation, definitions or inference rules? | It describes the sample, instruments or procedure — `method` |

@@ -21,9 +21,10 @@ Rules:
         (error), every setup is discharged (warning); with --partial both are
         reported as information only; future_work is never reported
     S5  structure.json: structure_version, non-empty thesis of non-retired
-        propositions, sections with unique ids, one of the nine roles, and
+        propositions, sections with unique ids, one of the ten roles, and
         first_prop values that start at the first proposition and strictly
-        increase in ledger order
+        increase in ledger order; an `abstract` section only as the first
+        entry, and no proposition inside it opens a commitment
     S6  an announcement is first discharged in the section that opened it or
         the next one (warning only)
 
@@ -52,7 +53,7 @@ RELATIONS = (
 )
 KINDS = ("question", "aim", "hypothesis", "plan", "announcement", "setup", "future_work")
 ROLES = (
-    "introduction", "background", "formal_setup", "method", "results",
+    "abstract", "introduction", "background", "formal_setup", "method", "results",
     "proofs", "discussion", "conclusion", "appendix",
 )
 MUST_KEEP = ("question", "aim", "hypothesis", "plan", "announcement")
@@ -306,8 +307,8 @@ def check_s4(commitments: dict[str, Commitment], partial: bool, report: Report) 
 # ---------- S5 / S6 ----------
 
 
-def check_s5(structure: dict, positions: dict[str, int], report: Report, partial: bool = False) -> list[tuple[str, int]]:
-    """Validate the plan; return [(section id, first position)] when the section list is usable, else [].
+def check_s5(structure: dict, positions: dict[str, int], report: Report, partial: bool = False) -> list[tuple[str, int, str]]:
+    """Validate the plan; return [(section id, first position, role)] when the section list is usable, else [].
 
     Errors in `thesis` or `structure_version` fail S5 but do not make a valid
     section list unusable for S6 and the state query. With `partial`, an empty
@@ -337,7 +338,7 @@ def check_s5(structure: dict, positions: dict[str, int], report: Report, partial
     if not isinstance(sections, list) or not sections:
         err("sections must be a non-empty list", about_sections=True)
         return []
-    plan: list[tuple[str, int]] = []
+    plan: list[tuple[str, int, str]] = []
     ids: set[str] = set()
     for i, sec in enumerate(sections, 1):
         if not isinstance(sec, dict):
@@ -357,8 +358,10 @@ def check_s5(structure: dict, positions: dict[str, int], report: Report, partial
         if not isinstance(first, str) or first not in positions:
             err(f"section `{sid}` first_prop {first!r} is not a non-retired ledger proposition", about_sections=True)
             continue
-        plan.append((sid, positions[first]))
-    for (prev_id, prev_pos), (sid, pos) in zip(plan, plan[1:]):
+        plan.append((sid, positions[first], role))
+        if role == "abstract" and i != 1:
+            err(f"section `{sid}` has role `abstract` but is not the first section", about_sections=True)
+    for (prev_id, prev_pos, _), (sid, pos, _) in zip(plan, plan[1:]):
         if pos <= prev_pos:
             err(f"sections `{prev_id}` (#{prev_pos}) and `{sid}` (#{pos}) are out of ledger order", about_sections=True)
     if not positions:
@@ -368,15 +371,30 @@ def check_s5(structure: dict, positions: dict[str, int], report: Report, partial
     return plan if sections_ok else []
 
 
-def section_index(plan: list[tuple[str, int]], position: int) -> int:
+def section_index(plan: list[tuple[str, int, str]], position: int) -> int:
     idx = 0
-    for i, (_, first) in enumerate(plan):
+    for i, (_, first, _) in enumerate(plan):
         if first <= position:
             idx = i
     return idx
 
 
-def check_s6(commitments: dict[str, Commitment], plan: list[tuple[str, int]], report: Report) -> None:
+def check_abstract_opens(records: list[Record], plan: list[tuple[str, int, str]], report: Report) -> None:
+    """S5: the abstract states the aims and findings in advance; it opens no commitment."""
+    if not plan or plan[0][2] != "abstract":
+        return
+    end = plan[1][1] if len(plan) > 1 else None
+    for rec in records:
+        if rec.position is None or (end is not None and rec.position >= end):
+            continue
+        raw = rec.data.get("opens", [])
+        ids = [o.get("id") for o in raw if isinstance(o, dict)] if isinstance(raw, list) else []
+        if ids:
+            listed = ", ".join(f"`{i}`" for i in ids)
+            report.add("S5", rec.problem("error", f"opens {listed} inside the abstract; the abstract opens no commitments"))
+
+
+def check_s6(commitments: dict[str, Commitment], plan: list[tuple[str, int, str]], report: Report) -> None:
     if not plan:
         report.add("S6", Problem("warning", "not evaluated: the section plan is invalid (see S5)"))
         return
@@ -413,6 +431,7 @@ def validate(ledger: Path, structure_path: Path, discourse_path: Path, partial: 
     commitments = check_s3(records, report)
     check_s4(commitments, partial, report)
     plan = check_s5(structure, positions, report, partial)
+    check_abstract_opens(records, plan, report)
     check_s6(commitments, plan, report)
     return report
 

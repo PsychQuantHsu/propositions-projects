@@ -100,10 +100,11 @@ prop_{t+1} 由三層決定，三層分開記錄：
 
 ### 章節角色用單一封閉詞彙
 
-`structure.json` 的每節帶 `role`。以下是封閉列舉，**只有這 9 個值，不得依性質相似類推新值**；所有 profile 共用同一套：
+`structure.json` 的每節帶 `role`。以下是封閉列舉，**只有這 10 個值，不得依性質相似類推新值**；所有 profile 共用同一套：
 
 | role | 這一節做什麼 |
 |---|---|
+| `abstract` | 放在引言之前、預先陳述目的與發現的摘要。只能是第一節，節內的 prop 不得開出承諾（承諾由正文開出與兌現，避免重複計算）；相鄰關係照標 |
 | `introduction` | 提出問題、說明重要性與缺口、宣告目的與計畫 |
 | `background` | 獨立成節的文獻與先前理論 |
 | `formal_setup` | 記號、定義、推論規則（如範例稿件 §1.1） |
@@ -115,6 +116,8 @@ prop_{t+1} 由三層決定，三層分開記錄：
 | `appendix` | 附錄 |
 
 節是扁平清單：小節（如 §1.1）是清單裡的一筆，角色可以和所屬大節不同。
+
+`abstract` 是 worked example 標註時發現的缺口（範例稿件的帳冊從摘要開始，原本 9 個角色都不適合），依本決策「詞彙變更等於 spec 變更」停下來問使用者；2026-11-02 使用者選擇加入 `abstract`，並由 S5 檢查兩件事：只能是第一節、節內不開承諾。
 
 考慮過的替代：依 profile 給不同角色詞彙（比照 `ledger-profiles`）。被否決：角色差異只有 `proofs` 一個值，不值得多一套 profile 對照。
 
@@ -170,7 +173,7 @@ prop_{t+1} 由三層決定，三層分開記錄：
   - S2：`relation` 屬 12 值；`start` 恰在第一筆；`return` 的 `refers_to` 指向更早的 prop；其他關係不得有 `refers_to`。
   - S3：承諾 `id` 格式正確且唯一、`kind` 屬 7 種；每個 `discharges` 的 id 由更早的 prop 開出；`future_work` 不得被兌現。
   - S4：`future_work` 與 `setup` 以外的承諾至少被兌現一次（錯誤）；`setup` 未兌現是警告；`--partial` 時兩者都降為資訊。
-  - S5：`structure.json` 形狀正確、`role` 屬 9 值、節 `id` 唯一、`first_prop` 存在且依帳冊順序嚴格遞增、第一節從第一個 prop 開始、`thesis` 非空且都存在。`--partial` 時空的 `thesis` 降為資訊（草稿常常還沒寫出主旨）；`thesis` 或版本號有誤不影響章節清單本身被 S6 與狀態查詢使用。
+  - S5：`structure.json` 形狀正確、`role` 屬 10 值、`abstract` 只能是第一節且節內的 prop 不開承諾、節 `id` 唯一、`first_prop` 存在且依帳冊順序嚴格遞增、第一節從第一個 prop 開始、`thesis` 非空且都存在。`--partial` 時空的 `thesis` 降為資訊（草稿常常還沒寫出主旨）；`thesis` 或版本號有誤不影響章節清單本身被 S6 與狀態查詢使用。
   - S6：`announcement` 的第一次兌現不在開出的那一節或下一節時，給警告。
 - 輸出：每條規則一行 `[PASS]`／`[FAIL]`／`[WARN]`，再列出逐筆問題（帶 prop 序號與 id）。
 - 結束碼：0 沒有錯誤（可有警告）；1 有錯誤；2 輸入錯誤（檔案不存在、JSON 無法解析、帳冊讀不到）。

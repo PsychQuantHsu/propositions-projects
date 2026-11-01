@@ -93,7 +93,7 @@ One JSON object for the whole article.
 | `sections` | ✅ | The section plan, a flat list in reading order |
 | `sections[].id` | ✅ | Identifier unique within the file, e.g. `sec-1`, `sec-1-1` |
 | `sections[].heading` | ✅ | The section heading |
-| `sections[].role` | ✅ | One of the nine section roles below |
+| `sections[].role` | ✅ | One of the ten section roles below |
 | `sections[].first_prop` | ✅ | Full UUID of the section's first non-retired proposition |
 
 - The list is **flat**. A subsection such as 1.1 is an entry of its own, and its
@@ -249,14 +249,15 @@ Close calls:
 - `hypothesis` or `aim`: a hypothesis is a claim that the test can reject; an
   aim is a task that is done or not done.
 
-### Section roles (9)
+### Section roles (10)
 
-These are the only 9 values; do not infer a new value from resemblance to a
-listed one. All profiles use the same nine roles. A role describes what the
+These are the only 10 values; do not infer a new value from resemblance to a
+listed one. All profiles use the same ten roles. A role describes what the
 section does, not where it sits.
 
 | Role | What the section does | Instance |
 |---|---|---|
+| `abstract` | States the aims and findings in advance, before the introduction. Only the first section may have this role, and no proposition inside it opens a commitment: the body opens and keeps them, so the abstract's aims and findings are not counted twice. Its propositions still carry relations | The abstract of the reference manuscript (no heading) |
 | `introduction` | Raises the problem, its importance and the gap; declares the aims and the plan | "1. Introduction" |
 | `background` | Reviews literature or prior theory in a section of its own; a review inside the introduction stays `introduction` | (generic; no instance in the reference manuscript) "2. Related work" |
 | `formal_setup` | Sets out notation, definitions and inference rules that the argument uses, even when placed under another section | "1.1. Congruence of choices inferred from LS and from CJ" (a subsection of the Introduction) |
@@ -284,7 +285,7 @@ drafts (below). `--format text|json` selects the output format.
 | S2 | error | `relation` is one of the 12 values. The first record is `start` and no other record is. A `return` carries `refers_to` naming an earlier proposition; no other record carries `refers_to` |
 | S3 | error | Commitment ids match the pattern and are unique; `kind` is one of the 7. Every discharged id was opened by a strictly earlier record. No `future_work` is discharged |
 | S4 | error / warning | Every `question`, `aim`, `hypothesis`, `plan` and `announcement` is discharged at least once (error). An undischarged `setup` is a warning. `future_work` is not reported |
-| S5 | error | `structure.json` has the required fields; each `role` is one of the 9; section ids are unique; every `first_prop` names a non-retired proposition, the values strictly increase in ledger order, and the first section starts at the first non-retired proposition; `thesis` is non-empty and every entry names a non-retired proposition |
+| S5 | error | `structure.json` has the required fields; each `role` is one of the 10; an `abstract` section is only the first entry and no proposition inside it opens a commitment; section ids are unique; every `first_prop` names a non-retired proposition, the values strictly increase in ledger order, and the first section starts at the first non-retired proposition; `thesis` is non-empty and every entry names a non-retired proposition |
 | S6 | warning | An `announcement` is first discharged neither in the section where it was opened nor in the next section |
 
 The output has one summary line per rule, marked `[PASS]`, `[FAIL]` or

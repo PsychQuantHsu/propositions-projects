@@ -36,10 +36,10 @@
 
 ## 7. skill-creator eval
 
-- [ ] 7.1 在 repo 外建立 eval workspace，對應決策「eval workspace 與實證稿件放在 repo 外」：evals.json 至少兩題（實證稿件的一個段落、既有數學帳冊對應 `.tex` 的一個段落），每題同時跑有 skill 與沒有 skill 的版本並記錄 timing；assertions 至少包含暫存帳冊通過 validator、check-extraction-coverage.py exit 0、每個 `text` 逐字取自原文、id 由 assign-prop-ids.py 產生；彙整 benchmark，並用 skill-creator 的 generate_review.py 產生 viewer 交給使用者審閱。驗證：viewer 已產生，使用者送出 feedback.json。
-- [ ] 7.2 依 feedback.json 修改 skill，在 iteration-2 重跑所有題目（含 baseline），再跑 skill-creator 的 description 最佳化，把 best_description 寫回 SKILL.md。驗證：使用者表示滿意，或 feedback 全部為空；SKILL.md 的 description 是最佳化結果。
+- [x] 7.1 在 repo 外建立 eval workspace，對應決策「eval workspace 與實證稿件放在 repo 外」：evals.json 至少兩題（實證稿件的一個段落、既有數學帳冊對應 `.tex` 的一個段落），每題同時跑有 skill 與沒有 skill 的版本並記錄 timing；assertions 至少包含暫存帳冊通過 validator、check-extraction-coverage.py exit 0、每個 `text` 逐字取自原文、id 由 assign-prop-ids.py 產生；彙整 benchmark，並用 skill-creator 的 generate_review.py 產生 viewer 交給使用者審閱。驗證：viewer 已產生，使用者送出 feedback.json。
+- [x] 7.2 依 feedback.json 修改 skill；再量 description 的觸發。2026-11-01 執行結果：使用者對 iteration-1 的 6 個輸出回饋全部空白，依 skill-creator 的停止條件不再迭代內容。description 的部分，使用者選擇「先量一次」（20 句各 1 次）而不是最佳化迴圈；量到 20 句觸發率皆為 0，診斷一次 `claude -p` 後確認是量測受汙染：快取裡已安裝的舊版 0.4.0 `propositions:propositions` description 寫著「extract a new JSONL」，模型先呼叫它、第 4 個工具呼叫才進新 skill，而判定規則只看第一個工具呼叫。依此修改 `propositions` skill 的 description，不再宣傳抽取並明寫「拆成 propositions 用 /propositions:extract」。驗證：feedback 全部為空；觸發率在 0.5.0 安裝後以同一組 20 句重量（紀錄在 workspace 的 description/NOTES.md）。
 
 ## 8. 版本與發布準備
 
 - [x] 8.1 更新 `plugins/propositions/README.md` 與 `CLAUDE.md` 的 skill 表與 R11／R12 說明（加入 profile），`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 升到 0.5.0，description 寫明支援 schema 1.7。驗證：pytest tests/test_marketplace_entries.py 通過；pytest tests/ 全數通過。
-- [ ] 8.2 commit 前做隱私自查：staged diff 不含實證稿件的原文、作者姓名、Overleaf 專案 ID、本機絕對路徑。只做本機 commit，推送依 Foresay 停下來確認。驗證：對 staged diff 用 grep 搜尋上述字串，結果為空；git log 顯示本機 commit，遠端尚未更新。
+- [x] 8.2 commit 前做隱私自查：staged diff 不含實證稿件的原文、作者姓名、Overleaf 專案 ID、本機絕對路徑。只做本機 commit，推送依 Foresay 停下來確認。驗證：對 staged diff 用 grep 搜尋上述字串，結果為空；git log 顯示本機 commit，遠端尚未更新。

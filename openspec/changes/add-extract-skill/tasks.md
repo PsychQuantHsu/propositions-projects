@@ -41,5 +41,5 @@
 
 ## 8. 版本與發布準備
 
-- [ ] 8.1 更新 `plugins/propositions/README.md` 與 `CLAUDE.md` 的 skill 表與 R11／R12 說明（加入 profile），`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 升到 0.5.0，description 寫明支援 schema 1.7。驗證：pytest tests/test_marketplace_entries.py 通過；pytest tests/ 全數通過。
+- [x] 8.1 更新 `plugins/propositions/README.md` 與 `CLAUDE.md` 的 skill 表與 R11／R12 說明（加入 profile），`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 升到 0.5.0，description 寫明支援 schema 1.7。驗證：pytest tests/test_marketplace_entries.py 通過；pytest tests/ 全數通過。
 - [ ] 8.2 commit 前做隱私自查：staged diff 不含實證稿件的原文、作者姓名、Overleaf 專案 ID、本機絕對路徑。只做本機 commit，推送依 Foresay 停下來確認。驗證：對 staged diff 用 grep 搜尋上述字串，結果為空；git log 顯示本機 commit，遠端尚未更新。

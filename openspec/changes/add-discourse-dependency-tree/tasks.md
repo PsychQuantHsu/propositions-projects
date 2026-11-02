@@ -43,14 +43,15 @@
 ## 8. 全篇標註與量測
 
 - [x] 8.1 [P] 範例稿件（在它自己的 repo）：用 `migrate-structure-v2.py` 把 1.0 附檔轉成 2.0 起點，依 construct 標註模式重新標 Abstract 到 §1.2（位置 1–147）的頭、關係與段頭。驗證：暫存附檔 `validate-structure.py --partial` 結束碼 0，複查報告中這一範圍的每筆都已處理。
-- [ ] 8.2 範例稿件：標完 §2 到 §4（位置 148–294）、所有段頭與章節 `parent`，經使用者確認後寫入附檔。驗證：不加 `--partial` 時 `validate-structure.py` 結束碼 0；`main.jsonl` 的 sha256 前後相同。
-- [ ] 8.3 [P] psychophysical_representations（在它自己的 repo）：依 construct 標註模式建立 `structure.json`（章節、角色、`parent`、thesis）與承諾，並標 §1 到 §2 的頭、關係與段頭。驗證：暫存附檔 `validate-structure.py --partial` 結束碼 0。
-- [ ] 8.4 psychophysical_representations：標完 §3 到 §9 與所有段頭，經使用者確認後寫入附檔。驗證：不加 `--partial` 時 `validate-structure.py` 結束碼 0；`main.jsonl` 的 sha256 前後相同。
-- [ ] 8.5 在兩篇上跑 `structure-metrics.py`，把交叉比例、右邊緣長度、頭的方向、關係計數與 S8 警告數記入 `docs/REFERENCE-MANUSCRIPTS.md`（只記數字）。兩篇句子弧的交叉比例都不超過 5% 才繼續；超過時停在本任務，回報並重新檢討模型。驗證：文件出現兩篇的數字，交叉比例對照 5% 的判定寫在完成紀錄。
+- [x] 8.2 範例稿件：標完 §2 到 §4（位置 148–294）、所有段頭與章節 `parent`，經使用者確認後寫入附檔。驗證：不加 `--partial` 時 `validate-structure.py` 結束碼 0；`main.jsonl` 的 sha256 前後相同。
+- [x] 8.3 [P] psychophysical_representations（在它自己的 repo）：依 construct 標註模式建立 `structure.json`（章節、角色、`parent`、thesis）與承諾，並標 §1 到 §2 的頭、關係與段頭。驗證：暫存附檔 `validate-structure.py --partial` 結束碼 0。
+- [x] 8.4 psychophysical_representations：標完 §3 到 §9 與所有段頭，經使用者確認後寫入附檔。驗證：不加 `--partial` 時 `validate-structure.py` 結束碼 0；`main.jsonl` 的 sha256 前後相同。
+  - 完成紀錄（2026-11-02）：經使用者同意，`main.jsonl` 先重排成 tex 閱讀順序（364 行的內容與 id 不變，R1–R13 結果不變），所以 sha256 改以「重排前後為同一組行」驗證；附檔在重排後的帳冊上不加 `--partial` 結束碼 0。寫入與本機 commit 在該稿件 repo（未推送）；該 repo 的 commit hook 另外更新了 `version-info.tex` 的版本戳記。
+- [x] 8.5 在兩篇上跑 `structure-metrics.py`，把交叉比例、右邊緣長度、頭的方向、關係計數與 S8 警告數記入 `docs/REFERENCE-MANUSCRIPTS.md`（只記數字）。兩篇句子弧的交叉比例都不超過 5% 才繼續；超過時停在本任務，回報並重新檢討模型。驗證：文件出現兩篇的數字，交叉比例對照 5% 的判定寫在完成紀錄。
 - [x] 8.6 落實決策「承諾範圍與 scope 排序以量測把關」：比較範例稿件上 `kind` 與 `scope` 的命中數。`scope` 嚴格勝出時，用 `/spectra-ingest` 把預設改為 `scope`，同步 `structure-state.py` 與測試；否則維持 `kind`，把兩個數字以 comment 記到 #31。驗證：完成紀錄寫明兩個命中數與採用結果；`pytest tests/` 全綠。
   - 完成紀錄（2026-11-02）：範例稿件 2.0 標註上 `kind` 89／231、`scope` 94／231（承諾與章節 `parent` 決定排序，與各句的頭無關），`scope` 嚴格勝出，預設改為 `scope`。改動只有預設值一處，直接修改 spec delta、proposal、design 與 `structure-state.py`、測試、STRUCTURE.md，未另跑 `/spectra-ingest`；數字另以 comment 記到 #31。
 
 ## 9. 發佈前整理
 
-- [ ] 9.1 更新使用者文件：`plugins/propositions/README.md`、`CLAUDE.md` 的 construct 與附檔兩列、`plugins/propositions/docs/PLAYBOOK.md` 的結構標註階段、`docs/REFERENCE-MANUSCRIPTS.md` 的範例改成依存樹。驗證：在上述檔案中搜尋 `refers_to`、`S1–S6`、`relation` 的「上一句」說法，除遷移說明外沒有殘留的 1.0 描述。
-- [ ] 9.2 propositions 升為 0.7.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 一致）。驗證：`pytest tests/` 全綠、`spectra validate add-discourse-dependency-tree` 通過、兩個 JSON 的版本號相同。
+- [x] 9.1 更新使用者文件：`plugins/propositions/README.md`、`CLAUDE.md` 的 construct 與附檔兩列、`plugins/propositions/docs/PLAYBOOK.md` 的結構標註階段、`docs/REFERENCE-MANUSCRIPTS.md` 的範例改成依存樹。驗證：在上述檔案中搜尋 `refers_to`、`S1–S6`、`relation` 的「上一句」說法，除遷移說明外沒有殘留的 1.0 描述。
+- [x] 9.2 propositions 升為 0.7.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 一致）。驗證：`pytest tests/` 全綠、`spectra validate add-discourse-dependency-tree` 通過、兩個 JSON 的版本號相同。

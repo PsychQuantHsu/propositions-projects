@@ -1,8 +1,13 @@
-"""Build small synthetic ledgers with structure sidecars for the structure tests.
+"""Build small synthetic ledgers with structure sidecars (format 2.0) for the structure tests.
 
-Position n (1-based) of every ledger has id ``pid(n)``. Records and sections are
-written with positions and converted to UUIDs, so a test reads like the spec's
-example tables.
+Position n (1-based) of every ledger has id ``pid(n)``. Records, paragraphs and
+sections are written with positions and converted to UUIDs, so a test reads like
+the spec's example tables.
+
+Defaults (Spectra change add-discourse-dependency-tree): one paragraph per
+section, starting at the section's first proposition; inside each paragraph the
+first live record is the root and every other record has the previous record as
+its head, with relation ``continue``.
 """
 from __future__ import annotations
 
@@ -17,9 +22,36 @@ def pid(pos: int) -> str:
     return UUIDS[pos - 1]
 
 
-def default_records(n: int) -> list[dict]:
-    """One record per position: `start` first, `continue` afterwards."""
-    return [{"pos": p, "relation": "start" if p == 1 else "continue"} for p in range(1, n + 1)]
+def chain(order: list[int]) -> list[dict]:
+    """Records for `order` in one paragraph: the first is the root, each later one heads to the one before."""
+    return [{"pos": p} if i == 0 else {"pos": p, "head": order[i - 1], "relation": "continue"} for i, p in enumerate(order)]
+
+
+def default_records(n: int, paragraph_starts: tuple[int, ...] = (1,), retired: tuple[int, ...] = ()) -> list[dict]:
+    """One record per live position; a chain inside each paragraph."""
+    live = [p for p in range(1, n + 1) if p not in retired]
+    starts = sorted(set(paragraph_starts))
+    records = []
+    for i, start in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else n + 1
+        records += chain([p for p in live if start <= p < end])
+    return records
+
+
+def _record_out(r: dict) -> dict:
+    rec = {"prop_id": pid(r["pos"])}
+    for key, value in r.items():
+        if key == "pos":
+            continue
+        if key == "head":
+            rec["head"] = pid(value) if isinstance(value, int) else value
+        elif key == "also":
+            rec["also"] = [{**a, "to": pid(a["to"]) if isinstance(a.get("to"), int) else a.get("to")} for a in value]
+        elif key == "refers_to" and isinstance(value, int):
+            rec["refers_to"] = pid(value)
+        else:
+            rec[key] = value
+    return rec
 
 
 def write_case(
@@ -29,48 +61,65 @@ def write_case(
     sections: list[dict] | None = None,
     thesis: list[int] | None = None,
     retired: tuple[int, ...] = (),
+    paragraphs: list[dict] | None = None,
+    cites: dict[int, list[int]] | None = None,
+    version: str | None = "2.0",
 ) -> Path:
     """Write main.jsonl (n props), discourse.jsonl and structure.json; return the ledger path.
 
-    Records use `pos` for prop_id and, in `refers_to`, a position; both are
-    converted to UUIDs. Sections use `first` for first_prop.
+    Records use `pos`, and positions in `head` and `also[].to`; sections and
+    paragraphs use `first` for first_prop. Paragraph `head` is a paragraph id.
+    `cites` maps a position to the positions its proposition cites.
     """
+    cites = cites or {}
     ledger = tmp / "main.jsonl"
     lines = []
     for p in range(1, n + 1):
         prop = {"id": pid(p), "text": f"Sentence {p}."}
+        if p in cites:
+            prop["cites"] = [pid(c) for c in cites[p]]
         if p in retired:
             prop["retired"] = {"since": "2026-11-02", "mechanism": "deleted", "match": "absent", "reason": "test"}
         lines.append(json.dumps(prop))
     ledger.write_text("\n".join(lines) + "\n")
 
-    records = default_records(n) if records is None else records
-    out = []
-    for r in records:
-        rec = {k: v for k, v in r.items() if k not in ("pos", "refers_to")}
-        rec = {"prop_id": pid(r["pos"]), **rec}
-        if "refers_to" in r:
-            rec["refers_to"] = pid(r["refers_to"])
-        out.append(json.dumps(rec))
-    (tmp / "discourse.jsonl").write_text("\n".join(out) + "\n")
-
     first_live = next(p for p in range(1, n + 1) if p not in retired)
     sections = sections or [{"id": "sec-1", "heading": "Introduction", "role": "introduction", "first": first_live}]
-    structure = {
-        "structure_version": "1.0",
-        "thesis": [pid(t) for t in (thesis if thesis is not None else [first_live])],
-        "sections": [
-            {"id": s["id"], "heading": s["heading"], "role": s["role"], "first_prop": pid(s["first"])}
-            for s in sections
-        ],
-    }
+    if paragraphs is None:
+        paragraphs = [{"id": f"p-{i}", "first": s["first"]} for i, s in enumerate(sections, 1)]
+    if records is None:
+        records = default_records(n, tuple(p["first"] for p in paragraphs), retired)
+    (tmp / "discourse.jsonl").write_text("\n".join(json.dumps(_record_out(r)) for r in records) + "\n")
+
+    structure: dict = {}
+    if version is not None:
+        structure["structure_version"] = version
+    structure["thesis"] = [pid(t) for t in (thesis if thesis is not None else [first_live])]
+    structure["sections"] = [
+        {"id": s["id"], "heading": s["heading"], "role": s["role"], "first_prop": pid(s["first"]),
+         **({"parent": s["parent"]} if "parent" in s else {})}
+        for s in sections
+    ]
+    structure["paragraphs"] = [
+        {"id": p["id"], "first_prop": pid(p["first"]), **{k: p[k] for k in ("head", "relation") if k in p}}
+        for p in paragraphs
+    ]
     (tmp / "structure.json").write_text(json.dumps(structure, indent=1) + "\n")
     return ledger
 
 
-def with_changes(n: int, changes: dict[int, dict]) -> list[dict]:
-    """Default records with the record at each position replaced/extended by `changes`."""
-    recs = default_records(n)
+def with_changes(n: int, changes: dict[int, dict], paragraph_starts: tuple[int, ...] = (1,)) -> list[dict]:
+    """Default records with the record at each position extended or overridden by `changes`.
+
+    A change may set ``"head": None`` to make the record a root; that removes
+    both `head` and `relation`.
+    """
+    recs = default_records(n, paragraph_starts)
+    by_pos = {r["pos"]: i for i, r in enumerate(recs)}
     for pos, change in changes.items():
-        recs[pos - 1] = {"pos": pos, **{k: v for k, v in recs[pos - 1].items() if k != "pos"}, **change}
+        merged = {**recs[by_pos[pos]], **change}
+        if change.get("head", "absent") is None:
+            merged.pop("head", None)
+            merged.pop("relation", None)
+        recs[by_pos[pos]] = merged
     return recs

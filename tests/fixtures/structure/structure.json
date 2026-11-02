@@ -1,5 +1,5 @@
 {
-  "structure_version": "1.0",
+  "structure_version": "2.0",
   "thesis": [
     "019a3c5e-7a00-7000-8000-000000000009"
   ],
@@ -23,10 +23,45 @@
       "first_prop": "019a3c5e-7a00-7000-8000-000000000008"
     },
     {
+      "id": "sec-alternative",
+      "heading": "An alternative explanation",
+      "role": "results",
+      "first_prop": "019a3c5e-7a00-7000-8000-00000000000a",
+      "parent": "sec-results"
+    },
+    {
       "id": "sec-discussion",
       "heading": "Discussion",
       "role": "discussion",
       "first_prop": "019a3c5e-7a00-7000-8000-00000000000b"
+    }
+  ],
+  "paragraphs": [
+    {
+      "id": "p-1",
+      "first_prop": "019a3c5e-7a00-7000-8000-000000000001"
+    },
+    {
+      "id": "p-2",
+      "first_prop": "019a3c5e-7a00-7000-8000-000000000007"
+    },
+    {
+      "id": "p-3",
+      "first_prop": "019a3c5e-7a00-7000-8000-000000000008"
+    },
+    {
+      "id": "p-4",
+      "first_prop": "019a3c5e-7a00-7000-8000-00000000000a"
+    },
+    {
+      "id": "p-5",
+      "first_prop": "019a3c5e-7a00-7000-8000-00000000000b"
+    },
+    {
+      "id": "p-6",
+      "first_prop": "019a3c5e-7a00-7000-8000-00000000000c",
+      "head": "p-5",
+      "relation": "addition"
     }
   ]
 }

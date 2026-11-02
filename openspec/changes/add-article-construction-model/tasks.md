@@ -22,7 +22,8 @@
 - [x] 4.2 寫 `plugins/propositions/skills/construct/SKILL.md` 的標註模式，落實 Annotation starts from a validated, fully covered ledger 與 Annotation writes sidecars only after validation and confirmation：先跑 `validate-propositions.py` 與 `check-extraction-coverage.py`，不通過就停下並轉介 `propositions:extract`；附檔先寫在帳冊目錄以外的暫存處，`validate-structure.py` 結束碼 0 後列出摘要（各關係數量、每個承諾的開出與兌現位置、章節與角色），使用者確認後才寫入；全程不改 `main.jsonl`。驗證：在合成帳冊上照 SKILL.md 實走一次，暫存檔在帳冊目錄外、validator 結束碼 0、`main.jsonl` 的 sha256 前後相同。
 - [x] 4.3 在 SKILL.md 寫下一步模式，落實 Next mode proposes at most three candidates without writing：跑 `validate-structure.py --partial` 與 `structure-state.py --at end`，說明目前章節角色與排序後的未兌現承諾，提出至多 3 個候選下一句，每個候選寫明推進哪個承諾（或為什麼該 `shift`）、用什麼關係與連接詞、預期的 `claim_type`。驗證：把合成帳冊截到第 10 個 prop（announcement 在第 10 個開出、尚未兌現）實走一次，第一個候選兌現開著的 announcement，稿件、`main.jsonl` 與兩個附檔的 sha256 前後相同。
 - [x] 4.4 寫 construct 的 description，落實 Construction requests route to the construct skill，並檢查 `propositions:extract` 與 `propositions:propositions` 的 description 沒有宣稱建構類請求。驗證：比照 add-extract-skill 的觸發測試，10 句建構類請求與 10 句抽取類請求各跑一次，記錄第一個工具呼叫，建構類命中 `propositions:construct`、抽取類命中 `propositions:extract` 的比例寫進 tasks 完成紀錄。
-  - 完成紀錄（2026-11-02，claude-opus-5-5，每句 1 次，嚴格＝第 1 個工具呼叫、寬鬆＝前 4 個內；量測資料存在 repo 外）：抽取類三輪皆 10/10 命中 extract（嚴格 9–10/10），沒有一句被 construct 搶走。建構類：空目錄兩輪嚴格 0/10、1/10，寬鬆 4/10、4/10；有帳冊的專案嚴格 0/10、寬鬆 6/10（問下一句與標註結構 6/6，檢查承諾是否兌現 0/4，模型改為直接讀稿）。description 改寫一輪（先寫它回答的兩個問題、補口語說法）。已知限制：稽核類請求的觸發偏弱，待使用者決定是否跑 description 最佳化迴圈。
+  - 完成紀錄（2026-11-02，claude-opus-5-5，每句 1 次，嚴格＝第 1 個工具呼叫、寬鬆＝前 4 個內；量測資料存在 repo 外）：抽取類三輪皆 10/10 命中 extract（嚴格 9–10/10），沒有一句被 construct 搶走。建構類：空目錄兩輪嚴格 0/10、1/10，寬鬆 4/10、4/10；有帳冊的專案嚴格 0/10、寬鬆 6/10（問下一句與標註結構 6/6，檢查承諾是否兌現 0/4，模型改為直接讀稿）。description 改寫一輪（先寫它回答的兩個問題、補口語說法）。已知限制：稽核類請求的觸發偏弱，使用者選擇跑 description 最佳化迴圈。
+  - 最佳化迴圈（skill-creator run_loop，2026-11-02，claude-opus-5-5，20 句 × 3 次，60/40 訓練／測試，5 輪改寫）：5 個版本分數完全相同（訓練 6/12、測試 4/8）——應觸發的 10 句在所有版本的第一個工具呼叫都不是 construct（0/30），不應觸發的全對。run_loop 只認第一個工具呼叫，而在有帳冊的專案裡，模型對「我的稿件」類請求一律先看檔案，這是地板效應，description 措辭分辨不出差異。保留原 description（迴圈選出的 best 也是原版）。實際可用度以前 4 個工具呼叫內的寬鬆量測為準（6/10）。
 
 ## 5. 範例稿件 worked example（私有 repo）
 
@@ -36,4 +37,4 @@
 ## 6. 文件、版本與收尾
 
 - [x] 6.1 更新 `plugins/propositions/README.md`、`plugins/propositions/docs/PLAYBOOK.md`、`CLAUDE.md`，加入 construct skill 與兩個腳本；`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 版本 0.5.0 → 0.6.0。驗證：新檔案 `git add` 後 `pytest tests/test_plugin_payload_tracked.py` 通過，兩個 JSON 的版本號一致。
-- [ ] 6.2 全面驗證並回報 #26：`pytest tests/` 全綠、`spectra validate add-article-construction-model` 通過；在 #26 留言連到本變更，並把 Clarity Surface 五列依 design 的五個決策標為 resolved。驗證：測試與 validate 的輸出、`gh issue view 26` 顯示五列都是 resolved。
+- [x] 6.2 全面驗證並回報 #26：`pytest tests/` 全綠、`spectra validate add-article-construction-model` 通過；在 #26 留言連到本變更，並把 Clarity Surface 五列依 design 的五個決策標為 resolved。驗證：測試與 validate 的輸出、`gh issue view 26` 顯示五列都是 resolved。

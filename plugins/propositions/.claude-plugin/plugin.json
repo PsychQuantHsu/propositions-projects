@@ -1,7 +1,7 @@
 {
   "name": "propositions",
-  "version": "0.5.0",
-  "description": "Author-claim infrastructure for academic LaTeX manuscripts: line-addressable propositions (JSONL), R1-R13 mechanical validator, audit chain (symbols / citations / code-manuscript / prop-iso), extraction discipline, and the domain-general manuscript-QA skills (clarity-audit, proofread with dual derivation/empirical modes, manuscript-audit). an extraction skill (paragraph → propositions behind a validator and a no-omission coverage gate), and ledger profiles (default / empirical). Supports propositions-ledger schema versions up to 1.7 (v1.2+/v1.4+/v1.6/v1.7 rules applied conditionally, incl. multi-file \\input manuscripts), plus verification records: a verification.jsonl sidecar with its validator and proofread-checklist conversion. Originally developed as the 'Locke project'.",
+  "version": "0.6.0",
+  "description": "Author-claim infrastructure for academic LaTeX manuscripts: line-addressable propositions (JSONL), R1-R13 mechanical validator, audit chain (symbols / citations / code-manuscript / prop-iso), extraction discipline, and the domain-general manuscript-QA skills (clarity-audit, proofread with dual derivation/empirical modes, manuscript-audit). an extraction skill (paragraph → propositions behind a validator and a no-omission coverage gate), and ledger profiles (default / empirical). Supports propositions-ledger schema versions up to 1.7 (v1.2+/v1.4+/v1.6/v1.7 rules applied conditionally, incl. multi-file \\input manuscripts), plus verification records: a verification.jsonl sidecar with its validator and proofread-checklist conversion, and article structure: structure.json / discourse.jsonl sidecars (commitments, section roles, adjacent relations) with an S1-S6 validator, a state query and the construct skill (annotate, or say what the next sentence of a draft should do). Originally developed as the 'Locke project'.",
   "author": {
     "name": "Che Cheng"
   },

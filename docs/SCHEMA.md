@@ -167,6 +167,8 @@ proposition ordering 改用 JSONL 檔案行序;**v1.4** = `retired` 欄位新增
 manuscript/propositions/
 ├── _meta.json             # schema_version + source + coverage + axioms
 ├── main.jsonl             # 1 prop per line, in main.tex reading order
+├── structure.json         # optional sidecar — article level (see §Structure sidecars)
+├── discourse.jsonl        # optional sidecar — 1 record per prop (see §Structure sidecars)
 ├── _smoke_tests/
 │   ├── rollback_60.tex
 │   ├── rollback_60_meta.json
@@ -178,6 +180,17 @@ manuscript/propositions/
     ├── theorem1_statement_clause_level_meta.json
     └── theorem1_statement_clause_level.jsonl
 ```
+
+## Structure sidecars (beside the ledger, outside its schema)
+
+Article structure is stored in two sidecar files in the ledger's directory, next to `main.jsonl`: `structure.json` for the article level (thesis, sections and their roles) and `discourse.jsonl` for one record per non-retired proposition (adjacent relation, commitments opened and discharged). Both are optional.
+
+- **The ledger schema does not change.** The sidecars add no field to `main.jsonl` or `_meta.json`, and adding, changing or removing them does not change `main.jsonl`. `schema_version` does not cover them, so adding them to a ledger needs no version bump or migration.
+- **`validate-propositions.py` does not read them.** R1–R13 are unchanged, and a ledger directory without the sidecars produces the same validator output and exit status as before.
+- **They have their own validator**, `plugins/propositions/scripts/validate-structure.py` (rules S1–S6). It needs both files; if either is missing it exits with status 2 and names the file.
+- **Full format**: `plugins/propositions/docs/STRUCTURE.md`.
+
+This follows the precedent of `verification.jsonl` (`plugins/propositions/docs/VERIFICATION.md`): the ledger stays an index of claims, and annotations that can be redone without touching it live beside it.
 
 ## `_meta.json` schema (root metadata)
 

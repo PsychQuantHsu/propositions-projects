@@ -104,6 +104,9 @@ If the validator exits non-zero or any range reports uncovered text, **stop**: r
 failures and send the user to `/propositions:extract`. Structure laid over a ledger with gaps
 would mislabel the propositions on both sides of each gap. Write nothing.
 
+A ledger not in TeX reading order, or one of about 100 propositions or more, goes through
+`/propositions:construct-batch`, which replaces A3 and returns here at A4.
+
 ### A2 — Read, and start from the paragraph plan
 
 Read `references/vocabulary.md`. Then read the manuscript and the ledger together in reading

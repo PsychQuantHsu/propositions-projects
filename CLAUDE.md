@@ -40,6 +40,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | `/propositions:proofread` | 語意軸,per-prop L1-L5 walk:分解是否忠實、claim_type 是否合身、cite 是否完整且成立、evidence_class 是否一致 |
 | `/propositions:manuscript-audit` | 跨檔案軸,cross-artifact drift audit (R1 symbols / R2 citations / R3 code-manuscript / R4 prop-iso) |
 | `/propositions:construct` | 建構軸,整篇文章的層次:標註承諾(研究問題、目的、假設、章節計畫、近距離承諾)、章節角色與三層依存樹(句在段內的頭、段在節內的頭、節的 parent),存成帳冊旁的 `structure.json`／`discourse.jsonl`(格式 2.0,S1–S8 檢查);寫到一半的稿件則依右邊緣與未兌現的承諾提出下一句的候選(#26、#30) |
+| `/propositions:construct-batch` | 長稿的建構軸標註:先把帳冊排成閱讀順序(`reorder-ledger.py`,dry-run gated),再依段落切批、分給 subagent、合併回暫存附檔(`structure-batch.py`);審查與寫入仍回 `/propositions:construct` |
 | `/propositions:clarity-audit` | 可讀性軸,散文層級的 stumble 掃描與改寫(不需要 JSONL) |
 
 | Rule (shipped) | When applies |

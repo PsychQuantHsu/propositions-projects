@@ -12,9 +12,15 @@ Then work paragraph by paragraph in reading order.
 
 **For each paragraph**, before its propositions:
 
-1. **Root.** Which proposition does everything else in the paragraph hang on,
-   directly or through others? Usually the paragraph's main claim. It gets no
-   `head` and no `relation`.
+1. **Root.** The first proposition of the paragraph that does not hang on a
+   later one: usually simply the first proposition; a fronted clause or a
+   framing fragment that opens the paragraph hangs on the sentence after it,
+   and the root is that sentence. The root gets no `head` and no `relation`.
+   This is a convention, not a judgement of which claim matters most: when a
+   paragraph lays down evidence and then concludes, the evidence is the root
+   and the conclusion hangs on it as `consequence`; when it lays down a fact
+   and then explains it, the fact is the root and the explanation hangs on it
+   as `reason`. The convention makes two annotators choose the same root.
 
 **For each proposition**, answer five questions in this order:
 
@@ -77,6 +83,18 @@ proposition's (or paragraph's) role relative to its head or `also` target.
 `basis`, the right way round: *By Lemma 2, the map is monotone.* has `basis`
 to Lemma 2 (and cites it). Lemma 2 does not get `basis` to the sentence that
 uses it.
+
+Patterns settled in the pilot (only the ten values; there is no `condition`):
+
+| Pattern | Head and relation |
+|---|---|
+| A scope or condition fragment ("Under such circumstances,", "In this case,") | the clause it qualifies, `specification` (it narrows where its head holds) |
+| "Suppose X. Then Y." in a statement | X is the root (or hangs where it belongs); Y hangs on X, `consequence` |
+| A list of assumptions ("Suppose further …", "Finally, suppose …") | each item hangs on the first, `addition` |
+| A case split | the first case hangs on what is split, `specification`; each further case hangs on the first case, `addition` |
+| A proof paragraph | the paragraph hangs on the statement's paragraph, `reason` |
+| A fact, then its explanation | the fact is the root; the explanation hangs on it, `reason` |
+| Evidence, then a conclusion | the evidence comes first; the conclusion hangs on it, `consequence` |
 
 ## Commitment kinds (7)
 

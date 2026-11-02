@@ -35,8 +35,10 @@
 
 ## 7. 試標
 
-- [ ] 7.1 依決策「先試標再全篇標註，第二篇用 psychophysical_representations」，在 repo 外的暫存處試標範例稿件 §3.3 與 psychophysical_representations 的 §2（Affine, gain-control, and Falmagne's power law）：試標節逐句標頭與關係、段頭，其餘部分用機械起點補滿（範例稿件用 `migrate-structure-v2.py` 的輸出；psychophysical_representations 用段首為根、其餘頭為上一句、關係 `continue`），使暫存附檔在 `--partial` 下通過 `validate-structure.py`。完成時：試標報告記錄兩節的 S7 交叉數、需要 `condition` 的句子數、「先鋪事實、下一句再解釋」的句子數與當下選用的關係、段落關係是否夠用。驗證：兩份暫存附檔 `validate-structure.py --partial` 結束碼 0；報告的數字寫進本任務的完成紀錄（只記數字與位置編號）。
-- [ ] 7.2 依試標報告決定詞彙：需要新增或修改關係時，用 `/spectra-ingest` 修訂 spec 與 design，再同步 `validate-structure.py` 常數、1.1 與 1.2 的文件與 3.x 的測試；不需要時在完成紀錄寫明理由。驗證：`spectra validate add-discourse-dependency-tree` 通過，`pytest tests/` 全綠。
+- [x] 7.1 依決策「先試標再全篇標註，第二篇用 psychophysical_representations」，在 repo 外的暫存處試標範例稿件 §3.3 與 psychophysical_representations 的 §2（Affine, gain-control, and Falmagne's power law）：試標節逐句標頭與關係、段頭，其餘部分用機械起點補滿（範例稿件用 `migrate-structure-v2.py` 的輸出；psychophysical_representations 用段首為根、其餘頭為上一句、關係 `continue`），使暫存附檔在 `--partial` 下通過 `validate-structure.py`。完成時：試標報告記錄兩節的 S7 交叉數、需要 `condition` 的句子數、「先鋪事實、下一句再解釋」的句子數與當下選用的關係、段落關係是否夠用。驗證：兩份暫存附檔 `validate-structure.py --partial` 結束碼 0；報告的數字寫進本任務的完成紀錄（只記數字與位置編號）。
+  - 完成紀錄（2026-11-02，暫存區在 repo 外）：範例稿件 §3.3 以 `migrate-structure-v2.py` 的輸出為起點（遷移本身 S1–S8 全過，複查 30 句、16 段、3 節），試標 #210–#245（36 句、5 段）：S7 交叉 0（句子弧與段落弧）；頭在後面 4 句（#211、#215、#220、#221）；需要 `condition` 的 1 句（#220）；「先鋪事實、下一句再解釋」1 處（#214／#216），事實當段根、解釋用 `reason` 即可；段根有歧義的 2 段（證據 → 結論，可反向標）；段落關係夠用（specification、consequence、sequence、addition，另有 1 個非相鄰段頭）。暫存附檔不加 `--partial` 結束碼 0。psychophysical_representations §2 在重排副本上試標（#41–#61，21 句、8 段）：S7 交叉 0；頭在後面 0；3 個「Suppose …」以段根加 `consequence` 表達，不需要 `condition`；分案 2 處（#58、#59）用 `specification`／`addition` 略嫌勉強；證明段以 `reason` 掛在敘述段上。暫存附檔 `--partial` 結束碼 0。另發現阻礙：該稿帳冊行序不是閱讀順序（364 行中 363 行重排後換位，區塊依「敘述＋附錄證明」排），全篇標註前須先決定是否把 `main.jsonl` 重排成閱讀順序（8.3）。
+- [x] 7.2 依試標報告決定詞彙：需要新增或修改關係時，用 `/spectra-ingest` 修訂 spec 與 design，再同步 `validate-structure.py` 常數、1.1 與 1.2 的文件與 3.x 的測試；不需要時在完成紀錄寫明理由。驗證：`spectra validate add-discourse-dependency-tree` 通過，`pytest tests/` 全綠。
+  - 完成紀錄（2026-11-02）：不改詞彙，spec 不需修訂。理由：(1) `condition` 只出現 1 次（#220），範圍或條件片語以 `specification` 表達（它限縮頭的適用範圍），數學的「Suppose X. Then Y.」以 X 為段根、Y 用 `consequence`；(2) 先鋪事實再解釋不需要新關係，事實當段根、解釋用 `reason`；(3) 段根歧義以標註慣例解決：段根取該段第一個不掛在後一句上的命題，結論用 `consequence` 掛在證據上；(4) 分案：第一個分案用 `specification` 掛在前提上，其餘分案用 `addition`。以上寫進 vocabulary.md 與 STRUCTURE.md（含 §3.3 例子改為 #214 為根、#220 用 `specification`），design 的 Open Questions 同步記為已解決。
 
 ## 8. 全篇標註與量測
 

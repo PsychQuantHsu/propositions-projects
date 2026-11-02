@@ -175,7 +175,15 @@ a paragraph root, position 11 is a root with two `also` entries.)
   "Under such circumstances,") hangs on the sentence after it. The relation is
   recorded on the dependent, so an edge has one spelling only.
 - **The paragraph root** is the proposition everything else in the paragraph
-  hangs on, directly or through others: usually its main claim. It has no head.
+  hangs on, directly or through others. By convention it is the first
+  proposition of the paragraph that does not hang on a later one, so that two
+  annotators choose the same root: evidence laid down first is the root and the
+  conclusion hangs on it (`consequence`); a fact laid down first is the root and
+  its explanation hangs on it (`reason`). It has no head.
+- **Scope and condition fragments** ("Under such circumstances,") hang on the
+  clause they qualify with `specification`; there is no separate condition
+  relation. The construct skill's `references/vocabulary.md` lists the other
+  settled patterns (assumption lists, case splits, proofs).
 - Clause-level propositions have heads too. When the ledger splits one sentence
   into two propositions, one is the head of the other; the clearest connectives
   often sit inside a sentence ("…; rather, …", "That is, …").
@@ -329,22 +337,22 @@ paragraph A  (#210-#213)    root #210 ("We noticed that …")
   #212 -consequence-> #210            ("… cannot be overlooked")
     #211 -addition-> #212             ("In addition to considering …,"; head after it)
     #213 -consequence-> #212          ("We now examine an alternative explanation.") opens an announcement
-paragraph B  (#214-#223)    root #216 ("a possible explanation … is that")    B -specification-> A
-  #214 -continue-> #216               (the counts the explanation is about; head after it)
-  #215 -reason-> #216                 ("Because …,"; head after it)
-  #217 -restatement-> #216            ("That is,")
-  #218 -restatement-> #216            ("In other words,")
-    #219 -contrast-> #218             ("Rather,")
-  #222 -consequence-> #216            (the prediction drawn from the explanation)
-    #220 -continue-> #222             ("Under such circumstances,"; head after it)
-    #221 -reason-> #222               ("since …,"; head after it)
-    #223 -contrast-> #222             (the test rejects the prediction)
+paragraph B  (#214-#223)    root #214 (the counts of undetermined cases)        B -specification-> A
+  #216 -reason-> #214                 ("a possible explanation … is that"; explains the counts)
+    #215 -reason-> #216               ("Because …,"; head after it)
+    #217 -restatement-> #216          ("That is,")
+      #218 -restatement-> #217        ("In other words,")
+        #219 -contrast-> #218         ("Rather,")
+    #222 -consequence-> #216          (the prediction drawn from the explanation)
+      #220 -specification-> #222     ("Under such circumstances,"; head after it)
+      #221 -reason-> #222             ("since …,"; head after it)
+      #223 -contrast-> #222           (the test rejects the prediction)
 paragraph C  (#224-…)       root #224 ("The above results indicated")       C -consequence-> B
 ```
 
 No arcs cross. #216 discharges the announcement opened by #213, one paragraph
 later; #223 discharges the hypothesis #216 opened and a plan item opened at the
-start of §3. At #221 the right frontier is #221, #216; #220 and #221 are
+start of §3. At #221 the right frontier is #221, #216, #214; #220 and #221 are
 pending, so the next proposition (#222) is their head and hangs on #216.
 
 ## Validator

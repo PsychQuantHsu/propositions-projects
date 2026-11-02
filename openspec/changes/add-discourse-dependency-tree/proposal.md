@@ -8,12 +8,12 @@
 - **BREAKING** 關係詞彙由 12 個改成 10 個：9 個內容關係（`continue`、`restatement`、`specification`、`instance`、`addition`、`contrast`、`reason`、`consequence`、`sequence`）加 `basis`（被指向的句子提供這一句用到的定義、結果、公理或分案）。`start`、`shift`、`return` 不再是標籤，改由樹推出。
 - **BREAKING** `structure.json` 的 `structure_version` 改為 `"2.0"`；新增 `paragraphs` 清單（`id`、`first_prop`、選填 `head`、`relation`）；`sections[]` 新增 `parent`。段落是封閉子樹：一句的頭只能在同一段內，段落的頭只能在同一節內，段落不跨節。1.0 的附檔不再被接受，檢查器會指向遷移工具。
 - 檢查規則：S2 改為檢查頭與關係（每段一個根、頭不出段、無環、`pending` 只在 `--partial`）；S5 加入段落計畫與章節 `parent`；新增 S7（交叉弧，只警告並計數）與 S8（標成 `basis` 的邊不在帳冊 `cites` 裡時警告）。S1、S3、S4、S6 不變。
-- 狀態查詢新增：位置 t 所在的段落與段根、右邊緣（從 t 沿著頭往上到段根，再沿段頭到節根、沿 `parent` 到全文）、還在等頭的句子、每個承諾的範圍（開出它的段落與章節）。新增 `--order kind|scope`：`kind` 為現行排序（預設）；`scope` 為「範圍越內層越前，同範圍先開先排」。
+- 狀態查詢新增：位置 t 所在的段落與段根、右邊緣（從 t 沿著頭往上到段根，再沿段頭到節根、沿 `parent` 到全文）、還在等頭的句子、每個承諾的範圍（開出它的段落與章節）。新增 `--order kind|scope`：`kind` 為 0.6.0 的排序；`scope` 為「範圍越內層越前，同範圍先開先排」，在範例稿件上命中較多（94 對 89／231），為預設。
 - 新增 `derive-paragraphs.py`：由 tex 空行與帳冊 `location` 推出預設段落清單。
 - 新增 `migrate-structure-v2.py`：把 1.0 附檔機械地轉成 2.0，並列出需要人工複查的記錄。
 - 新增 `structure-metrics.py`：報告交叉弧比例、右邊緣長度分布、兩種承諾排序的命中數、關係與頭方向的計數。
 - construct skill：annotate 模式改標頭、段落與章節樹；next 模式用右邊緣、等頭的句子與承諾提出候選，每個候選說明它掛在右邊緣的哪個節點上。
-- 驗收：範例稿件（Cheng, Lay, Hsu, & Tsai, 2021）重新標註、`PsychQuantHsu/psychophysical_representations` 全篇標註，兩篇都通過檢查；以 `structure-metrics.py` 報告交叉弧比例（超過 5% 須重新檢討模型）、右邊緣中位長度與排序命中數；`scope` 排序在範例稿件 231 個位置上贏過現行的 89 個命中，才把它改成預設。
+- 驗收：範例稿件（Cheng, Lay, Hsu, & Tsai, 2021）重新標註、`PsychQuantHsu/psychophysical_representations` 全篇標註，兩篇都通過檢查；以 `structure-metrics.py` 報告交叉弧比例（超過 5% 須重新檢討模型）、右邊緣中位長度與排序命中數；`scope` 排序在範例稿件 231 個位置上贏過現行的 89 個命中，才把它改成預設（量得 94，已改為預設）。
 
 ## Capabilities
 

@@ -99,7 +99,7 @@ S8 檢查方向一致：一條 `basis` 邊（樹上或 `also`）的目標必須�
 
 承諾的範圍是開出它的那一句所在的段與節。狀態查詢新增 `--order scope`：先依種類排序，同種類內依「開出承諾的章節與 t 所在章節的最近共同祖先」由深到淺，再依開出位置先開先排。這條規則在 #31 的資料上對應「巢狀項先內層、兄弟項照順序」，但預期 #209 那類交錯情形仍會排錯。
 
-預設維持 `--order kind`（現行）。只有在範例稿件 2.0 標註上，`scope` 的命中數嚴格大於 `kind` 的命中數，才用 `/spectra-ingest` 把預設改成 `scope`；否則維持現狀，把量到的數字記在 #31。
+只有在範例稿件 2.0 標註上，`scope` 的命中數嚴格大於 `kind` 的命中數，才把預設改成 `scope`；否則維持 `kind`，把量到的數字記在 #31。量測結果（任務 8.6）：`kind` 89／231、`scope` 94／231，預設改為 `scope`。
 
 ### 升版 2.0 只遷移不並存
 
@@ -149,7 +149,7 @@ S8 檢查方向一致：一條 `basis` 邊（樹上或 `also`）的目標必須�
 
 `structure_version` 不是 `"2.0"` 時結束碼 2，訊息含 `migrate-structure-v2.py`。
 
-**狀態查詢（`structure-state.py`）**：在 1.0 的輸出之外，JSON 新增 `paragraph`（`id`、根的位置與 id，根尚未寫出時為 null）、`frontier`（依序的節點清單，每個節點含 `level`：`sentence`／`paragraph`／`section`，以及位置與 id）、`pending`（頭為 `pending` 或頭在 t 之後的句子）、每個未兌現承諾的 `scope`（開出句的段落 id 與章節 id）、`order`（本次使用的排序）。`relation` 對段根輸出 `root`。新增 `--order kind|scope`，預設 `kind`。先套用 S1–S3 與 S2、S5 的樹結構部分，失敗時結束碼 1。
+**狀態查詢（`structure-state.py`）**：在 1.0 的輸出之外，JSON 新增 `paragraph`（`id`、根的位置與 id，根尚未寫出時為 null）、`frontier`（依序的節點清單，每個節點含 `level`：`sentence`／`paragraph`／`section`，以及位置與 id）、`pending`（頭為 `pending` 或頭在 t 之後的句子）、每個未兌現承諾的 `scope`（開出句的段落 id 與章節 id）、`order`（本次使用的排序）。`relation` 對段根輸出 `root`。新增 `--order kind|scope`，預設 `scope`（任務 8.6 的量測結果）。先套用 S1–S3 與 S2、S5 的樹結構部分，失敗時結束碼 1。
 
 **`derive-paragraphs.py`**：輸入 `--jsonl` 與 `--tex`，選填 `--structure`（讀取章節以對齊）。把 tex 的連續非空行視為一段，依每句 `location` 的起始行歸段，跳過沒有句子的段，章節起點落在段中時從該處切開；輸出 `paragraphs` 清單（id 為 `p-1`、`p-2`…）到 stdout 的 JSON。location 無法解析、落在段落之外，或指向主檔以外的檔案（多檔稿件；`main.tex:` 前綴視為主檔）時以結束碼 2 拒絕。
 

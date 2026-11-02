@@ -18,10 +18,12 @@ proposition that hangs on an earlier one hangs on a sentence node of this list.
 Pending records are the records at or before t whose head is `pending` or comes
 after t: the next proposition is usually their head.
 
-`--order kind` (default) orders open commitments by kind — announcement,
-hypothesis, plan, question, aim, setup — then by opening position, earliest
-first. `--order scope` keeps the kind order and, within a kind, puts first the
-commitments whose opening section shares the deepest section with t.
+`--order scope` (default) orders open commitments by kind — announcement,
+hypothesis, plan, question, aim, setup — then, within a kind, puts first the
+commitments whose opening section shares the deepest section with t, then by
+opening position, earliest first. `--order kind` drops the section step (the
+0.6.0 ordering). On the reference manuscript scope hits 94 of 231 positions,
+kind 89.
 
 The sidecars must pass S1-S3 and the structural checks of S2 and S5 of
 validate-structure.py; `head: pending` is accepted as with --partial.
@@ -94,7 +96,7 @@ def _paragraph_frontier(analysis, p_index: int) -> list[int]:
     return frontier(p_index, heads, root)
 
 
-def compute_state(ledger: Path, structure_path: Path, discourse_path: Path, at: str, order: str = "kind") -> dict:
+def compute_state(ledger: Path, structure_path: Path, discourse_path: Path, at: str, order: str = "scope") -> dict:
     analysis = load_checked(ledger, structure_path, discourse_path)
     live, positions = analysis.ledger.live, analysis.positions
     if not live:
@@ -198,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Report what the article owes the reader at a position (format 2.0).")
     p.add_argument("--jsonl", type=Path, required=True, help="the ledger (main.jsonl)")
     p.add_argument("--at", required=True, help="a proposition UUID, or `end`")
-    p.add_argument("--order", choices=ORDERS, default="kind", help="ordering of open commitments (default: kind)")
+    p.add_argument("--order", choices=ORDERS, default="scope", help="ordering of open commitments (default: scope)")
     p.add_argument("--structure", type=Path, help="structure.json (default: beside the ledger)")
     p.add_argument("--discourse", type=Path, help="discourse.jsonl (default: beside the ledger)")
     p.add_argument("--format", choices=("text", "json"), default="text")

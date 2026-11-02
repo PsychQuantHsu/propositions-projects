@@ -6,8 +6,8 @@ Requirement "The state query reports what the article owes at a position".
 At position t (t included) the query reports the section and paragraph, t's
 relation, the right frontier, the pending records, the commitments still open
 (with their scope), the future-work list and whether the thesis has appeared.
-`--order kind` (default) orders open commitments by kind, then opening position;
-`--order scope` puts commitments from a deeper shared section first within a kind.
+`--order scope` (default, task 8.6) puts commitments from a deeper shared section first within a kind;
+`--order kind` orders them by kind, then opening position.
 """
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def test_spec_example_order_and_gaps(tmp_path):
     ]
     assert [c["id"] for c in report["future_work"]] == ["c-fw-1"]
     assert report["open_commitments"][1]["opened_by"] == pid(2)
-    assert report["order"] == "kind"
+    assert report["order"] == "scope"
 
 
 @pytest.mark.parametrize("order", ["kind", "scope"])

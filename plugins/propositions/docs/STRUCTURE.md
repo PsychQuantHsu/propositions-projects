@@ -404,7 +404,7 @@ python3 plugins/propositions/scripts/structure-state.py \
 ```
 
 `--at` takes a proposition's full UUID or `end`; `--order kind|scope` chooses
-the ordering of open commitments (default `kind`); `--format text|json` and the
+the ordering of open commitments (default `scope`); `--format text|json` and the
 sidecar paths work as in the validator. The query first applies S1–S3 and the
 section and paragraph plan of S5, accepting `head: "pending"` as `--partial`
 does, and exits `1` if they fail: fix the structure before asking about it.
@@ -434,18 +434,20 @@ hangs on a sentence node of the right frontier. That is the mechanical answer
 to "where can the next proposition attach?". When records are pending, the next
 proposition is usually their head.
 
-**Ordering.** With `kind` (the default), open commitments are ordered by kind,
-from most to least pressing:
+**Ordering.** With `kind`, open commitments are ordered by kind, from most to
+least pressing:
 
 `announcement` → `hypothesis` → `plan` → `question` → `aim` → `setup`
 
 and within a kind by the position that opened them, earliest first. With
-`scope`, the kind order stays, and within a kind the commitments whose opening
+`scope` (the default), the kind order stays, and within a kind the commitments whose opening
 section shares the deepest section with t come first (a section contains its
 own range and every section under it; the depth of a top-level section is 1,
 and 0 means no shared section), then earliest first. `scope` puts a plan opened
 at the start of the current section before a plan item left over from the
-introduction. `future_work` takes no part in the ordering. The first open
+introduction. On the reference manuscript the first open commitment is the
+next one kept at 94 of 231 positions under `scope` and 89 under `kind`, so
+`scope` is the default. `future_work` takes no part in the ordering. The first open
 commitment in the list is the mechanical answer to "what should the next
 proposition advance?"; the `propositions:construct` skill starts from that
 answer and adds judgement from the section's role and the frontier.

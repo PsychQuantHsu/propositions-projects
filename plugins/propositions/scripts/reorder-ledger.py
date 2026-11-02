@@ -23,7 +23,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -73,6 +76,19 @@ def plan(raw_lines: list[str]) -> tuple[list[str], list[int]]:
     return result, sorted(line for line, n in counts.items() if n > 1)
 
 
+def write_atomically(path: Path, content: str) -> None:
+    """Replace path through an unpredictable temp file beside it, keeping its mode."""
+    fd, temp = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.")
+    try:
+        os.fchmod(fd, stat.S_IMODE(path.stat().st_mode))
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.replace(temp, path)
+    except BaseException:
+        Path(temp).unlink(missing_ok=True)
+        raise
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Put a ledger's lines into TeX reading order (dry run by default).")
     p.add_argument("--jsonl", type=Path, required=True, help="the ledger (main.jsonl)")
@@ -98,9 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{moved} line(s) move")
     if not args.write:
         return EXIT_WOULD_MOVE
-    temp = args.jsonl.with_suffix(".jsonl.reorder-tmp")
-    temp.write_text("".join(result), encoding="utf-8")
-    temp.replace(args.jsonl)
+    write_atomically(args.jsonl, "".join(result))
     print(f"written: {args.jsonl}")
     return EXIT_OK
 

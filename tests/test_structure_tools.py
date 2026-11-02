@@ -46,6 +46,14 @@ def test_reorder_write_keeps_lines_byte_identical(tmp_path: Path) -> None:
     assert set(path.read_text().splitlines()) == lines
 
 
+def test_reorder_write_keeps_mode_and_leaves_no_temp_file(tmp_path: Path) -> None:
+    path = ledger(tmp_path, [{"id": "b", "location": "main.tex:L9"}, {"id": "a", "location": "main.tex:L2"}])
+    path.chmod(0o640)
+    assert run(REORDER, "--jsonl", path, "--write").returncode == 0
+    assert path.stat().st_mode & 0o777 == 0o640
+    assert [p.name for p in tmp_path.iterdir()] == ["main.jsonl"]
+
+
 def test_reorder_in_order_exits_zero(tmp_path: Path) -> None:
     path = ledger(tmp_path, [{"id": "a", "location": "main.tex:L2"}, {"id": "b", "location": "main.tex:L2"}])
     result = run(REORDER, "--jsonl", path)

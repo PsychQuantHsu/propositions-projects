@@ -40,13 +40,16 @@ Operation D          extract → A             日常節奏             送審�
 ## 階段 1.5 — 文章結構（`/propositions:construct`，帳冊完整之後）
 
 帳冊說每一句主張什麼；文章結構說整篇怎麼蓋起來：文章向讀者開了哪些承諾（研究問題、目的、
-假設、宣告的章節計畫、「We now examine …」）、每一節的角色、每一句和上一句的關係。標註模式把
-這三層存成帳冊旁的 `structure.json`／`discourse.jsonl`（不改帳冊），用 `validate-structure.py`
-（S1–S6）檢查：承諾先開後兌現、完整的文章不欠帳。格式與詞彙見 [`STRUCTURE.md`](STRUCTURE.md)。
+假設、宣告的章節計畫、「We now examine …」）、每一節的角色，以及一棵三層的依存樹——每一句在
+段內掛在哪一句上（可在前或在後）、每一段在節內掛在哪一段上、每一節在哪一節底下。標註模式先用
+`derive-paragraphs.py` 從 tex 推出段落，再把這三層存成帳冊旁的 `structure.json`／`discourse.jsonl`
+（格式 2.0，不改帳冊），用 `validate-structure.py`（S1–S8）檢查：承諾先開後兌現、完整的文章不欠帳、
+每段是一棵樹；交叉弧（S7）與帳冊沒 cite 的 `basis`（S8）只警告。`structure-metrics.py` 報告樹合不合用。
+舊的 1.0 附檔用 `migrate-structure-v2.py` 轉換。格式與詞彙見 [`STRUCTURE.md`](STRUCTURE.md)。
 
-寫稿途中用下一步模式：`structure-state.py --at end` 依緊迫程度列出還沒兌現的承諾，skill 據此
-提出至多三個候選下一句（推進哪個承諾、用什麼關係接上），不寫入任何檔案。草稿還沒寫主旨時
-用 `--partial`。
+寫稿途中用下一步模式：`structure-state.py --at end` 列出右邊緣（下一句能掛的位置）、還在等頭的
+子句，以及依緊迫程度排序的未兌現承諾，skill 據此提出至多三個候選下一句（掛在哪裡、推進哪個承諾、
+用什麼關係接上），不寫入任何檔案。草稿還沒寫主旨、或最後一句還在等頭時用 `--partial`。
 
 ## 階段 2 — 日常節奏（每次改 tex）
 

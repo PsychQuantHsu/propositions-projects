@@ -2,52 +2,99 @@
 
 The definitions and boundary notes of every value live in
 `plugins/propositions/docs/STRUCTURE.md`; that file is the reference. This file is
-the decision procedure the construct skill follows when it labels a ledger. The
-three tables below list the same values in the same order as the validator, and
-a test keeps them identical.
+the decision procedure the construct skill follows when it labels a ledger
+(format 2.0: a dependency tree in three levels). The three tables below list the
+same values in the same order as the validator, and a test keeps them identical.
 
-Work proposition by proposition in reading order. For each one, answer four
-questions in this order:
+Start from the paragraph plan that `derive-paragraphs.py` proposes, and change it
+only where a TeX paragraph makes two arguments or two TeX paragraphs make one.
+Then work paragraph by paragraph in reading order.
 
-1. **Relation** — how does it connect to the proposition just before it? Ask the
+**For each paragraph**, before its propositions:
+
+1. **Root.** The first proposition of the paragraph that does not hang on a
+   later one: usually simply the first proposition; a fronted clause or a
+   framing fragment that opens the paragraph hangs on the sentence after it,
+   and the root is that sentence. The root gets no `head` and no `relation`.
+   This is a convention, not a judgement of which claim matters most: when a
+   paragraph lays down evidence and then concludes, the evidence is the root
+   and the conclusion hangs on it as `consequence`; when it lays down a fact
+   and then explains it, the fact is the root and the explanation hangs on it
+   as `reason`. The convention makes two annotators choose the same root.
+
+**For each proposition**, answer five questions in this order:
+
+1. **Head.** If it is not the root: which proposition of the same paragraph
+   does it hang on? It is often the previous one, but take the one it actually
+   explains, restates, gives a reason for or draws a conclusion from. The head
+   may come later: a fronted clause ("Because …,", "Since …,",
+   "Under such circumstances,") hangs on the sentence after it.
+2. **Relation.** What is this proposition's role relative to its head? Ask the
    questions of the relation table in the **priority order** given under the
-   table and take the first "yes", even when a later value also fits. `shift`
-   comes last: use it only when none of the others holds.
-2. **Opens** — does it promise the reader something that comes later? If so,
+   table and take the first "yes", even when a later value also fits.
+3. **Opens** — does it promise the reader something that comes later? If so,
    give each promise an id and a kind from the commitment table.
-3. **Discharges** — does it keep a promise opened earlier? List those ids.
-4. **Section** — is it the first proposition of a section with its own text?
-   If so, the section entry in `structure.json` starts here; pick its role from
-   the role table.
+4. **Discharges** — does it keep a promise opened earlier? List those ids.
+5. **Also** — does it stand in another relation that neither its head nor the
+   ledger's `cites` records (a contrast with a proposition three paragraphs
+   back, say)? Add `{"to": …, "relation": …}`. Do not repeat the head, and do
+   not copy every `cites` entry: `cites` is already recorded.
+
+**For each paragraph after the first in its section**: which earlier or later
+paragraph of the same section does it hang on, and how (a relation from the
+same table)? The section's main paragraph is its root paragraph.
+
+**For each section**: does it sit under another section (a subsection)? Set
+`parent` to that section's id. A subsection whose parent heading has no entry
+of its own (a heading with no propositions of its own) stays top-level.
 
 A connective is evidence, not the answer. "Moreover," usually means `addition`,
-but in a sentence that also says "mentioned in Section 1.2" the priority order
-makes it `return`. Read what the proposition does to the previous one.
+but its head may be a proposition several sentences back. Read what the
+proposition does to its head.
 
-## Relations (12)
+**Drafts.** A clause at the very end of a draft whose head has not been written
+yet gets `"head": "pending"` (and no relation). Only the last paragraph may
+have pending records, and only under `--partial`.
+
+## Relations (10)
 
 The rows are in the validator's order, which is not the order to ask them in
-(see the priority order below the table). These are the only 12 values; do not
-infer a new value from resemblance to a listed one.
+(see the priority order below the table). These are the only 10 values; do not
+infer a new value from resemblance to a listed one. Each value is this
+proposition's (or paragraph's) role relative to its head or `also` target.
 
 | Value | Ask | Not this when |
 |---|---|---|
-| `start` | Is this the first record of the article? | Any other position — a new section is `shift` or a local relation, never `start` |
-| `shift` | Asked last: no row below holds, and the proposition takes up the plan or an open commitment instead of the previous proposition | A local connective joins it to the previous proposition |
-| `continue` | Does it go on with the same topic without a more specific relation? | A connective or the content makes one of the specific rows true |
-| `restatement` | Does it say the same thing again in other words ("That is,", "In other words,")? | It adds detail the previous proposition did not have — `specification` |
-| `specification` | Does it make the previous proposition more specific or detailed? | It is an example of it — `instance` |
-| `instance` | Is it an example of the previous proposition ("To illustrate,", "e.g.")? | It is a further item of the same kind — `addition` |
-| `addition` | Is it another item of the same kind ("Moreover,", "Furthermore,")? | It returns to an earlier thread — `return` outranks it |
-| `contrast` | Does it oppose, concede to, or correct the previous proposition ("However,", "Rather,")? | It gives the cause of the previous proposition — `reason` |
-| `reason` | Does it give the reason or cause of the previous proposition ("because")? | The cause comes first and this proposition is the effect — `consequence` |
-| `consequence` | Does it follow from the previous proposition, including an interpretation drawn from evidence ("Therefore,", "Accordingly,", "These results suggest")? | It only says the same thing again — `restatement` |
-| `sequence` | Is it the next step of a procedure or in time ("We then", "Next,")? | The steps are items of a list, not an order — `addition` |
-| `return` | Does it come back to an earlier thread ("mentioned in Section 1.2", "Recall that")? Set `refers_to` to the proposition it returns to | It only continues the immediately previous proposition |
+| `continue` | Does it go on with the same topic as its head without a more specific relation? | A connective or the content makes one of the specific rows true |
+| `restatement` | Does it say what its head says again in other words ("That is,", "In other words,")? | It adds detail the head did not have — `specification` |
+| `specification` | Does it make its head more specific or detailed? | It is an example of it — `instance` |
+| `instance` | Is it an example of what its head states in general ("To illustrate,", "e.g.")? | It is a further item of the same kind — `addition` |
+| `addition` | Is it another item of the same kind as its head ("Moreover,", "Furthermore,")? | The order of the items is the point — `sequence` |
+| `contrast` | Does it oppose, concede to, or correct its head ("However,", "Rather,")? | It gives the cause of its head — `reason` |
+| `reason` | Does it give the reason or cause of its head, before it ("Because …,") or after it ("…, because …")? | It follows from its head — `consequence` |
+| `consequence` | Does it follow from its head, including an interpretation drawn from evidence ("Therefore,", "Accordingly,", "These results suggest")? | It only says the same thing again — `restatement` |
+| `sequence` | Is it the next step of a procedure or in time after its head ("We then", "Next,")? | The steps are items of a list, not an order — `addition` |
+| `basis` | Does its head (or target) supply a definition, result, axiom or case that this proposition uses, and nothing more specific holds? This proposition should cite the target in `main.jsonl` | A rhetorical relation also holds — that relation wins. Never the other way round: the target is the supplier, this proposition the user |
 
-**Priority order** for annotation: `return` > `restatement` > `specification` > `instance` >
-`contrast` > `reason` > `consequence` > `sequence` > `addition` > `continue`,
-with `shift` only when none of these holds.
+**Priority order** for annotation: `restatement` > `specification` > `instance` >
+`contrast` > `reason` > `consequence` > `sequence` > `basis` > `addition` >
+`continue`.
+
+`basis`, the right way round: *By Lemma 2, the map is monotone.* has `basis`
+to Lemma 2 (and cites it). Lemma 2 does not get `basis` to the sentence that
+uses it.
+
+Patterns settled in the pilot (only the ten values; there is no `condition`):
+
+| Pattern | Head and relation |
+|---|---|
+| A scope or condition fragment ("Under such circumstances,", "In this case,") | the clause it qualifies, `specification` (it narrows where its head holds) |
+| "Suppose X. Then Y." in a statement | X is the root (or hangs where it belongs); Y hangs on X, `consequence` |
+| A list of assumptions ("Suppose further …", "Finally, suppose …") | each item hangs on the first, `addition` |
+| A case split | the first case hangs on what is split, `specification`; each further case hangs on the first case, `addition` |
+| A proof paragraph | the paragraph hangs on the statement's paragraph, `reason` |
+| A fact, then its explanation | the fact is the root; the explanation hangs on it, `reason` |
+| Evidence, then a conclusion | the evidence comes first; the conclusion hangs on it, `consequence` |
 
 ## Commitment kinds (7)
 
@@ -69,7 +116,9 @@ Discharge a commitment at the proposition that keeps it: the answer to the
 question, the report that the aim was carried out, the test result (support or
 rejection both count), the first proposition of the announced part, the first
 use of the setup. A proposition never discharges a commitment it opens itself.
-`future_work` is never discharged.
+`future_work` is never discharged. A promise made at the end of a paragraph and
+kept in the next one is an `announcement`; keep it with the proposition that
+delivers it, not with the first sentence of the next paragraph by default.
 
 ## Section roles (10)
 
@@ -96,6 +145,9 @@ extracted into the ledger, so it needs no section entry.
 
 ## Recording the decision
 
-Add a `note` to a record whenever the choice was close (two rows of the relation
-table both held, or a commitment could be read as two kinds). The note names the
-runner-up and why it lost. Notes are what a reviewer reads to check the labels.
+Add a `note` to a record whenever the choice was close (two heads were
+plausible, two rows of the relation table both held, or a commitment could be
+read as two kinds). The note names the runner-up and why it lost. Notes are
+what a reviewer reads to check the labels. When S7 reports a crossing, look at
+both arcs first: a crossing is often a head chosen one sentence too far; keep
+it only when the text really is not tree-shaped, and say so in a note.

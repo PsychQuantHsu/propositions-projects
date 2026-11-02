@@ -1,32 +1,39 @@
 #!/usr/bin/env python3
-"""validate-structure.py — check a ledger's article-structure sidecars.
+"""validate-structure.py — check a ledger's article-structure sidecars (format 2.0).
 
 The propositions ledger (`main.jsonl`) says what each proposition claims. The
 structure sidecars say how the article is built: `structure.json` holds the
-section plan and the thesis, `discourse.jsonl` holds one record per proposition
-with its relation to the previous proposition and the commitments it opens and
-discharges. Format and vocabularies: `plugins/propositions/docs/STRUCTURE.md`.
-`validate-propositions.py` does not read these files.
+thesis, the section plan and the paragraph plan; `discourse.jsonl` holds one
+record per proposition with its head inside the paragraph, its relation to that
+head, and the commitments it opens and discharges. Format and vocabularies:
+`plugins/propositions/docs/STRUCTURE.md`. `validate-propositions.py` does not
+read these files.
 
 Rules:
     S1  discourse.jsonl has exactly one record per non-retired ledger
         proposition, in ledger order (missing / extra / duplicate / out of order)
-    S2  `relation` is one of the twelve values; `start` exactly once, first;
-        `return` carries `refers_to` naming an earlier proposition; no other
-        relation carries `refers_to`
+    S2  relations among the ten values, on records with a head and nowhere
+        else; `refers_to` is gone; each paragraph is a dependency tree with one
+        root, heads inside the paragraph and no cycle; `head: pending` only
+        with --partial and only in the last paragraph; `also` entries valid
     S3  commitment ids well-formed and unique, kinds among the seven; every
         discharge names a commitment opened by a strictly earlier record;
         `future_work` is never discharged
     S4  every question / aim / hypothesis / plan / announcement is discharged
         (error), every setup is discharged (warning); with --partial both are
         reported as information only; future_work is never reported
-    S5  structure.json: structure_version, non-empty thesis of non-retired
-        propositions, sections with unique ids, one of the ten roles, and
-        first_prop values that start at the first proposition and strictly
-        increase in ledger order; an `abstract` section only as the first
-        entry, and no proposition inside it opens a commitment
+    S5  structure.json: non-empty thesis, a section plan (unique ids, one of
+        the ten roles, increasing first_prop, `parent` naming an earlier
+        section, `abstract` only first and opening nothing) and a paragraph
+        plan (increasing first_prop starting at the first proposition, no
+        paragraph across a section boundary, one root paragraph per section,
+        paragraph heads inside the section, no cycle)
     S6  an announcement is first discharged in the section that opened it or
         the next one (warning only)
+    S7  crossing arcs, between records of one paragraph or paragraphs of one
+        section (warning only)
+    S8  a `basis` edge whose target the proposition does not cite in
+        main.jsonl (warning only)
 
 Usage:
     python3 validate-structure.py --jsonl main.jsonl [--structure structure.json]
@@ -35,21 +42,27 @@ Usage:
 Exit code:
     0 — no rule fails (warnings and information allowed)
     1 — at least one rule fails
-    2 — an input file is missing, unreadable or not valid JSON
+    2 — an input file is missing, unreadable or not valid JSON, or
+        structure_version is not "2.0" (version 1.0: run migrate-structure-v2.py)
 """
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from _lib.structure_io import (  # noqa: E402,F401  (re-exported for structure-state.py and structure-metrics.py)
+    STRUCTURE_VERSION, InputError, Ledger, load_discourse, load_ledger, load_structure,
+)
+from _lib.structure_tree import PENDING, crossing_pairs, unit_index  # noqa: E402
+
 RELATIONS = (
-    "start", "shift", "continue", "restatement", "specification", "instance",
-    "addition", "contrast", "reason", "consequence", "sequence", "return",
+    "continue", "restatement", "specification", "instance", "addition",
+    "contrast", "reason", "consequence", "sequence", "basis",
 )
 KINDS = ("question", "aim", "hypothesis", "plan", "announcement", "setup", "future_work")
 ROLES = (
@@ -57,74 +70,23 @@ ROLES = (
     "proofs", "discussion", "conclusion", "appendix",
 )
 MUST_KEEP = ("question", "aim", "hypothesis", "plan", "announcement")
-STRUCTURE_VERSIONS = ("1.0",)
 COMMITMENT_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 RULES = (
     ("S1", "records-cover-ledger"),
-    ("S2", "relations-closed"),
+    ("S2", "paragraph-trees"),
     ("S3", "commitments-opened-first"),
     ("S4", "commitments-kept"),
-    ("S5", "section-plan"),
+    ("S5", "section-and-paragraph-plan"),
     ("S6", "announcements-nearby"),
+    ("S7", "crossing-arcs"),
+    ("S8", "basis-cites"),
 )
 EXIT_OK, EXIT_FAIL, EXIT_USAGE = 0, 1, 2
-
-
-class InputError(Exception):
-    """A file is missing, unreadable or not valid JSON; exit 2."""
+MISSING = object()
 
 
 def vocab(values: tuple[str, ...]) -> str:
     return "{" + ", ".join(values) + "}"
-
-
-# ---------- loading ----------
-
-
-def load_ledger(path: Path) -> tuple[list[str], set[str]]:
-    """(non-retired ids in ledger order, every id) via validate-propositions' loader."""
-    if not path.is_file():
-        raise InputError(f"ledger not found: {path}")
-    spec = importlib.util.spec_from_file_location(
-        "validate_propositions", Path(__file__).parent / "validate-propositions.py"
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    try:
-        _, props, _ = module.load_props_jsonl(path)
-    except ValueError as exc:
-        raise InputError(f"{path}: {exc}") from exc
-    live = [p["id"] for p in props if "retired" not in p]
-    return live, {p["id"] for p in props}
-
-
-def load_discourse(path: Path) -> list[tuple[int, dict]]:
-    if not path.is_file():
-        raise InputError(f"discourse sidecar not found: {path}")
-    records = []
-    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if not raw.strip():
-            continue
-        try:
-            obj = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise InputError(f"{path.name} line {lineno}: invalid JSON ({exc.msg})") from exc
-        if not isinstance(obj, dict):
-            raise InputError(f"{path.name} line {lineno}: not a JSON object")
-        records.append((lineno, obj))
-    return records
-
-
-def load_structure(path: Path) -> dict:
-    if not path.is_file():
-        raise InputError(f"structure sidecar not found: {path}")
-    try:
-        obj = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise InputError(f"{path.name}: invalid JSON at line {exc.lineno} ({exc.msg})") from exc
-    if not isinstance(obj, dict):
-        raise InputError(f"{path.name}: not a JSON object")
-    return obj
 
 
 # ---------- report ----------
@@ -137,6 +99,7 @@ class Problem:
     position: int | None = None
     prop_id: str | None = None
     line: int | None = None
+    tag: str = ""  # "thesis" or "abstract": S5 problems that do not make the plan unusable
 
     def where(self) -> str:
         if self.position is not None:
@@ -155,8 +118,8 @@ class Report:
         sev = {p.severity for p in self.problems[rule]}
         return "FAIL" if "error" in sev else "WARN" if "warning" in sev else "PASS"
 
-    def failed(self) -> bool:
-        return any(self.status(r) == "FAIL" for r, _ in RULES)
+    def failed(self, rules: tuple[str, ...] | None = None) -> bool:
+        return any(self.status(r) == "FAIL" for r in (rules or tuple(r for r, _ in RULES)))
 
 
 @dataclass(frozen=True)
@@ -172,6 +135,15 @@ class Record:
 
     def where(self) -> str:
         return self.problem("info", "").where()
+
+
+@dataclass(frozen=True)
+class Paragraph:
+    pid: str
+    first: int
+    head: int | None  # index into the paragraph list, None for a section's root paragraph
+    relation: str | None
+    section: int | None  # index into the section plan, None when the plan is unusable
 
 
 # ---------- S1 ----------
@@ -203,26 +175,123 @@ def check_s1(records: list[Record], live: list[str], report: Report) -> None:
 # ---------- S2 ----------
 
 
-def check_s2(records: list[Record], positions: dict[str, int], report: Report) -> None:
+def _relation_problem(rel: object) -> str | None:
+    if not isinstance(rel, str) or rel not in RELATIONS:
+        return f"relation {rel!r} not in {vocab(RELATIONS)}"
+    return None
+
+
+def _check_also(rec: Record, positions: dict[str, int], head: object, report: Report) -> None:
+    raw = rec.data.get("also")
+    if raw is None:
+        return
+    if not isinstance(raw, list):
+        report.add("S2", rec.problem("error", "`also` must be a list of {to, relation}"))
+        return
+    for entry in raw:
+        to = entry.get("to") if isinstance(entry, dict) else None
+        rel = entry.get("relation") if isinstance(entry, dict) else None
+        if not isinstance(to, str) or to not in positions:
+            report.add("S2", rec.problem("error", f"also target {to!r} is not a non-retired ledger proposition"))
+        elif to == rec.data.get("prop_id"):
+            report.add("S2", rec.problem("error", "an `also` entry names the record itself"))
+        elif to == head:
+            report.add("S2", rec.problem("error", "an `also` entry repeats the record's head"))
+        problem = _relation_problem(rel)
+        if problem:
+            report.add("S2", rec.problem("error", f"also: {problem}"))
+
+
+def head_map(records: list[Record], positions: dict[str, int], para_firsts: list[int]) -> dict[int, object]:
+    """position -> head position (same paragraph), None (root) or PENDING; invalid heads are left out."""
+    out: dict[int, object] = {}
     for rec in records:
-        rel = rec.data.get("relation")
-        if not isinstance(rel, str) or rel not in RELATIONS:
-            report.add("S2", rec.problem("error", f"relation {rel!r} not in {vocab(RELATIONS)}"))
-        elif rec.index == 0 and rel != "start":
-            report.add("S2", rec.problem("error", "the first record must be `start`"))
-        elif rec.index > 0 and rel == "start":
-            report.add("S2", rec.problem("error", "`start` is allowed only on the first record"))
-        target = rec.data.get("refers_to")
-        if rel == "return":
-            target_pos = positions.get(target) if isinstance(target, str) else None
-            if target is None:
-                report.add("S2", rec.problem("error", "`return` needs `refers_to`"))
-            elif target_pos is None:
-                report.add("S2", rec.problem("error", f"refers_to {target!r} is not a non-retired ledger proposition"))
-            elif rec.position is not None and target_pos >= rec.position:
-                report.add("S2", rec.problem("error", f"refers_to must name an earlier proposition (names #{target_pos})"))
-        elif "refers_to" in rec.data:
-            report.add("S2", rec.problem("error", "`refers_to` is allowed only with `return`"))
+        if rec.position is None:
+            continue
+        head = rec.data.get("head", MISSING)
+        if head is MISSING:
+            out[rec.position] = None
+        elif head == PENDING:
+            out[rec.position] = PENDING
+        elif isinstance(head, str) and head in positions:
+            hp = positions[head]
+            if hp != rec.position and unit_index(para_firsts, hp) == unit_index(para_firsts, rec.position):
+                out[rec.position] = hp
+    return out
+
+
+def check_s2(records: list[Record], positions: dict[str, int], paragraphs: list[Paragraph],
+             partial: bool, report: Report) -> None:
+    firsts = [p.first for p in paragraphs]
+    last_paragraph = len(paragraphs) - 1
+    for rec in records:
+        if "refers_to" in rec.data:
+            report.add("S2", rec.problem("error", "`refers_to` is not a version 2.0 field; use `head` (and `also`)"))
+        head = rec.data.get("head", MISSING)
+        rel = rec.data.get("relation", MISSING)
+        here = unit_index(firsts, rec.position) if firsts and rec.position is not None else None
+        if head is MISSING:
+            if rel is not MISSING:
+                report.add("S2", rec.problem("error", "a root (no head) carries no relation"))
+        elif head == PENDING:
+            if not partial:
+                report.add("S2", rec.problem("error", "`head` is `pending`, which is allowed only with --partial"))
+            elif here is not None and here != last_paragraph:
+                report.add("S2", rec.problem("error", "`head: pending` is allowed only in the last paragraph"))
+            if rel is not MISSING and _relation_problem(rel):
+                report.add("S2", rec.problem("error", _relation_problem(rel)))
+        else:
+            hp = positions.get(head) if isinstance(head, str) else None
+            if hp is None:
+                report.add("S2", rec.problem("error", f"head {head!r} is not a non-retired ledger proposition or `pending`"))
+            elif hp == rec.position:
+                report.add("S2", rec.problem("error", "the record names itself as its head"))
+            elif here is not None and unit_index(firsts, hp) != here:
+                report.add("S2", rec.problem(
+                    "error", f"head #{hp} is in paragraph `{paragraphs[unit_index(firsts, hp)].pid}`, "
+                             f"not in this record's paragraph `{paragraphs[here].pid}`"))
+            if rel is MISSING:
+                report.add("S2", rec.problem("error", "a record with a head needs a relation"))
+            elif _relation_problem(rel):
+                report.add("S2", rec.problem("error", _relation_problem(rel)))
+        _check_also(rec, positions, head, report)
+    if not paragraphs:
+        report.add("S2", Problem("warning", "paragraph trees not evaluated: the paragraph plan is invalid (see S5)"))
+        return
+    _check_trees(records, positions, paragraphs, partial, report)
+
+
+def _check_trees(records: list[Record], positions: dict[str, int], paragraphs: list[Paragraph],
+                 partial: bool, report: Report) -> None:
+    firsts = [p.first for p in paragraphs]
+    heads = head_map(records, positions, firsts)
+    by_pos = {r.position: r for r in records if r.position is not None}
+    roots: dict[int, list[int]] = {i: [] for i in range(len(paragraphs))}
+    for pos, head in heads.items():
+        if head is None:
+            roots[unit_index(firsts, pos)].append(pos)
+    for i, found in roots.items():
+        last_partial = partial and i == len(paragraphs) - 1
+        if len(found) == 1 or (last_partial and not found):
+            continue
+        listed = ", ".join(f"#{p}" for p in found) or "none"
+        message = f"paragraph `{paragraphs[i].pid}` has {len(found)} roots ({listed}); exactly one record per paragraph has no head"
+        target = by_pos.get(found[0]) if found else None
+        report.add("S2", target.problem("error", message) if target else Problem("error", message))
+    reported: set[frozenset[int]] = set()
+    for start in heads:
+        path: list[int] = []
+        current = start
+        while isinstance(current, int) and current not in path:
+            path.append(current)
+            current = heads.get(current)
+        if isinstance(current, int):  # revisited: a cycle
+            cycle = frozenset(path[path.index(current):])
+            if cycle not in reported:
+                reported.add(cycle)
+                ordered = sorted(cycle)
+                report.add("S2", by_pos[ordered[0]].problem(
+                    "error", "heads form a cycle: " + " -> ".join(f"#{p}" for p in ordered + [ordered[0]])))
 
 
 # ---------- S3 / S4 ----------
@@ -304,36 +373,33 @@ def check_s4(commitments: dict[str, Commitment], partial: bool, report: Report) 
             report.add("S4", c.opened.problem("warning", message))
 
 
-# ---------- S5 / S6 ----------
+# ---------- S5: sections ----------
 
 
 def check_s5(structure: dict, positions: dict[str, int], report: Report, partial: bool = False) -> list[tuple[str, int, str]]:
-    """Validate the plan; return [(section id, first position, role)] when the section list is usable, else [].
+    """Validate thesis and section plan; return [(section id, first position, role)] when the section list is usable, else [].
 
-    Errors in `thesis` or `structure_version` fail S5 but do not make a valid
-    section list unusable for S6 and the state query. With `partial`, an empty
-    thesis is information: a draft often has not stated its thesis yet.
+    An error in `thesis` fails S5 but does not make a valid section list
+    unusable for S6 and the state query. With `partial`, an empty thesis is
+    information: a draft often has not stated its thesis yet.
     """
     sections_ok = True
 
-    def err(message: str, about_sections: bool = False) -> None:
+    def err(message: str, about_sections: bool = False, tag: str = "") -> None:
         nonlocal sections_ok
         if about_sections:
             sections_ok = False
-        report.add("S5", Problem("error", message))
+        report.add("S5", Problem("error", message, tag=tag))
 
-    version = structure.get("structure_version")
-    if version not in STRUCTURE_VERSIONS:
-        err(f"structure_version {version!r} not in {vocab(STRUCTURE_VERSIONS)}")
     thesis = structure.get("thesis")
     if thesis == [] and partial:
-        report.add("S5", Problem("info", "thesis not stated yet (empty list)"))
+        report.add("S5", Problem("info", "thesis not stated yet (empty list)", tag="thesis"))
     elif not isinstance(thesis, list) or not thesis:
-        err("thesis must be a non-empty list of proposition ids")
+        err("thesis must be a non-empty list of proposition ids", tag="thesis")
     else:
         for tid in thesis:
             if not isinstance(tid, str) or tid not in positions:
-                err(f"thesis entry {tid!r} is not a non-retired ledger proposition")
+                err(f"thesis entry {tid!r} is not a non-retired ledger proposition", tag="thesis")
     sections = structure.get("sections")
     if not isinstance(sections, list) or not sections:
         err("sections must be a non-empty list", about_sections=True)
@@ -371,12 +437,31 @@ def check_s5(structure: dict, positions: dict[str, int], report: Report, partial
     return plan if sections_ok else []
 
 
+def section_parents(structure: dict, plan: list[tuple[str, int, str]], report: Report) -> list[int | None]:
+    """S5: each `parent` names an earlier section; return parent indices parallel to `plan`."""
+    if not plan:
+        return []
+    index = {sid: i for i, (sid, _, _) in enumerate(plan)}
+    parents: list[int | None] = []
+    ok = True
+    for sec in structure.get("sections", []):
+        sid = sec.get("id") if isinstance(sec, dict) else None
+        if sid not in index:
+            continue
+        parent = sec.get("parent", MISSING)
+        if parent is MISSING:
+            parents.append(None)
+        elif isinstance(parent, str) and parent in index and index[parent] < index[sid]:
+            parents.append(index[parent])
+        else:
+            ok = False
+            parents.append(None)
+            report.add("S5", Problem("error", f"section `{sid}` parent {parent!r} does not name an earlier section"))
+    return parents if ok else [None] * len(plan)
+
+
 def section_index(plan: list[tuple[str, int, str]], position: int) -> int:
-    idx = 0
-    for i, (_, first, _) in enumerate(plan):
-        if first <= position:
-            idx = i
-    return idx
+    return unit_index([first for _, first, _ in plan], position)
 
 
 def check_abstract_opens(records: list[Record], plan: list[tuple[str, int, str]], report: Report) -> None:
@@ -391,7 +476,106 @@ def check_abstract_opens(records: list[Record], plan: list[tuple[str, int, str]]
         ids = [o.get("id") for o in raw if isinstance(o, dict)] if isinstance(raw, list) else []
         if ids:
             listed = ", ".join(f"`{i}`" for i in ids)
-            report.add("S5", rec.problem("error", f"opens {listed} inside the abstract; the abstract opens no commitments"))
+            problem = rec.problem("error", f"opens {listed} inside the abstract; the abstract opens no commitments")
+            report.add("S5", Problem(problem.severity, problem.message, problem.position, problem.prop_id, problem.line, "abstract"))
+
+
+# ---------- S5: paragraphs ----------
+
+
+def check_paragraphs(structure: dict, positions: dict[str, int], plan: list[tuple[str, int, str]],
+                     report: Report) -> list[Paragraph]:
+    """S5 paragraph plan; return the paragraphs when their spans are usable (ids, starts, order), else []."""
+    def err(message: str) -> None:
+        report.add("S5", Problem("error", message))
+
+    raw = structure.get("paragraphs")
+    if not isinstance(raw, list) or not raw:
+        err("paragraphs must be a non-empty list")
+        return []
+    entries: list[tuple[str, int, dict]] = []
+    ids: set[str] = set()
+    spans_ok = True
+    for i, par in enumerate(raw, 1):
+        pid = par.get("id") if isinstance(par, dict) else None
+        first = par.get("first_prop") if isinstance(par, dict) else None
+        if not isinstance(pid, str) or not pid:
+            err(f"paragraph {i} has no string `id`")
+            spans_ok = False
+            continue
+        if pid in ids:
+            err(f"duplicate paragraph id `{pid}`")
+            spans_ok = False
+        ids.add(pid)
+        if not isinstance(first, str) or first not in positions:
+            err(f"paragraph `{pid}` first_prop {first!r} is not a non-retired ledger proposition")
+            spans_ok = False
+            continue
+        entries.append((pid, positions[first], par))
+    for (prev, prev_pos, _), (pid, pos, _) in zip(entries, entries[1:]):
+        if pos <= prev_pos:
+            err(f"paragraphs `{prev}` (#{prev_pos}) and `{pid}` (#{pos}) are out of ledger order")
+            spans_ok = False
+    if entries and entries[0][1] != 1:
+        err(f"the first paragraph `{entries[0][0]}` starts at #{entries[0][1]}, not at the first proposition")
+        spans_ok = False
+    if not spans_ok:
+        return []
+    firsts = [pos for _, pos, _ in entries]
+    sec_firsts = [first for _, first, _ in plan]
+    for sid, first, _ in plan:
+        if first not in firsts:
+            inside = entries[unit_index(firsts, first)][0]
+            err(f"section `{sid}` starts at #{first}, inside paragraph `{inside}`; no paragraph may cross a section boundary")
+    index = {pid: i for i, (pid, _, _) in enumerate(entries)}
+    paragraphs: list[Paragraph] = []
+    for pid, first, par in entries:
+        section = unit_index(sec_firsts, first) if plan else None
+        head, rel = par.get("head", MISSING), par.get("relation", MISSING)
+        head_index = None
+        if head is MISSING:
+            if rel is not MISSING:
+                err(f"root paragraph `{pid}` carries a relation; a root has neither head nor relation")
+        else:
+            if not isinstance(head, str) or head not in index or head == pid:
+                err(f"paragraph `{pid}` head {head!r} does not name another paragraph")
+            else:
+                head_index = index[head]
+                if plan and unit_index(sec_firsts, entries[head_index][1]) != section:
+                    err(f"paragraph `{pid}` head `{head}` is in another section")
+            if rel is MISSING:
+                err(f"paragraph `{pid}` has a head but no relation")
+            elif _relation_problem(rel):
+                err(f"paragraph `{pid}`: {_relation_problem(rel)}")
+        paragraphs.append(Paragraph(pid, first, head_index, rel if isinstance(rel, str) else None, section))
+    _check_paragraph_trees(paragraphs, plan, report)
+    return paragraphs
+
+
+def _check_paragraph_trees(paragraphs: list[Paragraph], plan: list[tuple[str, int, str]], report: Report) -> None:
+    if plan:
+        for s, (sid, _, _) in enumerate(plan):
+            roots = [p.pid for p in paragraphs if p.section == s and p.head is None]
+            if len(roots) != 1:
+                report.add("S5", Problem(
+                    "error", f"section `{sid}` has {len(roots)} root paragraphs ({', '.join(roots) or 'none'}); "
+                             "exactly one paragraph per section has no head"))
+    reported: set[frozenset[int]] = set()
+    for start in range(len(paragraphs)):
+        path: list[int] = []
+        current: int | None = start
+        while current is not None and current not in path:
+            path.append(current)
+            current = paragraphs[current].head
+        if current is not None:
+            cycle = frozenset(path[path.index(current):])
+            if cycle not in reported:
+                reported.add(cycle)
+                names = [paragraphs[i].pid for i in sorted(cycle)]
+                report.add("S5", Problem("error", "paragraph heads form a cycle: " + " -> ".join(names + names[:1])))
+
+
+# ---------- S6 ----------
 
 
 def check_s6(commitments: dict[str, Commitment], plan: list[tuple[str, int, str]], report: Report) -> None:
@@ -413,27 +597,93 @@ def check_s6(commitments: dict[str, Commitment], plan: list[tuple[str, int, str]
             ))
 
 
+# ---------- S7 / S8 ----------
+
+
+def check_s7(records: list[Record], heads: dict[int, object], paragraphs: list[Paragraph], report: Report) -> None:
+    if not paragraphs:
+        return
+    firsts = [p.first for p in paragraphs]
+    by_pos = {r.position: r for r in records if r.position is not None}
+    groups: dict[int, list[tuple[int, int, int]]] = {}
+    for pos, head in heads.items():
+        if isinstance(head, int):
+            groups.setdefault(unit_index(firsts, pos), []).append((pos, head, pos))
+    for arcs in groups.values():
+        for (a1, b1, k1), (a2, b2, _) in crossing_pairs(arcs):
+            report.add("S7", by_pos[k1].problem("warning", f"arc ({a1}, {b1}) crosses arc ({a2}, {b2})"))
+    by_section: dict[object, list[tuple[int, int, int]]] = {}
+    for i, par in enumerate(paragraphs):
+        if par.head is not None:
+            by_section.setdefault(par.section, []).append((i + 1, par.head + 1, i))
+    for arcs in by_section.values():
+        for (a1, b1, _), (a2, b2, _) in crossing_pairs(arcs):
+            names = [paragraphs[x - 1].pid for x in (a1, b1, a2, b2)]
+            report.add("S7", Problem("warning", f"paragraph arc ({names[0]}, {names[1]}) crosses ({names[2]}, {names[3]})"))
+
+
+def check_s8(records: list[Record], positions: dict[str, int], cites: dict[str, frozenset[str]], report: Report) -> None:
+    for rec in records:
+        pid = rec.data.get("prop_id")
+        if rec.position is None or not isinstance(pid, str):
+            continue
+        targets = []
+        if rec.data.get("relation") == "basis" and isinstance(rec.data.get("head"), str):
+            targets.append(rec.data["head"])
+        for entry in rec.data.get("also") or []:
+            if isinstance(entry, dict) and entry.get("relation") == "basis" and isinstance(entry.get("to"), str):
+                targets.append(entry["to"])
+        for target in targets:
+            if target in positions and target not in cites.get(pid, frozenset()):
+                report.add("S8", rec.problem(
+                    "warning", f"basis edge to #{positions[target]} {target}, which this proposition does not cite in main.jsonl"))
+
+
 # ---------- driver ----------
 
 
-def validate(ledger: Path, structure_path: Path, discourse_path: Path, partial: bool) -> Report:
-    live, _ = load_ledger(ledger)
+@dataclass
+class Analysis:
+    """Everything the checks computed; the state query and the metrics read it."""
+    report: Report
+    ledger: Ledger
+    positions: dict[str, int]
+    records: list[Record]
+    plan: list[tuple[str, int, str]]
+    parents: list[int | None]
+    paragraphs: list[Paragraph]
+    heads: dict[int, object]
+    commitments: dict[str, Commitment]
+    structure: dict
+
+
+def analyse(ledger_path: Path, structure_path: Path, discourse_path: Path, partial: bool) -> Analysis:
+    ledger = load_ledger(ledger_path)
     raw_records = load_discourse(discourse_path)
     structure = load_structure(structure_path)
-    positions = {pid: i for i, pid in enumerate(live, 1)}
+    positions = {pid: i for i, pid in enumerate(ledger.live, 1)}
     records = [
         Record(i, line, data, positions.get(data.get("prop_id")) if isinstance(data.get("prop_id"), str) else None)
         for i, (line, data) in enumerate(raw_records)
     ]
     report = Report()
-    check_s1(records, live, report)
-    check_s2(records, positions, report)
+    check_s1(records, ledger.live, report)
+    plan = check_s5(structure, positions, report, partial)
+    parents = section_parents(structure, plan, report)
+    check_abstract_opens(records, plan, report)
+    paragraphs = check_paragraphs(structure, positions, plan, report)
+    check_s2(records, positions, paragraphs, partial, report)
     commitments = check_s3(records, report)
     check_s4(commitments, partial, report)
-    plan = check_s5(structure, positions, report, partial)
-    check_abstract_opens(records, plan, report)
     check_s6(commitments, plan, report)
-    return report
+    heads = head_map(records, positions, [p.first for p in paragraphs]) if paragraphs else {}
+    check_s7(records, heads, paragraphs, report)
+    check_s8(records, positions, ledger.cites, report)
+    return Analysis(report, ledger, positions, records, plan, parents, paragraphs, heads, commitments, structure)
+
+
+def validate(ledger: Path, structure_path: Path, discourse_path: Path, partial: bool) -> Report:
+    return analyse(ledger, structure_path, discourse_path, partial).report
 
 
 def render_text(report: Report) -> str:
@@ -472,11 +722,12 @@ def render_json(report: Report, ledger: Path, partial: bool) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Check a ledger's article-structure sidecars (S1-S6).")
+    p = argparse.ArgumentParser(description="Check a ledger's article-structure sidecars, format 2.0 (S1-S8).")
     p.add_argument("--jsonl", type=Path, required=True, help="the ledger (main.jsonl)")
     p.add_argument("--structure", type=Path, help="structure.json (default: beside the ledger)")
     p.add_argument("--discourse", type=Path, help="discourse.jsonl (default: beside the ledger)")
-    p.add_argument("--partial", action="store_true", help="unfinished draft: report open commitments as information")
+    p.add_argument("--partial", action="store_true",
+                   help="unfinished draft: open commitments and an empty thesis are information; `head: pending` allowed in the last paragraph")
     p.add_argument("--format", choices=("text", "json"), default="text")
     args = p.parse_args(argv)
     structure = args.structure or args.jsonl.parent / "structure.json"

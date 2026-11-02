@@ -82,7 +82,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 │  scripts/_lib/normalize.py          (R1 + coverage steps) │
 │  scripts/assign-prop-ids.py         (tmp id → UUID v7)    │
 │  scripts/check-extraction-coverage.py (no-omission gate)  │
-│  scripts/validate-structure.py      (S1-S6 sidecars)      │
+│  scripts/validate-structure.py      (S1-S8 sidecars)      │
 │  scripts/structure-state.py         (what is still owed)  │
 └───────────────────────────────────────────────────────────┘
                       ↑ verifies

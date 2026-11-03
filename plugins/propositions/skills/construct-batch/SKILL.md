@@ -66,6 +66,7 @@ Dispatch in parallel, one per `input-NN.json`, pinned to a cheaper model when th
 - the path of its input file and of `references/vocabulary.md` of the construct skill;
 - the output path `output-NN.json` and the format in the `structure-batch.py` docstring;
 - this instruction: choose heads for the tree as the text reads, and never move a head only to avoid a crossing. Keep a crossing and add a `note`.
+- the instruction that `note` is only for close calls, written as `runner-up: <the other choice>; lost because <reason>`, and that most propositions have none. When you write the subagent's prompt, do not list `note` as a field every proposition fills, and do not show it on every entry of an example: a note on every record makes A5's list of close calls the whole article (#34).
 - the instruction to report every place where the natural head would cross, naming both candidates. The summary needs that count: otherwise a low crossing rate says little.
 - the instruction to label only the tree. Commitments, moves and paragraph types are not theirs.
 

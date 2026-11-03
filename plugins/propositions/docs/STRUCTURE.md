@@ -166,7 +166,7 @@ a paragraph root, position 11 is a root with two `also` entries.)
 | `opens` | — | Commitments this proposition opens; each is `{"id": ..., "kind": ...}` |
 | `discharges` | — | Ids of commitments this proposition discharges |
 | `move` | — | One of the moves in `plugins/propositions/catalog/vocabulary.yaml`: what this proposition does for its paragraph (see Moves and paragraph types). `structure_version` stays `"2.0"`; sidecars without it need no change |
-| `note` | — | Free text |
+| `note` | — | Only on a close call (two heads, two relations, two commitment kinds or two moves were plausible): `runner-up: <the other choice>; lost because <reason>`. A record whose label was not a close call has no note; the evidence for a label is not written here. The validator does not check this field |
 
 ### Heads
 

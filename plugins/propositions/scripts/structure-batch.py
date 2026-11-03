@@ -14,6 +14,10 @@ An output file is:
     {"propositions": {"<position>": {"head": <position>|null, "relation": str|null,
                                      "note": str, "also": [{"to": <position>, "relation": str}]}},
      "paragraphs": {"<id>": {"head": "<paragraph id>"|null, "relation": str|null}}}
+`note` and `also` are optional. Give a `note` only on a close call, written as
+"runner-up: <the other choice>; lost because <reason>", and leave it out
+otherwise: most propositions have none (references/vocabulary.md of the
+construct skill, "Recording the decision").
 
 With --moves-only the tree is left alone and only moves are annotated. `split`
 adds to each proposition its `head` (the head's position, null for a paragraph

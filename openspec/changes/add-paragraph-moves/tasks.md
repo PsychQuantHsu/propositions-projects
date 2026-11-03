@@ -32,5 +32,5 @@
 ## 6. 收尾
 
 - [ ] 6.1 用兩篇暫存附檔跑 `structure-explain.py`，各挑 3 段給維護者看讀法輸出，取得確認後才把附檔寫進各自 repo 並 commit；`main.jsonl` 的 sha256 不變
-- [ ] 6.2 更新 plugins/propositions/README.md、plugins/propositions/docs/PLAYBOOK.md、CLAUDE.md；版本升到 0.8.0（plugins/propositions/.claude-plugin/plugin.json 與 .claude-plugin/marketplace.json）；README 註明用到 `move` 時需要 PyYAML
+- [x] 6.2 更新 plugins/propositions/README.md、plugins/propositions/docs/PLAYBOOK.md、CLAUDE.md；版本升到 0.8.0（plugins/propositions/.claude-plugin/plugin.json 與 .claude-plugin/marketplace.json）；README 註明用到 `move` 時需要 PyYAML
 - [ ] 6.3 總驗證：`pytest tests/` 全過（含 tests/test_plugin_payload_tracked.py，確認 catalog 兩個檔案有進 git）、`spectra validate add-paragraph-moves` 通過；對 `/propositions:construct` 試 5 句「這段句子之間是什麼關係」的請求，確認會觸發 explain 用法；把結果留言到 #33

@@ -1,7 +1,7 @@
 ---
 name: clarity-audit
 description: >-
-  Fix clarity problems in math/stats writing at ANY scale — one confusing sentence up to a whole section, not just whole-manuscript passes. Trigger when the reader stalls on a technical passage: unclear / abrupt / "太突兀" / "看不懂" / "怎麼來的" / "這是正式說法嗎" / "難連結", or "proofread / 整理 this derivation", or "is this the same as <standard result>". Names the specific stall (unanchored term, definition-away-from-use, claim-without-reason, notation clash, non-standard terminology) and rewrites the passage self-contained. This is the readability axis — distinct from proofread (per-proposition correctness). Reach for it even for a single sentence, over an ad-hoc inline rewrite.
+  Fix clarity problems in math/stats writing at ANY scale — one confusing sentence up to a whole section, not just whole-manuscript passes. Trigger when the reader stalls on a technical passage: unclear / abrupt / "太突兀" / "看不懂" / "怎麼來的" / "這是正式說法嗎" / "難連結", or "proofread / 整理 this derivation", or "is this the same as <standard result>". Names the specific stall (unanchored term, definition-away-from-use, claim-without-reason, notation clash, non-standard terminology) and rewrites the passage self-contained. This is the readability axis — distinct from proofread (per-proposition correctness). Reach for it even for a single sentence, over an ad-hoc inline rewrite. Not for how sentences connect or what each one does in its paragraph (/propositions:construct).
 ---
 
 # Math Writing Clarity Audit

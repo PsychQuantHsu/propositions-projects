@@ -165,3 +165,14 @@ def test_a_missing_sidecar_is_an_input_error(tmp_path: Path) -> None:
     ledger = case(tmp_path)
     (tmp_path / "discourse.jsonl").unlink()
     assert explain(ledger, "--all").returncode == 2
+
+
+def test_a_multi_line_text_stays_on_its_line(tmp_path: Path) -> None:
+    ledger = case(tmp_path)
+    rows = [json.loads(l) for l in ledger.read_text().splitlines()]
+    rows[1]["text"] = "First line\n  second line."
+    ledger.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    stdout = explain(ledger, "--paragraph", "p-1").stdout
+    assert "First line second line." in line_for(stdout, 2)
+    data = json.loads(explain(ledger, "--paragraph", "p-1", "--format", "json").stdout)
+    assert data["paragraphs"][0]["propositions"][1]["text"] == "First line\n  second line."

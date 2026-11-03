@@ -1,22 +1,21 @@
 ---
 name: construct
 description: >-
-  Answers "what should the next sentence or paragraph of this manuscript do?" and "does this
-  manuscript keep what it promises?" using the propositions ledger. Use whenever the user is
-  writing or revising a paper and asks what comes next ("下一句要寫什麼", "接下來那段要寫什麼才接得上",
-  "已知 prop_t，prop_{t+1} 該寫什麼", "what should the next sentence do"), whether its promises
-  are kept (research question answered, "organized as follows" followed, "we now examine"
-  carried out, announced analyses done: "研究問題有沒有回答到", "論證的走向有沒有斷掉",
-  "承諾有沒有兌現"), how the sentences of a paragraph relate to each other ("這段句子之間是什麼關係",
-  "explain how these sentences relate"), or wants the article structure annotated ("標註文章結構", "annotate the
-  article structure", section roles, relations between consecutive propositions) — even if they
-  never name this skill. Invoke it before opening the manuscript files: it finds the ledger and
-  the files itself. It records commitments, section roles and a dependency tree (each
-  proposition's head in its paragraph, each paragraph's head in its section) in two sidecars
-  beside the ledger (structure.json, discourse.jsonl), checks them (S1–S9), and reports what the
-  article still owes the reader at any position and where the next proposition can attach. Not for splitting text into propositions
+  Reads out how the sentences of a paragraph relate, and answers "what should the next sentence or
+  paragraph of this manuscript do?" and "does this manuscript keep what it promises?" using the
+  propositions ledger. Use whenever a user with a paper asks how its sentences connect, what each
+  sentence does or which sentence it hangs on ("這段句子之間是什麼關係", "每一句在做什麼、掛在哪一句", "句子和句子怎麼接的", "how do
+  the sentences of this paragraph relate"), what comes next ("下一句要寫什麼", "接下來那段要寫什麼才接得上", "已知
+  prop_t，prop_{t+1} 該寫什麼", "what should the next sentence do"), whether its promises are kept
+  ("organized as follows" followed, "we now examine" carried out: "研究問題有沒有回答到", "論證的走向有沒有斷掉",
+  "承諾有沒有兌現"), or wants the article structure annotated ("標註文章結構", "annotate the article structure",
+  section roles) — even if they never name this skill. Invoke it before opening the manuscript or
+  the sidecars: it finds them itself and has the tool that reads them out, so do not parse
+  structure.json or discourse.jsonl by hand. It records commitments, section roles, what each
+  sentence does and a dependency tree (S1–S9), and reports what the article owes the reader and
+  where the next proposition can attach. Not for splitting text into propositions
   (/propositions:extract), the R1–R13 validator (/propositions:propositions), the semantic walk
-  (/propositions:proofread), or sentence-level clarity (/propositions:clarity-audit).
+  (/propositions:proofread), or rewriting an unclear sentence (/propositions:clarity-audit).
 allowed-tools:
   - Read
   - Write

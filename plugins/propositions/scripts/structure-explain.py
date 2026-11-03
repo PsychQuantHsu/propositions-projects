@@ -175,7 +175,7 @@ def render_text(result: dict) -> str:
             pad = "  " * item["depth"]
             fields = [f"#{item['position']}", _label(item["move_zh"], item["move"]), _how_it_hangs(item)]
             if item.get("text"):
-                fields.append(item["text"])
+                fields.append(" ".join(item["text"].split()))
             out.append(pad + "  ".join(fields))
             out.extend(
                 f"{pad}  另：{a['relation_gloss'] or '接在'} #{a['to']}（{a['relation']}）" for a in item["also"]

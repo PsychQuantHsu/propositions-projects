@@ -22,7 +22,7 @@ moves:
   - id: state-goal
     does: States what this article or section sets out to do or answer.
     zh: 說目的
-    not: Saying only what comes next in the text, without a purpose, is preview.
+    not: Saying only what comes next in the text, without a purpose, is preview. Reminding the reader of a goal already stated is recap.
   - id: state-expectation
     does: States a hypothesis or what should be found if a claim holds.
     zh: 說預期
@@ -32,6 +32,7 @@ moves:
   - id: define
     does: Introduces a term, symbol or formal object and says what it means.
     zh: 定義
+    not: A condition the text relies on, rather than a meaning, is set-assumption.
   - id: set-assumption
     does: Fixes a condition that the following text relies on.
     zh: 設定條件
@@ -46,11 +47,13 @@ moves:
     zh: 陳述結果
     not: A statement obtained in place by a step of reasoning is derive.
   - id: derive
-    does: Obtains a statement from earlier ones by a step of reasoning or calculation.
+    does: Obtains a statement from earlier ones by a step of reasoning or calculation, in a proof or in prose.
     zh: 推導
+    not: Saying what should be found if a claim holds is state-expectation. Introducing a symbol is define.
   - id: open-case
     does: Narrows the discussion to one case of several.
     zh: 分案
+    not: A case in a statement that gives the case's formula or conclusion is state-result.
   - id: give-example
     does: Gives a concrete instance of what was just said.
     zh: 舉例
@@ -77,6 +80,10 @@ moves:
   - id: conclude
     does: Draws together what the preceding text has established.
     zh: 收束
+    not: Reminding the reader of what was done or found, without drawing a point from it, is recap.
+  - id: recap
+    does: Reminds the reader of what the article has already done or found.
+    zh: 回顧
   - id: propose-next
     does: Says what should be done next, beyond this article.
     zh: 提出後續
@@ -85,6 +92,9 @@ moves:
     zh: 指引去處
 
 paragraph_types:
+  - id: abstract
+    does: Sums up the whole article.
+    zh: 摘要
   - id: background
     does: Gives the reader what is already known about the topic.
     zh: 背景段
@@ -94,6 +104,7 @@ paragraph_types:
   - id: goal-summary
     does: Sums up what the study sets out to do and how.
     zh: 目的總結段
+    not: A summary of the whole article, findings included, is abstract.
   - id: roadmap
     does: Lays out what the following text will do.
     zh: 導覽段
@@ -118,6 +129,9 @@ paragraph_types:
   - id: discussion
     does: Says what the findings mean and how far they reach.
     zh: 討論段
+  - id: limitations
+    does: Says what the study cannot show or where it falls short.
+    zh: 研究限制段
   - id: future-direction
     does: Says where the work should go next.
     zh: 未來方向段

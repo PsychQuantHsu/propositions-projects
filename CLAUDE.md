@@ -53,7 +53,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 |---------------|------|
 | `plugins/propositions/docs/EXTRACTION-PROMPT.md` | LLM extraction discipline (餵給 Claude / GPT 抽 prop 用) |
 | `plugins/propositions/scripts/validate-structure.py`、`structure-state.py`、`structure-metrics.py`、`derive-paragraphs.py`、`migrate-structure-v2.py` + `docs/STRUCTURE.md` | 文章結構 sidecar（`structure.json`、`discourse.jsonl`，格式 2.0）：不改帳冊 schema，S1–S9 檢查承諾先開後兌現、完整文章不欠帳、章節與段落計畫、每段是一棵依存樹（交叉弧與帳冊沒 cite 的 `basis` 只警告）；狀態查詢列出右邊緣、等頭的子句與依緊迫程度（`--order kind|scope`）排序的未兌現承諾；量測報告樹合不合用；1.0 附檔經遷移工具轉換（#26、#30） |
-| `plugins/propositions/catalog/vocabulary.yaml`、`plugins/propositions/scripts/structure-explain.py`、`build-paragraph-catalog.py` | 每一句「在做什麼」的封閉詞彙（手寫，帶 `move`／`type` 的附檔由 S9 檢查，需要 PyYAML）；讀法工具把一段讀成「第幾句、在做什麼、掛在第幾句、什麼關係」；`catalog/paragraph-catalog.yaml` 由工具從附檔產生，只含次數，是觀察到的走法不是規則；`structure-batch.py --moves-only` 只標步驟不動依存樹，`structure-metrics.py --compare-moves` 報告兩份標註的 Cohen's κ（#33，實作中）|
+| `plugins/propositions/catalog/vocabulary.yaml`、`plugins/propositions/scripts/structure-explain.py`、`build-paragraph-catalog.py` | 每一句「在做什麼」的封閉詞彙（手寫，帶 `move`／`type` 的附檔由 S9 檢查，需要 PyYAML）；讀法工具把一段讀成「第幾句、在做什麼、掛在第幾句、什麼關係」；`catalog/paragraph-catalog.yaml` 由工具從附檔產生，只含次數，是觀察到的走法不是規則；`structure-batch.py --moves-only` 只標步驟不動依存樹，`structure-metrics.py --compare-moves` 報告兩份標註的 Cohen's κ（#33）|
 | `plugins/propositions/scripts/validate-verification.py`、`proofread-to-verification.py` + `docs/VERIFICATION.md` | 驗證紀錄 sidecar（`verification.jsonl`）：帳冊只當索引，proofread／Lean／CAS 等方法的判定記在旁邊；轉換只認完整 proposition id（#12） |
 
 同一個 marketplace 另有第二個 plugin `plugins/tschema-check/`（#4）：文件對外部來源的忠實度查核，validator 自帶、不 import 本 plugin（安裝後 plugin 彼此隔離）。

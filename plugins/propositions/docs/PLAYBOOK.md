@@ -43,7 +43,7 @@ Operation D          extract → A             日常節奏             送審�
 假設、宣告的章節計畫、「We now examine …」）、每一節的角色，以及一棵三層的依存樹——每一句在
 段內掛在哪一句上（可在前或在後）、每一段在節內掛在哪一段上、每一節在哪一節底下。標註模式先用
 `derive-paragraphs.py` 從 tex 推出段落，再把這三層存成帳冊旁的 `structure.json`／`discourse.jsonl`
-（格式 2.0，不改帳冊），用 `validate-structure.py`（S1–S8）檢查：承諾先開後兌現、完整的文章不欠帳、
+（格式 2.0，不改帳冊），用 `validate-structure.py`（S1–S9）檢查：承諾先開後兌現、完整的文章不欠帳、
 每段是一棵樹；交叉弧（S7）與帳冊沒 cite 的 `basis`（S8）只警告。`structure-metrics.py` 報告樹合不合用。
 舊的 1.0 附檔用 `migrate-structure-v2.py` 轉換。格式與詞彙見 [`STRUCTURE.md`](STRUCTURE.md)。
 

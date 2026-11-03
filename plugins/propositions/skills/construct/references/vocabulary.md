@@ -218,8 +218,16 @@ Patterns settled in the pilot:
   of the job its sentence does, even when it is the head's `reason` or
   `specification`. `explain-why` is for a sentence that gives a reason as its own job.
 - **A statement block:** each "Suppose ..." is `set-assumption` and the "Then ..."
-  is `state-result`, although the relation says `consequence`. Inside a proof each
-  step is `derive`, and the sentence that starts a case is `open-case`.
+  is `state-result`, although the relation says `consequence`. An opening sentence
+  whose content is in the items after it ("Suppose ... Then one of the following
+  holds") is `set-assumption`. In a statement that lists cases, a heading that only
+  names the case is `open-case`, and one that gives the case's formula or conclusion
+  is `state-result`.
+- **Inside a proof** each step is `derive`, including a check that a lemma's conditions
+  hold, and the sentence that starts a case is `open-case`. Introducing a symbol is
+  `define` even there.
+- **A footnote has its own job.** The fragment rule does not cover it.
+- **A title or heading the ledger lists** is `set-context`.
 - **A test's outcome:** `state-result` when the text only reports it, `rule-out`
   when the text uses it to set an explanation aside. The same `claim_type: result`
   takes either.

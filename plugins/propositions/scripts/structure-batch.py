@@ -12,10 +12,11 @@ shape, not the tree.
 
 An output file is:
     {"propositions": {"<position>": {"head": <position>|null, "relation": str|null,
-                                     "note": str, "also": [{"to": <position>, "relation": str}]}},
+                                     ["also": [{"to": <position>, "relation": str}]],
+                                     ["note": "runner-up: ...; lost because ..."]}},
      "paragraphs": {"<id>": {"head": "<paragraph id>"|null, "relation": str|null}}}
-`note` and `also` are optional. Give a `note` only on a close call, written as
-"runner-up: <the other choice>; lost because <reason>", and leave it out
+Fields in [brackets] are optional. Give a `note` only on a close call, written
+as "runner-up: <the other choice>; lost because <reason>", and leave it out
 otherwise: most propositions have none (references/vocabulary.md of the
 construct skill, "Recording the decision").
 

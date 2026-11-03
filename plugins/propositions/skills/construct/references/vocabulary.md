@@ -239,9 +239,15 @@ Patterns settled in the pilot:
 ## Recording the decision
 
 A record gets a `note` only when the choice was close, and has none otherwise.
-A choice is close in exactly these four cases: two heads were plausible, two
-rows of the relation table both held, a commitment could be read as two kinds,
-or two moves both fit. Write the note as
+A choice is close in exactly these four cases, and in no other:
+
+1. two heads were plausible (a kept S7 crossing is this case: the other
+   plausible head is the one that would not cross);
+2. two rows of the relation table both held;
+3. a commitment could be read as two kinds;
+4. two moves both fit.
+
+Write the note as
 `runner-up: <the other choice>; lost because <reason>`. The evidence for a
 label (the connective, "paragraph root", "no connective") is not a note: the
 label already says it. In most paragraphs few records, if any, have a note.
@@ -251,5 +257,6 @@ check first. A note on every record makes that list the whole article.
 
 When S7 reports a crossing, look at both arcs first: a crossing is often a
 head chosen one sentence too far. Keep it only when the text really is not
-tree-shaped. A kept crossing is a close call: the runner-up in its note is the
-head that would not cross.
+tree-shaped. A kept crossing is case 1 above: the runner-up in its note is the
+head that would not cross, and the reason it lost is why the text needs the
+crossing head.

@@ -831,3 +831,26 @@ def test_fixture_notes_mark_close_calls_only() -> None:
     notes = [r["note"] for r in records if r.get("note")]
     assert 0 < len(notes) < len(records) / 2, f"{len(notes)} of {len(records)} records carry a note"
     assert all(n.startswith("runner-up: ") and "lost because" in n for n in notes), notes
+
+
+NOTE_CONTRACT = "runner-up: <the other choice>; lost because <reason>"
+NOTE_CONTRACT_SOURCES = (
+    "plugins/propositions/skills/construct/references/vocabulary.md",
+    "plugins/propositions/docs/STRUCTURE.md",
+    "plugins/propositions/scripts/structure-batch.py",
+    "plugins/propositions/skills/construct/SKILL.md",
+    "plugins/propositions/skills/construct-batch/SKILL.md",
+)
+
+
+@pytest.mark.parametrize("source", NOTE_CONTRACT_SOURCES)
+def test_note_contract_is_stated_where_prompts_are_written_from(source: str) -> None:
+    """Every place an annotator's prompt is built from states the same note contract (#34)."""
+    assert NOTE_CONTRACT in (REPO_ROOT / source).read_text(encoding="utf-8")
+
+
+def test_batch_format_shows_note_as_optional() -> None:
+    """The answer shape in the batch docstring must not draw `note` as a field every entry has (#34)."""
+    doc = (SCRIPTS / "structure-batch.py").read_text(encoding="utf-8").split('"""')[1]
+    shape = doc[doc.index("An output file is:"):doc.index("With --moves-only")]
+    assert '["note":' in shape and '"note": str' not in shape, shape

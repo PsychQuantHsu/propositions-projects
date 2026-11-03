@@ -34,16 +34,20 @@ Rules:
         section (warning only)
     S8  a `basis` edge whose target the proposition does not cite in
         main.jsonl (warning only)
+    S9  a record's `move` and a paragraph's `type`, both optional, are values of
+        the vocabulary; no order of moves is ever reported
 
 Usage:
     python3 validate-structure.py --jsonl main.jsonl [--structure structure.json]
-        [--discourse discourse.jsonl] [--partial] [--format text|json]
+        [--discourse discourse.jsonl] [--vocabulary vocabulary.yaml] [--partial]
+        [--format text|json]
 
 Exit code:
     0 — no rule fails (warnings and information allowed)
     1 — at least one rule fails
-    2 — an input file is missing, unreadable or not valid JSON, or
-        structure_version is not "2.0" (version 1.0: run migrate-structure-v2.py)
+    2 — an input file is missing, unreadable or not valid JSON,
+        structure_version is not "2.0" (version 1.0: run migrate-structure-v2.py),
+        or moves or types are present and the vocabulary cannot be loaded
 """
 from __future__ import annotations
 
@@ -58,6 +62,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _lib.structure_io import (  # noqa: E402,F401  (re-exported for structure-state.py and structure-metrics.py)
     STRUCTURE_VERSION, InputError, Ledger, load_discourse, load_ledger, load_structure,
 )
+from _lib.move_vocabulary import load_vocabulary  # noqa: E402
 from _lib.structure_tree import PENDING, crossing_pairs, unit_index  # noqa: E402
 
 RELATIONS = (
@@ -80,6 +85,7 @@ RULES = (
     ("S6", "announcements-nearby"),
     ("S7", "crossing-arcs"),
     ("S8", "basis-cites"),
+    ("S9", "moves-and-types"),
 )
 EXIT_OK, EXIT_FAIL, EXIT_USAGE = 0, 1, 2
 MISSING = object()
@@ -639,6 +645,27 @@ def check_s8(records: list[Record], positions: dict[str, int], cites: dict[str, 
                     "warning", f"basis edge to #{positions[target]} {target}, which this proposition does not cite in main.jsonl"))
 
 
+# ---------- S9 ----------
+
+
+def check_s9(records: list[Record], structure: dict, vocabulary_path: Path | None, report: Report) -> None:
+    """`move` and `type` are values of the vocabulary. Sidecars with neither never load it."""
+    marked = [r for r in records if "move" in r.data]
+    raw = structure.get("paragraphs")
+    typed = [p for p in raw if isinstance(p, dict) and "type" in p] if isinstance(raw, list) else []
+    if not marked and not typed:
+        return
+    vocabulary = load_vocabulary(vocabulary_path)
+    for rec in marked:
+        move = rec.data["move"]
+        if not isinstance(move, str) or move not in vocabulary.moves:
+            report.add("S9", rec.problem("error", f"move {move!r} is not in the vocabulary"))
+    for par in typed:
+        kind = par["type"]
+        if not isinstance(kind, str) or kind not in vocabulary.paragraph_types:
+            report.add("S9", Problem("error", f"paragraph `{par.get('id')}` type {kind!r} is not in the vocabulary"))
+
+
 # ---------- driver ----------
 
 
@@ -657,7 +684,9 @@ class Analysis:
     structure: dict
 
 
-def analyse(ledger_path: Path, structure_path: Path, discourse_path: Path, partial: bool) -> Analysis:
+def analyse(ledger_path: Path, structure_path: Path, discourse_path: Path, partial: bool,
+            check_moves: bool = False, vocabulary_path: Path | None = None) -> Analysis:
+    """Run the checks. S9 runs only with `check_moves`: the state query and the metrics do not use the vocabulary."""
     ledger = load_ledger(ledger_path)
     raw_records = load_discourse(discourse_path)
     structure = load_structure(structure_path)
@@ -679,11 +708,14 @@ def analyse(ledger_path: Path, structure_path: Path, discourse_path: Path, parti
     heads = head_map(records, positions, [p.first for p in paragraphs]) if paragraphs else {}
     check_s7(records, heads, paragraphs, report)
     check_s8(records, positions, ledger.cites, report)
+    if check_moves:
+        check_s9(records, structure, vocabulary_path, report)
     return Analysis(report, ledger, positions, records, plan, parents, paragraphs, heads, commitments, structure)
 
 
-def validate(ledger: Path, structure_path: Path, discourse_path: Path, partial: bool) -> Report:
-    return analyse(ledger, structure_path, discourse_path, partial).report
+def validate(ledger: Path, structure_path: Path, discourse_path: Path, partial: bool,
+             vocabulary_path: Path | None = None) -> Report:
+    return analyse(ledger, structure_path, discourse_path, partial, True, vocabulary_path).report
 
 
 def render_text(report: Report) -> str:
@@ -722,10 +754,11 @@ def render_json(report: Report, ledger: Path, partial: bool) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Check a ledger's article-structure sidecars, format 2.0 (S1-S8).")
+    p = argparse.ArgumentParser(description="Check a ledger's article-structure sidecars, format 2.0 (S1-S9).")
     p.add_argument("--jsonl", type=Path, required=True, help="the ledger (main.jsonl)")
     p.add_argument("--structure", type=Path, help="structure.json (default: beside the ledger)")
     p.add_argument("--discourse", type=Path, help="discourse.jsonl (default: beside the ledger)")
+    p.add_argument("--vocabulary", type=Path, help="vocabulary.yaml (default: the one shipped with the plugin)")
     p.add_argument("--partial", action="store_true",
                    help="unfinished draft: open commitments and an empty thesis are information; `head: pending` allowed in the last paragraph")
     p.add_argument("--format", choices=("text", "json"), default="text")
@@ -733,7 +766,7 @@ def main(argv: list[str] | None = None) -> int:
     structure = args.structure or args.jsonl.parent / "structure.json"
     discourse = args.discourse or args.jsonl.parent / "discourse.jsonl"
     try:
-        report = validate(args.jsonl, structure, discourse, args.partial)
+        report = validate(args.jsonl, structure, discourse, args.partial, args.vocabulary)
     except InputError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE

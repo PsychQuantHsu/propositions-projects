@@ -187,8 +187,9 @@ Article structure is stored in two sidecar files in the ledger's directory, next
 
 - **The ledger schema does not change.** The sidecars add no field to `main.jsonl` or `_meta.json`, and adding, changing or removing them does not change `main.jsonl`. `schema_version` does not cover them, so adding them to a ledger needs no version bump or migration.
 - **`validate-propositions.py` does not read them.** R1–R13 are unchanged, and a ledger directory without the sidecars produces the same validator output and exit status as before.
-- **They have their own validator**, `plugins/propositions/scripts/validate-structure.py` (rules S1–S8). It needs both files; if either is missing it exits with status 2 and names the file. It refuses any `structure_version` other than `"2.0"` with status 2.
+- **They have their own validator**, `plugins/propositions/scripts/validate-structure.py` (rules S1–S9). It needs both files; if either is missing it exits with status 2 and names the file. It refuses any `structure_version` other than `"2.0"` with status 2.
 - **Version 1.0 sidecars are migrated, not read.** `plugins/propositions/scripts/migrate-structure-v2.py` writes 2.0 sidecars and a review report into another directory and never touches the ledger or the 1.0 files; `derive-paragraphs.py` proposes the paragraph plan from the TeX source.
+- **Two optional fields record what a sentence or paragraph does.** `move` on a `discourse.jsonl` record and `type` on a `structure.json` paragraph take values from the closed list in `plugins/propositions/catalog/vocabulary.yaml`. Rule S9 checks the values only and never reports the order of moves. They do not change `structure_version` (still `"2.0"`), and sidecars without them need no change. Details are in `STRUCTURE.md`.
 - **Full format**: `plugins/propositions/docs/STRUCTURE.md`.
 
 This follows the precedent of `verification.jsonl` (`plugins/propositions/docs/VERIFICATION.md`): the ledger stays an index of claims, and annotations that can be redone without touching it live beside it.

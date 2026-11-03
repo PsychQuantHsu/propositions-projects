@@ -150,3 +150,84 @@ def test_merge_refuses_incomplete_answers(tmp_path: Path, damage: str) -> None:
     result = run(BATCH, "merge", *fixture_args(), "--out-dir", tmp_path)
     assert result.returncode == 2
     assert not (tmp_path / "discourse.jsonl").exists()
+
+
+# ---------- structure-batch.py --moves-only ----------
+
+def moves_answers(out: Path) -> None:
+    for path in out.glob("input-*.json"):
+        batch = json.loads(path.read_text())
+        answer = {
+            "propositions": {str(p["position"]): {"move": "claim"} for p in batch["propositions"]},
+            "paragraphs": {p["id"]: {"type": "background"} for p in batch["paragraphs"]},
+        }
+        path.with_name(path.name.replace("input-", "output-")).write_text(json.dumps(answer))
+
+
+def read_records(path: Path) -> list[dict]:
+    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+
+def test_moves_only_split_carries_head_and_relation(tmp_path: Path) -> None:
+    assert run(BATCH, "split", *fixture_args(), "--out-dir", tmp_path, "--moves-only").returncode == 0
+    props = [p for f in sorted(tmp_path.glob("input-*.json")) for p in json.loads(f.read_text())["propositions"]]
+    live = [json.loads(l)["id"] for l in (FIXTURE / "main.jsonl").read_text().splitlines() if l.strip()]
+    pos = {p: i for i, p in enumerate(live, 1)}
+    for prop, rec in zip(props, read_records(FIXTURE / "discourse.jsonl")):
+        assert "head" in prop and "relation" in prop
+        assert prop["head"] == (pos[rec["head"]] if rec.get("head") else None)
+        assert prop["relation"] == rec.get("relation")
+    assert any(p["head"] is None for p in props) and any(isinstance(p["head"], int) for p in props)
+
+
+def test_moves_only_split_keeps_pending_heads(tmp_path: Path) -> None:
+    records = read_records(FIXTURE / "discourse.jsonl")
+    records[-1] = {"prop_id": records[-1]["prop_id"], "head": "pending"}
+    discourse = tmp_path / "pending.jsonl"
+    discourse.write_text("".join(json.dumps(r) + "\n" for r in records))
+    args = ["--jsonl", FIXTURE / "main.jsonl", "--structure", FIXTURE / "structure.json", "--discourse", discourse]
+    out = tmp_path / "out"
+    assert run(BATCH, "split", *args, "--out-dir", out, "--moves-only").returncode == 0
+    last = json.loads(sorted(out.glob("input-*.json"))[-1].read_text())["propositions"][-1]
+    assert last["head"] == "pending" and last["relation"] is None
+
+
+def test_plain_split_is_unchanged_by_the_flag_existing(tmp_path: Path) -> None:
+    run(BATCH, "split", *fixture_args(), "--out-dir", tmp_path)
+    for f in tmp_path.glob("input-*.json"):
+        assert all("head" not in p and "relation" not in p for p in json.loads(f.read_text())["propositions"])
+
+
+def test_moves_only_merge_changes_nothing_but_move_and_type(tmp_path: Path) -> None:
+    run(BATCH, "split", *fixture_args(), "--out-dir", tmp_path, "--max-props", 4, "--moves-only")
+    moves_answers(tmp_path)
+    result = run(BATCH, "merge", *fixture_args(), "--out-dir", tmp_path, "--moves-only")
+    assert result.returncode == 0, result.stderr
+    merged = read_records(tmp_path / "discourse.jsonl")
+    assert all(r.pop("move") == "claim" for r in merged)
+    assert merged == read_records(FIXTURE / "discourse.jsonl")
+    structure = json.loads((tmp_path / "structure.json").read_text())
+    assert all(p.pop("type") == "background" for p in structure["paragraphs"])
+    assert structure == json.loads((FIXTURE / "structure.json").read_text())
+
+
+@pytest.mark.parametrize("damage", ["missing_prop", "missing_paragraph", "non_string_move", "empty_type"])
+def test_moves_only_merge_refuses_bad_answers(tmp_path: Path, damage: str) -> None:
+    run(BATCH, "split", *fixture_args(), "--out-dir", tmp_path, "--max-props", 4, "--moves-only")
+    moves_answers(tmp_path)
+    output = sorted(tmp_path.glob("output-*.json"))[0]
+    data = json.loads(output.read_text())
+    key, pid = sorted(data["propositions"], key=int)[0], sorted(data["paragraphs"])[0]
+    if damage == "missing_prop":
+        del data["propositions"][key]
+    elif damage == "missing_paragraph":
+        del data["paragraphs"][pid]
+    elif damage == "non_string_move":
+        data["propositions"][key]["move"] = 3
+    else:
+        data["paragraphs"][pid]["type"] = ""
+    output.write_text(json.dumps(data))
+    result = run(BATCH, "merge", *fixture_args(), "--out-dir", tmp_path, "--moves-only")
+    assert result.returncode == 2
+    assert output.name in result.stderr
+    assert not (tmp_path / "discourse.jsonl").exists() and not (tmp_path / "structure.json").exists()

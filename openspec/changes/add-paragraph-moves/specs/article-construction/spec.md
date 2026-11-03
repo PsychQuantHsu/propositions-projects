@@ -42,7 +42,7 @@ The skill's description SHALL claim requests about an article's overall structur
 
 ### Requirement: Explain mode reads out how sentences relate
 
-When the user asks how the sentences of a paragraph or section relate, the skill SHALL run `structure-explain.py` on that paragraph or section and show its output, then say in plain language what the paragraph does and which sentence the others hang on. The skill SHALL NOT write any file in explain mode. When the requested text has no sidecars, the skill SHALL say so and offer annotation mode.
+When the user asks how the sentences of a paragraph or section relate, the skill SHALL run `structure-explain.py` on that paragraph or section and show its output, then say in plain language what the paragraph does and which sentence the others hang on. When the user asks about one sentence's connections, the skill SHALL run `structure-links.py sentence` on it. The skill SHALL NOT write any file in explain mode. When the requested text has no sidecars, the skill SHALL say so and offer annotation mode.
 
 #### Scenario: Explain mode leaves files untouched
 
@@ -54,11 +54,11 @@ When the user asks how the sentences of a paragraph or section relate, the skill
 - **WHEN** the user asks about a paragraph of a manuscript whose ledger directory has no `discourse.jsonl`
 - **THEN** the skill says the sidecars are missing and offers annotation mode without writing anything
 
-### Requirement: Next mode does not consult the paragraph catalog
+### Requirement: Next mode does not consult the link catalog
 
-In this version the skill's next mode SHALL NOT read `paragraph-catalog.yaml`. Whether it should is decided later from the hit rates `structure-metrics.py` reports.
+In this version the skill's next mode SHALL NOT read `links.csv`. Whether it should is decided later from the hit rates `structure-metrics.py` reports.
 
 #### Scenario: The catalog has no effect on next mode
 
-- **WHEN** next mode runs with and without `paragraph-catalog.yaml` present
+- **WHEN** next mode runs with and without `links.csv` present
 - **THEN** the state query it uses gives the same output

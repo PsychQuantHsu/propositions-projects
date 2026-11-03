@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from _lib.link_catalog import RELATION_GLOSSES as GLOSSES  # noqa: E402
 from _lib.move_vocabulary import Vocabulary, load_vocabulary  # noqa: E402
 from _lib.structure_io import ledger_field  # noqa: E402
 from _lib.structure_tree import PENDING  # noqa: E402
@@ -41,18 +42,6 @@ from _lib.structure_tree import PENDING  # noqa: E402
 EXIT_OK, EXIT_USAGE = 0, 2
 UNLABELLED, ROOT = "未標", "段根"
 WAITING = "等待後面的句子當頭"
-GLOSSES = {
-    "continue": "接續",
-    "restatement": "換句話說",
-    "specification": "具體說明",
-    "instance": "舉例說明",
-    "addition": "補充",
-    "contrast": "對照",
-    "reason": "說明理由",
-    "consequence": "推出結果",
-    "sequence": "接著下一步",
-    "basis": "用到",
-}
 
 
 def _load_state():

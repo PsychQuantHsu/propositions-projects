@@ -187,7 +187,7 @@ record other things, and a move that only restates one of them adds nothing:
    a change to the vocabulary, not a labelling decision.
 
 Label what each sentence does, even when the order looks unusual. No rule checks
-the order of moves, and a path missing from `paragraph-catalog.yaml` is not a
+the order of moves, and a link missing from `catalog/links.csv` is not a
 problem, so never change a label to make a paragraph look like another one.
 
 **For each paragraph**, after its propositions:

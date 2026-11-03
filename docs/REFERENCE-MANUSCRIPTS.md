@@ -115,7 +115,7 @@ Spectra change `add-article-construction-model` 以期刊版全文做了一次�
 
 `add-paragraph-moves` 在格式 2.0 之上多標一層：每一句在做什麼（`move`）、每一段在做什麼（`type`）。依存樹原封不動，兩篇附檔拿掉這兩個欄位後與先前完全相同。
 
-做法：先試標兩篇各一節定出慣例，再由 subagent 分批全篇標註；標完後依回報補上 `recap` 這個步驟與 `abstract`、`limitations` 兩個段落類型，只針對受影響的標籤修正（30 句、5 段）。詞彙最後是 24 個步驟、15 個段落類型，見 `plugins/propositions/catalog/vocabulary.yaml`。走法統計見 `plugins/propositions/catalog/paragraph-catalog.yaml`，只含次數。
+做法：先試標兩篇各一節定出慣例，再由 subagent 分批全篇標註；標完後依回報補上 `recap` 這個步驟與 `abstract`、`limitations` 兩個段落類型，只針對受影響的標籤修正（30 句、5 段）。詞彙最後是 24 個步驟、15 個段落類型，見 `plugins/propositions/catalog/vocabulary.yaml`。各種連結的次數見 `plugins/propositions/catalog/links.csv`，只含次數（見下方「連結清單」）。
 
 | 項目 | 實證稿 | 數學稿 |
 |---|---|---|
@@ -140,3 +140,21 @@ Spectra change `add-article-construction-model` 以期刊版全文做了一次�
 - **κ 不等於人讀起來清楚。** 這要靠實際讀 `structure-explain.py` 的輸出。
 - **最不穩的地方：** `recap` 和 `state-result` 的界線（尤其是結果段裡的總結），實證稿的 `derive`（7 句只有 2 句一致）與 `compare`（4 句只有 1 句一致），以及段落類型 `abstract` 和 `discussion` 的界線。
 - **樣本只有兩篇。** 留一段測試是同一篇之內，次數不是機率，也不代表其他文類。
+
+### 連結清單（#33，2026-11-04）
+
+全篇標完後，目錄由「段落類型 → 步驟 → 下一步」的 YAML 改成帶類型的連結清單（`plugins/propositions/catalog/links.csv`），因為量到步驟之間的走法有環，硬改成 DAG 會丟掉真實的走法。
+
+| 連結 | 實證稿 | 數學稿 | 看過的步驟組合（兩篇合計） |
+|---|---|---|---|
+| `next`（含段落開頭與結尾） | 339 | 423 | 136／576 |
+| `head` | 249 | 189 | 123／576 |
+| `cites` | 329 | 442 | 158／576 |
+| `discharge` | 40 | 6 | 32／576 |
+| `paragraph`（段落類型之間） | 34 | 100 | 31／225 |
+| `also` | 0 | 0 | 0 |
+
+- **有環：** 24 個步驟裡 21 個會接自己；15 個段落類型有 13 個在 `next` 上有環。具體句子只看 `head` 是每段一棵樹，`cites` 由 R3 保證無環，兩者混在一起才出現 2 到 3 句的小環，所以清單分種類記。
+- **引用的範圍：** 771 條引用中，同一段 363、同一節的其他段 198、其他節 210。
+- **看過與沒看過：** 表中「看過的組合」只說明兩篇用到了哪些；沒看過的由 `structure-links.py catalog --unseen` 從詞彙算出。兩篇判斷不出哪些是不可能的，所以不標。
+

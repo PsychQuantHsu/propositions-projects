@@ -9,7 +9,8 @@
 - 新增一層標註：`discourse.jsonl` 的紀錄可記 `move`（這一句在做什麼），`structure.json` 的段落可記 `type`（這段是什麼類型）。兩者都是選填，`structure_version` 維持 `"2.0"`，既有附檔不改也照常通過。
 - 新增封閉詞彙 `plugins/propositions/catalog/vocabulary.yaml`，手寫，定義步驟與段落類型。
 - 新增 `plugins/propositions/scripts/structure-explain.py`：把一段或一節讀成「第幾句、在做什麼、掛在第幾句、什麼關係」。這是主要成果。
-- 新增 `plugins/propositions/scripts/build-paragraph-catalog.py` 與產生的 `plugins/propositions/catalog/paragraph-catalog.yaml`：每個段落類型的步驟與每一步之後的走法，只含次數，不含稿件文字。
+- 新增 `plugins/propositions/scripts/build-link-catalog.py` 與產生的 `plugins/propositions/catalog/links.csv`：步驟之間所有種類的連結，一種連結一列，記類型、段落類型、兩端、關係、範圍、標籤與次數，只含次數，不含稿件文字。（全篇標完後依維護者決定由 YAML 目錄改來，見 design。）
+- 新增 `plugins/propositions/scripts/structure-links.py`：列出一句的所有連結，以及目錄裡某個步驟看過與沒看過的走法。「沒看過」由詞彙算出，不另外儲存。
 - `validate-structure.py` 新增規則 S9：`move` 與 `type` 的值要在詞彙裡。目錄沒有的走法不提示。
 - `structure-metrics.py` 報告步驟的覆蓋率、和 `claim_type` 與關係的關聯、下一步的命中率，以及兩份標註之間的 Cohen's κ。
 - `structure-batch.py` 新增只標步驟的模式，不動既有的依存樹。
@@ -19,7 +20,7 @@
 ## Non-Goals
 
 - next 模式這次不引用目錄。要不要引用，之後依本次報告的命中率決定。
-- 不做 CSV 統計表。目前的預測力不值得先做。
+- 不標「不可能」的走法。兩篇稿件判斷不出來，沒看過不等於不可能；目錄只分看過與沒看過。
 - 目錄沒有的走法不提示，也不觸發檢查失敗；目錄只是觀察到的走法，不是規則。
 - 不修 #34（每筆都有 `note` 的問題）。
 
@@ -40,13 +41,16 @@
 - Affected code:
   - New:
     - plugins/propositions/catalog/vocabulary.yaml
-    - plugins/propositions/catalog/paragraph-catalog.yaml
+    - plugins/propositions/catalog/links.csv
+    - plugins/propositions/scripts/_lib/link_catalog.py
+    - plugins/propositions/scripts/structure-links.py
     - plugins/propositions/scripts/_lib/move_vocabulary.py
     - plugins/propositions/scripts/structure-explain.py
-    - plugins/propositions/scripts/build-paragraph-catalog.py
+    - plugins/propositions/scripts/build-link-catalog.py
     - tests/test_move_vocabulary.py
     - tests/test_structure_explain.py
-    - tests/test_build_paragraph_catalog.py
+    - tests/test_build_link_catalog.py
+    - tests/test_structure_links.py
   - Modified:
     - plugins/propositions/scripts/validate-structure.py
     - plugins/propositions/scripts/structure-metrics.py
@@ -65,4 +69,5 @@
     - tests/test_validate_structure.py
     - tests/test_structure_metrics.py
     - tests/test_structure_tools.py
-  - 依賴：標到 `move` 或 `type` 時需要 PyYAML；沒有這兩個欄位的附檔不需要。
+  - Removed（本 change 內先產生、後取代）：plugins/propositions/catalog/paragraph-catalog.yaml、plugins/propositions/scripts/build-paragraph-catalog.py、tests/test_build_paragraph_catalog.py
+  - 依賴：標到 `move` 或 `type` 時需要 PyYAML；沒有這兩個欄位的附檔不需要。查目錄（`structure-links.py catalog`）要用詞彙驗證輸入值，也需要 PyYAML。

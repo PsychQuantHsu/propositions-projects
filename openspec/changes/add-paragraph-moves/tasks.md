@@ -31,6 +31,15 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 用兩篇暫存附檔跑 `structure-explain.py`，各挑 3 段給維護者看讀法輸出，取得確認後才把附檔寫進各自 repo 並 commit；`main.jsonl` 的 sha256 不變
+- [x] 6.1 用兩篇暫存附檔跑 `structure-explain.py`，各挑 3 段給維護者看讀法輸出，取得確認後才把附檔寫進各自 repo 並 commit；`main.jsonl` 的 sha256 不變
 - [x] 6.2 更新 plugins/propositions/README.md、plugins/propositions/docs/PLAYBOOK.md、CLAUDE.md；版本升到 0.8.0（plugins/propositions/.claude-plugin/plugin.json 與 .claude-plugin/marketplace.json）；README 註明用到 `move` 時需要 PyYAML
-- [ ] 6.3 總驗證：`pytest tests/` 全過（含 tests/test_plugin_payload_tracked.py，確認 catalog 兩個檔案有進 git）、`spectra validate add-paragraph-moves` 通過；對 `/propositions:construct` 試 5 句「這段句子之間是什麼關係」的請求，確認會觸發 explain 用法；把結果留言到 #33
+- [x] 6.3 總驗證：`pytest tests/` 全過（含 tests/test_plugin_payload_tracked.py，確認 catalog 兩個檔案有進 git）、`spectra validate add-paragraph-moves` 通過；對 `/propositions:construct` 試 5 句「這段句子之間是什麼關係」的請求，確認會觸發 explain 用法；把結果留言到 #33
+
+## 7. 連結清單與查詢（全篇標完後追加）
+
+- [x] 7.1 在 tests/test_build_link_catalog.py 先寫失敗測試：spec 的五個 scenario（閱讀順序與依賴分開記、跨節引用的 scope、兌現帶承諾種類、不含稿件內容、`--check` 過期時 exit 1 且不改檔），另測 `also` 與 `paragraph` 列、標頭逐字相符、同樣輸入得到相同位元組、缺 move 的連結不寫入且印出數量、`pending` 頭與詞彙外的值 exit 2。然後把 plugins/propositions/scripts/build-paragraph-catalog.py 改寫成 plugins/propositions/scripts/build-link-catalog.py，共用定義放 plugins/propositions/scripts/_lib/link_catalog.py，並移除 tests/test_build_paragraph_catalog.py（Requirement: The link catalog is generated from annotated sidecars；設計：目錄是帶類型的連結清單，不是 DAG）
+- [x] 7.2 在 tests/test_structure_links.py 先寫失敗測試：`sentence` 的兩個方向（spec 的 scenario）、`also`、跨段與跨節的 `cites`、承諾兌現、用 proposition id 指定、`--no-text`、找不到的位置 exit 2、不寫檔；`catalog` 的計數依總數排序、`--type` 與 `--label` 篩選、`--to` 反查、`--unseen` 的補集（spec 的 scenario）、`--unseen` 缺 `--kind` 與拼錯的值 exit 2、目錄標頭或次數不合法 exit 2。然後實作 plugins/propositions/scripts/structure-links.py（Requirement: Link queries report every link of a sentence and the paths of a value；設計：「所有可能」只分看過與沒看過、查詢工具）
+- [x] 7.3 從兩篇稿件的附檔產生 plugins/propositions/catalog/links.csv，`--check` 通過；刪除 plugins/propositions/catalog/paragraph-catalog.yaml；用帳冊逐條比對，確認檔內沒有任何 proposition 文字片段、proposition id 或本機路徑；用 `structure-links.py sentence` 在兩篇各查 2 句，確認與 `structure-explain.py` 的輸出一致
+- [x] 7.4 改文件：plugins/propositions/docs/STRUCTURE.md（目錄改成連結清單：六種 kind、方向、scope、為什麼不是 DAG、看過與沒看過）、plugins/propositions/skills/construct/SKILL.md（explain 用法加單句查詢、next 模式不讀 `links.csv`；Requirement: Next mode does not consult the link catalog）、plugins/propositions/skills/construct/references/vocabulary.md、plugins/propositions/README.md、CLAUDE.md、docs/REFERENCE-MANUSCRIPTS.md（各種連結的數量、有環的量測、看過 136／576）；確認沒有檔案再提到 `paragraph-catalog.yaml`
+- [ ] 7.5 總驗證：`pytest tests/` 全過（含 tests/test_plugin_payload_tracked.py，確認 `links.csv` 進了 git、舊 YAML 已移除）、`spectra validate add-paragraph-moves` 通過、版本維持 0.8.0（尚未發布）；把結果留言到 #33
+

@@ -71,24 +71,64 @@ A record in `discourse.jsonl` MAY have a string field `move`, and a paragraph in
 - **WHEN** `--paragraph p-999` names no paragraph
 - **THEN** the exit status is 2 and the message names `p-999`
 
-### Requirement: The paragraph catalog is generated from annotated sidecars
+### Requirement: The link catalog is generated from annotated sidecars
 
-`build-paragraph-catalog.py` SHALL accept `--sidecars <label>=<ledger directory>` one or more times, `--vocabulary`, `--out`, and `--check`. It SHALL write a YAML file that lists, for each paragraph type seen, the number of paragraphs per label, the moves that open it with counts per label, and, for each move, the options that follow it within a paragraph of that type: the next move or `END`, the next proposition's relation, the move of the next proposition's head, and counts per label. Sentences without a move and paragraphs without a type SHALL be left out and their numbers reported in the file's `excluded` section. The file SHALL contain no ledger text, no proposition ids, no paragraph ids and no paths. With `--check` the tool SHALL write nothing and exit 1 when the file on disk differs from what it would write. Output SHALL be sorted so that the same input gives the same bytes.
+`build-link-catalog.py` SHALL accept `--sidecars <label>=<ledger directory>` one or more times, `--vocabulary`, `--out`, and `--check`, and SHALL write a CSV file whose header is exactly `kind,paragraph_type,from,to,relation,scope,label,count`. Each row SHALL count the links of one kind between two values observed in the sources under one label. The kinds SHALL be exactly these six:
 
-#### Scenario: A transition is counted per label
+| `kind` | `from` | `to` | `relation` |
+|---|---|---|---|
+| `next` | a sentence's move, or `START` | the move of the next sentence of its paragraph, or `END` | the next sentence's relation; `ROOT` when it is the paragraph root; empty for `END` |
+| `head` | a sentence's move | its head's move | its relation |
+| `also` | a sentence's move | the move of an `also` target | that entry's relation |
+| `cites` | a sentence's move | the move of a proposition its ledger entry cites | empty |
+| `discharge` | the move of a sentence that discharges a commitment | the move of the sentence that opened it | the commitment's kind |
+| `paragraph` | a paragraph's type | its head paragraph's type | the paragraph relation |
 
-- **WHEN** one paragraph of type `goal-summary` under the label `empirical` goes from `state-goal` to `state-baseline` by `specification` with its head at `state-goal`
-- **THEN** the catalog has that option under `goal-summary` and `state-goal` with `empirical` count 1
+`next` points forward in reading order; every other kind points from the dependent end to what it depends on. `paragraph_type` SHALL be the type of the paragraph holding the `from` sentence, empty when that paragraph has no type, and empty for `paragraph`. `scope` SHALL be `paragraph` when both ends are in one paragraph, `section` when they are in one section, and `article` otherwise; it is `section` for `paragraph`. A link whose end has no move, or no type for `paragraph`, SHALL be left out and the number left out per label printed. The tool SHALL refuse a source with a `pending` head. The file SHALL contain no ledger text, proposition ids, paragraph ids or paths. Rows SHALL be sorted so that the same input gives the same bytes. With `--check` the tool SHALL write nothing and exit 1 when the file on disk differs from what it would write.
+
+#### Scenario: Reading order and dependency are separate kinds
+
+- **WHEN** a paragraph of type `goal-summary` under label `empirical` has root `state-goal` followed by `state-baseline`, whose head is the root by `specification`
+- **THEN** the catalog has the rows `next,goal-summary,START,state-goal,ROOT,paragraph,empirical,1`, `next,goal-summary,state-goal,state-baseline,specification,paragraph,empirical,1` and `head,goal-summary,state-baseline,state-goal,specification,paragraph,empirical,1`
+
+#### Scenario: A citation across sections
+
+- **WHEN** a `state-result` sentence cites a `define` sentence of another section
+- **THEN** the catalog has a `cites` row from `state-result` to `define` with scope `article`
+
+#### Scenario: A discharge carries the commitment kind
+
+- **WHEN** a `preview` sentence opens an announcement that a `state-result` sentence discharges
+- **THEN** the catalog has a `discharge` row from `state-result` to `preview` with relation `announcement`
 
 #### Scenario: The catalog carries no manuscript content
 
 - **WHEN** the catalog is built from a fixture ledger
-- **THEN** no proposition text, proposition id or directory path of the fixture occurs in the file
+- **THEN** no proposition text, proposition id, paragraph id or directory path of the fixture occurs in the file
 
 #### Scenario: The check mode finds a stale catalog
 
 - **WHEN** a move in the sidecars changes after the catalog was written and `--check` is given
 - **THEN** the exit status is 1 and the file is unchanged
+
+### Requirement: Link queries report every link of a sentence and the paths of a value
+
+`structure-links.py sentence` SHALL accept `--jsonl`, `--at <position or proposition id>`, optional `--structure`, `--discourse`, `--vocabulary`, `--no-text` and `--format text|json`, and SHALL list every link of that sentence with the catalog's kinds and a direction: `out` when the sentence is the link's `from` end and `in` when it is the `to` end. For each link it SHALL give the other sentence's position and move, the relation or commitment kind, and the scope. `structure-links.py catalog` SHALL accept exactly one of `--from <value>` or `--to <value>`, optional `--kind`, `--type`, `--label`, `--unseen`, `--catalog` (default: the plugin's `catalog/links.csv`), `--vocabulary` and `--format`, and SHALL list the observed links matching the filters with their counts per label and in total, most frequent first. With `--unseen`, which requires `--kind`, it SHALL also list every value the vocabulary allows at the other end that no matching row has: moves (with `END` for `next` from a value, `START` for `next` to a value), or paragraph types for `paragraph`. A value, kind or paragraph type outside the vocabulary SHALL be an input error. Neither subcommand SHALL write any file. Exit status SHALL be 0 when it reports and 2 on an input error.
+
+#### Scenario: A sentence's links in both directions
+
+- **WHEN** sentence 3 hangs on 1 by `specification`, sentence 4 hangs on 3 by `continue`, and `--at 3` is given
+- **THEN** the output has `head` out to 1 with `specification`, `head` in from 4 with `continue`, `next` in from 2 and `next` out to 4
+
+#### Scenario: Unseen paths are computed, not stored
+
+- **WHEN** the catalog has `next` rows from `state-goal` only to `state-baseline` and `END`, and `--from state-goal --kind next --unseen` is given
+- **THEN** the unseen list holds every other move of the vocabulary and not `state-baseline` or `END`
+
+#### Scenario: A misspelt value is refused
+
+- **WHEN** `--from state-gaol` is given
+- **THEN** the exit status is 2 and the message names `state-gaol`
 
 ### Requirement: Metrics report whether moves add anything
 

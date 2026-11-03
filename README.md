@@ -113,24 +113,36 @@ propositions-projects/
 │   │   ├── .claude-plugin/plugin.json
 │   │   ├── README.md
 │   │   ├── skills/          # user-invocable slash commands
-│   │   │   ├── propositions/SKILL.md      # validate / refresh / extract
+│   │   │   ├── propositions/SKILL.md      # validate / refresh locations / onboard
+│   │   │   ├── extract/SKILL.md           # text → propositions
 │   │   │   ├── proofread/SKILL.md         # per-prop L1-L5 semantic walk
 │   │   │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
+│   │   │   ├── construct/SKILL.md         # article structure, explain, next
+│   │   │   ├── construct-batch/SKILL.md   # long-manuscript structure batches
 │   │   │   └── clarity-audit/SKILL.md     # prose readability
-│   │   ├── scripts/         # validator + audit tooling
+│   │   ├── scripts/         # validator, audit, extraction and structure tooling
 │   │   │   ├── validate-propositions.py
 │   │   │   ├── refresh-prop-locations.py
+│   │   │   ├── assign-prop-ids.py, check-extraction-coverage.py
 │   │   │   ├── audit-theorem-boundaries.py
 │   │   │   ├── audit-{citations,symbols,code-manuscript}.py
 │   │   │   ├── run-audit.sh
-│   │   │   ├── migrate-{prop-id-to-uuid,json-to-jsonl}.py
-│   │   │   └── _lib/latex_env_parser.py
+│   │   │   ├── validate-structure.py      # S1-S9
+│   │   │   ├── structure-{state,explain,links,metrics,batch}.py
+│   │   │   ├── build-link-catalog.py, derive-paragraphs.py, reorder-ledger.py
+│   │   │   ├── validate-verification.py, proofread-to-verification.py
+│   │   │   ├── migrate-{prop-id-to-uuid,json-to-jsonl,structure-v2}.py
+│   │   │   └── _lib/          # shared parsers and helpers
+│   │   ├── catalog/         # vocabulary.yaml (moves, paragraph types), links.csv (generated)
 │   │   ├── rules/           # discipline rules (the skills link to these)
 │   │   │   ├── manuscript-jsonl-sync.md
 │   │   │   ├── manuscript-consistency-audit.md
 │   │   │   └── code-and-manuscript-sync.md
+│   │   ├── templates/ledger/  # Operation D scaffold
 │   │   └── docs/
-│   │       └── EXTRACTION-PROMPT.md
+│   │       ├── EXTRACTION-PROMPT.md
+│   │       ├── STRUCTURE.md, VERIFICATION.md
+│   │       └── PLAYBOOK.md
 │   └── tschema-check/       # source-fidelity review (migrated from truth-conditions, #4)
 │       ├── .claude-plugin/plugin.json
 │       ├── README.md
@@ -140,10 +152,12 @@ propositions-projects/
 ├── CLAUDE.md                # repo-level instructions
 ├── README.md                # this file
 ├── scripts/                 # forwarding shims into the plugin (pinned-CI entry points)
-├── tests/                   # pytest test suite (150+ tests)
+├── tests/                   # pytest test suite (730+ tests)
 └── docs/                    # repo-level docs, NOT plugin payload
     ├── SCHEMA.md            # canonical schema; each ledger carries its own copy
     ├── MIGRATION-propositions-projects.md
+    ├── REFERENCE-MANUSCRIPTS.md  # the two reference manuscripts and their measurements
+    ├── NOTES-proposition-representation-and-ai.md
     └── RELEASE-FLOW.md
 ```
 

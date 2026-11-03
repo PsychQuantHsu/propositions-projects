@@ -19,14 +19,14 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
-from structure_case import UUIDS, chain, pid, with_changes, write_case  # noqa: E402
+from structure_case import UUIDS, chain, pid, with_changes, write_case, write_vocabulary  # noqa: E402
 
 REPO_ROOT = Path(__file__).parent.parent
 SCRIPTS = REPO_ROOT / "plugins" / "propositions" / "scripts"
 SCRIPT = SCRIPTS / "validate-structure.py"
 VALIDATE_PROPS = REPO_ROOT / "scripts" / "validate-propositions.py"
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "structure"
-ALL_RULES = ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8")
+ALL_RULES = ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")
 
 RELATIONS = "continue, restatement, specification, instance, addition, contrast, reason, consequence, sequence, basis"
 ROLES = "abstract, introduction, background, formal_setup, method, results, proofs, discussion, conclusion, appendix"
@@ -738,3 +738,88 @@ def test_s5_body_commitments_are_unaffected_by_the_abstract_rule(tmp_path):
                         paragraph_starts=(1, 4))
     result = run(write_case(tmp_path, 6, recs, sections=ABSTRACT_FIRST))
     assert status(result.stdout, "S5") == "PASS", result.stdout
+
+
+# ---------- S9: moves and paragraph types (Spectra change add-paragraph-moves) ----------
+
+
+def run_without_yaml(ledger: Path, *flags: str) -> subprocess.CompletedProcess:
+    code = (
+        "import runpy, sys\n"
+        "sys.modules['yaml'] = None\n"
+        f"sys.argv = ['validate-structure.py', '--jsonl', {str(ledger)!r}, *{list(flags)!r}]\n"
+        f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n"
+    )
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+
+
+def test_s9_unknown_move_fails(tmp_path: Path) -> None:
+    ledger = write_case(tmp_path, 3, with_changes(3, {2: {"move": "state-gaol"}}))
+    result = run(ledger, "--vocabulary", str(write_vocabulary(tmp_path)))
+    assert result.returncode == 1, result.stdout
+    assert status(result.stdout, "S9") == "FAIL"
+    assert any(pid(2) in l and "state-gaol" in l for l in problems(result.stdout, "S9"))
+
+
+def test_s9_unknown_paragraph_type_fails(tmp_path: Path) -> None:
+    ledger = write_case(tmp_path, 3, paragraphs=[{"id": "p-1", "first": 1, "type": "summary"}])
+    result = run(ledger, "--vocabulary", str(write_vocabulary(tmp_path)))
+    assert result.returncode == 1, result.stdout
+    assert any("p-1" in l and "summary" in l for l in problems(result.stdout, "S9"))
+
+
+def test_s9_known_values_pass(tmp_path: Path) -> None:
+    ledger = write_case(
+        tmp_path, 3, with_changes(3, {1: {"move": "state-goal"}, 2: {"move": "state-baseline"}}),
+        paragraphs=[{"id": "p-1", "first": 1, "type": "goal-summary"}],
+    )
+    result = run(ledger, "--vocabulary", str(write_vocabulary(tmp_path)))
+    assert result.returncode == 0, result.stdout
+    assert status(result.stdout, "S9") == "PASS"
+
+
+def test_s9_move_must_be_a_string(tmp_path: Path) -> None:
+    ledger = write_case(tmp_path, 3, with_changes(3, {2: {"move": 7}}))
+    result = run(ledger, "--vocabulary", str(write_vocabulary(tmp_path)))
+    assert result.returncode == 1
+    assert status(result.stdout, "S9") == "FAIL"
+
+
+def test_s9_sidecars_without_moves_need_no_vocabulary(tmp_path: Path) -> None:
+    ledger = write_case(tmp_path, 3)
+    result = run_without_yaml(ledger, "--vocabulary", str(tmp_path / "absent.yaml"))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert status(result.stdout, "S9") == "PASS"
+
+
+def test_s9_missing_parser_is_an_input_error(tmp_path: Path) -> None:
+    ledger = write_case(tmp_path, 3, with_changes(3, {2: {"move": "state-goal"}}))
+    result = run_without_yaml(ledger, "--vocabulary", str(write_vocabulary(tmp_path)))
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "PyYAML" in result.stderr
+
+
+def test_s9_unusual_order_is_not_reported(tmp_path: Path) -> None:
+    ledger = write_case(
+        tmp_path, 3, with_changes(3, {1: {"move": "state-concern"}, 2: {"move": "state-goal"}, 3: {"move": "state-concern"}}),
+    )
+    result = run(ledger, "--vocabulary", str(write_vocabulary(tmp_path)))
+    assert result.returncode == 0, result.stdout
+    assert problems(result.stdout, "S9") == []
+
+
+def test_s9_broken_vocabulary_is_an_input_error(tmp_path: Path) -> None:
+    broken = (
+        "moves:\n  - {id: state-goal, does: a., zh: 甲}\n  - {id: state-goal, does: b., zh: 乙}\n"
+        "paragraph_types: []\n"
+    )
+    ledger = write_case(tmp_path, 3, with_changes(3, {2: {"move": "state-goal"}}))
+    result = run(ledger, "--vocabulary", str(write_vocabulary(tmp_path, broken)))
+    assert result.returncode == 2
+    assert "state-goal" in result.stderr
+
+
+def test_s9_default_vocabulary_ships_with_the_plugin(tmp_path: Path) -> None:
+    ledger = write_case(tmp_path, 3, with_changes(3, {1: {"move": "state-goal"}}))
+    result = run(ledger)
+    assert status(result.stdout, "S9") == "PASS", result.stdout + result.stderr

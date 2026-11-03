@@ -1,0 +1,119 @@
+# What a sentence (a move) or a paragraph (a type) can be doing.
+# Definitions and format: plugins/propositions/docs/STRUCTURE.md.
+#
+# A move says what the sentence does for its paragraph. How the sentence connects
+# to the others is recorded separately by `head` and `relation`; what kind of claim
+# it is, by the ledger's `claim_type`. A move that only repeats one of those adds
+# nothing, and `structure-metrics.py` reports the association so this can be seen.
+#
+# Allowed keys: id, does, zh, not. Never put manuscript text here.
+moves:
+  - id: set-context
+    does: Gives a background fact the reader needs before the paragraph's point.
+    zh: 鋪陳背景
+    not: A fact about earlier studies is report-prior.
+  - id: report-prior
+    does: Reports what earlier work or common practice has done or found.
+    zh: 報告既有做法
+  - id: identify-gap
+    does: Says what is wrong, missing or unresolved in what came before.
+    zh: 指出缺口
+    not: A limit on this article's own claim is qualify.
+  - id: state-goal
+    does: States what this article or section sets out to do or answer.
+    zh: 說目的
+    not: Saying only what comes next in the text, without a purpose, is preview.
+  - id: state-expectation
+    does: States a hypothesis or what should be found if a claim holds.
+    zh: 說預期
+  - id: preview
+    does: Announces what comes next in the text.
+    zh: 預告
+  - id: define
+    does: Introduces a term, symbol or formal object and says what it means.
+    zh: 定義
+  - id: set-assumption
+    does: Fixes a condition that the following text relies on.
+    zh: 設定條件
+  - id: describe-procedure
+    does: Says what was done, in what order or by which method.
+    zh: 說明做法
+  - id: describe-data
+    does: Says what the data, sample or materials are.
+    zh: 說明資料
+  - id: state-result
+    does: States a finding or a theorem without arguing for it here.
+    zh: 陳述結果
+    not: A statement obtained in place by a step of reasoning is derive.
+  - id: derive
+    does: Obtains a statement from earlier ones by a step of reasoning or calculation.
+    zh: 推導
+  - id: open-case
+    does: Narrows the discussion to one case of several.
+    zh: 分案
+  - id: give-example
+    does: Gives a concrete instance of what was just said.
+    zh: 舉例
+  - id: explain-why
+    does: Gives the reason or mechanism behind a statement.
+    zh: 解釋原因
+  - id: rule-out
+    does: Uses evidence or argument to set aside a competing explanation.
+    zh: 排除對立解釋
+  - id: interpret
+    does: Says what a result means for the question.
+    zh: 詮釋
+    not: Pulling several points together is conclude.
+  - id: compare
+    does: Sets two results, methods or views side by side.
+    zh: 對照
+  - id: qualify
+    does: Limits how far a statement holds, or adds a caveat.
+    zh: 限定範圍
+  - id: conclude
+    does: Draws together what the preceding text has established.
+    zh: 收束
+  - id: propose-next
+    does: Says what should be done next, beyond this article.
+    zh: 提出後續
+
+paragraph_types:
+  - id: background
+    does: Gives the reader what is already known about the topic.
+    zh: 背景段
+  - id: gap
+    does: Shows what existing work leaves open.
+    zh: 指出缺口段
+  - id: goal-summary
+    does: Sums up what the study sets out to do and how.
+    zh: 目的總結段
+  - id: roadmap
+    does: Lays out what the following text will do.
+    zh: 導覽段
+  - id: setup
+    does: Fixes definitions, notation or assumptions for what follows.
+    zh: 定義與設定段
+  - id: method
+    does: Says how the study was carried out.
+    zh: 方法段
+  - id: result-report
+    does: Reports what was found.
+    zh: 結果報告段
+  - id: alternative-test
+    does: Tests a competing explanation of a finding.
+    zh: 檢驗對立解釋段
+  - id: theorem-statement
+    does: States a formal result.
+    zh: 定理敘述段
+  - id: proof
+    does: Establishes a formal result step by step.
+    zh: 證明段
+  - id: discussion
+    does: Says what the findings mean and how far they reach.
+    zh: 討論段
+  - id: future-direction
+    does: Says where the work should go next.
+    zh: 未來方向段
+  - id: remark
+    does: Adds a side note to something already said.
+    zh: 補充說明段

@@ -101,7 +101,7 @@ def write_case(
         for s in sections
     ]
     structure["paragraphs"] = [
-        {"id": p["id"], "first_prop": pid(p["first"]), **{k: p[k] for k in ("head", "relation") if k in p}}
+        {"id": p["id"], "first_prop": pid(p["first"]), **{k: p[k] for k in ("head", "relation", "type") if k in p}}
         for p in paragraphs
     ]
     (tmp / "structure.json").write_text(json.dumps(structure, indent=1) + "\n")
@@ -123,3 +123,19 @@ def with_changes(n: int, changes: dict[int, dict], paragraph_starts: tuple[int, 
             merged.pop("relation", None)
         recs[by_pos[pos]] = merged
     return recs
+
+
+VOCABULARY = """\
+moves:
+  - {id: state-goal, does: States what the article sets out to do., zh: 說目的}
+  - {id: state-baseline, does: Says what serves as the comparison., zh: 說對照基準}
+  - {id: state-concern, does: Says what the study is most concerned with., zh: 說關注點}
+paragraph_types:
+  - {id: goal-summary, does: Sums up the study's goal., zh: 目的總結段}
+"""
+
+
+def write_vocabulary(tmp: Path, text: str = VOCABULARY) -> Path:
+    path = tmp / "vocabulary.yaml"
+    path.write_text(text, encoding="utf-8")
+    return path

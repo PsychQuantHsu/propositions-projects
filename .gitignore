@@ -12,8 +12,11 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Claude Code local settings
-.claude/
+# Claude Code local settings stay local; project rules under .claude/rules/ are
+# tracked so every clone gets them. `.claude/*` (not `.claude/`) is required:
+# git cannot re-include a path whose parent directory is itself excluded.
+/.claude/*
+!/.claude/rules/
 
 # Symlink shim auto-created by tests/conftest.py to expose smoke_tests
 # fixtures at the legacy manuscript-style path; not part of source tree.

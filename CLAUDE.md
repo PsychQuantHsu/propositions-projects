@@ -159,6 +159,7 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 - **Loud failure over silent fix**:寧可 anchor_failed 不要亂猜 line number
 - **Schema 升級走 spec 流程**:不要 ad-hoc 加 enum 值;先改 `docs/SCHEMA.md` 確定新 canonical set,再更 validator + tests
 - **Test 覆蓋每條 rule**:R1-R13 各自有獨立 fixture;改 normalize_for_match 等 shared helper 必跑全 R-rule test suite
+- **新程式一律寫 Swift**:工具的目標是像 Akashic-Library 一樣完全用 Swift;既有 Python 只修不長,要加功能先移植那個模組。哪裡放什麼、例外與既有檔清單見 [`.claude/rules/swift-is-the-implementation-language.md`](.claude/rules/swift-is-the-implementation-language.md)
 
 ## Test suite
 

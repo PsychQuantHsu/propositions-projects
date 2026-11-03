@@ -54,6 +54,10 @@ moves:
   - id: give-example
     does: Gives a concrete instance of what was just said.
     zh: 舉例
+  - id: propose-explanation
+    does: Puts forward an explanation that is still to be examined.
+    zh: 提出待檢驗的解釋
+    not: A reason the text takes as settled is explain-why.
   - id: explain-why
     does: Gives the reason or mechanism behind a statement.
     zh: 解釋原因
@@ -76,6 +80,9 @@ moves:
   - id: propose-next
     does: Says what should be done next, beyond this article.
     zh: 提出後續
+  - id: point-to
+    does: Sends the reader to a table, figure or another place in the text.
+    zh: 指引去處
 
 paragraph_types:
   - id: background

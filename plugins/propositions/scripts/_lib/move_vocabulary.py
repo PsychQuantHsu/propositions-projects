@@ -36,13 +36,19 @@ class Vocabulary:
     paragraph_types: dict[str, Entry]
 
 
-def _read_yaml(path: Path) -> object:
+def require_yaml():
+    """The yaml module, or an InputError naming PyYAML."""
     try:
         import yaml
     except ImportError as exc:
         raise InputError(
             "reading moves or paragraph types needs PyYAML, which is not installed: python3 -m pip install pyyaml"
         ) from exc
+    return yaml
+
+
+def _read_yaml(path: Path) -> object:
+    yaml = require_yaml()
     if not path.is_file():
         raise InputError(f"vocabulary not found: {path}")
     try:

@@ -35,6 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _lib.move_vocabulary import Vocabulary, load_vocabulary  # noqa: E402
+from _lib.structure_io import ledger_field  # noqa: E402
 from _lib.structure_tree import PENDING  # noqa: E402
 
 EXIT_OK, EXIT_USAGE = 0, 2
@@ -66,17 +67,6 @@ state = _load_state()
 vs = state.vs
 
 
-def ledger_texts(path: Path) -> dict[str, str]:
-    texts: dict[str, str] = {}
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if line and not line.startswith("//"):
-            prop = json.loads(line)
-            if isinstance(prop.get("text"), str):
-                texts[prop.get("id")] = prop["text"]
-    return texts
-
-
 def tree_depth(position: int, heads: dict[int, object]) -> int:
     """Edges from `position` up to the root; a pending head counts as one edge."""
     depth, current = 0, position
@@ -91,7 +81,7 @@ def tree_depth(position: int, heads: dict[int, object]) -> int:
 
 
 def explain_proposition(analysis, position: int, end_heads: dict[int, object], vocabulary: Vocabulary | None,
-                        texts: dict[str, str] | None) -> dict:
+                        texts: dict[str, object] | None) -> dict:
     prop_id = analysis.ledger.live[position - 1]
     data = analysis.records[position - 1].data
     head = end_heads.get(position)
@@ -114,7 +104,7 @@ def explain_proposition(analysis, position: int, end_heads: dict[int, object], v
         ],
     }
     if texts is not None:
-        item["text"] = texts.get(prop_id, "")
+        item["text"] = str(texts.get(prop_id, ""))
     return item
 
 
@@ -130,7 +120,7 @@ def explain(ledger: Path, structure: Path, discourse: Path, vocabulary_path: Pat
         raise vs.InputError(f"no section `{section}`")
     has_labels = any("move" in r.data for r in analysis.records) or any("type" in p for p in raw.values())
     vocabulary = load_vocabulary(vocabulary_path) if has_labels else None
-    texts = ledger_texts(ledger) if with_text else None
+    texts = ledger_field(ledger, "text") if with_text else None
     headings = {s["id"]: s for s in analysis.structure["sections"]}
     total = len(analysis.ledger.live)
     out = []

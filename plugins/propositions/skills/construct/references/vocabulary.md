@@ -5,6 +5,8 @@ The definitions and boundary notes of every value live in
 the decision procedure the construct skill follows when it labels a ledger
 (format 2.0: a dependency tree in three levels). The three tables below list the
 same values in the same order as the validator, and a test keeps them identical.
+Moves and paragraph types are the exception: their values and definitions live in
+`plugins/propositions/catalog/vocabulary.yaml`.
 
 Start from the paragraph plan that `derive-paragraphs.py` proposes, and change it
 only where a TeX paragraph makes two arguments or two TeX paragraphs make one.
@@ -22,7 +24,7 @@ Then work paragraph by paragraph in reading order.
    and then explains it, the fact is the root and the explanation hangs on it
    as `reason`. The convention makes two annotators choose the same root.
 
-**For each proposition**, answer five questions in this order:
+**For each proposition**, answer six questions in this order:
 
 1. **Head.** If it is not the root: which proposition of the same paragraph
    does it hang on? It is often the previous one, but take the one it actually
@@ -39,10 +41,15 @@ Then work paragraph by paragraph in reading order.
    ledger's `cites` records (a contrast with a proposition three paragraphs
    back, say)? Add `{"to": …, "relation": …}`. Do not repeat the head, and do
    not copy every `cites` entry: `cites` is already recorded.
+6. **Move** — what does it do for its paragraph? See "Moves and paragraph
+   types" below.
 
 **For each paragraph after the first in its section**: which earlier or later
 paragraph of the same section does it hang on, and how (a relation from the
 same table)? The section's main paragraph is its root paragraph.
+
+**For each paragraph**, once its propositions are labelled: its `type`. See
+"Moves and paragraph types" below.
 
 **For each section**: does it sit under another section (a subsection)? Set
 `parent` to that section's id. A subsection whose parent heading has no entry
@@ -143,11 +150,89 @@ Back matter that carries no argument (declarations of competing interest,
 author-contribution statements, the questionnaire items of an appendix) is not
 extracted into the ledger, so it needs no section entry.
 
+## Moves and paragraph types
+
+The values are in `plugins/propositions/catalog/vocabulary.yaml`: the lists
+`moves` and `paragraph_types`, where each entry has `does`, `zh` and sometimes
+`not`. That file is the list. It is not copied here because it can still change.
+It is closed: S9 rejects any other value, and a value that resembles a listed one
+is not mapped to it.
+
+A move says what the sentence does for its paragraph. Two other fields already
+record other things, and a move that only restates one of them adds nothing:
+
+| Field | What it records |
+|---|---|
+| `claim_type` (in the ledger) | What kind of claim the sentence is |
+| `head`, `relation` | What the sentence hangs on, and how it connects |
+| `move` | What the sentence does for its paragraph |
+
+**For each proposition**, with the whole paragraph in view:
+
+1. **Say what the paragraph needs this sentence for**, in your own words, before
+   you look at the list. "It is a claim" and "it makes its head more specific"
+   are not answers: the first is its `claim_type` and the second its relation.
+2. **Find the value** whose `does` says the same thing.
+3. **Read the `not` hints** of that value and of any value that came close. A
+   `not` hint says when a sentence belongs to a neighbouring value; follow it.
+4. **Check that the move is not a restatement.** A `claim` can point out what
+   earlier work leaves open in one paragraph and say where the work should go
+   next in another, and those are two moves. Two sentences joined to their heads
+   by `specification` can also do different work: one says what the study
+   compares, the other what a later study should try. If your only reason for a
+   value is the `claim_type` or the relation, go back to question 1.
+5. **Decide.** If one value fits, take it. If two fit, take the closer one and
+   record the runner-up (see "Recording the decision"). If none fits, stop and
+   report the sentence's position. Do not choose a near value: adding a value is
+   a change to the vocabulary, not a labelling decision.
+
+Label what each sentence does, even when the order looks unusual. No rule checks
+the order of moves, and a path missing from `paragraph-catalog.yaml` is not a
+problem, so never change a label to make a paragraph look like another one.
+
+**For each paragraph**, after its propositions:
+
+1. **Label the sentences first.** A type chosen first pulls the sentences towards
+   it.
+2. **Ask what the paragraph as a whole does**, reading its moves in order, and
+   find the value in `paragraph_types` whose `does` says the same thing. Read its
+   `not` hint if it has one.
+3. **Keep it apart from the section's role.** A role says what the section does; a
+   type says what this paragraph does. A paragraph in a results section may do
+   something other than report results.
+4. **Decide.** If none fits, stop and report the paragraph's id. If a paragraph
+   seems to need two types, it may be making two arguments, which is a question
+   for the paragraph plan.
+
+`structure-metrics.py` reports Cramér's V between move and `claim_type` and
+between move and relation. When moves line up almost one to one with either field,
+the move layer adds nothing and the vocabulary needs another look.
+
+Patterns settled in the pilot:
+
+- **Consecutive sentences doing the same job share a move.** A sentence that says
+  its head again more plainly keeps its head's move; `restatement` already records
+  how it connects. There is no move for "says it again".
+- **A fragment takes the move of the sentence it belongs to.** A condition, a scope
+  phrase, a "because" clause or a display equation split off by the ledger is part
+  of the job its sentence does, even when it is the head's `reason` or
+  `specification`. `explain-why` is for a sentence that gives a reason as its own job.
+- **A statement block:** each "Suppose ..." is `set-assumption` and the "Then ..."
+  is `state-result`, although the relation says `consequence`. Inside a proof each
+  step is `derive`, and the sentence that starts a case is `open-case`.
+- **A test's outcome:** `state-result` when the text only reports it, `rule-out`
+  when the text uses it to set an explanation aside. The same `claim_type: result`
+  takes either.
+- **An explanation being considered** is `propose-explanation` until the text has
+  tested it, however confidently it is worded.
+- **A short paragraph still gets a type**, from what it does in its section. A
+  one-sentence paragraph that finishes a statement or corrects a detail is `remark`.
+
 ## Recording the decision
 
 Add a `note` to a record whenever the choice was close (two heads were
-plausible, two rows of the relation table both held, or a commitment could be
-read as two kinds). The note names the runner-up and why it lost. Notes are
+plausible, two rows of the relation table both held, a commitment could be
+read as two kinds, or two moves both fit). The note names the runner-up and why it lost. Notes are
 what a reviewer reads to check the labels. When S7 reports a crossing, look at
 both arcs first: a crossing is often a head chosen one sentence too far; keep
 it only when the text really is not tree-shaped, and say so in a note.

@@ -12,20 +12,20 @@
 
 ## 3. 標註流程
 
-- [ ] 3.1 [P] 在 tests/test_structure_tools.py 先寫失敗測試：`--moves-only` 的輸入帶頭與關係；merge 只改 `move`、`type`，移除這兩欄後與暫存內容相同；少答一筆則 exit 2 且不寫檔。然後在 plugins/propositions/scripts/structure-batch.py 實作（Requirement: Moves are batch-annotated without touching the tree；設計：步驟和關係分開記，不合併）
-- [ ] 3.2 [P] 改 plugins/propositions/skills/construct/SKILL.md：標註流程要標 `move`、`type`，摘要列出次數，缺值時停下回報；新增 explain 用法（只讀、沒有附檔就說明並提議標註）；description 加上句子關係的請求；next 模式不讀目錄。同步 plugins/propositions/skills/construct/references/vocabulary.md 的判定程序與 plugins/propositions/skills/construct-batch/SKILL.md 的只標步驟流程（Requirement: Annotation writes sidecars only after validation and confirmation、Requirement: Construction requests route to the construct skill、Requirement: Explain mode reads out how sentences relate、Requirement: Next mode does not consult the paragraph catalog）
-- [ ] 3.3 [P] 改 plugins/propositions/docs/STRUCTURE.md（新欄位、S9、詞彙與目錄的關係、explain 的用法）與 docs/SCHEMA.md 的附檔節；確認沒有任何檔案宣稱 next 模式會讀目錄
+- [x] 3.1 [P] 在 tests/test_structure_tools.py 先寫失敗測試：`--moves-only` 的輸入帶頭與關係；merge 只改 `move`、`type`，移除這兩欄後與暫存內容相同；少答一筆則 exit 2 且不寫檔。然後在 plugins/propositions/scripts/structure-batch.py 實作（Requirement: Moves are batch-annotated without touching the tree；設計：步驟和關係分開記，不合併）
+- [x] 3.2 [P] 改 plugins/propositions/skills/construct/SKILL.md：標註流程要標 `move`、`type`，摘要列出次數，缺值時停下回報；新增 explain 用法（只讀、沒有附檔就說明並提議標註）；description 加上句子關係的請求；next 模式不讀目錄。同步 plugins/propositions/skills/construct/references/vocabulary.md 的判定程序與 plugins/propositions/skills/construct-batch/SKILL.md 的只標步驟流程（Requirement: Annotation writes sidecars only after validation and confirmation、Requirement: Construction requests route to the construct skill、Requirement: Explain mode reads out how sentences relate、Requirement: Next mode does not consult the paragraph catalog）
+- [x] 3.3 [P] 改 plugins/propositions/docs/STRUCTURE.md（新欄位、S9、詞彙與目錄的關係、explain 的用法）與 docs/SCHEMA.md 的附檔節；確認沒有任何檔案宣稱 next 模式會讀目錄
 
 ## 4. 試標與全篇標註
 
-- [ ] 4.1 兩篇稿件各試標一節（暫存位置，用只標步驟的批次模式）：讀 `structure-explain.py` 的輸出逐段檢查，增刪 plugins/propositions/catalog/vocabulary.yaml，並把慣例寫進 plugins/propositions/skills/construct/references/vocabulary.md；每次改詞彙後重跑 tests/test_move_vocabulary.py（設計：步驟要說明段落內的功能，不重複 `claim_type`）
+- [x] 4.1 兩篇稿件各試標一節（暫存位置，用只標步驟的批次模式）：讀 `structure-explain.py` 的輸出逐段檢查，增刪 plugins/propositions/catalog/vocabulary.yaml，並把慣例寫進 plugins/propositions/skills/construct/references/vocabulary.md；每次改詞彙後重跑 tests/test_move_vocabulary.py（設計：步驟要說明段落內的功能，不重複 `claim_type`）
 - [ ] 4.2 兩篇全篇標註：用 `structure-batch.py --moves-only` 切批、分給 subagent、合併到暫存副本；`validate-structure.py` S1 到 S9 都過，且 `move` 與 `type` 的覆蓋率都是 100%；移除這兩欄後與現有附檔內容相同
 - [ ] 4.3 一致性：獨立的 subagent 只看詞彙與句子，重標兩篇各至少 15 段、合計至少 60 句（不給第一次的結果），用 `structure-metrics.py --compare-moves` 算 κ。低於 0.6 就修訂詞彙或定義、重標並再量一次；第二次仍低於 0.6 就停下回報，不宣告完成（設計：步驟靠模型標，所以一定要量一致性）
 
 ## 5. 目錄與量測
 
-- [ ] 5.1 [P] 在 tests/test_build_paragraph_catalog.py 先寫失敗測試：轉移依標籤計數；未標者列入 `excluded`；輸出不含文字、proposition id、段落 id 與路徑；同樣輸入得到相同位元組；`--check` 過期時 exit 1 且不改檔。然後實作 plugins/propositions/scripts/build-paragraph-catalog.py（Requirement: The paragraph catalog is generated from annotated sidecars；設計：手寫的詞彙和產生的目錄是兩個檔案）
-- [ ] 5.2 [P] 在 tests/test_structure_metrics.py 先寫失敗測試：覆蓋率、Cramér's V、留一段的命中率、`--compare-moves` 的 κ（8／10 一致時 raw agreement 0.80 且 n=10）；沒有步驟時報告不變。然後改 plugins/propositions/scripts/structure-metrics.py（Requirement: Metrics report whether moves add anything）
+- [x] 5.1 [P] 在 tests/test_build_paragraph_catalog.py 先寫失敗測試：轉移依標籤計數；未標者列入 `excluded`；輸出不含文字、proposition id、段落 id 與路徑；同樣輸入得到相同位元組；`--check` 過期時 exit 1 且不改檔。然後實作 plugins/propositions/scripts/build-paragraph-catalog.py（Requirement: The paragraph catalog is generated from annotated sidecars；設計：手寫的詞彙和產生的目錄是兩個檔案）
+- [x] 5.2 [P] 在 tests/test_structure_metrics.py 先寫失敗測試：覆蓋率、Cramér's V、留一段的命中率、`--compare-moves` 的 κ（8／10 一致時 raw agreement 0.80 且 n=10）；沒有步驟時報告不變。然後改 plugins/propositions/scripts/structure-metrics.py（Requirement: Metrics report whether moves add anything）
 - [ ] 5.3 從兩篇暫存附檔產生 plugins/propositions/catalog/paragraph-catalog.yaml（標籤 `empirical`、`default`），`--check` 通過；grep 確認檔內沒有稿件文字、proposition id 與本機路徑
 - [ ] 5.4 把結果寫進 docs/REFERENCE-MANUSCRIPTS.md：κ、Cramér's V、留一段命中率（和 #33 的基準 55%／77%、59%／81% 比較）、步驟與類型的分布；同時寫明 κ 量到的是模型之間的一致
 

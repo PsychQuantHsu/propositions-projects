@@ -16,11 +16,20 @@ same inputs as structure-state.py and reports:
   - ordering: for `kind` and `scope`, the number of evaluated positions and hits.
     Position t is evaluated when a commitment open at t is discharged after t;
     it is a hit when the first commitment in the ordering is among those first
-    discharged at the earliest such position.
+    discharged at the earliest such position;
+  - moves, only when records have a `move` (Spectra change add-paragraph-moves):
+    how much is labelled; the count of each move and paragraph type; Cramér's V
+    between move and `claim_type`, and between move and relation (paragraph roots
+    have no relation and are left out); the leave-one-paragraph-out top-3 hit rate
+    for the next proposition's relation and for its move, given the current move
+    and given no condition, over the labelled positions (END when the paragraph
+    ends, ROOT when the next proposition is the root). With --compare-moves, raw
+    agreement and Cohen's kappa over what both labellings labelled. These are
+    reports: no value changes the exit status.
 
 Usage:
     python3 structure-metrics.py --jsonl main.jsonl [--structure structure.json]
-        [--discourse discourse.jsonl] [--format text|json]
+        [--discourse discourse.jsonl] [--compare-moves LEDGER_DIR] [--format text|json]
 
 Exit code:
     0 — metrics reported
@@ -34,9 +43,12 @@ import importlib.util
 import json
 import statistics
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from _lib.move_metrics import agreement, cramers_v, leave_one_group_out  # noqa: E402
+from _lib.structure_io import ledger_field  # noqa: E402
 from _lib.structure_tree import (  # noqa: E402
     ORDERS, PENDING, crossing_members, crossing_pairs, frontier, ordering_key, shared_depth, unit_index,
 )
@@ -100,7 +112,71 @@ def _ordering(analysis) -> dict:
     return out
 
 
-def compute(ledger: Path, structure_path: Path, discourse_path: Path) -> dict:
+def _next_rows(analysis) -> tuple[list, list, list, list]:
+    """Rows (paragraph, condition, target) for next relation and next move, each with and without the condition."""
+    records, pars = analysis.records, analysis.paragraphs
+    total = len(records)
+    relation_rows, relation_flat, move_rows, move_flat = [], [], [], []
+    for i, par in enumerate(pars):
+        end = pars[i + 1].first if i + 1 < len(pars) else total + 1
+        for pos in range(par.first, end):
+            move = records[pos - 1].data.get("move")
+            if not isinstance(move, str):
+                continue
+            nxt = records[pos].data if pos + 1 < end else None
+            relation = "END" if nxt is None else nxt.get("relation", "ROOT") if "head" in nxt else "ROOT"
+            relation_rows.append((i, move, relation))
+            relation_flat.append((i, "", relation))
+            target = "END" if nxt is None else nxt.get("move")
+            if isinstance(target, str):
+                move_rows.append((i, move, target))
+                move_flat.append((i, "", target))
+    return relation_rows, relation_flat, move_rows, move_flat
+
+
+def _sidecar_labels(directory: Path) -> tuple[dict, dict]:
+    """(prop id -> move, paragraph id -> type) of another labelling, without validating it."""
+    records = vs.load_discourse(directory / "discourse.jsonl")
+    structure = vs.load_structure(directory / "structure.json")
+    moves = {d.get("prop_id"): d["move"] for _, d in records if isinstance(d.get("move"), str)}
+    types = {p.get("id"): p["type"] for p in structure.get("paragraphs", []) if isinstance(p.get("type"), str)}
+    return moves, types
+
+
+def _move_report(analysis, ledger: Path, compare: Path | None) -> dict | None:
+    labelled = [r for r in analysis.records if isinstance(r.data.get("move"), str)]
+    if not labelled:
+        return None
+    raw_pars = analysis.structure["paragraphs"]
+    typed = {p["id"]: p["type"] for p in raw_pars if isinstance(p.get("type"), str)}
+    claims = ledger_field(ledger, "claim_type")
+    relation_rows, relation_flat, move_rows, move_flat = _next_rows(analysis)
+    claim_pairs = [(r.data["move"], claims[r.data["prop_id"]]) for r in labelled if r.data.get("prop_id") in claims]
+    relation_pairs = [(r.data["move"], r.data["relation"]) for r in labelled if isinstance(r.data.get("relation"), str)]
+    report = {
+        "labelled_propositions": len(labelled),
+        "proposition_share": round(len(labelled) / len(analysis.records), 4),
+        "labelled_paragraphs": len(typed),
+        "paragraph_share": round(len(typed) / len(raw_pars), 4),
+        "counts": dict(sorted(Counter(r.data["move"] for r in labelled).items())),
+        "type_counts": dict(sorted(Counter(typed.values()).items())),
+        "association": {"claim_type": cramers_v(claim_pairs), "relation": cramers_v(relation_pairs)},
+        "next_relation": {"evaluated": len(relation_rows), "current_move": leave_one_group_out(relation_rows),
+                          "no_condition": leave_one_group_out(relation_flat)},
+        "next_move": {"evaluated": len(move_rows), "current_move": leave_one_group_out(move_rows),
+                      "no_condition": leave_one_group_out(move_flat)},
+    }
+    if compare is not None:
+        other_moves, other_types = _sidecar_labels(compare)
+        own_moves = {r.data["prop_id"]: r.data["move"] for r in labelled}
+        report["agreement"] = {
+            "moves": agreement([(own_moves[k], other_moves[k]) for k in own_moves if k in other_moves]),
+            "types": agreement([(typed[k], other_types[k]) for k in typed if k in other_types]),
+        }
+    return report
+
+
+def compute(ledger: Path, structure_path: Path, discourse_path: Path, compare: Path | None = None) -> dict:
     analysis = state.load_checked(ledger, structure_path, discourse_path)
     firsts = [p.first for p in analysis.paragraphs]
     sentence_groups: dict[int, list] = {}
@@ -126,6 +202,7 @@ def compute(ledger: Path, structure_path: Path, discourse_path: Path) -> dict:
             relations[rel] += 1
         also += len(rec.data.get("also") or [])
     lengths = _frontier_lengths(analysis)
+    moves = _move_report(analysis, ledger, compare)
     return {
         "propositions": len(analysis.ledger.live),
         "paragraphs": len(analysis.paragraphs),
@@ -138,7 +215,38 @@ def compute(ledger: Path, structure_path: Path, discourse_path: Path) -> dict:
         "also": also,
         "s8_warnings": sum(1 for p in analysis.report.problems["S8"] if p.severity == "warning"),
         "ordering": _ordering(analysis),
+        **({"moves": moves} if moves else {}),
     }
+
+
+def _pct(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.0%}"
+
+
+def _agreement_line(name: str, a: dict) -> str:
+    if not a["n"]:
+        return f"{name}: nothing labelled in both"
+    kappa = "n/a" if a["kappa"] is None else f"{a['kappa']:.2f}"
+    return f"{name}: n {a['n']}, raw agreement {a['raw']:.2f}, Cohen's kappa {kappa}"
+
+
+def _render_moves(mv: dict) -> list[str]:
+    a, nr, nm = mv["association"], mv["next_relation"], mv["next_move"]
+    out = [
+        f"moves labelled: {mv['labelled_propositions']} propositions ({mv['proposition_share']:.1%}), "
+        f"{mv['labelled_paragraphs']} paragraphs ({mv['paragraph_share']:.1%})",
+        "move counts: " + ", ".join(f"{k} {v}" for k, v in mv["counts"].items()),
+        "type counts: " + (", ".join(f"{k} {v}" for k, v in mv["type_counts"].items()) or "none"),
+        f"Cramér's V: move and claim_type {a['claim_type']}, move and relation {a['relation']}",
+        f"next relation, top-3 leaving one paragraph out (n {nr['evaluated']}): "
+        f"given the move {_pct(nr['current_move'])}, no condition {_pct(nr['no_condition'])}",
+        f"next move, top-3 leaving one paragraph out (n {nm['evaluated']}): "
+        f"given the move {_pct(nm['current_move'])}, no condition {_pct(nm['no_condition'])}",
+    ]
+    if "agreement" in mv:
+        out += [_agreement_line("agreement on moves", mv["agreement"]["moves"]),
+                _agreement_line("agreement on types", mv["agreement"]["types"])]
+    return out
 
 
 def render_text(m: dict) -> str:
@@ -154,6 +262,8 @@ def render_text(m: dict) -> str:
     ]
     for order, r in m["ordering"].items():
         out.append(f"ordering {order}: {r['hits']}/{r['evaluated']} hits")
+    if "moves" in m:
+        out += _render_moves(m["moves"])
     return "\n".join(out) + "\n"
 
 
@@ -162,12 +272,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--jsonl", type=Path, required=True, help="the ledger (main.jsonl)")
     p.add_argument("--structure", type=Path, help="structure.json (default: beside the ledger)")
     p.add_argument("--discourse", type=Path, help="discourse.jsonl (default: beside the ledger)")
+    p.add_argument("--compare-moves", type=Path, metavar="LEDGER_DIR",
+                   help="another labelling's directory (discourse.jsonl, structure.json): report agreement on moves and types")
     p.add_argument("--format", choices=("text", "json"), default="text")
     args = p.parse_args(argv)
     structure = args.structure or args.jsonl.parent / "structure.json"
     discourse = args.discourse or args.jsonl.parent / "discourse.jsonl"
     try:
-        m = compute(args.jsonl, structure, discourse)
+        m = compute(args.jsonl, structure, discourse, args.compare_moves)
     except vs.InputError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE

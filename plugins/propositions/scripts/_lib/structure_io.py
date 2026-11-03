@@ -43,6 +43,18 @@ def load_ledger(path: Path) -> Ledger:
     return Ledger(live, cites)
 
 
+def ledger_field(path: Path, name: str) -> dict[str, object]:
+    """One field of every proposition, by id; propositions without it are left out."""
+    values: dict[str, object] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("//"):
+            prop = json.loads(line)
+            if name in prop:
+                values[prop.get("id")] = prop[name]
+    return values
+
+
 def load_discourse(path: Path) -> list[tuple[int, dict]]:
     if not path.is_file():
         raise InputError(f"discourse sidecar not found: {path}")

@@ -823,3 +823,11 @@ def test_s9_default_vocabulary_ships_with_the_plugin(tmp_path: Path) -> None:
     ledger = write_case(tmp_path, 3, with_changes(3, {1: {"move": "state-goal"}}))
     result = run(ledger)
     assert status(result.stdout, "S9") == "PASS", result.stdout + result.stderr
+
+
+def test_fixture_notes_mark_close_calls_only() -> None:
+    """The shipped fixture is the example annotators copy: a `note` names a runner-up (#34)."""
+    records = [json.loads(line) for line in (FIXTURE / "discourse.jsonl").read_text().splitlines() if line.strip()]
+    notes = [r["note"] for r in records if r.get("note")]
+    assert 0 < len(notes) < len(records) / 2, f"{len(notes)} of {len(records)} records carry a note"
+    assert all(n.startswith("runner-up: ") and "lost because" in n for n in notes), notes

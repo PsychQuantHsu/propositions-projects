@@ -1,12 +1,12 @@
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000001", "head": "019a3c5e-7a00-7000-8000-000000000002", "relation": "reason", "opens": [{"id": "c-setup-study-time", "kind": "setup"}], "note": "head comes later: 'therefore' in 2 marks 1 as its reason; concern used again in Discussion"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000002", "opens": [{"id": "c-q-spacing", "kind": "question"}], "note": "paragraph root"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000003", "head": "019a3c5e-7a00-7000-8000-000000000002", "relation": "restatement", "opens": [{"id": "c-aim-compare", "kind": "aim"}], "note": "In other words"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000004", "head": "019a3c5e-7a00-7000-8000-000000000003", "relation": "continue", "opens": [{"id": "c-hyp-spacing", "kind": "hypothesis"}], "note": "no connective"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000005", "head": "019a3c5e-7a00-7000-8000-000000000004", "relation": "reason", "note": "clause of the same sentence; because"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000006", "head": "019a3c5e-7a00-7000-8000-000000000002", "relation": "continue", "opens": [{"id": "c-plan-method", "kind": "plan"}, {"id": "c-plan-results", "kind": "plan"}, {"id": "c-plan-discussion", "kind": "plan"}], "note": "article plan, one commitment per item; returns to the root"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000007", "discharges": ["c-plan-method"], "note": "paragraph root; first prop of Method"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000008", "discharges": ["c-plan-results", "c-aim-compare"], "note": "paragraph root; One week later"}
-{"prop_id": "019a3c5e-7a00-7000-8000-000000000009", "head": "019a3c5e-7a00-7000-8000-000000000008", "relation": "consequence", "discharges": ["c-hyp-spacing", "c-q-spacing"], "note": "These results support"}
-{"prop_id": "019a3c5e-7a00-7000-8000-00000000000a", "also": [{"to": "019a3c5e-7a00-7000-8000-000000000009", "relation": "contrast"}], "opens": [{"id": "c-ann-study-time", "kind": "announcement"}], "note": "root of the subsection's only paragraph; However (contrast with 9 kept in also); we now examine"}
-{"prop_id": "019a3c5e-7a00-7000-8000-00000000000b", "also": [{"to": "019a3c5e-7a00-7000-8000-000000000001", "relation": "contrast"}, {"to": "019a3c5e-7a00-7000-8000-000000000007", "relation": "basis"}], "discharges": ["c-setup-study-time", "c-ann-study-time", "c-plan-discussion"], "note": "paragraph root; As noted in the Introduction (contrast with 1); uses the method in 7"}
-{"prop_id": "019a3c5e-7a00-7000-8000-00000000000c", "opens": [{"id": "c-fw-interval", "kind": "future_work"}], "note": "root of its own paragraph; In addition"}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000001", "head": "019a3c5e-7a00-7000-8000-000000000002", "relation": "reason", "opens": [{"id": "c-setup-study-time", "kind": "setup"}], "note": "runner-up: paragraph root, with 2 as its consequence; lost because 'therefore' in 2 marks 1 as the reason for the question 2 asks"}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000002", "opens": [{"id": "c-q-spacing", "kind": "question"}]}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000003", "head": "019a3c5e-7a00-7000-8000-000000000002", "relation": "restatement", "opens": [{"id": "c-aim-compare", "kind": "aim"}]}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000004", "head": "019a3c5e-7a00-7000-8000-000000000003", "relation": "continue", "opens": [{"id": "c-hyp-spacing", "kind": "hypothesis"}]}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000005", "head": "019a3c5e-7a00-7000-8000-000000000004", "relation": "reason"}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000006", "head": "019a3c5e-7a00-7000-8000-000000000002", "relation": "continue", "opens": [{"id": "c-plan-method", "kind": "plan"}, {"id": "c-plan-results", "kind": "plan"}, {"id": "c-plan-discussion", "kind": "plan"}], "note": "runner-up: head 5 with relation continue; lost because the plan follows on from the question in 2, not from the reason given in 5"}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000007", "discharges": ["c-plan-method"]}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000008", "discharges": ["c-plan-results", "c-aim-compare"]}
+{"prop_id": "019a3c5e-7a00-7000-8000-000000000009", "head": "019a3c5e-7a00-7000-8000-000000000008", "relation": "consequence", "discharges": ["c-hyp-spacing", "c-q-spacing"]}
+{"prop_id": "019a3c5e-7a00-7000-8000-00000000000a", "also": [{"to": "019a3c5e-7a00-7000-8000-000000000009", "relation": "contrast"}], "opens": [{"id": "c-ann-study-time", "kind": "announcement"}]}
+{"prop_id": "019a3c5e-7a00-7000-8000-00000000000b", "also": [{"to": "019a3c5e-7a00-7000-8000-000000000001", "relation": "contrast"}, {"to": "019a3c5e-7a00-7000-8000-000000000007", "relation": "basis"}], "discharges": ["c-setup-study-time", "c-ann-study-time", "c-plan-discussion"]}
+{"prop_id": "019a3c5e-7a00-7000-8000-00000000000c", "opens": [{"id": "c-fw-interval", "kind": "future_work"}]}

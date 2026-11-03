@@ -171,7 +171,7 @@ Rule S6 SHALL warn when an `announcement` commitment is first discharged neither
 ---
 ### Requirement: Structure validation reports per rule with fixed exit codes
 
-`validate-structure.py` SHALL accept `--jsonl` for the ledger, optional `--structure` and `--discourse` paths defaulting to the ledger's directory, `--partial`, and `--format text|json`. It SHALL print one summary line per rule (S1 to S8) marked PASS, FAIL or WARN, followed by each problem with the proposition's position and id. It SHALL exit 0 when no rule fails, 1 when any rule fails, and 2 when an input file is missing, unreadable or not valid JSON, or when `structure_version` is not `"2.0"`; in the last case the message SHALL name `migrate-structure-v2.py`.
+`validate-structure.py` SHALL accept `--jsonl` for the ledger, optional `--structure` and `--discourse` paths defaulting to the ledger's directory, optional `--vocabulary`, `--partial`, and `--format text|json`. It SHALL print one summary line per rule (S1 to S9) marked PASS, FAIL or WARN, followed by each problem with the proposition's position and id. It SHALL exit 0 when no rule fails, 1 when any rule fails, and 2 when an input file is missing, unreadable or not valid JSON, when `structure_version` is not `"2.0"`, or when moves or types are present and the vocabulary cannot be loaded; when `structure_version` is not `"2.0"` the message SHALL name `migrate-structure-v2.py`.
 
 #### Scenario: Warnings alone do not fail validation
 
@@ -187,6 +187,11 @@ Rule S6 SHALL warn when an `announcement` commitment is first discharged neither
 
 - **WHEN** `structure.json` has `structure_version` set to `"1.0"`
 - **THEN** the exit status is 2 and the message names `migrate-structure-v2.py`
+
+#### Scenario: A broken vocabulary is an input error
+
+- **WHEN** a record has `move` and the vocabulary file has a repeated id
+- **THEN** the exit status is 2 and the message names the repeated id
 
 ---
 ### Requirement: The state query reports what the article owes at a position

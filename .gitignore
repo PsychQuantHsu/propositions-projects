@@ -42,3 +42,6 @@ tests/fixtures/hsu-regression/
 # pointer (#3). Anchored for the same reason as /manuscript/ above.
 /references/mcs.pdf
 /references/mcs.txt
+
+# IDD tree-lock (idd-tree-lock.sh #183) — per-machine session state, not tracked
+.claude/.idd/tree-lock

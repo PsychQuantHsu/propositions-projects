@@ -162,8 +162,9 @@ paragraphs). Follow `references/vocabulary.md`: per paragraph its root, then per
 its head (inside the paragraph, before or after it), its relation, what it opens and
 discharges, any `also`, and its `move`; per paragraph after a section's first its head
 paragraph and relation; every paragraph's `type`, once its sentences are labelled; per
-subsection its `parent`. Put a `note` on every close call, naming the runner-up and why it
-lost. For a draft that has not stated its thesis yet, `thesis` is `[]`.
+subsection its `parent`. Put a `note` on every close call and nowhere else, written as
+`runner-up: <the other choice>; lost because <reason>` (`references/vocabulary.md`, "Recording
+the decision"). For a draft that has not stated its thesis yet, `thesis` is `[]`.
 
 Every record gets a `move` and every paragraph a `type`, from `catalog/vocabulary.yaml`. A
 needed value that is not in that file is a stop: report the sentence's position (or the

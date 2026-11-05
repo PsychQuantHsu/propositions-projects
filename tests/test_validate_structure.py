@@ -11,6 +11,7 @@ cases map one-to-one onto the spec's example tables; only the fixture tests use
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -823,3 +824,52 @@ def test_s9_default_vocabulary_ships_with_the_plugin(tmp_path: Path) -> None:
     ledger = write_case(tmp_path, 3, with_changes(3, {1: {"move": "state-goal"}}))
     result = run(ledger)
     assert status(result.stdout, "S9") == "PASS", result.stdout + result.stderr
+
+
+def test_fixture_notes_mark_close_calls_only() -> None:
+    """The shipped fixture is the example annotators copy: a `note` names a runner-up (#34)."""
+    records = [json.loads(line) for line in (FIXTURE / "discourse.jsonl").read_text().splitlines() if line.strip()]
+    notes = [r["note"] for r in records if r.get("note")]
+    assert 0 < len(notes) < len(records) / 2, f"{len(notes)} of {len(records)} records carry a note"
+    assert all(n.startswith("runner-up: ") and "lost because" in n for n in notes), notes
+
+
+NOTE_CONTRACT = "runner-up: <the other choice>; lost because <reason>"
+NOTE_CONTRACT_SOURCES = (
+    "plugins/propositions/skills/construct/references/vocabulary.md",
+    "plugins/propositions/docs/STRUCTURE.md",
+    "plugins/propositions/scripts/structure-batch.py",
+    "plugins/propositions/skills/construct/SKILL.md",
+    "plugins/propositions/skills/construct-batch/SKILL.md",
+)
+
+
+@pytest.mark.parametrize("source", NOTE_CONTRACT_SOURCES)
+def test_note_contract_is_stated_where_prompts_are_written_from(source: str) -> None:
+    """Every place an annotator's prompt is built from states the same note contract (#34)."""
+    text = " ".join((REPO_ROOT / source).read_text(encoding="utf-8").split())
+    assert NOTE_CONTRACT in text
+
+
+def recording_the_decision() -> str:
+    guide = (REPO_ROOT / NOTE_CONTRACT_SOURCES[0]).read_text(encoding="utf-8")
+    return guide[guide.index("## Recording the decision"):]
+
+
+def test_close_calls_are_a_closed_list_of_four_cases() -> None:
+    """A fifth case must be a deliberate edit of the list, not a sentence added after it (#34)."""
+    section = recording_the_decision()
+    assert "exactly these four cases, and in no other" in " ".join(section.split())
+    assert re.findall(r"^(\d+)\. ", section, re.MULTILINE) == ["1", "2", "3", "4"]
+
+
+def test_moves_only_batches_are_named_as_the_path_without_a_note() -> None:
+    """Case 4 cannot reach a record through --moves-only, so the guide must say where it goes (#34)."""
+    assert "--moves-only" in recording_the_decision()
+
+
+def test_batch_format_shows_note_as_optional() -> None:
+    """The answer shape in the batch docstring must not draw `note` as a field every entry has (#34)."""
+    doc = (SCRIPTS / "structure-batch.py").read_text(encoding="utf-8").split('"""')[1]
+    shape = doc[doc.index("An output file is:"):doc.index("With --moves-only")]
+    assert '["note":' in shape and '"note": str' not in shape, shape

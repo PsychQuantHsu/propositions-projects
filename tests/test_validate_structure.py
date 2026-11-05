@@ -11,6 +11,7 @@ cases map one-to-one onto the spec's example tables; only the fixture tests use
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -846,7 +847,25 @@ NOTE_CONTRACT_SOURCES = (
 @pytest.mark.parametrize("source", NOTE_CONTRACT_SOURCES)
 def test_note_contract_is_stated_where_prompts_are_written_from(source: str) -> None:
     """Every place an annotator's prompt is built from states the same note contract (#34)."""
-    assert NOTE_CONTRACT in (REPO_ROOT / source).read_text(encoding="utf-8")
+    text = " ".join((REPO_ROOT / source).read_text(encoding="utf-8").split())
+    assert NOTE_CONTRACT in text
+
+
+def recording_the_decision() -> str:
+    guide = (REPO_ROOT / NOTE_CONTRACT_SOURCES[0]).read_text(encoding="utf-8")
+    return guide[guide.index("## Recording the decision"):]
+
+
+def test_close_calls_are_a_closed_list_of_four_cases() -> None:
+    """A fifth case must be a deliberate edit of the list, not a sentence added after it (#34)."""
+    section = recording_the_decision()
+    assert "exactly these four cases, and in no other" in " ".join(section.split())
+    assert re.findall(r"^(\d+)\. ", section, re.MULTILINE) == ["1", "2", "3", "4"]
+
+
+def test_moves_only_batches_are_named_as_the_path_without_a_note() -> None:
+    """Case 4 cannot reach a record through --moves-only, so the guide must say where it goes (#34)."""
+    assert "--moves-only" in recording_the_decision()
 
 
 def test_batch_format_shows_note_as_optional() -> None:

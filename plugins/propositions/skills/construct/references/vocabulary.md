@@ -255,6 +255,10 @@ label already says it. In most paragraphs few records, if any, have a note.
 A5 lists the records that have a note, so the reviewer knows which labels to
 check first. A note on every record makes that list the whole article.
 
+One path cannot write a note: a `--moves-only` batch sets only `move` and
+`type`. Its subagent reports a case 4 close call in its reply instead, and A5
+shows those beside the records that have a note.
+
 When S7 reports a crossing, look at both arcs first: a crossing is often a
 head chosen one sentence too far. Keep it only when the text really is not
 tree-shaped. A kept crossing is case 1 above: the runner-up in its note is the

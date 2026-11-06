@@ -15,7 +15,7 @@ declarative claim 提煉成一行 JSONL，配 R1–R13 validator 保持稿件與
 | `SCHEMA.md` | schema 契約的**釘版副本**（scaffold 時從 plugin canonical 拷入；升版時隨 migration 更新） |
 | `EXTRACTION-PROMPT.md` | 抽取紀律的釘版副本（`/propositions:extract` 餵給 LLM 用） |
 | `_meta.json` | `schema_version` + `profile`（`default` 或 `empirical`，決定 validator 接受哪些 `claim_type`／`evidence_class`）+ `source`（主檔路徑、錨定 commit、`parts` 快照）+ `coverage` |
-| `main.jsonl` | 一行一個 proposition，依稿件閱讀序（`/propositions:extract` 產出、A 閘門把關） |
+| `main.jsonl` | 一行一個 proposition，依稿件閱讀序（Operation D 建空檔、`/propositions:extract` 寫入、A 閘門把關） |
 | `_smoke_tests/` | 本稿專屬的最小 fixture（見其 README） |
 
 ## 生命週期（短版）

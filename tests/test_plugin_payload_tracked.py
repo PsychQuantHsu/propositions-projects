@@ -265,3 +265,21 @@ def test_no_orphan_skill_outside_published_entries():
         "nobody and shadow the published copies):\n"
         + "\n".join(f"  {path}" for path in orphans)
     )
+
+
+PROPOSITIONS_SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "propositions" / "SKILL.md"
+
+
+def test_operation_d_scaffolds_an_empty_ledger():
+    """A new manuscript must get from Operation D to extraction (#41).
+
+    The validator, the coverage check and extract all open `main.jsonl`, and
+    extract's Step 2 raises FileNotFoundError without it. Nothing on an author's
+    disk reveals this: the reference manuscripts' ledgers were not built by
+    Operation D.
+    """
+    section = PROPOSITIONS_SKILL.read_text(encoding="utf-8").split("## Operation D", 1)[1]
+    listing, rest = section.split("**Dry-run listing.**", 1)[1].split("**Scaffold on confirm.**", 1)
+    scaffold = rest.split("**Hand off.**", 1)[0]
+    assert "`main.jsonl`" in listing, "the dry-run listing must show every file D creates"
+    assert "empty `main.jsonl`" in scaffold, "Operation D must create the ledger file"

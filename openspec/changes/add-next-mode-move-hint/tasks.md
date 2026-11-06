@@ -18,4 +18,4 @@
 ## 4. 驗收
 
 - [x] 4.1 實跑驗收：用截短的草稿讓 subagent 只讀 Next mode 段落並產出候選，三種情形各一份：結尾是帶 `pending` 的句子、結尾沒有等頭的子句、結尾沒有 `move`。逐項檢查：每個候選都有 **Does**；前三個是依 `to` 加總的結果；第一個候選的規則沒變；沒有 `move` 時略過提示並說明；檔案指紋前後相同。驗證：把結果記到 #36，不含稿件文字；有不符就修 skill 再跑。
-- [ ] 4.2 全套 `pytest tests/` 通過、`idd-ci-gate.sh` 對 head commit 通過、`spectra validate add-next-mode-move-hint` 通過，且 `git diff --stat main -- plugins/propositions/scripts` 為空。驗證：貼出三者的輸出。
+- [x] 4.2 全套 `pytest tests/` 通過、`idd-ci-gate.sh` 對 head commit 通過、`spectra validate add-next-mode-move-hint` 通過，且 `git diff --stat main -- plugins/propositions/scripts` 為空。驗證：貼出三者的輸出。

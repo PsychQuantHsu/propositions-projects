@@ -20,4 +20,4 @@
 
 - [x] 5.1 實跑驗收：準備五份目錄（沒有 `_meta.json`、剛 scaffold 的空帳冊、有帳冊沒有附檔、有附檔沒有 `move`、完整），subagent 只讀 analyze 的 SKILL.md，回報狀態與下一步，不執行會寫入的步驟。檢查狀態與預先寫好的答案相同、檔案指紋不變。完整那份另外檢查報告的十項都有，讀法寫在帳冊目錄之外。驗證：把結果記到 #40，不含稿件文字；有不符就修 skill 再跑。
 - [x] 5.2 路由驗收：獨立讀者只看八個 skill 的 description，把 10 句請求（5 句分析整篇、5 句屬於其他 skill）分給 skill。驗證：10 句都分對；分錯就改 description 再跑。
-- [ ] 5.3 全套 `pytest tests/` 通過、`idd-ci-gate.sh` 對 head commit 通過、`spectra validate add-analyze-entry-skill` 通過，且 `git diff --stat main -- plugins/propositions/scripts` 為空。驗證：貼出輸出。
+- [x] 5.3 全套 `pytest tests/` 通過、`idd-ci-gate.sh` 對 head commit 通過、`spectra validate add-analyze-entry-skill` 通過，且 `git diff --stat main -- plugins/propositions/scripts` 為空。驗證：貼出輸出。

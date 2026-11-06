@@ -401,7 +401,7 @@ def test_analyze_judges_coverage_from_the_runs():
     ):
         assert needle in section, needle
     assert "location" in section, "the runs not counted must stay checkable"
-    assert "Pass these runs" in section, "construct's A1 stops on any uncovered text (#42)"
+    assert "Pass these runs" in section, "construct's A1 stops on any uncovered text"
 
 
 def test_analyze_labels_moves_without_redrawing_the_tree():

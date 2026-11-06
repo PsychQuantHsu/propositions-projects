@@ -37,7 +37,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 |-------|------|
 | `/propositions:analyze` | 整篇文章的入口:從檔案判斷做到哪一步,呼叫下面的 skill 跑下一個還沒完成的步驟,最後報告(不存進度檔,重跑就接續)。預設做到讀出句子之間的關係;`proofread`、`manuscript-audit`、`clarity-audit` 要明確要求才跑。本身不寫任何檔案,寫入都在被呼叫的 skill 裡確認;不取代下面任何一個 skill(#40) |
 | `/propositions:propositions` | 機械軸,四個 operation 共一個 skill:**A** 跑 R1-R13 validator 確認 jsonl ↔ tex bijection(v1.6 起 file-aware,支援 multi-file `\input` 樹)、**B** windowed locator 修 `prop.location` 行號漂移(dry-run gated)、**C** 指向 `/propositions:extract`、**D** onboard 無 ledger 的新稿(scaffold 釘版 SCHEMA/EXTRACTION-PROMPT + `_meta.json` + 空的 `main.jsonl`,dry-run gated) |
-| `/propositions:extract` | 拆解軸,段落／區段／定理 → propositions:LLM 用暫時 id 寫到帳冊外暫存,`assign-prop-ids.py` 換 UUID v7,`check-extraction-coverage.py` 確認範圍內沒有漏掉的文字,對合併後的副本跑 validator,確認 diff 才寫入帳冊;依帳冊 profile 載入數學或實證的 reference |
+| `/propositions:extract` | 拆解軸,段落／區段／定理 → propositions:LLM 用暫時 id 寫到帳冊外暫存,`assign-prop-ids.py` 換 UUID v7,`check-extraction-coverage.py` 確認範圍內沒有漏掉的文字(只有列舉的排版指令不算文字,全由控制字組成的公式算),對合併後的副本跑 validator,確認 diff 才寫入帳冊;依帳冊 profile 載入數學或實證的 reference |
 | `/propositions:proofread` | 語意軸,per-prop L1-L5 walk:分解是否忠實、claim_type 是否合身、cite 是否完整且成立、evidence_class 是否一致 |
 | `/propositions:manuscript-audit` | 跨檔案軸,cross-artifact drift audit (R1 symbols / R2 citations / R3 code-manuscript / R4 prop-iso) |
 | `/propositions:construct` | 建構軸,整篇文章的層次:標註承諾(研究問題、目的、假設、章節計畫、近距離承諾)、章節角色與三層依存樹(句在段內的頭、段在節內的頭、節的 parent),存成帳冊旁的 `structure.json`／`discourse.jsonl`(格式 2.0,S1–S9 檢查);寫到一半的稿件則依右邊緣與未兌現的承諾提出下一句的候選,每個候選寫出預期的 `move`,並參考連結清單的走法(提示不是規則,不改候選順序,#36);也能解釋一段裡句子之間的關係(`structure-explain.py`,#33)(#26、#30) |

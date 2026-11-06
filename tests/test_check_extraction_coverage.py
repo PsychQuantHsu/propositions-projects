@@ -276,3 +276,16 @@ def test_retired_props_are_not_candidates(tmp_path):
     assert data["candidates"] == 0
     assert len(data["uncovered"]) == 1
     assert result.returncode == 1
+
+
+def test_empty_ledger_reports_the_range_as_uncovered(tmp_path):
+    # Operation D leaves an empty main.jsonl (#41): nothing is a candidate, so
+    # every sentence in the range is reported, and analyze reads that as
+    # ledger-incomplete.
+    tex = tex_with({5: "The effect was small."})
+    tex_path, jsonl = write_case(tmp_path, tex, [])
+    result = run(tex_path, "1-10", jsonl)
+    data = report(result)
+    assert data["candidates"] == 0
+    assert [run_["excerpt"] for run_ in data["uncovered"]] == ["The effect was small."]
+    assert result.returncode == 1

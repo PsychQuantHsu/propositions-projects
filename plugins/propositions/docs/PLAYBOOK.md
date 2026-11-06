@@ -21,7 +21,7 @@ Operation D          extract → A             日常節奏             送審�
 ## 階段 0 — Onboard（Operation D，一次性）
 
 新稿還沒有 ledger 時跑一次。產出：`propositions/`（釘版 SCHEMA.md + EXTRACTION-PROMPT.md
-副本、`_meta.json`、README、`_smoke_tests/` 骨架）。要點：
+副本、`_meta.json`、空的 `main.jsonl`、README、`_smoke_tests/` 骨架）。要點：
 
 - **放置層選穩定目錄**。版本目錄輪替慣例（`05xx-2026/` → 下一版換目錄）的稿，ledger
   放輪替層的上一層；版本切換是 re-anchor（階段 4），不是搬 ledger。

@@ -1,7 +1,7 @@
 ---
 name: propositions
 description: >-
-  Run the R1-R13 mechanical validator on a propositions JSONL side-file (prop↔tex subset match, cite DAG, UUID v7 uniqueness, claim_type/evidence_class enums, file-aware location anchoring incl. multi-file \input trees); fix location-field drift (refresh-prop-locations.py, dry-run gated); or onboard a manuscript that has no ledger yet (Operation D scaffold: pinned SCHEMA/EXTRACTION-PROMPT copies + _meta.json + smoke-test skeleton, dry-run gated). Use when adopting the propositions workflow on a new .tex (scaffolding the ledger), running the mechanical gate before an audit or submission, or when the R13 location-drift WARN spikes after editing the tex. The mechanical axis — NOT splitting manuscript text into propositions (that is /propositions:extract), the L4 semantic walk (/propositions:proofread), or cross-doc drift (/propositions:manuscript-audit).
+  Run the R1-R13 mechanical validator on a propositions JSONL side-file (prop↔tex subset match, cite DAG, UUID v7 uniqueness, claim_type/evidence_class enums, file-aware location anchoring incl. multi-file \input trees); fix location-field drift (refresh-prop-locations.py, dry-run gated); or onboard a manuscript that has no ledger yet (Operation D scaffold: pinned SCHEMA/EXTRACTION-PROMPT copies + _meta.json + empty main.jsonl + smoke-test skeleton, dry-run gated). Use when adopting the propositions workflow on a new .tex (scaffolding the ledger), running the mechanical gate before an audit or submission, or when the R13 location-drift WARN spikes after editing the tex. The mechanical axis — NOT splitting manuscript text into propositions (that is /propositions:extract), the L4 semantic walk (/propositions:proofread), or cross-doc drift (/propositions:manuscript-audit).
 allowed-tools:
   - Read
   - Write
@@ -157,7 +157,7 @@ separate so an extraction failure never pollutes a clean scaffold).
 4. **Refuse to overwrite.** If the chosen layer already contains `main.jsonl` or
    `_meta.json`, abort and point at Operation A, Operation B or `/propositions:extract` instead.
 5. **Dry-run listing.** Print every file that would be created with its target path:
-   `README.md`, `SCHEMA.md`, `EXTRACTION-PROMPT.md`, `_meta.json`, `_smoke_tests/README.md`.
+   `README.md`, `SCHEMA.md`, `EXTRACTION-PROMPT.md`, `_meta.json`, `main.jsonl`, `_smoke_tests/README.md`.
    Include the chosen profile in the listing. Then **AskUserQuestion**: apply / abort. On
    abort, write nothing.
 6. **Scaffold on confirm.**
@@ -169,6 +169,8 @@ separate so an extraction failure never pollutes a clean scaffold).
      `docs/SCHEMA.md` → ledger `SCHEMA.md`, `docs/EXTRACTION-PROMPT.md` → ledger
      `EXTRACTION-PROMPT.md`. The templates directory deliberately carries no copy of
      either — the pin is taken live from the canonical files so it can never lag them.
+   - Create an empty `main.jsonl`. The validator, the coverage check and `/propositions:extract`
+     all read this file, and extraction merges into it, so a ledger without it cannot start (#41).
 7. **Hand off.** Report the created files, then name the next step with the resolved
    `--jsonl` and `--tex` paths filled in: `/propositions:extract` (section by section is
    fine), which ends with Operation A as the validator gate. D itself never extracts.

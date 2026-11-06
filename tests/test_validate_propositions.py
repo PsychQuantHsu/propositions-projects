@@ -2243,3 +2243,12 @@ def test_r9_default_env_types_still_work_without_newtheorem():
         }]
         result = run_validator(*write_fixture(tmp_path, props, tex, schema_version="1.2"))
         assert "checked=1" in result.stdout, result.stdout
+
+
+def test_empty_ledger_from_a_fresh_scaffold_passes(tmp_path):
+    """Operation D leaves an empty main.jsonl; it must validate so extract can start (#41)."""
+    jsonl, meta, tex = write_fixture(
+        tmp_path, [], "\\section{Results}\nThe effect was small.\n", schema_version="1.7"
+    )
+    result = run_validator(jsonl, meta, tex)
+    assert result.returncode == 0, result.stdout + result.stderr

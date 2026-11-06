@@ -8,8 +8,8 @@
     {
       "name": "propositions",
       "source": "./plugins/propositions",
-      "description": "Author-claim ledger infrastructure: JSONL propositions, R1-R13 validator, audit chain, onboarding (Operation D scaffold) + extraction (propositions:extract, coverage-gated) + manuscript-QA skills (clarity-audit / proofread / manuscript-audit). Supports ledger schema ≤ 1.7 (profiles: default / empirical), incl. multi-file \\input manuscripts; verification-record sidecar (validator + proofread conversion); article-structure sidecars with an S1-S6 validator, a state query and propositions:construct (annotate structure / what the next sentence should do).",
-      "version": "0.9.0"
+      "description": "Author-claim ledger infrastructure: JSONL propositions, R1-R13 validator, audit chain, onboarding (Operation D scaffold) + extraction (propositions:extract, coverage-gated) + manuscript-QA skills (clarity-audit / proofread / manuscript-audit). Supports ledger schema ≤ 1.7 (profiles: default / empirical), incl. multi-file \\input manuscripts; verification-record sidecar (validator + proofread conversion); article-structure sidecars with an S1-S9 validator, a state query and propositions:construct (annotate structure / what the next sentence should do); propositions:analyze, the entry point for a whole article.",
+      "version": "0.10.0"
     },
     {
       "name": "tschema-check",

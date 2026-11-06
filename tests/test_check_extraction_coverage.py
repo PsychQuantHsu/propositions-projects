@@ -289,3 +289,78 @@ def test_empty_ledger_reports_the_range_as_uncovered(tmp_path):
     assert data["candidates"] == 0
     assert [run_["excerpt"] for run_ in data["uncovered"]] == ["The effect was small."]
     assert result.returncode == 1
+
+
+# ---------- a run of layout commands is not text (#42) ----------
+
+
+@pytest.mark.parametrize("command", ["\\maketitle", "\\clearpage", "\\item", "{\\small"])
+def test_a_lone_layout_command_is_not_text(tmp_path, command):
+    tex = tex_with({5: command, 7: "The effect was small."})
+    tex_path, jsonl = write_case(tmp_path, tex, [prop(1, "The effect was small.", "main.tex:L7")])
+    result = run(tex_path, "1-10", jsonl)
+    assert report(result)["uncovered"] == []
+    assert result.returncode == 0
+
+
+def test_covered_footnote_text_leaves_nothing_behind(tmp_path):
+    tex = tex_with({5: "\\footnote{The effect was small.}"})
+    tex_path, jsonl = write_case(tmp_path, tex, [prop(1, "The effect was small.", "main.tex:L5")])
+    result = run(tex_path, "5-5", jsonl)
+    assert report(result)["uncovered"] == []
+    assert result.returncode == 0
+
+
+def test_uncovered_footnote_text_is_still_reported(tmp_path):
+    tex = tex_with({5: "\\footnote{The effect was small.}"})
+    tex_path, jsonl = write_case(tmp_path, tex, [])
+    result = run(tex_path, "5-5", jsonl)
+    runs = report(result)["uncovered"]
+    assert len(runs) == 1
+    assert "The effect was small" in runs[0]["excerpt"]
+    assert result.returncode == 1
+
+
+def test_a_command_argument_is_text(tmp_path):
+    tex = tex_with({5: "\\cite{smith2020}"})
+    tex_path, jsonl = write_case(tmp_path, tex, [])
+    result = run(tex_path, "5-5", jsonl)
+    assert len(report(result)["uncovered"]) == 1
+    assert result.returncode == 1
+
+
+def test_an_unlisted_command_is_still_reported(tmp_path):
+    # The list is closed: anything not on it stays visible, the safe direction.
+    tex = tex_with({5: "\\mycommand"})
+    tex_path, jsonl = write_case(tmp_path, tex, [])
+    result = run(tex_path, "5-5", jsonl)
+    assert len(report(result)["uncovered"]) == 1
+    assert result.returncode == 1
+
+
+def test_a_control_word_inside_uncovered_prose_stays_in_the_excerpt(tmp_path):
+    # Only the decision changes: a reported run is shown as it stands.
+    tex = tex_with({5: "The \\emph{large} effect."})
+    tex_path, jsonl = write_case(tmp_path, tex, [])
+    runs = report(run(tex_path, "5-5", jsonl))["uncovered"]
+    assert len(runs) == 1
+    assert runs[0]["excerpt"].startswith("The")
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "$\\alpha \\le \\beta$",
+        "\\begin{equation}\\alpha = \\beta\\end{equation}",
+        "\\[ \\alpha \\le \\beta \\]",
+    ],
+)
+def test_a_formula_written_in_control_words_is_text(tmp_path, line):
+    # The tool exists so that nothing is left out, and a mathematical manuscript's
+    # formulas are mostly control words. Removing every control word would pass a
+    # dropped equation in silence, so only the listed layout commands are removed.
+    tex = tex_with({5: line})
+    tex_path, jsonl = write_case(tmp_path, tex, [])
+    result = run(tex_path, "5-5", jsonl)
+    assert len(report(result)["uncovered"]) == 1
+    assert result.returncode == 1

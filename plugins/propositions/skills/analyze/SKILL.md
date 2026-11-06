@@ -83,14 +83,14 @@ also run the check on each file in the `\input` tree, over the whole file.
 
 Do not use the check's exit code: a finished ledger exits 1 too. Read every run in `uncovered`.
 Only sentences of the body count, including one that shares a run with a command. LaTeX commands
-with no sentence (a bare `\footnote{` or `\maketitle`), headings, front matter, author statements
+with no sentence (a bare `\vspace{1em}`), headings, front matter, author statements
 after the body (contributions, funding, competing interests), appendix instruments and the
 bibliography do not.
 
 This is a judgment, so keep the location of every run you did not count: the report lists them, so
 that the user can check them. Pass these runs to `/propositions:construct` or
 `/propositions:construct-batch` when you invoke them, as runs already read and accepted, because
-their precondition stops on any uncovered text (#42).
+their precondition stops on any uncovered text.
 
 ## Act on the state
 

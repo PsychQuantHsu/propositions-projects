@@ -24,6 +24,11 @@ unescaped `%`; `\\label{...}`; sectioning commands with their titles;
 `\\begin{...}` / `\\end{...}` markers; the full content of table/figure floats.
 Excluded floats are listed in the output.
 
+A run counts as text only if it holds a letter or digit once the commands in
+LAYOUT_COMMANDS are removed, so a bare `\\maketitle` or `\\footnote{` is not
+reported. Only those commands are removed: a formula written in control words
+is text. A run that is reported is shown as it stands.
+
 Exit codes: 0 nothing uncovered, 1 uncovered text found, 2 bad input.
 """
 from __future__ import annotations
@@ -48,6 +53,16 @@ _LABEL_RE = re.compile(r"\\label\{")
 _SECTIONING_RE = re.compile(r"\\(?:section|subsection|subsubsection|paragraph)\*?\{")
 _ENV_MARKER_RE = re.compile(r"\\(?:begin|end)\{[^}]*\}(?:\[[^\]]*\])?")
 _FLOAT_BEGIN_RE = re.compile(r"\\begin\{(table\*?|figure\*?)\}")
+# Commands that carry no text of their own. Closed on purpose: removing every
+# control word would also pass a dropped formula such as \\alpha \\le \\beta in
+# silence, the omission this tool exists to catch. An unlisted command is
+# reported, which is the safe direction.
+LAYOUT_COMMANDS = (
+    "appendix", "bigskip", "centering", "clearpage", "footnote", "footnotesize",
+    "Huge", "huge", "item", "LARGE", "Large", "large", "maketitle", "medskip",
+    "newpage", "noindent", "normalsize", "par", "scriptsize", "small", "smallskip", "tiny",
+)
+_LAYOUT_COMMAND_RE = re.compile(r"\\(?:" + "|".join(LAYOUT_COMMANDS) + r")(?![A-Za-z])\*?")
 
 
 class UsageError(Exception):
@@ -192,6 +207,11 @@ def locate(norm: str, needle: str, abs_pos: list[int], src: Source, near: int) -
     return nearest[0], None
 
 
+def has_text(piece: str) -> bool:
+    """Whether a run holds a letter or digit once the layout commands are removed."""
+    return any(ch.isalnum() for ch in _LAYOUT_COMMAND_RE.sub("", piece))
+
+
 def uncovered_runs(norm: str, covered: list[bool], mask: list[bool], abs_pos: list[int], src: Source) -> list[dict]:
     runs, i = [], 0
     while i < len(norm):
@@ -202,7 +222,7 @@ def uncovered_runs(norm: str, covered: list[bool], mask: list[bool], abs_pos: li
         while j < len(norm) and not covered[j] and not mask[abs_pos[j]]:
             j += 1
         piece = norm[i:j]
-        if any(ch.isalnum() for ch in piece):
+        if has_text(piece):
             runs.append({
                 "start_line": src.line_of(abs_pos[i]),
                 "end_line": src.line_of(abs_pos[j - 1]),

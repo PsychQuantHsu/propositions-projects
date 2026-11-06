@@ -6,6 +6,7 @@ The article is tests/link_case.py; `out` means the sentence is the link's `from`
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -217,3 +218,103 @@ def test_a_malformed_catalog_is_an_input_error(tmp_path: Path, text: str) -> Non
     path = tmp_path / "links.csv"
     path.write_text(text, encoding="utf-8")
     assert run(tmp_path, "catalog", "--catalog", str(path), "--from", "state-goal").returncode == 2
+
+
+# ---------- next mode's move hint (Spectra change add-next-mode-move-hint) ----------
+
+SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "construct" / "SKILL.md"
+STATE = REPO_ROOT / "plugins" / "propositions" / "scripts" / "structure-state.py"
+VALIDATE = REPO_ROOT / "plugins" / "propositions" / "scripts" / "validate-structure.py"
+
+
+def next_mode() -> str:
+    text = SKILL.read_text(encoding="utf-8")
+    return " ".join(text[text.index("## Next mode"):text.index("## Explain mode")].split())
+
+
+def test_next_mode_no_longer_refuses_the_catalog() -> None:
+    assert "does not read" not in next_mode()
+
+
+def test_next_mode_reads_the_last_move_with_the_sentence_query() -> None:
+    assert '"$LINKS" sentence --jsonl "$LEDGER/main.jsonl" --at' in next_mode()
+    assert "--no-text --format json" in next_mode()
+
+
+def test_next_mode_queries_the_whole_catalog() -> None:
+    raw = SKILL.read_text(encoding="utf-8")
+    section = raw[raw.index("## Next mode"):raw.index("## Explain mode")]
+    calls = [line for line in section.splitlines() if '"$LINKS" catalog' in line]
+    assert len(calls) == 1, calls
+    assert "--kind next" in calls[0]
+    assert "--type" not in calls[0] and "--label" not in calls[0]
+
+
+@pytest.mark.parametrize("phrase", (
+    "Add up the rows by `to`",
+    "`END` counts as a value",
+    "first appear in the listing",
+    "observed paths, not a rule",
+    "does not change the order of the candidates",
+    "does not choose the relation",
+))
+def test_next_mode_states_how_the_hint_is_built_and_used(phrase: str) -> None:
+    assert phrase in next_mode()
+
+
+def test_next_mode_skips_the_hint_in_three_named_cases() -> None:
+    section = next_mode()
+    for case in ("has no `move`", "no `next` path", "exits non-zero"):
+        assert case in section
+
+
+def test_next_mode_candidates_state_a_move() -> None:
+    section = next_mode()
+    assert "**Does**" in section
+    assert "`none fits`" in section
+
+
+def draft_with_a_pending_record(tmp: Path) -> Path:
+    records = [{"pos": 1, "move": "state-goal"}, {"pos": 2, "head": "pending", "move": "state-baseline"}]
+    return write_case(tmp, 2, records=records)
+
+
+def test_next_mode_sentence_query_reads_a_draft_with_a_pending_head(tmp_path: Path) -> None:
+    ledger = draft_with_a_pending_record(tmp_path)
+    vocabulary = write_vocabulary(tmp_path)
+    partial = subprocess.run([sys.executable, str(VALIDATE), "--jsonl", str(ledger), "--partial",
+                              "--vocabulary", str(vocabulary)], capture_output=True, text=True)
+    assert partial.returncode == 0, partial.stdout + partial.stderr
+    result = run(tmp_path, "sentence", "--jsonl", str(ledger), "--at", "2", "--no-text", "--format", "json")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["move"] == "state-baseline"
+
+
+def test_next_mode_sentence_query_reports_no_move(tmp_path: Path) -> None:
+    assert sentence(tmp_path, "7", "--no-text")["move"] is None
+
+
+def test_next_mode_catalog_query_fails_loudly_without_the_catalog(tmp_path: Path) -> None:
+    result = run(tmp_path, "catalog", "--catalog", str(tmp_path / "absent.csv"),
+                 "--from", "state-goal", "--kind", "next")
+    assert result.returncode == 2
+    assert "not found" in result.stderr
+
+
+def test_next_mode_catalog_query_finds_no_path_for_an_unobserved_move(tmp_path: Path) -> None:
+    assert query(tmp_path, "--from", "define", "--kind", "next")["seen"] == []
+
+
+def test_next_mode_state_query_does_not_depend_on_the_catalog(tmp_path: Path) -> None:
+    ledger = write_article(tmp_path / "a")
+    copy = tmp_path / "plugin" / "scripts"
+    shutil.copytree(STATE.parent, copy, ignore=shutil.ignore_patterns("__pycache__"))
+    assert not (copy.parent / "catalog").exists()
+
+    def state(script: Path) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, str(script), "--jsonl", str(ledger), "--at", "end", "--format", "json"],
+                              capture_output=True, text=True)
+
+    with_catalog, without_catalog = state(STATE), state(copy / STATE.name)
+    assert with_catalog.returncode == 0, with_catalog.stderr
+    assert with_catalog.stdout == without_catalog.stdout

@@ -36,7 +36,7 @@
 
 ### END 算一個走法
 
-命中率把段落結束記為 `END`，與其他 `move` 同列比較，提示也這樣算。`END` 在前三裡表示這個 `move` 之後常常換段；它讓「開新段」的候選多一個依據，但不強制。
+命中率把段落結束記為 `END`，與其他 `move` 同列比較，提示也這樣算。`END` 在前三裡表示這個 `move` 之後常常換段；它讓「開新段」的候選多一個依據，但不強制。`END` 不是 `move`，不能寫進候選的 **Does**。提示描述的是同一段內的接續，所以開新段的候選自己從詞彙選 `move`，不受提示限制。
 
 ### 提示不改候選的順序與掛點
 
@@ -53,7 +53,7 @@
 **Interface.** 兩個現成查詢，都由 skill 的指令列呼叫：
 
 - `structure-links.py` 的 `sentence` 子命令，帶 `--jsonl`、`--at <N2 回報的 position>`、`--no-text`、`--format json`；讀 JSON 的 `move`（沒有標註時是 null）。
-- `structure-links.py` 的 `catalog` 子命令，帶 `--from <move>`、`--kind next`，不帶 `--type`、`--label`。
+- `structure-links.py` 的 `catalog` 子命令，帶 `--from <move>`、`--kind next`、`--format json`，不帶 `--type`、`--label`；讀 `seen` 陣列的 `to` 與 `total`。文字輸出的欄數隨標籤而變，不適合用來加總。
 
 **Failure modes.** 以下三種情形都略過提示、用一行說明原因，next 模式照常完成，候選仍然寫 **Does**：最後一句沒有 `move`；連結清單沒有這個 `move` 的 `next` 走法；任一查詢非零結束（例如缺 `links.csv` 或 PyYAML）。附檔本身有問題的情形由 N1 先擋下，不到這一步。
 

@@ -307,8 +307,8 @@ Then the default answer:
 
 ### N4 — Read the move hint
 
-The link catalog shows which moves have followed the last proposition's move. Use the `position`
-from N2 to read that move:
+The link catalog shows which moves have followed the last proposition's move. Use the top-level
+`position` field of the N2 output to read that move:
 
 ```bash
 python3 "$LINKS" sentence --jsonl "$LEDGER/main.jsonl" --at <position> --no-text --format json
@@ -317,13 +317,20 @@ python3 "$LINKS" sentence --jsonl "$LEDGER/main.jsonl" --at <position> --no-text
 Then, with the `move` it reports:
 
 ```bash
-python3 "$LINKS" catalog --from <move> --kind next
+python3 "$LINKS" catalog --from <move> --kind next --format json
 ```
 
-Add up the rows by `to`: the catalog has one row per relation, so one move can fill several rows.
-The hint is the three values with the highest totals. A tie keeps the order in which the values
-first appear in the listing, and `END` counts as a value: it says paragraphs often end after this
-move. Report the three values with their totals, and say that these are observed paths, not a rule.
+Use neither `--type` nor `--label`: the counts get too small to read, and tables from other
+manuscripts still help.
+
+Add up the rows by `to`: each row of `seen` has a `to` and a `total`, and there is one row per
+relation, so one move can fill several rows. The hint is up to three values with the highest
+totals. A tie keeps the order in which the values first appear in the listing, and `END` counts as
+a value. Report the values with their totals, and say that these are observed paths, not a rule.
+
+`END` is not a move: it says paragraphs often end after this move, which supports a candidate that
+starts a new paragraph. The hint describes what follows inside the paragraph, so it says nothing
+about the move of such a candidate, and no candidate's **Does** is `END`.
 
 The hint only informs the **Does** item below. It does not change the order of the candidates or
 the rule for the first one, and it does not choose the relation, because the catalog showed no lift

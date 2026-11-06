@@ -33,12 +33,22 @@ In next mode the skill SHALL run `validate-structure.py --partial` and `structur
 
 ### Requirement: Next mode takes a move hint from the link catalog
 
-Before proposing candidates, the skill SHALL read the move of the last proposition of the draft with `structure-links.py sentence`, and SHALL run `structure-links.py catalog` on that move with `--kind next` and with neither `--type` nor `--label`. The skill SHALL add the observed counts per next value, with `END` counted as a value, and SHALL report the three values with the highest totals as the hint; a tie SHALL keep the order in which the values first appear in the listing. The skill SHALL state that the hint lists observed paths and is not a rule. The hint SHALL NOT change the order of the candidates, the rule for the first candidate, the attachment of any candidate or the relation of any candidate. A candidate's move SHALL NOT be required to appear in the hint, and the skill SHALL NOT warn when it does not.
+Before proposing candidates, the skill SHALL read the move of the last proposition of the draft with `structure-links.py sentence`, and SHALL run `structure-links.py catalog` on that move with `--kind next` and `--format json` and with neither `--type` nor `--label`. The skill SHALL add the observed counts per next value, with `END` counted as a value, and SHALL report up to three values with the highest totals as the hint; a tie SHALL keep the order in which the values first appear in the listing. The skill SHALL state that the hint lists observed paths and is not a rule. The hint SHALL NOT change the order of the candidates, the rule for the first candidate, the attachment of any candidate or the relation of any candidate. A candidate's move SHALL NOT be required to appear in the hint, and the skill SHALL NOT warn when it does not. `END` SHALL NOT be stated as a candidate's move, and the hint SHALL NOT constrain the move of a candidate that starts a new paragraph.
 
 #### Scenario: The hint counts moves, not rows
 
 - **WHEN** the catalog lists `recap` in rows with counts 4, 2, 1 and 1, and `compare` in rows with counts 1 and 1
 - **THEN** the hint gives `recap` with total 8 before `compare` with total 2
+
+#### Scenario: Fewer than three values were observed
+
+- **WHEN** the catalog lists two next values for the move
+- **THEN** the hint gives those two values
+
+#### Scenario: END leads the hint
+
+- **WHEN** `END` is the first value of the hint
+- **THEN** no candidate states `END` as its move, and a candidate that starts a new paragraph chooses its move from the vocabulary
 
 #### Scenario: Pending records outrank the hint
 

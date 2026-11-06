@@ -7,6 +7,7 @@
 
 - [x] 2.1 實作 Requirement「Next mode takes a move hint from the link catalog」：在 `plugins/propositions/skills/construct/SKILL.md` 拿掉 Next mode 開頭的 does not read 句子，在 N3 之後新增 N4 — Read the move hint，原本的 N4、N5 順延為 N5、N6。新步驟用 N2 回報的 `position` 跑 sentence 查詢取得 `move`，再跑 catalog 查詢，依 `to` 加總、同分保留清單順序、`END` 算一個走法，回報前三個並說明是觀察到的走法，不是規則；寫明三種略過條件與「用一行說明後照常完成」。驗證：1.1 的測試通過；`structure-links.py` 與其他 Python 檔案沒有變動（`git diff --stat -- plugins/propositions/scripts` 為空）。
 - [x] 2.2 實作修改後的 Requirement「Next mode proposes at most three candidates without writing」：N5 的候選清單新增 **Does**，寫明它是 `catalog/vocabulary.yaml` 的值，沒有合適的值時寫 `none fits` 並說明這一句要做什麼（對應 design「候選的 move 是詞彙裡的值，或寫 none fits」）；既有的第一個候選規則與 N6 的檔案指紋不動；關係仍照原方式決定，不取自 catalog 的列。驗證：1.1 的測試通過，並人工對照 spec 的情境逐條讀過一次。
+- [x] 2.3 依獨立讀者的審查補齊提示的邊界：不足三個值時有幾個報幾個；`END` 不是 `move`，不寫進 **Does**，開新段的候選不受提示限制；catalog 查詢改用 `--format json`；`position` 寫明是 N2 輸出的頂層欄位。驗證：`pytest tests/test_structure_links.py -k next_mode` 在改之前失敗、改之後通過；delta spec 與 design 同步更新。
 
 ## 3. 文件與版本
 

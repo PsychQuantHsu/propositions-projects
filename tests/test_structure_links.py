@@ -246,8 +246,9 @@ def test_next_mode_queries_the_whole_catalog() -> None:
     section = raw[raw.index("## Next mode"):raw.index("## Explain mode")]
     calls = [line for line in section.splitlines() if '"$LINKS" catalog' in line]
     assert len(calls) == 1, calls
-    assert "--kind next" in calls[0]
+    assert "--kind next" in calls[0] and "--format json" in calls[0]
     assert "--type" not in calls[0] and "--label" not in calls[0]
+    assert "neither `--type` nor `--label`" in next_mode()
 
 
 @pytest.mark.parametrize("phrase", (
@@ -257,6 +258,10 @@ def test_next_mode_queries_the_whole_catalog() -> None:
     "observed paths, not a rule",
     "does not change the order of the candidates",
     "does not choose the relation",
+    "up to three",
+    "top-level `position`",
+    "`END` is not a move",
+    "a candidate that starts a new paragraph",
 ))
 def test_next_mode_states_how_the_hint_is_built_and_used(phrase: str) -> None:
     assert phrase in next_mode()

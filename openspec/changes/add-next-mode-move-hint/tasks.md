@@ -10,9 +10,9 @@
 
 ## 3. 文件與版本
 
-- [ ] 3.1 [P] 在 `plugins/propositions/docs/STRUCTURE.md`、`plugins/propositions/README.md`、`CLAUDE.md` 寫明 next 模式會參考連結清單提示 `move`，提示不是規則，也不改候選順序。驗證：三個檔案都提到這件事，且沒有任何文件還說 next 模式不讀 `links.csv`（搜尋 `links.csv` 與 next 模式逐筆確認）。
-- [ ] 3.2 [P] 在 `docs/REFERENCE-MANUSCRIPTS.md` 記下 #36 的量測：依位置狀態分組的命中率、跨稿件命中率、量法與限制（兩篇稿件；這兩個表由一次性量測得出，工具不重現）；不放稿件文字。驗證：表內數字與 #36 的 Note 逐格相同。
-- [ ] 3.3 [P] 把 `propositions` plugin 升到 0.9.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json`）。驗證：`pytest tests/test_marketplace_entries.py` 通過，兩處版本相同。
+- [x] 3.1 [P] 在 `plugins/propositions/docs/STRUCTURE.md`、`plugins/propositions/README.md`、`CLAUDE.md` 寫明 next 模式會參考連結清單提示 `move`，提示不是規則，也不改候選順序。驗證：三個檔案都提到這件事，且沒有任何文件還說 next 模式不讀 `links.csv`（搜尋 `links.csv` 與 next 模式逐筆確認）。
+- [x] 3.2 [P] 在 `docs/REFERENCE-MANUSCRIPTS.md` 記下 #36 的量測：依位置狀態分組的命中率、跨稿件命中率、量法與限制（兩篇稿件；這兩個表由一次性量測得出，工具不重現）；不放稿件文字。驗證：表內數字與 #36 的 Note 逐格相同。
+- [x] 3.3 [P] 把 `propositions` plugin 升到 0.9.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json`）。驗證：`pytest tests/test_marketplace_entries.py` 通過，兩處版本相同。
 
 ## 4. 驗收
 

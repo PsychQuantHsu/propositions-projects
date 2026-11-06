@@ -267,7 +267,9 @@ Both live in `plugins/propositions/catalog/`.
   manuscript text, no proposition ids, no paragraph ids and no paths. It is a
   record of the links observed in the manuscripts that were annotated, **not a
   rule**: a link missing from it is not an error, and the validator never reads
-  it. `--check` exits 1 when the file on disk differs from what the sidecars
+  it. Next mode of `propositions:construct` reads its `next` links as a hint for
+  each candidate's expected move; the hint changes neither the order of the
+  candidates nor their relation. `--check` exits 1 when the file on disk differs from what the sidecars
   would produce.
 
 ### The link catalog: `links.csv`

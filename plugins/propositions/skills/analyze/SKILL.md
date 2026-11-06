@@ -38,7 +38,8 @@ Then establish, from the request or by asking once (AskUserQuestion, all at once
 - `LEDGER` — the ledger directory (`find . -name _meta.json -not -path './.git/*'` finds an existing
   one). With no ledger yet, Operation D chooses where it goes.
 - `MAIN` — the manuscript's main `.tex` file. With a ledger, `source.file` in `_meta.json` names it,
-  relative to the repository root: use that, not a file that looks like the main one.
+  relative to the repository root (`grep -m1 '"file"' "$LEDGER/_meta.json"`): use that, not a file
+  that looks like the main one.
 
 Fingerprint the files before anything else. A file that does not exist yet is simply not listed.
 
@@ -70,15 +71,21 @@ python3 "$SCRIPTS/validate-structure.py" --jsonl "$LEDGER/main.jsonl" --partial
 python3 "$SCRIPTS/structure-metrics.py" --jsonl "$LEDGER/main.jsonl" --format json
 ```
 
+The states depend on exit codes, so run these without a pipe: `| tail` reports the exit code of
+`tail`. An empty `main.jsonl` passes the validator, so a freshly scaffolded ledger is
+`ledger-incomplete`, not `ledger-invalid`. The `grep -c` counts retired propositions too, which is
+close enough for the 100 threshold.
+
 ### Coverage: read the runs
 
 Set `A` and `B` to the lines of `\begin{document}` and `\end{document}`. In a multi-file manuscript
 also run the check on each file in the `\input` tree, over the whole file.
 
 Do not use the check's exit code: a finished ledger exits 1 too. Read every run in `uncovered`.
-Only sentences of the body count. LaTeX commands with no sentence (a bare `\footnote{` or
-`\maketitle`), headings, front matter, author statements after the body, appendix instruments and
-the bibliography do not.
+Only sentences of the body count, including one that shares a run with a command. LaTeX commands
+with no sentence (a bare `\footnote{` or `\maketitle`), headings, front matter, author statements
+after the body (contributions, funding, competing interests), appendix instruments and the
+bibliography do not.
 
 This is a judgment, so keep the location of every run you did not count: the report lists them, so
 that the user can check them. Pass these runs to `/propositions:construct` or

@@ -83,7 +83,7 @@ The skill SHALL run `check-extraction-coverage.py` on the lines between `\begin{
 
 #### Scenario: A complete ledger with uncovered commands
 
-- **WHEN** the coverage check exits 1 and the only uncovered runs are a bare `\footnote{` and back matter
+- **WHEN** the coverage check exits 1 and the only uncovered runs are a bare `\vspace{1em}` and back matter
 - **THEN** the state is not `ledger-incomplete`, and the report lists those locations
 
 #### Scenario: An unextracted section
@@ -94,6 +94,14 @@ The skill SHALL run `check-extraction-coverage.py` on the lines between `\begin{
 
 <!-- @trace
 source: add-analyze-entry-skill
+updated: 2026-11-06
+code:
+  - propositions-projects.code-workspace
+-->
+
+
+<!-- @trace
+source: fix-coverage-bare-commands
 updated: 2026-11-06
 code:
   - propositions-projects.code-workspace

@@ -60,6 +60,11 @@ The repository and marketplace were renamed from `propositions` to `propositions
 ```bash
 # Inside your manuscript repo (with manuscript/main.tex + manuscript/propositions/main.jsonl)
 
+/propositions:analyze            # the whole article: works out how far it has got, runs the next
+                                 # unfinished step, and reports. Stops at every write. proofread,
+                                 # manuscript-audit and clarity-audit run only when asked.
+
+# Or run any one step directly:
 /propositions:propositions       # the mechanical axis — three operations in one skill:
                                  #   A validate      R1-R13 gates
                                  #   B refresh       fix location drift (dry-run gated)

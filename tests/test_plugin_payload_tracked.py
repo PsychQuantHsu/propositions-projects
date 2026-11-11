@@ -446,3 +446,589 @@ def test_analyze_holds_no_program_of_its_own():
     text = ANALYZE_SKILL.read_text(encoding="utf-8")
     assert not re.search(r"python3\s+-", text), "python3 - and python3 -c are programs in a skill"
     assert "<<" not in text, "heredocs hand a program to an interpreter"
+
+
+# ---------- Article obligations table (add-article-obligations, #47) ----------
+#
+# The table is data that no program reads yet, so this guard is the only thing
+# that keeps it well formed and complete (spec: article-obligations). Each check
+# is a function from a table to a list of problems, so every refusal the spec
+# names is exercised on a small table held in memory; one case then asserts that
+# the committed file has no problem at all.
+#
+# Exit condition: once the Swift package exists (#46) this guard moves to Swift
+# Testing and these cases are deleted.
+
+import copy  # noqa: E402
+import functools  # noqa: E402
+import importlib.util  # noqa: E402
+import sys  # noqa: E402
+
+PROPOSITIONS_PLUGIN = REPO_ROOT / "plugins" / "propositions"
+OBLIGATIONS = PROPOSITIONS_PLUGIN / "catalog" / "obligations.yaml"
+OBLIGATIONS_DOC = PROPOSITIONS_PLUGIN / "docs" / "OBLIGATIONS.md"
+
+OBL_TOP_KEYS = ("groups", "entries", "unconstrained")
+OBL_ENTRY_KEYS = (
+    "id", "class", "group", "unit", "applies", "criterion", "check", "owner", "verified_by", "on_warning",
+)
+OBL_REQUIRED_KEYS = ("id", "class", "unit", "criterion", "check", "verified_by")
+OBL_GROUP_KEYS = ("id", "zh", "does", "axiom")
+OBL_GROUPS = ("dependence", "commitment", "support", "consistency", "truth", "placement", "completeness")
+OBL_DEPENDENCE_AXIOM = "academic-writing/A1_no_forward_dependence"
+OBL_CLASSES = ("precondition", "obligation")
+OBL_UNITS = ("proposition", "article")
+OBL_APPLIES_KEYS = ("profile", "claim_type", "evidence_class", "cites", "opens", "section_role")
+OBL_ACCOUNTED_FIELDS = ("claim_type", "evidence_class", "opens", "section_role")
+OBL_WARNING_RULES = ("judge", "info")
+# `info` is the one setting that lets a warning pass, so it is allowed only on
+# the checks the maintainer reviewed for it. Extend this in the same change in
+# which the maintainer approves another one.
+OBL_INFO_REVIEWED_CHECKS = ("structure:S7", "ledger:R3")
+OBL_MECHANICAL_SOURCES = ("ledger", "structure", "records", "coverage", "order", "audit")
+# The closed inventory of implemented checks (spec: "A check is named only when
+# it is implemented"). A change that implements a check adds its id here.
+OBL_INVENTORY = (
+    *(f"ledger:R{n}" for n in ("1", "1.5", "2", "3", "4", "7", "8", "9", "10", "11", "12", "13")),
+    *(f"structure:S{n}" for n in range(1, 10)),
+    *(f"records:V{n}" for n in range(1, 7)),
+    "coverage:text",
+    "order:ledger",
+    *(f"audit:R{n}" for n in range(1, 4)),
+    *(f"proofread:L{n}" for n in range(1, 6)),
+    *(f"proofread:E{n}" for n in range(1, 8)),
+)
+OBL_EMPIRICAL_LAYERS = tuple(f"proofread:E{n}" for n in range(1, 8))
+OBL_UNWALKED_LAYERS_OWNER = 57
+OBL_REQUIRED_OWNERS = (46, 49, 50, 55)
+OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
+OBL_DOC_ISSUES = ("#21", "#59", "#62")
+OBL_DOC_ENTRY_ID_LIMIT = 2
+OBL_ID = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+")
+OBL_AXIOM = re.compile(r"[a-z0-9-]+/[A-Za-z0-9_]+")
+
+
+def _load_obligations_script(stem: str):
+    path = PROPOSITIONS_PLUGIN / "scripts" / f"{stem}.py"
+    spec = importlib.util.spec_from_file_location(f"obligations_guard_{stem.replace('-', '_')}", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@functools.lru_cache(maxsize=None)
+def _obligation_vocabulary() -> dict[str, tuple[str, ...]]:
+    """The value sets `applies` draws on, read from the validators that own them."""
+    profiles = _load_obligations_script("validate-propositions").PROFILE_VOCABULARIES
+    structure = _load_obligations_script("validate-structure")
+
+    def union(field: str) -> tuple[str, ...]:
+        seen: list[str] = []
+        for vocabulary in profiles.values():
+            seen.extend(value for value in vocabulary[field] if value not in seen)
+        return tuple(seen)
+
+    return {
+        "profile": tuple(profiles),
+        "claim_type": union("claim_type"),
+        "evidence_class": union("evidence_class"),
+        "cites": ("present", "absent"),
+        "opens": tuple(structure.KINDS),
+        "section_role": tuple(structure.ROLES),
+    }
+
+
+@functools.lru_cache(maxsize=None)
+def _obligation_methods() -> tuple[str, ...]:
+    return tuple(_load_obligations_script("validate-verification").METHODS)
+
+
+def _is_text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _group_problems(groups) -> list[str]:
+    if not isinstance(groups, list):
+        return ["groups is not a list"]
+    problems: list[str] = []
+    ids = [group.get("id") if isinstance(group, dict) else None for group in groups]
+    for group_id in ids:
+        if group_id not in OBL_GROUPS:
+            problems.append(f"group {group_id!r} is not one of the seven groups")
+    if tuple(ids) != OBL_GROUPS:
+        problems.append(f"groups are not the seven in order: {', '.join(OBL_GROUPS)}")
+    for group in groups:
+        if not isinstance(group, dict):
+            problems.append("a group is not a mapping")
+            continue
+        group_id = group.get("id")
+        for key in group:
+            if key not in OBL_GROUP_KEYS:
+                problems.append(f"group {group_id!r}: key {key!r} is not allowed")
+        for key in ("zh", "does"):
+            if not _is_text(group.get(key)):
+                problems.append(f"group {group_id!r}: {key} is missing")
+        axiom = group.get("axiom")
+        if axiom is not None and not (isinstance(axiom, str) and OBL_AXIOM.fullmatch(axiom)):
+            problems.append(f"group {group_id!r}: axiom {axiom!r} is not <domain>/<axiom id>")
+        if group_id == "dependence" and axiom != OBL_DEPENDENCE_AXIOM:
+            problems.append(f"group 'dependence': axiom is not {OBL_DEPENDENCE_AXIOM}")
+    return problems
+
+
+def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
+    problems: list[str] = []
+    for key in entry:
+        if key not in OBL_ENTRY_KEYS:
+            problems.append(f"key {key!r} is not allowed")
+    for key in OBL_REQUIRED_KEYS:
+        if key not in entry:
+            problems.append(f"{key} is missing")
+
+    entry_id = entry.get("id")
+    well_formed_id = isinstance(entry_id, str) and OBL_ID.fullmatch(entry_id) is not None
+    if not well_formed_id:
+        problems.append("id is not <prefix>.<name> in lowercase letters, digits and hyphens")
+    prefix = entry_id.split(".", 1)[0] if well_formed_id else None
+
+    kind, group = entry.get("class"), entry.get("group")
+    if kind not in OBL_CLASSES:
+        problems.append(f"class {kind!r} is not one of {', '.join(OBL_CLASSES)}")
+    elif kind == "precondition":
+        if "group" in entry:
+            problems.append("a precondition has no group")
+        if prefix != "index":
+            problems.append("the id of a precondition starts with index.")
+    elif group not in OBL_GROUPS:
+        problems.append(f"an obligation needs a group among the seven, found {group!r}")
+    elif prefix != group:
+        problems.append(f"the id of an obligation starts with its group, {group}.")
+
+    unit = entry.get("unit")
+    if unit not in OBL_UNITS:
+        problems.append(f"unit {unit!r} is not one of {', '.join(OBL_UNITS)}")
+    criterion = entry.get("criterion")
+    if not _is_text(criterion) or "\n" in criterion.strip() or len(criterion) > 200:
+        problems.append("criterion is not one line of at most 200 characters")
+
+    applies = entry.get("applies")
+    if applies is not None and (not isinstance(applies, dict) or not applies):
+        problems.append("applies is not a non-empty mapping")
+        applies = None
+    for key, values in (applies or {}).items():
+        if key not in OBL_APPLIES_KEYS:
+            problems.append(f"applies key {key!r} is not allowed")
+            continue
+        if unit == "article" and key != "profile":
+            problems.append(f"an entry whose unit is article applies by profile only, found {key}")
+        if not isinstance(values, list) or not values:
+            problems.append(f"applies {key} is not a non-empty list")
+            continue
+        for value in values:
+            if value not in vocabulary[key]:
+                problems.append(f"{key} value {value!r} is not in the vocabulary")
+
+    check, owner = entry.get("check"), entry.get("owner")
+    is_gap = check == "gap"
+    if not is_gap and check not in OBL_INVENTORY:
+        problems.append(f"check {check!r} is neither gap nor an id of the inventory")
+    if is_gap and not (isinstance(owner, int) and not isinstance(owner, bool) and owner > 0):
+        problems.append("a gap needs an owner, the number of the issue that will supply the check")
+    if not is_gap and "owner" in entry:
+        problems.append("owner is allowed only when check is gap")
+    if check in OBL_EMPIRICAL_LAYERS or owner == OBL_UNWALKED_LAYERS_OWNER:
+        if (applies or {}).get("profile") != ["empirical"]:
+            problems.append("an empirical proofread layer applies with profile [empirical] and no other profile")
+
+    verified_by = entry.get("verified_by")
+    mechanical = verified_by == ["mechanical"]
+    source = check.split(":", 1)[0] if isinstance(check, str) and ":" in check else None
+    if not isinstance(verified_by, list) or not verified_by:
+        problems.append("verified_by is not a non-empty list")
+        verified_by = []
+    elif not mechanical:
+        for method in verified_by:
+            if method not in methods:
+                problems.append(f"verified_by value {method!r} is neither mechanical alone nor a verification method")
+        if "proofread" in verified_by and "cross_model" not in verified_by:
+            problems.append("verified_by lists proofread without cross_model")
+        if source in OBL_MECHANICAL_SOURCES:
+            problems.append(f"a check from {source} is verified_by [mechanical]")
+        if unit == "article":
+            problems.append("an entry whose unit is article is verified_by [mechanical]")
+    if source == "proofread" and "proofread" not in verified_by:
+        problems.append("a check from proofread lists proofread in verified_by")
+
+    rule = entry.get("on_warning")
+    if mechanical:
+        if rule not in OBL_WARNING_RULES:
+            problems.append(f"on_warning {rule!r} is not one of {', '.join(OBL_WARNING_RULES)}")
+        elif rule == "info" and check not in OBL_INFO_REVIEWED_CHECKS:
+            problems.append("on_warning info is allowed only on a check the maintainer reviewed for it")
+    elif "on_warning" in entry:
+        problems.append("on_warning is allowed only when verified_by is [mechanical]")
+    return problems
+
+
+def _format_problems(table, vocabulary, methods) -> list[str]:
+    """Problems that can be told from the top level, one group or one entry at a time."""
+    if not isinstance(table, dict):
+        return ["the table is not a mapping"]
+    problems = [f"top-level key {key!r} is not allowed" for key in table if key not in OBL_TOP_KEYS]
+    problems += [f"top-level key {key!r} is missing" for key in OBL_TOP_KEYS if key not in table]
+    problems += _group_problems(table.get("groups"))
+    entries = table.get("entries")
+    if not isinstance(entries, list):
+        return problems + ["entries is not a list"]
+    seen: set[str] = set()
+    for position, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            problems.append(f"entry {position} is not a mapping")
+            continue
+        entry_id = entry.get("id")
+        label = f"entry {entry_id!r}" if isinstance(entry_id, str) else f"entry {position}"
+        if isinstance(entry_id, str):
+            if entry_id in seen:
+                problems.append(f"{label}: id is repeated")
+            seen.add(entry_id)
+        problems += [f"{label}: {problem}" for problem in _entry_problems(entry, vocabulary, methods)]
+    return problems
+
+
+def _obl_entries(table) -> list[dict]:
+    entries = table.get("entries") if isinstance(table, dict) else None
+    return [entry for entry in entries or [] if isinstance(entry, dict)]
+
+
+def _accounting_problems(table, vocabulary) -> list[str]:
+    """Every implemented check has an entry; every vocabulary value is placed exactly once."""
+    entries = _obl_entries(table)
+    named_checks = {entry.get("check") for entry in entries}
+    problems = [f"inventory check {check!r} is not named by any entry" for check in OBL_INVENTORY if check not in named_checks]
+
+    named: dict[str, set] = {field: set() for field in OBL_ACCOUNTED_FIELDS}
+    for entry in entries:
+        applies = entry.get("applies")
+        for field in OBL_ACCOUNTED_FIELDS:
+            values = applies.get(field) if isinstance(applies, dict) else None
+            if isinstance(values, list):
+                named[field].update(value for value in values if isinstance(value, str))
+
+    listed: dict[str, set] = {field: set() for field in OBL_ACCOUNTED_FIELDS}
+    for position, item in enumerate(table.get("unconstrained") or [], 1):
+        label = f"unconstrained item {position}"
+        if not isinstance(item, dict) or set(item) != {"field", "value", "why"}:
+            problems.append(f"{label} needs exactly field, value and why")
+            if not isinstance(item, dict):
+                continue
+        field, value, why = item.get("field"), item.get("value"), item.get("why")
+        if field not in OBL_ACCOUNTED_FIELDS:
+            problems.append(f"{label}: field {field!r} is not one of {', '.join(OBL_ACCOUNTED_FIELDS)}")
+            continue
+        if value not in vocabulary[field]:
+            problems.append(f"{label}: {field} value {value!r} is not in the vocabulary")
+            continue
+        if "why" in item and (not _is_text(why) or "\n" in why.strip()):
+            problems.append(f"{label}: why is not one line")
+        listed[field].add(value)
+
+    for field in OBL_ACCOUNTED_FIELDS:
+        for value in vocabulary[field]:
+            in_entry, in_list = value in named[field], value in listed[field]
+            if in_entry and in_list:
+                problems.append(f"{field} value {value!r} is both named by an entry and listed in unconstrained")
+            elif not in_entry and not in_list:
+                problems.append(f"{field} value {value!r} is neither named by an entry nor listed in unconstrained")
+    return problems
+
+
+OBL_REVIEWED_BACKWARD = {
+    "class": "obligation", "group": "dependence", "check": "gap", "owner": 46,
+    "verified_by": ["mechanical"], "on_warning": "judge",
+}
+
+
+def _reviewed_problems(table) -> list[str]:
+    """The entries the maintainer reviewed keep their values; the known gaps keep their owners."""
+    entries = _obl_entries(table)
+    problems: list[str] = []
+
+    def with_check(check: str) -> list[dict]:
+        return [entry for entry in entries if entry.get("check") == check]
+
+    backward = next((entry for entry in entries if entry.get("id") == "dependence.cites-backward"), None)
+    if backward is None:
+        problems.append("entry 'dependence.cites-backward' is missing")
+    else:
+        for key, value in OBL_REVIEWED_BACKWARD.items():
+            if backward.get(key) != value:
+                problems.append(
+                    f"entry 'dependence.cites-backward': {key} is {backward.get(key)!r}, reviewed as {value!r}"
+                )
+
+    announced = with_check("structure:S6")
+    if not announced or any(e.get("class") != "obligation" or e.get("on_warning") != "judge" for e in announced):
+        problems.append("the entries whose check is structure:S6 are obligations with on_warning judge, at least one")
+    crossing = with_check("structure:S7")
+    if not crossing or any(e.get("on_warning") != "info" for e in crossing):
+        problems.append("the entries whose check is structure:S7 have on_warning info, at least one")
+    graph = with_check("ledger:R3")
+    if not any(
+        e.get("class") == "obligation" and e.get("group") == "dependence" and e.get("on_warning") == "judge"
+        for e in graph
+    ):
+        problems.append("no entry whose check is ledger:R3 is a dependence obligation with on_warning judge")
+    if not any(e.get("on_warning") == "info" for e in graph):
+        problems.append("no entry whose check is ledger:R3 has on_warning info")
+    if not {"obligation", "precondition"} <= {e.get("class") for e in with_check("structure:S5")}:
+        problems.append("the entries whose check is structure:S5 include an obligation and a precondition")
+
+    unwalked = [entry for entry in entries if entry.get("owner") == OBL_UNWALKED_LAYERS_OWNER]
+    if len(unwalked) != 3:
+        problems.append(
+            f"owner {OBL_UNWALKED_LAYERS_OWNER} is named by {len(unwalked)} entries, not the 3 for E8, E9 and E10"
+        )
+    for entry in unwalked:
+        verified_by = entry.get("verified_by") or []
+        if entry.get("check") != "gap" or "proofread" not in verified_by or "cross_model" not in verified_by:
+            problems.append(
+                f"entry {entry.get('id')!r}: an entry owned by issue {OBL_UNWALKED_LAYERS_OWNER} is a gap "
+                "verified by proofread and cross_model"
+            )
+    for owner in OBL_REQUIRED_OWNERS:
+        if not any(entry.get("owner") == owner for entry in entries):
+            problems.append(f"owner {owner} is named by no entry")
+    return problems
+
+
+def _document_problems(text: str, table) -> list[str]:
+    """The document explains the table without holding a second copy of it."""
+    problems: list[str] = []
+    ids = sorted({entry["id"] for entry in _obl_entries(table) if isinstance(entry.get("id"), str)})
+    mentioned = [entry_id for entry_id in ids if entry_id in text]
+    if len(mentioned) > OBL_DOC_ENTRY_ID_LIMIT:
+        problems.append(
+            f"the document mentions {len(mentioned)} entry ids, more than the {OBL_DOC_ENTRY_ID_LIMIT} allowed "
+            f"as examples: {', '.join(mentioned)}"
+        )
+    problems += [f"the document does not name the outcome {outcome}" for outcome in OBL_OUTCOMES if outcome not in text]
+    problems += [f"the document does not say why the layer {layer} is a gap" for layer in ("E8", "E9", "E10") if layer not in text]
+    problems += [f"the document does not name issue {issue}" for issue in OBL_DOC_ISSUES if issue not in text]
+    if "owner" not in text:
+        problems.append("the document does not say that a gap is owned by the issue in its owner")
+    return problems
+
+
+def _small_table() -> dict:
+    """A table that breaks no format rule; each refusal case changes one thing in it."""
+    groups = [{"id": group, "zh": "組", "does": "Protects one thing."} for group in OBL_GROUPS]
+    groups[0]["axiom"] = OBL_DEPENDENCE_AXIOM
+    return {
+        "groups": groups,
+        "entries": [
+            {
+                "id": "index.text-in-manuscript", "class": "precondition", "unit": "proposition",
+                "criterion": "The proposition's text occurs in the manuscript.",
+                "check": "ledger:R1", "verified_by": ["mechanical"], "on_warning": "judge",
+            },
+            {
+                "id": "dependence.cites-backward", "class": "obligation", "group": "dependence",
+                "unit": "proposition", "applies": {"cites": ["present"]},
+                "criterion": "Every proposition this one cites comes earlier in reading order.",
+                "check": "gap", "owner": 46, "verified_by": ["mechanical"], "on_warning": "judge",
+            },
+            {
+                "id": "support.cites-imply", "class": "obligation", "group": "support",
+                "unit": "proposition", "applies": {"cites": ["present"]},
+                "criterion": "The propositions this one cites imply it.",
+                "check": "proofread:L4", "verified_by": ["proofread", "cross_model"],
+            },
+        ],
+        "unconstrained": [],
+    }
+
+
+def _obl_entry(table: dict, entry_id: str) -> dict:
+    return next(entry for entry in table["entries"] if entry["id"] == entry_id)
+
+
+INDEX_ROW = "index.text-in-manuscript"
+GAP_ROW = "dependence.cites-backward"
+MODEL_ROW = "support.cites-imply"
+
+
+def _set(entry_id: str, **changes):
+    return lambda table: _obl_entry(table, entry_id).update(changes)
+
+
+def _drop(entry_id: str, key: str):
+    return lambda table: _obl_entry(table, entry_id).pop(key)
+
+
+def _then(*steps):
+    def run(table):
+        for step in steps:
+            step(table)
+    return run
+
+
+OBL_FORMAT_REFUSALS = [
+    ("unknown top-level key", lambda t: t.update(notes=[]), ["notes"]),
+    ("unknown entry key", _set(INDEX_ROW, example="x"), [INDEX_ROW, "example"]),
+    ("repeated id", lambda t: t["entries"].append(copy.deepcopy(_obl_entry(t, GAP_ROW))), [GAP_ROW, "repeated"]),
+    ("two-line criterion", _set(INDEX_ROW, criterion="One thing.\nAnother."), [INDEX_ROW, "criterion"]),
+    ("criterion over 200 characters", _set(INDEX_ROW, criterion="x" * 201), [INDEX_ROW, "criterion"]),
+    ("third class", _set(INDEX_ROW, **{"class": "information"}), [INDEX_ROW, "information"]),
+    ("precondition without the index prefix", _set(INDEX_ROW, id="info.text"), ["info.text", "index"]),
+    ("obligation without its group prefix", _set(MODEL_ROW, id="truth.cites-imply"), ["truth.cites-imply", "support"]),
+    ("obligation without a group", _drop(MODEL_ROW, "group"), [MODEL_ROW, "group"]),
+    ("precondition with a group", _set(INDEX_ROW, group="support"), [INDEX_ROW, "group"]),
+    ("eighth group", lambda t: t["groups"].append({"id": "style", "zh": "文", "does": "Protects style."}), ["style"]),
+    ("groups out of order", lambda t: t["groups"].reverse(), ["groups", "order"]),
+    ("group without its Chinese label", lambda t: t["groups"][2].pop("zh"), ["support", "zh"]),
+    ("dependence names another axiom", lambda t: t["groups"][0].update(axiom="academic-writing/A2_other"),
+     ["dependence", OBL_DEPENDENCE_AXIOM]),
+    ("value outside the vocabulary", _set(INDEX_ROW, applies={"claim_type": ["lemma"]}), [INDEX_ROW, "lemma"]),
+    ("optional sidecar field as a key", _set(INDEX_ROW, applies={"move": ["define"]}), [INDEX_ROW, "move"]),
+    ("empty value list", _set(INDEX_ROW, applies={"claim_type": []}), [INDEX_ROW, "claim_type"]),
+    ("article unit keyed on a proposition field",
+     _set(INDEX_ROW, unit="article", applies={"claim_type": ["claim"]}), [INDEX_ROW, "article"]),
+    ("empirical layer without the profile limit",
+     _then(_set(MODEL_ROW, check="proofread:E3"), _drop(MODEL_ROW, "applies")), [MODEL_ROW, "empirical"]),
+    ("gap without an owner", _drop(GAP_ROW, "owner"), [GAP_ROW, "owner"]),
+    ("owner on an implemented check", _set(INDEX_ROW, owner=46), [INDEX_ROW, "owner"]),
+    ("check outside the inventory", _set(INDEX_ROW, check="ledger:R6"), [INDEX_ROW, "ledger:R6"]),
+    ("proofread without cross_model", _set(MODEL_ROW, verified_by=["proofread"]), [MODEL_ROW, "cross_model"]),
+    ("unknown method", _set(MODEL_ROW, verified_by=["proofread", "cross_model", "oracle"]), [MODEL_ROW, "oracle"]),
+    ("mechanical source verified by a method",
+     _then(_set(INDEX_ROW, verified_by=["human"]), _drop(INDEX_ROW, "on_warning")), [INDEX_ROW, "mechanical"]),
+    ("article unit verified by a method",
+     _then(_set(MODEL_ROW, unit="article"), _drop(MODEL_ROW, "applies")), [MODEL_ROW, "mechanical"]),
+    ("mechanical entry without a warning rule", _drop(INDEX_ROW, "on_warning"), [INDEX_ROW, "on_warning"]),
+    ("warning rule on a non-mechanical entry", _set(MODEL_ROW, on_warning="judge"), [MODEL_ROW, "on_warning"]),
+    ("third warning value", _set(INDEX_ROW, on_warning="none"), [INDEX_ROW, "none"]),
+    ("unreviewed entry passing on a warning",
+     _set(INDEX_ROW, check="ledger:R1.5", on_warning="info"), [INDEX_ROW, "info"]),
+]
+
+
+def _names(problems: list[str], needles: list[str]) -> bool:
+    return any(all(needle in problem for needle in needles) for problem in problems)
+
+
+def test_obligations_small_table_breaks_no_format_rule():
+    assert _format_problems(_small_table(), _obligation_vocabulary(), _obligation_methods()) == []
+
+
+@pytest.mark.parametrize(
+    "mutate, needles",
+    [(mutate, needles) for _, mutate, needles in OBL_FORMAT_REFUSALS],
+    ids=[label for label, _, _ in OBL_FORMAT_REFUSALS],
+)
+def test_obligations_format_refusal_names_what_is_wrong(mutate, needles):
+    table = _small_table()
+    mutate(table)
+    problems = _format_problems(table, _obligation_vocabulary(), _obligation_methods())
+    assert _names(problems, needles), problems
+
+
+def test_obligations_guard_reads_vocabularies_from_their_source():
+    vocabulary = _obligation_vocabulary()
+    assert vocabulary["profile"] == ("default", "empirical")
+    assert "result" in vocabulary["claim_type"] and "claim" in vocabulary["claim_type"]
+    assert "measured" in vocabulary["evidence_class"] and "derived" in vocabulary["evidence_class"]
+    assert "future_work" in vocabulary["opens"] and "appendix" in vocabulary["section_role"]
+    assert "cross_model" in _obligation_methods()
+
+
+def test_obligations_check_that_no_entry_names_is_reported():
+    problems = _accounting_problems(_small_table(), _obligation_vocabulary())
+    assert _names(problems, ["'records:V4'"]), problems
+    assert not _names(problems, ["'ledger:R1'"]), problems  # the small table names this one
+
+
+@pytest.mark.parametrize("field, value", [("claim_type", "conjecture"), ("section_role", "afterword")])
+def test_obligations_new_vocabulary_value_has_to_be_placed(field, value):
+    vocabulary = dict(_obligation_vocabulary())
+    vocabulary[field] = (*vocabulary[field], value)
+    assert _names(_accounting_problems(_small_table(), vocabulary), [field, value])
+
+
+def test_obligations_value_is_placed_once():
+    vocabulary = _obligation_vocabulary()
+    table = _small_table()
+    table["unconstrained"].append(
+        {"field": "section_role", "value": "appendix", "why": "No entry singles the appendix out."}
+    )
+    assert not _names(_accounting_problems(table, vocabulary), ["section_role", "appendix"])
+    _obl_entry(table, INDEX_ROW)["applies"] = {"section_role": ["appendix"]}
+    assert _names(_accounting_problems(table, vocabulary), ["appendix", "both"])
+
+
+@pytest.mark.parametrize(
+    "item, needles",
+    [
+        ({"field": "section_role", "value": "appendix"}, ["unconstrained", "why"]),
+        ({"field": "move", "value": "define", "why": "Not a field."}, ["unconstrained", "move"]),
+        ({"field": "section_role", "value": "afterword", "why": "Not a role."}, ["unconstrained", "afterword"]),
+    ],
+    ids=["no reason", "field not accounted", "value outside the vocabulary"],
+)
+def test_obligations_unconstrained_item_is_checked(item, needles):
+    table = _small_table()
+    table["unconstrained"].append(item)
+    assert _names(_accounting_problems(table, _obligation_vocabulary()), needles)
+
+
+def test_obligations_reviewed_entries_are_required():
+    problems = _reviewed_problems(_small_table())
+    assert _names(problems, ["57", "3"]), problems
+    assert _names(problems, ["structure:S6"]), problems
+    assert _names(problems, ["structure:S7"]), problems
+    assert _names(problems, ["ledger:R3"]), problems
+    assert _names(problems, ["structure:S5"]), problems
+    for owner in (49, 50, 55):
+        assert _names(problems, [f"owner {owner}"]), problems
+
+
+def test_obligations_reviewed_entry_cannot_be_changed():
+    table = _small_table()
+    _obl_entry(table, GAP_ROW)["on_warning"] = "info"
+    assert _names(_reviewed_problems(table), [GAP_ROW, "on_warning"])
+
+
+def test_obligations_document_cannot_copy_the_table():
+    table = _small_table()
+    text = " ".join(entry["id"] for entry in table["entries"])
+    assert _names(_document_problems(text, table), ["3", "entry ids"])
+
+
+def test_obligations_document_has_to_say_the_essentials():
+    problems = _document_problems("An empty document.", _small_table())
+    for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, "E8", "E9", "E10"):
+        assert _names(problems, [needle]), (needle, problems)
+
+
+@pytest.fixture(scope="module")
+def obligations() -> dict:
+    yaml = pytest.importorskip("yaml", reason="the obligations guard parses the table with PyYAML")
+    assert OBLIGATIONS.is_file(), f"missing {_rel(OBLIGATIONS)}"
+    with OBLIGATIONS.open(encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def test_obligations_table_has_no_problem(obligations):
+    vocabulary = _obligation_vocabulary()
+    problems = (
+        _format_problems(obligations, vocabulary, _obligation_methods())
+        + _accounting_problems(obligations, vocabulary)
+        + _reviewed_problems(obligations)
+    )
+    assert problems == [], "\n".join(problems)
+
+
+def test_obligations_document_has_no_problem(obligations):
+    assert OBLIGATIONS_DOC.is_file(), f"missing {_rel(OBLIGATIONS_DOC)}"
+    problems = _document_problems(OBLIGATIONS_DOC.read_text(encoding="utf-8"), obligations)
+    assert problems == [], "\n".join(problems)

@@ -1,0 +1,718 @@
+# The article obligations table: what a manuscript's ledger and sidecars have to
+# get right (preconditions) and what the article owes its reader (obligations),
+# one entry each, with the check that verifies it.
+#
+# How to read an entry, how an outcome is decided and what "sound" means:
+#   plugins/propositions/docs/OBLIGATIONS.md
+# No program reads this file yet. tests/test_plugin_payload_tracked.py keeps it
+# well formed and complete.
+#
+# check        gap, or one id of the closed inventory of implemented checks
+# owner        only on a gap: the issue that will supply the check
+# verified_by  [mechanical], or the verification methods, all of them required
+# on_warning   on mechanical entries: judge (a finding short of an error leaves
+#              the entry unverified until someone judges it) or info (the finding
+#              is listed and the entry passes; only on entries reviewed for it)
+
+groups:
+  - id: dependence
+    zh: 依賴
+    does: Every sentence depends only on what has already appeared.
+    axiom: academic-writing/A1_no_forward_dependence
+  - id: commitment
+    zh: 承諾
+    does: Every commitment made to the reader is kept.
+  - id: support
+    zh: 支持
+    does: Every claim is carried by the grounds given for it.
+  - id: consistency
+    zh: 一致
+    does: No two statements of the article conflict.
+  - id: truth
+    zh: 真實與來源
+    does: What the article says is true, and its numbers and citations can be traced to a source.
+  - id: placement
+    zh: 位置
+    does: Content sits in the section whose role fits it.
+  - id: completeness
+    zh: 完成
+    does: The manuscript holds nothing left unfinished.
+
+entries:
+  # ---- Preconditions: is the ledger a faithful index of the manuscript? ----
+
+  - id: index.text-in-manuscript
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's text occurs in the manuscript."
+    check: ledger:R1
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.retired-text-absent
+    class: precondition
+    unit: proposition
+    criterion: "A retired proposition's text is no longer live in the manuscript."
+    check: ledger:R1
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.sections-have-propositions
+    class: precondition
+    unit: article
+    criterion: "Every top-level section of the manuscript has at least one proposition."
+    check: ledger:R1.5
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.cites-resolve
+    class: precondition
+    unit: proposition
+    applies:
+      cites: [present]
+    criterion: "Every id in the proposition's cites names a proposition in the ledger."
+    check: ledger:R2
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.proposition-is-cited
+    class: precondition
+    unit: proposition
+    criterion: "Another proposition cites this one, or its claim type is exempt from the orphan check."
+    check: ledger:R3
+    verified_by: [mechanical]
+    on_warning: info
+
+  - id: index.id-is-uuid
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's id is a canonical UUID v7 and the entry carries no second identifier."
+    check: ledger:R7
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.id-is-unique
+    class: precondition
+    unit: proposition
+    criterion: "No other proposition in the ledger has the same id."
+    check: ledger:R8
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.block-within-environment
+    class: precondition
+    unit: proposition
+    criterion: "A proposition assigned to a theorem-like block lies within that environment's lines in the manuscript."
+    check: ledger:R9
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.connective-asserts-nothing
+    class: precondition
+    unit: proposition
+    applies:
+      claim_type: [connective, reference]
+    criterion: "A connective or reference proposition lists no asserts."
+    check: ledger:R10
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.evidence-class-known
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's evidence_class is a value of the ledger's profile."
+    check: ledger:R11
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.claim-type-known
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's claim_type is a value of the ledger's profile."
+    check: ledger:R12
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.location-anchored
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's location names the file and the lines where its text starts."
+    check: ledger:R13
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.extraction-covers-text
+    class: precondition
+    unit: article
+    criterion: "No text in an extracted range of the manuscript is left without a proposition."
+    check: coverage:text
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.ledger-in-reading-order
+    class: precondition
+    unit: article
+    criterion: "The ledger's line order is the manuscript's reading order."
+    check: order:ledger
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.asserts-faithful
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's asserts state what its text claims, no more and no less."
+    check: proofread:L1
+    verified_by: [proofread, cross_model]
+
+  - id: index.claim-type-fits
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's claim_type fits what its text does."
+    check: proofread:L2
+    verified_by: [proofread, cross_model]
+
+  - id: index.cites-complete
+    class: precondition
+    unit: proposition
+    criterion: "Everything the proposition's text relies on is declared in its cites."
+    check: proofread:L3
+    verified_by: [proofread, cross_model]
+
+  - id: index.evidence-class-fits
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's evidence_class is consistent with its claim_type and its cites."
+    check: proofread:L5
+    verified_by: [proofread, cross_model]
+
+  # ---- Preconditions: are the structure sidecars a faithful index? ----
+
+  - id: index.discourse-record-per-proposition
+    class: precondition
+    unit: proposition
+    criterion: "The discourse sidecar has exactly one record for the proposition, in ledger order."
+    check: structure:S1
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.paragraph-is-a-tree
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's record has a valid head and relation, and its paragraph forms one tree."
+    check: structure:S2
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.commitments-well-formed
+    class: precondition
+    unit: proposition
+    criterion: "Commitment ids are well formed and unique, and each discharge names a commitment an earlier record opened."
+    check: structure:S3
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.plans-well-formed
+    class: precondition
+    unit: article
+    criterion: "The section plan and the paragraph plan are complete and well formed."
+    check: structure:S5
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.arcs-do-not-cross
+    class: precondition
+    unit: proposition
+    criterion: "No two arcs of the proposition's paragraph, or of its section, cross."
+    check: structure:S7
+    verified_by: [mechanical]
+    on_warning: info
+
+  - id: index.basis-edges-cited
+    class: precondition
+    unit: proposition
+    criterion: "Every basis relation of the proposition points at a proposition it cites in the ledger."
+    check: structure:S8
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.moves-in-vocabulary
+    class: precondition
+    unit: proposition
+    criterion: "The proposition's move and its paragraph's type, when present, are values of the vocabulary."
+    check: structure:S9
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Preconditions: are the verification records well formed? ----
+
+  - id: index.records-well-formed
+    class: precondition
+    unit: article
+    criterion: "Every verification record is a JSON object with its required keys."
+    check: records:V1
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.records-name-propositions
+    class: precondition
+    unit: article
+    criterion: "Every verification record names a proposition in the ledger."
+    check: records:V2
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.records-use-vocabulary
+    class: precondition
+    unit: article
+    criterion: "Every verification record's method and status are values of their vocabularies."
+    check: records:V3
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.records-are-dated
+    class: precondition
+    unit: article
+    criterion: "Every verification record carries a valid date."
+    check: records:V4
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.records-point-to-evidence
+    class: precondition
+    unit: article
+    criterion: "Every verification record that gives a verdict points to its evidence."
+    check: records:V5
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.records-not-duplicated
+    class: precondition
+    unit: article
+    criterion: "No verification record is recorded twice."
+    check: records:V6
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Dependence ----
+
+  - id: dependence.cites-backward
+    class: obligation
+    group: dependence
+    unit: proposition
+    applies:
+      cites: [present]
+    criterion: "Every proposition this one cites comes earlier in reading order, or the forward reference is a roadmap or a promissory note."
+    check: gap
+    owner: 46
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: dependence.cites-acyclic
+    class: obligation
+    group: dependence
+    unit: proposition
+    applies:
+      cites: [present]
+    criterion: "The proposition's citations lead back to it by no path."
+    check: ledger:R3
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: dependence.symbols-introduced
+    class: obligation
+    group: dependence
+    unit: proposition
+    criterion: "Every symbol the proposition uses is introduced by an earlier proposition."
+    check: gap
+    owner: 55
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Commitment ----
+
+  - id: commitment.kept
+    class: obligation
+    group: commitment
+    unit: proposition
+    applies:
+      opens: [question, aim, hypothesis, plan, announcement]
+    criterion: "Every question, aim, hypothesis, plan and announcement the proposition opens is discharged later."
+    check: structure:S4
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: commitment.setups-used
+    class: obligation
+    group: commitment
+    unit: proposition
+    applies:
+      opens: [setup]
+    criterion: "Every setup the proposition opens is taken up later."
+    check: structure:S4
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: commitment.announcements-kept-nearby
+    class: obligation
+    group: commitment
+    unit: proposition
+    applies:
+      opens: [announcement]
+    criterion: "An announcement is first discharged in the section that opened it or in the next one."
+    check: structure:S6
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Support ----
+
+  - id: support.cites-imply
+    class: obligation
+    group: support
+    unit: proposition
+    applies:
+      cites: [present]
+    criterion: "The propositions this one cites imply what it asserts."
+    check: proofread:L4
+    verified_by: [proofread, cross_model]
+
+  - id: support.contrast-estimated
+    class: obligation
+    group: support
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "A comparison the proposition claims was estimated, not only described."
+    check: proofread:E5
+    verified_by: [proofread, cross_model]
+
+  - id: support.strength-matches-test
+    class: obligation
+    group: support
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "The proposition asserts no more than the test it rests on returned."
+    check: proofread:E6
+    verified_by: [proofread, cross_model]
+
+  - id: support.exposures-separable
+    class: obligation
+    group: support
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "Two exposures the proposition treats as separable are neither nested nor collinear."
+    check: gap
+    owner: 57
+    verified_by: [proofread, cross_model]
+
+  # ---- Consistency ----
+
+  - id: consistency.no-known-contradiction
+    class: obligation
+    group: consistency
+    unit: article
+    criterion: "No contradiction pattern known to the validator holds among the propositions."
+    check: ledger:R4
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: consistency.no-contradiction
+    class: obligation
+    group: consistency
+    unit: article
+    criterion: "No two propositions of the article contradict each other."
+    check: gap
+    owner: 61
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: consistency.variable-roles
+    class: obligation
+    group: consistency
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "Each variable the proposition uses plays one role across the manuscript."
+    check: gap
+    owner: 57
+    verified_by: [proofread, cross_model]
+
+  - id: consistency.code-references-defined
+    class: obligation
+    group: consistency
+    unit: article
+    criterion: "Every code symbol the manuscript's documents refer to is defined in the analysis code."
+    check: audit:R3
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: consistency.code-symbols-mentioned
+    class: obligation
+    group: consistency
+    unit: article
+    criterion: "Every symbol the analysis code defines is mentioned in the manuscript's documents."
+    check: audit:R3
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Truth ----
+
+  - id: truth.numbers-match-artifact
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "Every number in the proposition matches the artifact it comes from."
+    check: proofread:E1
+    verified_by: [proofread, cross_model]
+
+  - id: truth.quantity-computable
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "The quantity the proposition claims can be computed from the dataset as collected."
+    check: proofread:E2
+    verified_by: [proofread, cross_model]
+
+  - id: truth.figure-shows-what-text-says
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "A figure the proposition cites shows what the proposition says it shows."
+    check: proofread:E3
+    verified_by: [proofread, cross_model]
+
+  - id: truth.figure-comes-from-model
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "A figure the proposition cites is computed from a fitted model or the data, not from literals."
+    check: proofread:E4
+    verified_by: [proofread, cross_model]
+
+  - id: truth.sample-matches
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "The sample the analysis used is the sample the proposition states."
+    check: proofread:E7
+    verified_by: [proofread, cross_model]
+
+  - id: truth.composite-holds-per-component
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "A claim about a composite group holds for each component the proposition names."
+    check: gap
+    owner: 57
+    verified_by: [proofread, cross_model]
+
+  - id: truth.cited-keys-have-entries
+    class: obligation
+    group: truth
+    unit: article
+    criterion: "Every citation key in the manuscript has an entry in the bibliography."
+    check: audit:R2
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: truth.references-exist
+    class: obligation
+    group: truth
+    unit: article
+    criterion: "Every work the manuscript cites can be found in an external source."
+    check: gap
+    owner: 50
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: truth.external-support-found
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      evidence_class: [external]
+    criterion: "The support outside the paper that the proposition rests on can be found and says what the proposition says."
+    check: gap
+    owner: 50
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Placement ----
+
+  - id: placement.discussion-opens-no-hypothesis
+    class: obligation
+    group: placement
+    unit: proposition
+    applies:
+      section_role: [discussion]
+    criterion: "A proposition in a discussion section opens no new hypothesis."
+    check: gap
+    owner: 60
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: placement.method-does-not-interpret
+    class: obligation
+    group: placement
+    unit: proposition
+    applies:
+      section_role: [method]
+    criterion: "A proposition in a method section does not interpret results."
+    check: gap
+    owner: 60
+    verified_by: [mechanical]
+    on_warning: judge
+
+  # ---- Completeness ----
+
+  - id: completeness.thesis-stated
+    class: obligation
+    group: completeness
+    unit: article
+    criterion: "The article names the propositions that carry its thesis."
+    check: structure:S5
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: completeness.no-placeholder
+    class: obligation
+    group: completeness
+    unit: article
+    criterion: "The manuscript contains no placeholder left to be filled in."
+    check: gap
+    owner: 49
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: completeness.no-working-paths
+    class: obligation
+    group: completeness
+    unit: article
+    criterion: "The manuscript shows no path of a working file."
+    check: audit:R1
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: completeness.no-leaked-labels
+    class: obligation
+    group: completeness
+    unit: article
+    criterion: "No citation argument in the manuscript carries a label id leaked from another source."
+    check: audit:R2
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: completeness.bibliography-entries-cited
+    class: obligation
+    group: completeness
+    unit: article
+    criterion: "Every entry in the bibliography is cited in the manuscript."
+    check: audit:R2
+    verified_by: [mechanical]
+    on_warning: judge
+
+# Vocabulary values that no entry's `applies` names, each with the reason.
+unconstrained:
+  - field: claim_type
+    value: axiom
+    why: "What an axiom has to be is part of the claim-type fit entry, which applies to every claim type."
+  - field: claim_type
+    value: definition
+    why: "What a definition has to be is part of the claim-type fit entry, which applies to every claim type."
+  - field: claim_type
+    value: hypothesis
+    why: "No check states a requirement that holds for this claim type alone."
+  - field: claim_type
+    value: claim
+    why: "No check states a requirement that holds for this claim type alone."
+  - field: claim_type
+    value: case_split
+    why: "What a case split has to be is part of the claim-type fit entry, which applies to every claim type."
+  - field: claim_type
+    value: display_equation
+    why: "No check states a requirement that holds for this claim type alone."
+  - field: claim_type
+    value: restatement
+    why: "What a restatement has to be is part of the claim-type fit entry, which applies to every claim type."
+  - field: claim_type
+    value: commentary
+    why: "What a commentary has to be is part of the claim-type fit entry, which applies to every claim type."
+  - field: claim_type
+    value: example
+    why: "No check states a requirement that holds for this claim type alone."
+  - field: claim_type
+    value: scope_qualifier
+    why: "No check states a requirement that holds for this claim type alone."
+  - field: claim_type
+    value: result
+    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by claim type."
+  - field: claim_type
+    value: interpretation
+    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by claim type."
+  - field: evidence_class
+    value: verified
+    why: "What this class needs is part of the evidence-class fit entry, which applies to every class."
+  - field: evidence_class
+    value: derived
+    why: "What this class needs is part of the evidence-class fit entry, which applies to every class."
+  - field: evidence_class
+    value: hypothesized
+    why: "No check states a requirement that holds for this evidence class alone."
+  - field: evidence_class
+    value: conventional
+    why: "No check states a requirement that holds for this evidence class alone."
+  - field: evidence_class
+    value: open
+    why: "No check states a requirement that holds for this evidence class alone."
+  - field: evidence_class
+    value: measured
+    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by evidence class."
+  - field: evidence_class
+    value: tested
+    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by evidence class."
+  - field: evidence_class
+    value: descriptive
+    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by evidence class."
+  - field: evidence_class
+    value: not_computable
+    why: "It records the finding of the computability layer, which applies by profile."
+  - field: opens
+    value: future_work
+    why: "Future work is never discharged, and the structure validator never reports it as owed."
+  - field: section_role
+    value: abstract
+    why: "What an abstract opens is limited by the section plan, which the plan entry covers."
+  - field: section_role
+    value: introduction
+    why: "No check states a requirement that holds for this section role alone."
+  - field: section_role
+    value: background
+    why: "No check states a requirement that holds for this section role alone."
+  - field: section_role
+    value: formal_setup
+    why: "No check states a requirement that holds for this section role alone."
+  - field: section_role
+    value: results
+    why: "No check states a requirement that holds for this section role alone."
+  - field: section_role
+    value: proofs
+    why: "No check states a requirement that holds for this section role alone."
+  - field: section_role
+    value: conclusion
+    why: "No check states a requirement that holds for this section role alone."
+  - field: section_role
+    value: appendix
+    why: "No check states a requirement that holds for this section role alone."

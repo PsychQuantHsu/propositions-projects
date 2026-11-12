@@ -546,7 +546,11 @@ OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70")
 # Words the document needs for the rules the spec asks it to state: the audit
 # severity that is easy to leave out, and what a report has to show for a unit
 # to pass.
-OBL_DOC_WORDS = ("suspicious", "examined", "external_source")
+OBL_DOC_WORDS = ("suspicious", "--partial", "external_source")
+# The section of the document that says, for a check named by several entries,
+# which of them a finding counts for. Its table has one group of rows per check.
+OBL_ROUTING_HEADING = "### Which entry a finding counts for"
+OBL_CHECK_ID = re.compile(r"`((?:ledger|structure|records|coverage|order|audit|proofread):[A-Za-z0-9.]+)`")
 OBL_DOC_ENTRY_ID_LIMIT = 2
 OBL_ID = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+")
 OBL_AXIOM = re.compile(r"[a-z0-9-]+/[A-Za-z0-9_]+")
@@ -614,7 +618,8 @@ def _group_problems(groups) -> list[str]:
             if not _is_text(group.get(key)):
                 problems.append(f"group {group_id!r}: {key} is missing")
         axiom = group.get("axiom")
-        if axiom is not None and not (isinstance(axiom, str) and OBL_AXIOM.fullmatch(axiom)):
+        # `axiom: null` is a key that is present and names no axiom, not a missing key.
+        if "axiom" in group and not (isinstance(axiom, str) and OBL_AXIOM.fullmatch(axiom)):
             problems.append(f"group {group_id!r}: axiom {axiom!r} is not <domain>/<axiom id>")
         if group_id == "dependence" and axiom != OBL_DEPENDENCE_AXIOM:
             problems.append(f"group 'dependence': axiom is not {OBL_DEPENDENCE_AXIOM}")
@@ -659,7 +664,8 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
         problems.append("criterion is not one line of at most 200 characters")
 
     applies = entry.get("applies")
-    if applies is not None and (not isinstance(applies, dict) or not applies):
+    # `applies: null` is a key that is present and states nothing, not a missing key.
+    if "applies" in entry and (not isinstance(applies, dict) or not applies):
         problems.append("applies is not a non-empty mapping")
         applies = None
     for key, values in (applies or {}).items():
@@ -890,6 +896,30 @@ def _document_problems(text: str, table) -> list[str]:
     problems += [f"the document does not mention {word}" for word in OBL_DOC_WORDS if word not in text]
     if "owner" not in text:
         problems.append("the document does not say that a gap is owned by the issue in its owner")
+    problems += _routing_problems(text, table)
+    return problems
+
+
+def _routing_problems(text: str, table) -> list[str]:
+    """The document's routing table covers exactly the checks that several entries name."""
+    named: dict[str, int] = {}
+    for entry in _obl_entries(table):
+        check = entry.get("check")
+        if isinstance(check, str) and check != "gap":
+            named[check] = named.get(check, 0) + 1
+    shared = {check for check, count in named.items() if count > 1}
+    if OBL_ROUTING_HEADING not in text:
+        return [f"the document has no section {OBL_ROUTING_HEADING!r}"] if shared else []
+    section = text.split(OBL_ROUTING_HEADING, 1)[1]
+    section = re.split(r"^#{1,6} ", section, maxsplit=1, flags=re.MULTILINE)[0]
+    placed = set()
+    for line in section.splitlines():
+        if line.startswith("|"):
+            placed.update(OBL_CHECK_ID.findall(line.split("|")[1]))
+    problems = [f"the routing table does not place the findings of {check}, which several entries name"
+                for check in sorted(shared - placed)]
+    problems += [f"the routing table places the findings of {check}, which one entry names or none"
+                 for check in sorted(placed - shared)]
     return problems
 
 
@@ -955,6 +985,8 @@ OBL_FORMAT_REFUSALS = [
     ("criterion over 200 characters", _set(INDEX_ROW, criterion="x" * 201), [INDEX_ROW, "criterion"]),
     ("external_source that is not true", _set(INDEX_ROW, external_source="yes"), [INDEX_ROW, "external_source"]),
     ("external_source set to false", _set(INDEX_ROW, external_source=False), [INDEX_ROW, "external_source"]),
+    ("applies given as null", _set(INDEX_ROW, applies=None), [INDEX_ROW, "applies"]),
+    ("axiom given as null", lambda t: t["groups"][2].update(axiom=None), ["support", "axiom"]),
     ("third class", _set(INDEX_ROW, **{"class": "information"}), [INDEX_ROW, "information"]),
     ("precondition without the index prefix", _set(INDEX_ROW, id="info.text"), ["info.text", "index"]),
     ("obligation without its group prefix", _set(MODEL_ROW, id="truth.cites-imply"), ["truth.cites-imply", "support"]),
@@ -1121,6 +1153,18 @@ def test_obligations_document_has_to_say_the_essentials():
     problems = _document_problems("An empty document.", _small_table())
     for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, *OBL_DOC_WORDS, "E8", "E9", "E10"):
         assert _names(problems, [needle]), (needle, problems)
+    # A check that two entries name needs a row in the routing table, and only such a check has one.
+    table = _small_table()
+    second = copy.deepcopy(_obl_entry(table, INDEX_ROW))
+    second["id"] = "index.retirements-hold"
+    table["entries"].append(second)
+    assert _names(_routing_problems("No routing section.", table), ["no section"])
+    unplaced = f"{OBL_ROUTING_HEADING}\n\n| Check | Finding |\n|---|---|\n| `proofread:L4` | any |\n"
+    problems = _routing_problems(unplaced, table)
+    assert _names(problems, ["does not place", "ledger:R1"]), problems
+    assert _names(problems, ["proofread:L4", "one entry"]), problems
+    placed = f"{OBL_ROUTING_HEADING}\n\n| Check | Finding |\n|---|---|\n| `ledger:R1` | any |\n\n## Next\n| `audit:R2` | x |\n"
+    assert _routing_problems(placed, table) == []
 
 
 def _load_obligations_text(text: str):

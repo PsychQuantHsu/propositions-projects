@@ -10,9 +10,10 @@
 # check        gap, or one id of the closed inventory of implemented checks
 # owner        only on a gap: the issue that will supply the check
 # verified_by  [mechanical], or the verification methods, all of them required
-# on_warning   on mechanical entries: judge (a finding short of an error leaves
-#              the entry unverified until someone judges it) or info (the finding
-#              is listed and does not count; only on entries reviewed for it)
+# on_warning   on mechanical entries, what a finding short of an error does once
+#              a unit can pass: judge (it keeps the unit from passing until
+#              someone judges it) or info (it is listed and does not; only on
+#              entries reviewed for it)
 # external_source  true on an entry whose check has to consult a source outside
 #              the manuscript's repository, whoever decides it
 
@@ -651,7 +652,7 @@ entries:
     class: obligation
     group: completeness
     unit: article
-    criterion: "The structure sidecar names at least one proposition as the article's thesis."
+    criterion: "The article states its thesis."
     check: structure:S5
     verified_by: [mechanical]
     on_warning: judge

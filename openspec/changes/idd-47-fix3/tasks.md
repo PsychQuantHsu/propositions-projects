@@ -14,8 +14,8 @@
 
 ## 4. 獨立讀者盲驗
 
-- [ ] 4.1 題目改成規格的二十四個範例情況加五題（一筆沒檢查就不合理、`lean` 的 `refuted`、前提沒通過、今天有沒有文章能通過、R3 的警告在兩列），共二十九題，答案先存檔；派新的讀者，只給表、文件與題目。把題目、答案、相同的題數與對應的 commit 更新到 #47 的盲驗紀錄。驗證：二十九題全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
+- [x] 4.1 題目改成規格的二十四個範例情況加五題（一筆沒檢查就不合理、`lean` 的 `refuted`、前提沒通過、今天有沒有文章能通過、R3 的警告在兩列），共二十九題，答案先存檔；派新的讀者，只給表、文件與題目。把題目、答案、相同的題數與對應的 commit 更新到 #47 的盲驗紀錄。驗證：二十九題全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
 
 ## 5. 驗收
 
-- [ ] 5.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix3` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。
+- [x] 5.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix3` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。

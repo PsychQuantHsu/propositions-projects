@@ -67,7 +67,8 @@ The class is written on each entry. It does not follow from which tool runs the
 check: one check can cover both, and the table then holds one entry for each,
 naming the same check. The structure validator's S5, for example, checks both
 that the section and paragraph plans are well formed (a precondition) and that
-the article has a thesis whose propositions the sidecar names (an obligation).
+the sidecar names at least one proposition as the article's thesis (an
+obligation).
 
 The distinction matters when reading a result. "Every rule of the ledger
 validator passes" says that the index is right. It says nothing yet about the
@@ -80,6 +81,11 @@ are annotations, and nothing compares them with the text. A proposition whose
 hypothesis was never annotated opens nothing, so the entries about commitments
 do not apply to it. Until a check exists (issue #66), the outcomes of the
 obligations that apply by those annotations are not to be trusted.
+
+A second precondition without a check concerns the ledger itself: that its
+profile fits the manuscript. The entries on numbers, samples and figures apply
+only in a ledger with the empirical profile, and nothing compares the declared
+profile with what the manuscript reports. Issue #70 owns it.
 
 There is no third class. A finding that is reported for information only has an
 entry of its own, in whichever class fits what would be corrected if someone
@@ -123,6 +129,20 @@ criterion that needs "or" is split into two entries. An entry whose unit is
 `article` uses `profile` only, and for the article `profile` is the profile of
 the manuscript's ledger.
 
+When the value a key needs cannot be read for a unit, the entry is `unverified`
+for that unit, not `not_applicable`:
+
+- `profile`: the ledger's `_meta.json` declares a profile that the validator
+  rejects. A ledger that declares none has the default profile.
+- `claim_type`, `evidence_class`: the proposition's ledger entry has no such
+  field.
+- `opens`, `section_role`: the proposition has no record in the discourse
+  sidecar, or the section plan is missing or invalid. A proposition whose
+  record opens nothing has a value: it opens no commitment.
+
+Which propositions may leave `claim_type` or `evidence_class` out is not
+settled (issue #70).
+
 The move and the paragraph type are not keys. The sidecars leave them optional,
 so an entry keyed on one of them would treat an unannotated proposition as not
 applicable. `opens` is optional too and is a key; that is why the table holds
@@ -131,17 +151,24 @@ the precondition on the sidecars described under [Two classes](#two-classes).
 The empirical layers of the proofread skill apply with two keys:
 `profile: [empirical]` and
 `evidence_class: [measured, tested, descriptive, not_computable]`. Those four
-classes mark a claim that rests on data. The empirical walk has no artifact to
-re-run for any other proposition, and the skill says of an `external` one that
-the empirical layers do not apply to it. Without the profile, every proposition
-of a mathematical manuscript would stay unverified under these entries; without
-the evidence classes, every proposition without an artifact would. The
-derivation layers are not limited by profile, so a proposition of an empirical
-ledger that rests on data has to pass both walks.
+classes mark a claim made about data. The skill says that its layers E1 to E8
+do not apply to an `external` proposition, which has no artifact to re-run;
+the table gives the entries for E9 and E10 the same limit. `not_computable`
+is one of the four because it marks a quantity the data cannot produce, and
+the entry for E2 is the one that fails it. Without the profile, every
+proposition of a mathematical manuscript would stay unverified under these
+entries; without the evidence classes, every proposition without an artifact
+would.
+
+A proposition of an empirical ledger that carries any other evidence class is
+outside these entries, also when its text interprets data. Whether its class
+is right is what the entry for the layer L5 decides. The derivation layers are
+not limited by profile, so a proposition of an empirical ledger that rests on
+data has to pass both walks.
 
 Numbers are compared with artifacts only in a ledger with the empirical
-profile. A manuscript that reports data declares that profile; under the default
-profile no entry checks its numbers.
+profile. Whether a manuscript that reports data has that profile is the second
+precondition described under [Two classes](#two-classes).
 
 `unconstrained` at the end of the table lists every value of `claim_type`,
 `evidence_class`, the commitment kinds and the section roles that no entry's
@@ -158,7 +185,7 @@ checks.
 ### The inventory
 
 The inventory is closed. What its members have in common is that each reports
-a finding, or leaves a record, for a unit without changing any file.
+findings, or leaves records, about units under an id of its own.
 
 | Ids | Reported by | Defined in |
 |---|---|---|
@@ -174,8 +201,11 @@ a finding, or leaves a record, for a unit without changing any file.
 ### What is not in the inventory
 
 - The fourth pass of the cross-artifact audit. It runs the ledger validator.
-- The theorem-boundary audit and the dry run of the location refresh. They are
-  the same checks as `ledger:R9` and `ledger:R13`.
+- The theorem-boundary audit. It compares what `ledger:R9` compares. It also
+  reports environments it could not close and propositions whose block it
+  could not resolve, which R9 passes over in silence; that difference belongs
+  to issue #68.
+- The dry run of the location refresh. It is the same check as `ledger:R13`.
 - The link catalog's currency check. Its subject is a file of this plugin, not
   a manuscript.
 - The checks of the `tschema-check` plugin. They belong to another plugin.
@@ -219,7 +249,7 @@ finding, and at which level, is this closed list:
 | The three validators | A problem reported as an error | A problem reported as a warning |
 | The audit scripts | A `definite` finding | A finding of any other severity: `likely`, `suspicious` or `FYI` |
 | The reordering dry run | Its report that a number of ledger lines move | Its report of manuscript lines that hold several propositions |
-| The coverage check | None | Each run of text reported as uncovered, and each warning that a proposition's text was not found in the range |
+| The coverage check | None | Each run of text reported as uncovered, and each warning the check prints |
 
 A line that reports no problem, such as a pass line or a count of what was
 checked, is not a finding. The exit status of a script is not used to tell the
@@ -228,30 +258,43 @@ check ends in failure on a finished ledger too.
 
 The coverage check has no error level because a finished ledger still leaves
 runs uncovered: front matter, headings, the bibliography. Every run is a
-finding to be judged, and a run judged to be a sentence of the body fails the
-entry.
+finding to be judged, and a run judged to be text of the body that no
+proposition holds fails the entry.
 
-A finding counts for one entry and for one or more units:
+Every finding counts for at least one unit of at least one entry.
 
-- It counts for the entry whose `criterion` it concerns. A finding that is not
-  an error concerns a criterion without yet showing that it is violated:
-  whether it is violated is what a judgment decides, also when the script
-  itself calls the finding harmless. When several entries name the same check,
-  deciding which one a finding concerns is a judgment by the reader until
-  checks report to entries.
-- Within that entry, a finding that names a proposition counts for that
-  proposition. A cycle that the ledger validator reports counts for every
-  proposition its message lists. A finding that names no proposition counts for
-  every unit the entry applies to.
+Which entry:
+
+- A finding counts for the entry whose `criterion` it concerns, also when the
+  script itself calls the finding harmless. A finding that is not an error
+  concerns a criterion without yet showing that it is violated; whether it is
+  violated is what a judgment decides.
+- A finding that concerns the criterion of no entry counts for every entry that
+  names its check. So does a finding for which the reader cannot decide between
+  several entries that name the same check. Deciding between them is a judgment
+  by the reader until checks report to entries.
+
+Which unit:
+
+- Under an entry whose unit is `article`, every finding counts for the article.
+- Under an entry whose unit is `proposition`, a finding that names a
+  proposition the entry applies to counts for that proposition.
+- Every other finding counts for every unit the entry applies to: one that
+  names nothing, or a retired proposition, a record, a section or a line, or a
+  proposition the entry does not apply to. A cycle that the ledger validator
+  reports is counted this way too, because the validator does not list every
+  proposition that lies on a cycle.
 
 `on_warning` says what a finding that is not an error does to the entry:
 
-- `judge`: the entry is unverified until someone judges the finding. The
-  judgment either passes the entry or fails it.
-- `info`: the finding is listed in the report and the entry passes.
+- `judge`: the entry is unverified until a judgment of the finding is
+  recorded. A judgment that the criterion is violated fails the entry; a
+  judgment that it is not makes the finding stop counting. Nothing records
+  such a judgment yet (issue #62).
+- `info`: the finding is listed in the report and does not count.
 
-`info` is the one setting that lets a warning pass, so it is allowed only on
-entries the maintainer has reviewed for it. There are four: an uncited
+`info` is the one setting under which a finding does not count, so it is
+allowed only on entries the maintainer has reviewed for it. There are four: an uncited
 proposition (`ledger:R3`), crossing arcs (`structure:S7`), a code symbol that
 the documents never mention (`audit:R3`) and a bibliography entry that is never
 cited (`audit:R2`). Every other mechanical entry says `judge`, including an
@@ -286,93 +329,85 @@ review are the methods of those names.
 An entry has exactly one of four outcomes for a unit: `not_applicable`,
 `unverified`, `failed` or `passed`. The first rule that fits decides.
 
-1. The unit does not satisfy `applies`: `not_applicable`.
-2. `check` is `gap`: `unverified`.
-3. `verified_by` is `[mechanical]`:
-   - the check has not been run on the current files: `unverified`;
+1. A value that `applies` needs cannot be read for the unit: `unverified`.
+2. The unit does not satisfy `applies`: `not_applicable`.
+3. `check` is `gap`: `unverified`.
+4. `verified_by` is `[mechanical]`. Only a run of the check made after the
+   last change to every file it reads counts.
+   - there is no such run: `unverified`;
    - a finding that is an error counts for the unit: `failed`;
-   - a finding that is not an error counts for the unit: `unverified` under
-     `judge`, `passed` under `info`, with the finding listed as information;
-   - no finding counts for the unit: `passed`.
-4. `verified_by` lists methods. For each listed method, read its current
-   records for the proposition from the latest back (the greatest `checked_at`
-   first, and on the same day the later line of the file first) and stop at the
-   first record that the table below stops on.
-
-   | The record is | and covers the entry's check | and covers only other checks | and what it covers cannot be established |
-   |---|---|---|---|
-   | `refuted` or `partial` | stop: against the entry | pass over | stop: against the entry |
-   | `supported` | stop: for the entry | pass over | pass over |
-   | `unresolved` or `not_attempted` | stop: undecided | pass over | pass over |
-
-   A method with no record that stops the reading is undecided. Then:
-   - any listed method is against the entry: `failed`;
-   - every listed method is for the entry: `passed`;
+   - a finding that is not an error counts for the unit: under `judge`,
+     `unverified` until a judgment is recorded, then as the judgment says;
+     under `info`, the finding is listed as information and the next two lines
+     decide;
+   - the report of the run lists the unit among those the check examined:
+     `passed`;
+   - otherwise: `unverified`.
+5. `verified_by` lists methods:
+   - a record that counts is `refuted` or `partial`: `failed`;
+   - for every listed method, a record that counts is `supported`: `passed`;
    - otherwise: `unverified`.
 
-   The latest record of a method does not decide alone. The two walks of the
-   proofread skill each leave a record, so the latest one covers only one of
-   them.
+`passed` means that the named check examined the unit and reported nothing
+against it. It is not proof that the criterion holds. A check can be weaker
+than the criterion it serves, for example by matching patterns where the
+criterion speaks of meaning. That difference is corrected in the check, not by
+rewording the criterion to follow the code.
 
-### When a check has not been run
+### What a report has to show
 
-A check has not been run for a unit in these seven cases, and no others.
+A report lists a unit as examined when it names the proposition as one the
+check examined or, for the article, names every file of the manuscript's input
+tree as read. A line that says a rule passed, or that gives a count, lists no
+unit. The ledger validator prints such a line for R9 and for R13 while it
+passes over propositions in silence.
 
-1. It was not executed after the last change to a file it reads.
-2. It could not run at all and ended with a tool error, for example for a
-   missing input.
-3. It reports that it skipped the rule because the ledger's schema version
-   predates the rule or the ledger's profile is invalid.
-4. It lists the unit as one it could not examine, as the location check does
-   for a proposition it cannot anchor. When it reports only how many units it
-   skipped, the entry is unverified for every unit it applies to.
-5. The structure validator was run with `--partial`. That mode reports what a
-   half-written manuscript still owes as information.
-6. For the coverage check, a part of the manuscript's body was in no range it
-   was run on. The body is the main file from `\begin{document}` to
-   `\end{document}`, and the whole of every other file of the `\input` tree.
-7. It reports that it did not evaluate the rule, or it evaluates nothing
-   because an input that another rule checks is invalid. When the structure
-   validator reports an error under S5, its rules S2, S6 and S7 have not been
-   run, whatever they print.
+No check of the inventory lists the units it examined today. The units a check
+names are those it has a finding for and those it sets aside, such as a retired
+proposition or one it cannot anchor. So no mechanical entry is `passed` for any
+unit yet: each is `failed`, `unverified` or `not_applicable`. Issue #68 asks
+every check to report what it examined. It takes in issue #63, which asks the
+same of R9.
 
-One report is not a skip. When the ledger validator says that the manuscript
-has no theorem-like environment, R9 has nothing to compare: its entry passes
-for a proposition that is not assigned to a theorem-like block, and is
-unverified for one that is.
+This is deliberate. An earlier version of this document listed the cases in
+which a check had not been run and treated every other case as a run. Reading
+the scripts turned up several hundred paths on which a check leaves a unit
+unexamined without saying so. A list that misses one of them passes a unit
+that nothing looked at.
 
 ### When a record counts
 
-A record counts only when it is current: the proposition's entry in the ledger,
-and the entries of the propositions it cites, are the ones the record judged. A
-record carries no version, so this is established from outside it. Either its
-`checked_at` is later than the day of the last change to those entries in the
-ledger's history, or its `evidence_snapshot` matches the entry. A record that
-is not current, or for which this cannot be established, is passed over,
-whatever its status.
+A record counts for an entry only when the record itself shows two things:
 
-A record covers a check when the reading or computation that produced the
-record performed that check. This is established from what the record's
-`evidence_ref` points to. Rule 4 says what a record does when it cannot be
-established: a `supported` record then counts for nothing, and a `refuted` or
-`partial` record counts against every entry of its method.
+- that the reading or computation that produced it performed the entry's
+  check;
+- that it was made on the present version of everything that check reads: the
+  proposition's ledger entry, the entries of the propositions it cites, the
+  manuscript and, for the empirical layers, the artifacts.
 
-The proofread skill has two walks, and neither includes the other. The
-derivation walk lists L1 to L5. The empirical walk lists E1 to E7. A record
-does not name its walk, so the walk is read from the checklist that
-`evidence_ref` points to. A `supported` record from the empirical walk
-therefore does not cover a derivation layer, and the other way round. The
-empirical walk does E6 across propositions: its record for a proposition covers
-E6 when the walk compared that proposition's assertion with the places that
-restate it. A second reading by another model covers the checks of the reading
-it repeats.
+A record of today's format shows neither. It names no walk and no layer. Its
+`checked_at` is, by default, the day the record was converted from a
+checklist, not the day of the reading. It holds no version of what was read,
+and its `evidence_ref` points to a checklist that both walks write to the same
+path, so a later walk replaces it. No record counts yet, and every entry that
+lists methods is `unverified` for every unit it applies to. Issue #62 owns the
+record format.
+
+What a record will have to say follows from how the proofread skill reads. It
+has two walks, and neither includes the other: the derivation walk lists L1 to
+L5, the empirical walk lists E1 to E7. A `supported` record from one walk does
+not cover a layer of the other. The empirical walk does E6 across
+propositions, so its record covers E6 for a proposition only when the walk
+compared that proposition's assertion with the places that restate it. A
+second reading by another model covers the checks of the reading it repeats.
 
 ### One limit of the records
 
-A verification record names a proposition and a method, not an entry. A
-`refuted` or `partial` record therefore fails every entry of that method whose
-check it covers, preconditions and obligations alike. To learn which entry the
-reading faulted, read its findings.
+A verification record names a proposition and a method, not an entry. Once
+records count, a `refuted` or `partial` record therefore fails every entry of
+that method whose check the record shows it performed, preconditions and
+obligations alike. To learn which entry the reading faulted, read its
+findings.
 
 ## When an article is sound
 
@@ -406,26 +441,25 @@ for. No format is fixed here.
 
 ### No article is sound yet
 
-Three things keep every article from being sound today, and each has an owner.
+Four things keep every article from being sound today, and each has an owner.
 
 1. **Gaps.** Each entry whose `check` is `gap` is unverified for every unit it
    applies to. Its `owner` is the issue that will supply the check.
-2. **Records that cannot say what they cover.** A warning under `judge` has no
-   place where the judgment is recorded, so the entry stays unverified. A
-   record names neither its walk nor the version of the proposition it judged.
-   Issue #62.
-3. **No second reading.** No tool writes `cross_model` records, so every entry
+2. **Checks that do not say what they examined.** No mechanical entry passes
+   until its check lists the units it examined. Issue #68.
+3. **Records that cannot say what they cover.** A record shows neither the
+   reading that produced it nor the version it read, and a warning under
+   `judge` has no place where the judgment is recorded. Issue #62.
+4. **No second reading.** No tool writes `cross_model` records, so every entry
    that needs one is unverified. Issue #21.
 
-Three more things keep some articles from being sound.
+Three limits will remain for some manuscripts once checks report what they
+examine.
 
-- The reordering dry run supports single-file manuscripts only, so the entry on
-  reading order is unverified for a multi-file manuscript. Issue #59.
-- The ledger validator's R9 reports how many propositions it skipped, not
-  which, so its entry is unverified for every proposition of a multi-file
-  manuscript. Issue #63.
-- The audit's code pass needs a directory of analysis code, so its two entries
-  are unverified for a manuscript that has none. Issue #64.
+- The reordering dry run supports single-file manuscripts only. Issue #59.
+- The symbol audit and the citation audit read the main file only, and the
+  citation audit reads one bibliography file of a fixed name. Issue #69.
+- The audit's code pass needs a directory of analysis code. Issue #64.
 
 ## Changing the table
 

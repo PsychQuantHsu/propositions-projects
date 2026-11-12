@@ -74,9 +74,10 @@ between `proofread` and `lean` is worth reading for exactly this reason.
 
 That describes the derivation walk of the proofread skill. A record from its
 empirical walk means the proposition passed the empirical layers that walk
-lists, and the record does not say which walk produced it. How a record counts
-toward an article being sound, including which checks it covers and whether it
-is still current, is decided by `docs/OBLIGATIONS.md`.
+lists, and the record does not say which walk produced it. Whether a record
+counts toward an article being sound is decided by `docs/OBLIGATIONS.md`. A
+record of this format shows neither the walk that produced it nor the version
+it read, so by that document none counts yet.
 
 ## Validator
 
@@ -114,7 +115,7 @@ to read them. `unresolved` and `not_attempted` never count as disagreement.
 
 The latest-record rule of this section is for this warning only. Whether an
 entry of the obligations table passes is decided by `docs/OBLIGATIONS.md`,
-which reads a method's records further back than the latest one.
+which does not use this rule.
 
 ## Connecting a method
 

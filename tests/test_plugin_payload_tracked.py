@@ -527,16 +527,19 @@ OBL_EMPIRICAL_APPLIES = {
 OBL_PINNED_GAPS = {
     "truth.not-refuted": ("obligation", 62),
     "index.structure-faithful": ("precondition", 66),
+    "index.profile-fits-manuscript": ("precondition", 70),
 }
-OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62, 66)
+OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62, 66, 70)
 # A verdict against a proposition from a method that no entry lists (a Lean
 # refutation, a human review) counts through this entry, so that soundness
 # stays "every entry passes" with no condition outside the table.
 OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
 OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
-OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66")
-# Words the document needs for the rules the spec asks it to state.
-OBL_DOC_WORDS = ("suspicious", "--partial", "evidence_snapshot")
+OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70")
+# Words the document needs for the rules the spec asks it to state: the audit
+# severity that is easy to leave out, and what a report has to show for a unit
+# to pass.
+OBL_DOC_WORDS = ("suspicious", "examined")
 OBL_DOC_ENTRY_ID_LIMIT = 2
 OBL_ID = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+")
 OBL_AXIOM = re.compile(r"[a-z0-9-]+/[A-Za-z0-9_]+")
@@ -1064,7 +1067,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (49, 50, 55, 62, 66):   # 46 is in the small table
+    for owner in (49, 50, 55, 62, 66, 70):   # 46 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
 
 

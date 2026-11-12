@@ -24,4 +24,4 @@
 
 ## 6. 驗收
 
-- [ ] 6.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；IDD 的 CI gate 對 head commit 通過；`spectra validate idd-47-fix1` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出四項的輸出。
+- [x] 6.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；IDD 的 CI gate 對 head commit 通過；`spectra validate idd-47-fix1` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出四項的輸出。

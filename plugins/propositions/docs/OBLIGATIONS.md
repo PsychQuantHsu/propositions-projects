@@ -54,7 +54,8 @@ from it will have to be judged before the entry passes.
 A unit is what an entry is decided for.
 
 - `proposition`: each proposition of the ledger that is not retired. A proposition is retired only when its
-  `retired` block is well formed, so one whose block is malformed is a unit.
+  `retired` block is well formed by the ledger validator's test, so one whose
+  block is malformed is a unit.
 - `article`: the manuscript as a whole, once.
 
 ## Two classes
@@ -143,14 +144,18 @@ already rules the unit out:
 - `profile`: the ledger's `_meta.json` declares a profile that the validator
   rejects. A ledger that declares none has the default profile.
 - `claim_type`, `evidence_class`: the proposition's ledger entry has no such
-  field.
+  field, or the field holds something other than a string.
 - `cites`: the field is present with a value that is not a list, such as
-  `null` or a string. A proposition without the field cites nothing; whether it relies on something it does not declare is
-  what the entry for the layer L3 asks.
-- `opens`, `section_role`: the proposition has no record in the discourse
-  sidecar or more than one, its `opens` is not a list of well-formed
-  commitments, or the section plan is missing or invalid. A proposition whose record opens nothing has a
-  value: it opens no commitment.
+  `null` or a string. A proposition without the field cites nothing; whether
+  it relies on something it does not declare is what the entry for the layer
+  L3 asks.
+- `opens`: the proposition has no record in the discourse sidecar or more
+  than one, or the record's `opens` is present and is not a list of
+  commitments that the structure validator accepts. A record without `opens`,
+  or with an empty list, opens nothing, and that is a value.
+- `section_role`: the section plan of the structure sidecar is missing or
+  invalid. The plan and the ledger's order place a proposition in a section; a
+  discourse record is not needed for that.
 
 Which propositions may leave `claim_type` or `evidence_class` out is not
 settled (issue #70).
@@ -201,8 +206,7 @@ there, never both, so a value added to a vocabulary cannot go unnoticed.
 
 `check` is `gap` or the id of an implemented check. An id carries its source,
 because two sources number their rules R1, R2, R3: `ledger:R2` (a cited id
-resolves) and `audit:R2` (a citation key is in the bibliography) are different
-checks.
+resolves) and `audit:R2` (the citation audit) are different checks.
 
 ### The inventory
 
@@ -217,7 +221,7 @@ findings, or leaves records, about units under an id of its own.
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
 | `order:ledger` | The dry run of `reorder-ledger.py` | The construct-batch skill |
-| `audit:R1`, `R2`, `R3` | `audit-symbols.py`, `audit-citations.py` and `audit-code-manuscript.py`, in that order | `rules/manuscript-consistency-audit.md` |
+| `audit:R1`, `R2`, `R3` | `audit-symbols.py`, `audit-citations.py` and `audit-code-manuscript.py`, in that order. `audit:R2` stands for both rules of the citation script, which it labels R2 and R2-bis | `rules/manuscript-consistency-audit.md` |
 | `proofread:L1` to `L5`, `proofread:E1` to `E7` | The per-proposition walk of the proofread skill | The proofread skill |
 
 ### What is not in the inventory
@@ -340,9 +344,14 @@ sidecars, without the output of any check. The first rule that fits decides.
 3. `check` is `gap`: `unverified`.
 
 For every other entry and unit, the outcome depends on what the check reported
-or on the verification records. Computing it is the work of the outcome rules
-(issue #71). One thing about it is already fixed: today it is `failed` or
-`unverified`, and never `passed`.
+or on the verification records. Today it is never `passed`. By the definitions
+above it is `failed` when the check reported that the criterion is violated
+for the unit, and `unverified` otherwise.
+
+Deciding that from a check's output or from a record is the work of the
+outcome rules (issue #71): which outputs are errors and which are warnings,
+which entry and which unit a finding counts for, when a run still counts, what
+a recorded judgment does, and when an entry is `passed`.
 
 ### Why nothing passes yet
 

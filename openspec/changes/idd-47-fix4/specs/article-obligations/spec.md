@@ -10,7 +10,7 @@
 - `opens`: it opens at least one commitment of a listed kind;
 - `section_role`: the role of the section that contains it.
 
-When the value a key needs cannot be read for a unit, the entry SHALL be `unverified` for that unit and not `not_applicable`, unless another key whose value can be read already rules the unit out. A value cannot be read when the ledger declares a profile that the validator rejects (a ledger that declares none has the default profile); when the proposition's ledger entry has no `claim_type` or no `evidence_class` and the key asks for that field; when its `cites` field is present with a value that is not a list, such as `null` (a proposition without the field cites nothing); and, for `opens` and `section_role`, when the proposition has no record in the discourse sidecar or more than one, its `opens` is not a list of well-formed commitments, or the section plan is missing or invalid. A proposition whose record opens nothing has a value: it opens no commitment.
+When the value a key needs cannot be read for a unit, the entry SHALL be `unverified` for that unit and not `not_applicable`, unless another key whose value can be read already rules the unit out. A value cannot be read when the ledger declares a profile that the validator rejects (a ledger that declares none has the default profile); when the key asks for `claim_type` or `evidence_class` and the proposition's ledger entry has no such field or holds something other than a string in it; when its `cites` field is present with a value that is not a list, such as `null` (a proposition without the field cites nothing); for `opens`, when the proposition has no record in the discourse sidecar or more than one, or the record's `opens` is present and is not a list of commitments that the structure validator accepts; and for `section_role`, when the section plan of the structure sidecar is missing or invalid. A record without `opens`, or with an empty list, opens nothing, and that is a value. The section of a proposition follows from the plan and the ledger's order, so a discourse record is not needed to read `section_role`.
 
 An entry without `applies` applies to every unit. An entry with `unit: article` SHALL use no key other than `profile`, and for the article `profile` is the profile of the manuscript's ledger. The file SHALL have no other way to state applicability: no negation and no alternative between keys. Every listed value SHALL belong to the vocabulary of its field: the accepted profiles and the claim types and evidence classes of every profile in the ledger validator, and the commitment kinds and section roles in the structure validator. The relation of a record SHALL NOT be a key: every record has one, and no entry's requirement differs by its value except that a `basis` edge needs a citation, which one entry asks of every proposition. The move and the paragraph type SHALL NOT be keys: the sidecars leave them optional, so an unannotated proposition would be treated as not applicable. `opens` is optional too and is a key, which is why the table holds the precondition `index.structure-faithful`.
 
@@ -176,7 +176,7 @@ Three outcomes follow from the data file and from the manuscript's ledger and si
 2. A value that `applies` needs cannot be read for the unit: `unverified`.
 3. `check` is `gap`: `unverified`.
 
-For every other entry and unit, the outcome depends on what the check reported or on the verification records. The rules that compute it are not part of this capability: which outputs of a check are errors and which fall short of one, which entry and which unit a finding counts for, when a run still counts, what a recorded judgment does, and the condition under which an entry is `passed`. Issue 71 owns them together with the tool that applies them, so that tests hold them.
+For every other entry and unit, the outcome depends on what the check reported or on the verification records. By the definitions it is `failed` when the check reported that the criterion is violated for the unit and `unverified` otherwise. The rules that decide this from a check's output or from a record are not part of this capability: which outputs of a check are errors and which fall short of one, which entry and which unit a finding counts for, when a run still counts, what a recorded judgment does, and the condition under which an entry is `passed`. Issue 71 owns them together with the tool that applies them, so that tests hold them.
 
 This capability fixes two things about those rules. Today such an outcome is `failed` or `unverified` and never `passed`, because nothing shows that a check examined a unit: a mechanical check does not report which units it examined (issue 68), and a verification record does not show which reading produced it or which version it read (issue 62). And a `supported` record counts only for the checks that its reading performed. The document SHALL say both, and SHALL say which rules it leaves to issue 71.
 
@@ -196,15 +196,19 @@ No executable check: these are definitions, and no program computes an outcome i
 | `dependence.cites-backward` | a proposition that cites two others | `unverified` |
 | `dependence.cites-backward` | a proposition whose `cites` list is empty | `not_applicable` |
 | the entry whose `check` is `ledger:R2` | a proposition whose `cites` field is `null` | `unverified` |
-| the entry whose `check` is `structure:S6` | a proposition whose one record in the discourse sidecar opens nothing | `not_applicable` |
+| the entry whose `check` is `proofread:E1` | a proposition of a ledger with the empirical profile whose `evidence_class` is `null` | `unverified` |
+| the entry whose `check` is `structure:S6` | a proposition whose one record in the discourse sidecar has an empty `opens` list | `not_applicable` |
+| the entry whose `check` is `structure:S6` | a proposition whose one record in the discourse sidecar has no `opens` key; the section plan is missing | `not_applicable` |
 | the entry whose `check` is `structure:S6` | a proposition with two records in the discourse sidecar | `unverified` |
-| the entry whose `check` is `ledger:R2` | a proposition that cites one other; the ledger validator prints a pass line for R2 | not `passed`; `failed` or `unverified`, by the rules of issue 71 |
-| the entry whose `check` is `proofread:L4` | a proposition that cites one other; its `proofread` and `cross_model` records are both `supported` | not `passed`; `failed` or `unverified`, by the rules of issue 71 |
+| `placement.method-does-not-interpret` | a proposition with no record in the discourse sidecar; the section plan is valid and places it in a section whose role is `results` | `not_applicable` |
+| `placement.method-does-not-interpret` | a proposition in a manuscript whose section plan is invalid | `unverified` |
+| the entry whose `check` is `ledger:R2` | a proposition that cites one other; the ledger validator reported no violation for it | `unverified` |
+| the entry whose `check` is `proofread:L4` | a proposition that cites one other; its `proofread` and `cross_model` records are both `supported` | `unverified` |
 
 #### Scenario: Nothing passes today
 
 - **WHEN** an entry whose `check` is not `gap` applies to a unit
-- **THEN** its outcome for that unit is `failed` or `unverified`, and the document says which issues have to be done before it can be `passed`
+- **THEN** its outcome for that unit is `failed` when the check reported that the criterion is violated for it and `unverified` otherwise, and the document says which issues have to be done before it can be `passed`
 
 #### Scenario: A gap is unverified wherever it applies
 
@@ -221,7 +225,7 @@ It SHALL also state the limits that remain for some manuscripts once checks repo
 
 It SHALL state two limits of what the table reaches. Numbers are compared with artifacts only in a ledger with the empirical profile, and whether a ledger's profile fits its manuscript is a precondition that has no check yet (issue 70). The two entries on support outside the paper apply by the evidence class `external`, which only the empirical profile has, so in a ledger with the default profile no entry asks whether a cited work says what a proposition takes from it (issue 50).
 
-No executable check: soundness is a definition that the document states for readers and for later tools, and nothing in this change computes it. The guard checks only that the document names the four outcomes and the issues that own the reasons no article is sound yet.
+No executable check: soundness is a definition that the document states for readers and for later tools, and nothing in this change computes it. The guard checks that the document names the four outcomes and the issues that own the reasons no article is sound yet.
 
 #### Scenario: A gap keeps an article from being sound
 

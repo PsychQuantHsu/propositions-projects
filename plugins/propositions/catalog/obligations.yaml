@@ -2,8 +2,9 @@
 # get right (preconditions) and what the article owes its reader (obligations),
 # one entry each, with the check that verifies it.
 #
-# How to read an entry, how an outcome is decided and what "sound" means:
+# How to read an entry, what the four outcomes mean and what "sound" means:
 #   plugins/propositions/docs/OBLIGATIONS.md
+# The rules that compute an outcome from what the checks print are issue 71.
 # No program reads this file yet. tests/test_plugin_payload_tracked.py keeps it
 # well formed and complete.
 #

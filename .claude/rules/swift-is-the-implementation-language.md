@@ -59,7 +59,8 @@ plugin 目錄或其他位置另建 package。
 3. **指名的守衛測試，在 Swift package 建好之前。** 這是封閉清單，目前只有一組：
    - `tests/test_plugin_payload_tracked.py` 裡名稱以 `test_obligations_` 開頭的案例（義務表的守衛，#47）。
      它檢查的是 `plugins/propositions/catalog/obligations.yaml` 與
-     `plugins/propositions/docs/OBLIGATIONS.md` 的內容，不是任何腳本的行為。
+     `plugins/propositions/docs/OBLIGATIONS.md` 的內容，以及 `plugins/propositions/docs/VERIFICATION.md`
+     指到義務表文件的三個字句，不是任何腳本的行為。
 
    清單裡的這一組可以修改，也可以在同一組裡加案例；不新建 `test_*.py`，不新增腳本或 `_lib` 模組。
    要把別的守衛加進這份清單，先在這裡加一列、寫明它檢查哪些檔，並由維護者決定。不得因為「它也是檢查

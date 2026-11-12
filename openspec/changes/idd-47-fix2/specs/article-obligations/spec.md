@@ -1,5 +1,37 @@
 ## MODIFIED Requirements
 
+### Requirement: The obligations table is a closed data file
+
+`plugins/propositions/catalog/obligations.yaml` SHALL be a YAML mapping with exactly three keys: `groups`, `entries` and `unconstrained`. Each item of `entries` SHALL be a mapping whose keys come from this closed set: `id`, `class`, `group`, `unit`, `applies`, `criterion`, `check`, `owner`, `verified_by`, `on_warning`, `external_source`. Any other top-level key or entry key SHALL be an error.
+
+`id` SHALL have the form `<prefix>.<name>`, where both parts consist of lowercase letters, digits and hyphens, and SHALL be unique in the file. `unit` SHALL be `proposition` or `article`. A `proposition` unit is a proposition of the ledger that is not retired. A proposition is retired only when its `retired` block is well formed, so one whose block is malformed is a unit. The `article` unit is the manuscript as a whole. `criterion` SHALL be one line of at most 200 characters stating what has to hold; the definition of the check it points to stays in that check's own document. `external_source`, when present, SHALL be `true`.
+
+#### Scenario: An unknown entry key is refused
+
+- **WHEN** an entry has a key named `example`
+- **THEN** the guard fails and its message names the entry id and the key
+
+#### Scenario: A repeated id is refused
+
+- **WHEN** two entries have the id `dependence.cites-backward`
+- **THEN** the guard fails and its message names `dependence.cites-backward`
+
+#### Scenario: A criterion that copies a definition is refused
+
+- **WHEN** an entry's `criterion` spans two lines or is longer than 200 characters
+- **THEN** the guard fails and its message names the entry id
+
+#### Scenario: A mark for an outside source is true or absent
+
+- **WHEN** an entry has `external_source: yes` written as a string, or `external_source: false`
+- **THEN** the guard fails and its message names the entry id and `external_source`
+
+##### Example: an entry key outside the closed set
+
+- **GIVEN** a table in which the entry `index.text-in-manuscript` carries the key `example`
+- **WHEN** the format check runs
+- **THEN** it reports a problem that names `index.text-in-manuscript` and `example`
+
 ### Requirement: Entries are preconditions or obligations
 
 `class` SHALL be `precondition` or `obligation`. There is no third class.
@@ -142,7 +174,7 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected 
 - An entry whose `check` comes from the proofread source SHALL list `proofread`.
 - Every entry that lists `proofread` SHALL also list `cross_model`: each proofread layer is read by a language model, and a judgment by a language model needs a second reading by another model.
 
-The three kinds of verification that issue 47 names map onto `verified_by` as follows. A check by a script is `mechanical`, whether the script is in this plugin or looks something up in an external source. A judgment by a language model is `proofread` together with `cross_model`. A prover, a certificate, a computer-algebra system and a human review are the methods of those names. The entries that need an external source are the gaps owned by issue 50, and the document SHALL say so.
+The three kinds of verification that issue 47 names are stated on each entry as follows. A check by a script is `mechanical`. A judgment by a language model is `proofread` together with `cross_model`. A prover, a certificate, a computer-algebra system and a human review are the methods of those names. A check that has to consult a source outside the manuscript's repository is marked with `external_source: true`, whether a script or a reading decides it; the mark is a key of its own for that reason, and an entry keeps it when a gap's check is supplied. Exactly three entries SHALL carry it: `truth.references-exist`, `truth.external-support-found` and `truth.external-support-agrees`. The document SHALL say which entries carry it and why it is not a value of `verified_by`.
 
 `on_warning` SHALL be present on every entry whose `verified_by` is `[mechanical]` and absent from every other entry. Its value SHALL be `judge` or `info`, with no third value:
 
@@ -175,6 +207,11 @@ The three kinds of verification that issue 47 names map onto `verified_by` as fo
 
 - **WHEN** an entry with `verified_by: [proofread, cross_model]` has `on_warning: judge`
 - **THEN** the guard fails and its message names the entry id
+
+#### Scenario: The entries that need an outside source are marked
+
+- **WHEN** the entries that carry `external_source` are listed
+- **THEN** they are exactly `truth.references-exist`, `truth.external-support-found` and `truth.external-support-agrees`, and the guard fails when one of them loses the mark or another entry gains it
 
 ##### Example: the entries the maintainer reviewed
 
@@ -320,3 +357,31 @@ No executable check: soundness is a definition that the document states for read
 
 - **WHEN** a reader looks up why the proofread layer E9 is a gap
 - **THEN** the document says that the walk of the proofread skill does not list E8, E9 and E10, so a verdict does not show that they were read
+
+### Requirement: A guard checks the table
+
+The repository SHALL have automated tests that fail when the data file or the document breaks any requirement above that can be decided from their text: the closed keys, the two classes and their prefixes, the groups, applicability, the inventory and owners, the accounting of checks and vocabulary values, `verified_by` and `on_warning`, the entries that need an outside source, the entries the maintainer reviewed, and the limit on entry ids in the document. The guard SHALL refuse a data file in which one mapping holds the same key twice, because a YAML loader keeps the last value and drops the first without a message. Each failure message SHALL name the entry, value or check concerned. The tests are cases in `tests/test_plugin_payload_tracked.py` whose names start with `test_obligations_`; a change to this capability SHALL add no test file and no script module. A change is accepted only when these cases pass; a skipped case does not count.
+
+The guard is written in Python while the vocabularies it reads are defined in the Python validators. The project rule on the implementation language records this as an exception that ends when the Swift package of issue 46 exists and the vocabularies have a Swift source; the guard then moves to that package's test target.
+
+#### Scenario: The guard runs with the suite
+
+- **WHEN** the repository's test suite runs
+- **THEN** the cases whose names start with `test_obligations_` run and pass on the committed data file and document
+
+#### Scenario: The guard reads the vocabularies from their source
+
+- **WHEN** the structure validator gains a section role
+- **THEN** the guard fails until an entry names the new role or `unconstrained` lists it, without the guard itself being edited
+
+##### Example: an entry with the same key twice
+
+- **GIVEN** the text of a data file in which one entry has two `check:` lines
+- **WHEN** the guard loads it
+- **THEN** loading fails and the message names `check`
+
+##### Example: a section role added to the structure validator
+
+- **GIVEN** the vocabulary of `section_role` with one more value, `afterword`, that no entry names and `unconstrained` does not list
+- **WHEN** the accounting check runs
+- **THEN** it reports a problem that names `section_role` and `afterword`

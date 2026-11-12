@@ -27,6 +27,7 @@ quotes two entries as examples and no more.
 | `owner` | gaps only | The number of the issue that will supply the check |
 | `verified_by` | always | `[mechanical]`, or the verification methods the entry needs, all of them |
 | `on_warning` | mechanical entries only | `judge` or `info` — see [Mechanical entries](#mechanical-entries) |
+| `external_source` | entries that need one | `true` when the check has to consult a source outside the manuscript's repository — see [Gaps](#gaps) |
 
 ```yaml
 - id: dependence.cites-backward
@@ -233,9 +234,12 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected
 to be verified. They are provisional: the change that supplies the check sets
 them to what the check does.
 
-Three gaps need a source outside the manuscript's repository: that the cited
+Three entries need a source outside the manuscript's repository: that the cited
 works exist, that the support outside the paper can be found, and that it says
-what is taken from it. Issue #50 owns them.
+what is taken from it. Each carries `external_source: true`. The mark is a key
+of its own because it says where the check looks, not who decides: two of the
+three are decided by a script and one by a reading. All three are gaps today,
+owned by issue #50, and each keeps the mark when its check is supplied.
 
 ## How an entry is verified
 

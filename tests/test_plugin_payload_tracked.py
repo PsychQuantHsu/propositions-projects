@@ -471,6 +471,7 @@ OBLIGATIONS_DOC = PROPOSITIONS_PLUGIN / "docs" / "OBLIGATIONS.md"
 OBL_TOP_KEYS = ("groups", "entries", "unconstrained")
 OBL_ENTRY_KEYS = (
     "id", "class", "group", "unit", "applies", "criterion", "check", "owner", "verified_by", "on_warning",
+    "external_source",
 )
 OBL_REQUIRED_KEYS = ("id", "class", "unit", "criterion", "check", "verified_by")
 OBL_GROUP_KEYS = ("id", "zh", "does", "axiom")
@@ -530,6 +531,12 @@ OBL_PINNED_GAPS = {
     "index.profile-fits-manuscript": ("precondition", 70),
 }
 OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62, 66, 70)
+# The entries whose check has to consult a source outside the manuscript's
+# repository. The mark is a key of its own, not a value of verified_by: one of
+# the three is decided by a reading, and the mark has to outlive the gap.
+OBL_EXTERNAL_SOURCE_ENTRIES = (
+    "truth.references-exist", "truth.external-support-found", "truth.external-support-agrees",
+)
 # A verdict against a proposition from a method that no entry lists (a Lean
 # refutation, a human review) counts through this entry, so that soundness
 # stays "every entry passes" with no condition outside the table.
@@ -539,7 +546,7 @@ OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70")
 # Words the document needs for the rules the spec asks it to state: the audit
 # severity that is easy to leave out, and what a report has to show for a unit
 # to pass.
-OBL_DOC_WORDS = ("suspicious", "examined")
+OBL_DOC_WORDS = ("suspicious", "examined", "external_source")
 OBL_DOC_ENTRY_ID_LIMIT = 2
 OBL_ID = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+")
 OBL_AXIOM = re.compile(r"[a-z0-9-]+/[A-Za-z0-9_]+")
@@ -622,6 +629,8 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
     for key in OBL_REQUIRED_KEYS:
         if key not in entry:
             problems.append(f"{key} is missing")
+    if "external_source" in entry and entry["external_source"] is not True:
+        problems.append(f"external_source is {entry['external_source']!r}; when present it is true")
 
     entry_id = entry.get("id")
     well_formed_id = isinstance(entry_id, str) and OBL_ID.fullmatch(entry_id) is not None
@@ -853,6 +862,12 @@ def _reviewed_problems(table) -> list[str]:
     for owner in OBL_REQUIRED_OWNERS:
         if not any(entry.get("owner") == owner for entry in entries):
             problems.append(f"owner {owner} is named by no entry")
+    marked = {entry.get("id") for entry in entries if "external_source" in entry}
+    for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
+        if entry_id not in marked:
+            problems.append(f"entry {entry_id!r} needs an outside source and has no external_source")
+    for entry_id in sorted(marked - set(OBL_EXTERNAL_SOURCE_ENTRIES), key=str):
+        problems.append(f"entry {entry_id!r} has external_source and is not one the spec names for it")
     verdicts = by_id.get(OBL_UNLISTED_VERDICT_ENTRY)
     if verdicts is not None and verdicts.get("unit") != "proposition":
         problems.append(f"entry {OBL_UNLISTED_VERDICT_ENTRY!r} is decided for each proposition")
@@ -938,6 +953,7 @@ OBL_FORMAT_REFUSALS = [
     ("repeated id", lambda t: t["entries"].append(copy.deepcopy(_obl_entry(t, GAP_ROW))), [GAP_ROW, "repeated"]),
     ("two-line criterion", _set(INDEX_ROW, criterion="One thing.\nAnother."), [INDEX_ROW, "criterion"]),
     ("criterion over 200 characters", _set(INDEX_ROW, criterion="x" * 201), [INDEX_ROW, "criterion"]),
+    ("external_source that is not true", _set(INDEX_ROW, external_source="yes"), [INDEX_ROW, "external_source"]),
     ("third class", _set(INDEX_ROW, **{"class": "information"}), [INDEX_ROW, "information"]),
     ("precondition without the index prefix", _set(INDEX_ROW, id="info.text"), ["info.text", "index"]),
     ("obligation without its group prefix", _set(MODEL_ROW, id="truth.cites-imply"), ["truth.cites-imply", "support"]),
@@ -1069,6 +1085,8 @@ def test_obligations_reviewed_entries_are_required():
     assert _names(problems, ["structure:S5"]), problems
     for owner in (49, 50, 55, 62, 66, 70):   # 46 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
+    for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
+        assert _names(problems, [entry_id, "external_source"]), problems
 
 
 def test_obligations_reviewed_entry_cannot_be_changed():

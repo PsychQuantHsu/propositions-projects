@@ -13,6 +13,8 @@
 # on_warning   on mechanical entries: judge (a finding short of an error leaves
 #              the entry unverified until someone judges it) or info (the finding
 #              is listed and does not count; only on entries reviewed for it)
+# external_source  true on an entry whose check has to consult a source outside
+#              the manuscript's repository, whoever decides it
 
 groups:
   - id: dependence
@@ -578,6 +580,7 @@ entries:
     owner: 50
     verified_by: [mechanical]
     on_warning: judge
+    external_source: true
 
   - id: truth.external-support-found
     class: obligation
@@ -590,6 +593,7 @@ entries:
     owner: 50
     verified_by: [mechanical]
     on_warning: judge
+    external_source: true
 
   # Whether a source says what is taken from it needs a reading, so it is
   # separate from whether the source can be found.
@@ -603,6 +607,7 @@ entries:
     check: gap
     owner: 50
     verified_by: [proofread, cross_model]
+    external_source: true
 
   - id: truth.not-refuted
     class: obligation

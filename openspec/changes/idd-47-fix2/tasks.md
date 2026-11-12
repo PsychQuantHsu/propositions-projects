@@ -23,4 +23,10 @@
 ## 6. 驗收
 
 - [x] 6.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix2` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。
-- [ ] 6.2 維護者回答四件事之後才做：封存這個 change、貼完成紀錄、跑第三輪驗證。四件事是審表之後動過的列、Swift 規則的例外、「外部工具」的標記、這個 change 的「通過的條件」。驗證：#47 有維護者的回覆。
+- [x] 6.2 等維護者回答四件事：審表之後動過的列、Swift 規則的例外、「外部工具」的標記、這個 change 的「通過的條件」。驗證：#47 有維護者的回覆與照回覆定案的紀錄。
+
+## 7. 照維護者的回覆
+
+- [x] 7.1 改 `.claude/rules/swift-is-the-implementation-language.md`，對應 Requirement「A guard checks the table」：〈例外〉加第 3 類（檢查資料檔與文件內容的守衛測試，加在既有的 pytest 檔，退場條件是 #46），〈觸發過的實例〉加一列。驗證：規則檔的〈例外〉寫「只有三類」，第 3 類有兩個條件與退場條件。
+- [x] 7.2 外部來源的標記，對應 Requirement「The obligations table is a closed data file」「Each entry states how it is verified」：先改守衛（欄位清單加 `external_source`、值只能是 `true`、剛好是規格點名的三列、文件要寫出這個欄位名），看到失敗；再在 `plugins/propositions/catalog/obligations.yaml` 的三列加 `external_source: true`，在 `plugins/propositions/docs/OBLIGATIONS.md` 的欄位表與缺口那一節說明。驗證：改表之前守衛失敗並指名三列；之後 `pytest tests/test_plugin_payload_tracked.py` 全部通過。
+- [ ] 7.3 重跑獨立讀者（文件與表又動過），結果更新到 #47 的盲驗紀錄。驗證：二十五題全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。

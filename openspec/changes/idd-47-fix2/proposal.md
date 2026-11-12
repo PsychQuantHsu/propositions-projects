@@ -15,12 +15,15 @@
 - **寫明通過的意思**：那條檢查檢查過這個單位、沒有回報問題；不是判準被證明成立。
 - 表多一列缺口 `index.profile-fits-manuscript`（#70）；三列判準改寫（`completeness.thesis-stated`、`index.extraction-covers-text`、`index.cites-complete`）。
 - 文件的幾處說明改正：引用 `proofread` 技能的那一句、檢查清單的共同性質、`not_computable` 的理由、定理邊界稽核的排除理由。過不了的原因加上 #68、#69、#70。
+- **外部來源的標記**（維護者 2026-11-12 交給實作者決定）：列多一個欄位 `external_source: true`，只出現在要查稿件 repo 以外來源的三列。它不是 `verified_by` 的值，因為三列裡有一列由閱讀判斷；#50 補上檢查之後標記仍在。
+- **Swift 規則的例外**（維護者 2026-11-12：「幫我改規則」）：`.claude/rules/swift-is-the-implementation-language.md` 加第 3 類例外，守衛測試在 #46 建好 package 之前可以加在既有的 pytest 檔。
 
 ## Non-Goals
 
 - 不改任何腳本，不改驗證紀錄的格式，不實作任何缺口的檢查。
 - 不改寫判準去貼合程式的細節。檢查比判準弱的地方由檢查那一側修。
-- 不在這個 change 裡封存、升版或貼完成紀錄。下面四件事等維護者決定：審表之後動過的列；守衛寫在既有的 pytest 檔而 Swift 規則檔沒有記例外；Expected 第 2 條的「外部工具」要不要在列上有標記；這個 change 的「通過的條件」。
+- 不升版：這個 change 改的內容還沒發布過，版本維持 0.11.0。
+- 維護者 2026-11-12 回覆了四件事（紀錄在 #47）：審表之後動過的列全部維持；Swift 規則檔加例外；「外部工具」用獨立的欄位標記；「通過的條件」維持這個 change 的改法。
 
 ## Capabilities
 
@@ -30,13 +33,13 @@
 
 ### Modified Capabilities
 
-- `article-obligations`: 七條 requirement 修改：類別、適用條件、已實作的檢查、驗證方式、四種結果、完全合理、說明文件。
+- `article-obligations`: 九條 requirement 修改：資料檔的欄位、類別、適用條件、已實作的檢查、驗證方式、四種結果、完全合理、說明文件、守衛。
 
 ## Impact
 
 - Affected specs: `article-obligations`（修改）
 - Affected code:
-  - Modified: `plugins/propositions/catalog/obligations.yaml`、`plugins/propositions/docs/OBLIGATIONS.md`、`plugins/propositions/docs/VERIFICATION.md`、`tests/test_plugin_payload_tracked.py`
+  - Modified: `plugins/propositions/catalog/obligations.yaml`、`plugins/propositions/docs/OBLIGATIONS.md`、`plugins/propositions/docs/VERIFICATION.md`、`tests/test_plugin_payload_tracked.py`、`.claude/rules/swift-is-the-implementation-language.md`
   - New: (none)
   - Removed: (none)
 - GitHub：新開 #68、#69、#70 並加進 #45 的子題清單；在 #49、#50、#57、#62、#66 留 note；#47 記錄盲驗的題目與答案。

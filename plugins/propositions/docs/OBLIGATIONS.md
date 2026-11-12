@@ -91,7 +91,7 @@ and does not restate it.
 | `consistency` | No two statements of the article conflict | not written yet |
 | `truth` | What the article says is true, and its numbers and citations can be traced to a source | not written yet |
 | `placement` | Content sits in the section whose role fits it | not written yet |
-| `completeness` | The manuscript holds nothing left unfinished | none planned |
+| `completeness` | The manuscript holds nothing left unfinished | not written yet, and possibly none |
 
 The table is checked whether or not `che-axiom-systems` is installed: the
 criteria a check can act on live here, the principles live there.
@@ -246,13 +246,25 @@ An entry has exactly one of four outcomes for a unit: `not_applicable`,
    - it reports a finding that is not an error: `unverified` under `judge`,
      `passed` under `info`, with the finding listed as information;
    - it reports nothing for the unit: `passed`.
-4. `verified_by` lists methods. Take, for each listed method, the latest record
-   for the proposition (the greatest `checked_at`, and on the same day the
-   later line of the file):
-   - any of them is `refuted` or `partial`: `failed`;
-   - all of them are `supported` and each covers the entry's check: `passed`;
-   - otherwise, which includes `unresolved`, `not_attempted` and a method with
-     no record: `unverified`.
+4. `verified_by` lists methods. For each listed method, read its records for
+   the proposition from the latest back (the greatest `checked_at` first, and
+   on the same day the later line of the file first) and stop at the first
+   record that the table below stops on.
+
+   | The record is | and covers the entry's check | and covers only other checks | and what it covers cannot be established |
+   |---|---|---|---|
+   | `refuted` or `partial` | stop: against the entry | pass over | stop: against the entry |
+   | `supported` | stop: for the entry | pass over | pass over |
+   | `unresolved` or `not_attempted` | stop: undecided | pass over | pass over |
+
+   A method with no record that stops the reading is undecided. Then:
+   - any listed method is against the entry: `failed`;
+   - every listed method is for the entry: `passed`;
+   - otherwise: `unverified`.
+
+   The latest record of a method does not decide alone. The two walks of the
+   proofread skill each leave a record, so the latest one covers only one of
+   them.
 
 ### When a check has not been run
 
@@ -279,23 +291,25 @@ unverified for one that is.
 
 ### What a record covers
 
-A `supported` record counts for an entry only if it covers the entry's check: the
-reading or computation that produced the record performed that check. This is
-established from what the record's `evidence_ref` points to. A record for which
-it cannot be established covers no check.
+A record covers a check when the reading or computation that produced the
+record performed that check. This is established from what the record's
+`evidence_ref` points to. Rule 4 says what a record does when it cannot be
+established: a `supported` record then counts for nothing, and a `refuted` or
+`partial` record counts against every entry of its method.
 
 The proofread skill has two walks, and neither includes the other. The
 derivation walk lists L1 to L5. The empirical walk lists E1 to E7. A record
 does not name its walk, so the walk is read from the checklist that
 `evidence_ref` points to. A `supported` record from the empirical walk
-therefore does not cover a derivation layer, and the other way round.
+therefore does not cover a derivation layer, and the other way round. A second
+reading by another model covers the checks of the reading it repeats.
 
 ### Two limits
 
 - A verification record names a proposition and a method, not an entry. A
-  `refuted` or `partial` record therefore fails every entry verified by that
-  method for the proposition, preconditions and obligations alike. To learn
-  which entry the reading faulted, read its findings.
+  `refuted` or `partial` record therefore fails every entry of that method
+  whose check it covers, preconditions and obligations alike. To learn which
+  entry the reading faulted, read its findings.
 - When several entries name the same check, a finding counts for the entry
   whose `criterion` it violates. Deciding that is a judgment by the reader
   until checks report to entries.
@@ -304,14 +318,17 @@ Both limits err on the side of not passing.
 
 ## When an article is sound
 
-An article is sound when both of these hold:
-
-- every entry has the outcome `passed` or `not_applicable` for every unit;
-- for no proposition is the latest record of any method `refuted` or `partial`,
-  whether or not an entry lists that method.
+An article is sound when every entry has the outcome `passed` or
+`not_applicable` for every unit. Nothing outside the table is part of the
+definition.
 
 `unverified` counts against soundness exactly as `failed` does. An article
 that nothing has checked is not sound.
+
+A verdict against a proposition from a method that no entry lists, such as a
+Lean refutation or a human review, counts through an entry of its own, which
+says that no method's latest record for the proposition is `refuted` or
+`partial`. That entry is a gap today.
 
 ### Preconditions come first
 

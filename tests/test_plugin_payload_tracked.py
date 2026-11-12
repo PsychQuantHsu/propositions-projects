@@ -508,7 +508,11 @@ OBL_INVENTORY = (
 )
 OBL_EMPIRICAL_LAYERS = tuple(f"proofread:E{n}" for n in range(1, 8))
 OBL_UNWALKED_LAYERS_OWNER = 57
-OBL_REQUIRED_OWNERS = (46, 49, 50, 55)
+OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62)
+# A verdict against a proposition from a method that no entry lists (a Lean
+# refutation, a human review) counts through this entry, so that soundness
+# stays "every entry passes" with no condition outside the table.
+OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
 OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
 OBL_DOC_ISSUES = ("#21", "#59", "#62", "#64")
 OBL_DOC_ENTRY_ID_LIMIT = 2
@@ -812,6 +816,11 @@ def _reviewed_problems(table) -> list[str]:
     for owner in OBL_REQUIRED_OWNERS:
         if not any(entry.get("owner") == owner for entry in entries):
             problems.append(f"owner {owner} is named by no entry")
+    verdicts = by_id.get(OBL_UNLISTED_VERDICT_ENTRY)
+    if verdicts is None or verdicts.get("class") != "obligation" or verdicts.get("unit") != "proposition":
+        problems.append(
+            f"entry {OBL_UNLISTED_VERDICT_ENTRY!r} is missing or is not an obligation decided for each proposition"
+        )
     return problems
 
 
@@ -1008,6 +1017,7 @@ def test_obligations_reviewed_entries_are_required():
     assert _names(problems, ["structure:S5"]), problems
     for owner in (49, 50, 55):
         assert _names(problems, [f"owner {owner}"]), problems
+    assert _names(problems, ["truth.not-refuted"]), problems
 
 
 def test_obligations_reviewed_entry_cannot_be_changed():

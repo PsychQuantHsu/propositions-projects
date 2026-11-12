@@ -550,6 +550,16 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
+  - id: truth.not-refuted
+    class: obligation
+    group: truth
+    unit: proposition
+    criterion: "No verification method's latest record for the proposition is refuted or partial."
+    check: gap
+    owner: 62
+    verified_by: [mechanical]
+    on_warning: judge
+
   # ---- Placement ----
 
   - id: placement.discussion-opens-no-hypothesis

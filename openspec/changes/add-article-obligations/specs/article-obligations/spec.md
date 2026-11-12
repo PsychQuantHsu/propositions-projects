@@ -116,7 +116,7 @@ Every entry whose `check` is one of `proofread:E1` to `proofread:E7`, and each o
 
 The following SHALL NOT be inventory ids: the fourth pass of the cross-artifact audit (it runs the ledger validator); the theorem-boundary audit and the dry run of the location refresh (the same checks as `ledger:R9` and `ledger:R13`); the link catalog's currency check (its subject is a file of the plugin, not a manuscript); the checks of the `tschema-check` plugin; the stumble categories of the clarity audit, the counts in the construct skill's summary and the states of the analyze skill (none of them leaves a finding or a record for a unit under an id); and the proofread layers E8, E9 and E10 (defined in the layer table but absent from the walk, so a verdict does not show that they were read).
 
-A change that implements a new check SHALL add its id to this inventory and to the guard in the same change. When `check` is `gap`, the entry SHALL have `owner`, the number of the issue in this repository that will supply the check. When `check` is an inventory id, the entry SHALL NOT have `owner`. Exactly three entries SHALL have `owner: 57`, one for each of the layers E8, E9 and E10. At least one entry SHALL have each of the owners 46, 49, 50 and 55.
+A change that implements a new check SHALL add its id to this inventory and to the guard in the same change. When `check` is `gap`, the entry SHALL have `owner`, the number of the issue in this repository that will supply the check. When `check` is an inventory id, the entry SHALL NOT have `owner`. Exactly three entries SHALL have `owner: 57`, one for each of the layers E8, E9 and E10. At least one entry SHALL have each of the owners 46, 49, 50, 55 and 62.
 
 #### Scenario: A layer that is defined but not walked is a gap
 
@@ -220,18 +220,20 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 3. `verified_by` is `[mechanical]`: `unverified` when the check has not been run on the current files; `failed` when it reports an error for the unit; when it reports a finding that is not an error, `unverified` under `on_warning: judge` and `passed` under `on_warning: info`, with the finding listed as information; `passed` when it reports nothing for the unit. The levels are the check's own. An error is an error of a validator, a `definite` finding of an audit script, or a line that the reordering dry run reports as out of place. A finding that is not an error is a warning of a validator, a `likely` or `FYI` finding of an audit script, a run of text that the coverage check reports as uncovered, or the reordering dry run's report of propositions that share a line. The coverage check has no error level: a finished ledger still leaves runs uncovered (front matter, headings, the bibliography), so each run is judged, and a run judged to be a sentence of the body fails the entry. A status line or a summary that names no unit is not a finding. The exit status of a check SHALL NOT be used to tell the two apart, because the audit scripts end in failure on any finding and the coverage check ends in failure on a finished ledger.
 
    A check has not been run for a unit in these six cases and no others: it was not executed after the last change to a file it reads; it ended with a tool error; it reports that it skipped the rule because the ledger's schema version predates the rule or the ledger's profile is invalid; it lists the unit as one it could not examine, or reports only how many units it skipped, in which case the entry is `unverified` for every unit it applies to; the structure validator was run with `--partial`; or, for the coverage check, a part of the manuscript's body was in no range it was run on, the body being the main file between the beginning and the end of the document and the whole of every other file of the input tree. The ledger validator's report that the manuscript has no theorem-like environment is not a skip: the entry for R9 passes for a proposition that is not assigned to a theorem-like block and is `unverified` for one that is.
-4. `verified_by` lists methods: take, for each method, the latest record for the proposition as the verification records define latest. `failed` when any of them is `refuted` or `partial`; `passed` when all of them are `supported` and each of them covers the entry's check; otherwise `unverified`.
+4. `verified_by` lists methods. For each listed method, its records for the proposition are read from the latest back, as the verification records define latest, up to the first record that stops the reading. A `refuted` or `partial` record stops it and counts against the entry when it covers the entry's check or when what it covers cannot be established. A `supported` record stops it and counts for the entry when it covers the entry's check. An `unresolved` or `not_attempted` record that covers the entry's check stops it and leaves the method undecided. Every other record is passed over: one that is known to cover only other checks, and a `supported`, `unresolved` or `not_attempted` record whose coverage cannot be established. A method with no record that stops the reading is undecided. The outcome is `failed` when any listed method counts against the entry, `passed` when every listed method counts for it, and `unverified` otherwise.
 
-The document SHALL state what a record covers. A record covers a check when the reading that produced it performed that check. The proofread skill has two walks, a derivation walk that lists the L layers and an empirical walk that lists the E layers, and neither includes the other; a record does not name its walk, so the walk is read from the checklist that the record's `evidence_ref` points to, and a record whose walk cannot be established covers no layer.
+   The latest record of a method alone SHALL NOT decide the outcome: the two walks of the proofread skill each leave a record, so the latest one covers only one of them.
 
-The document SHALL also state two limits. First, a verification record names a proposition and a method and not an entry, so a `refuted` or `partial` record fails every entry verified by that method for the proposition. Second, when several entries name the same check, a finding counts for the entry whose `criterion` it violates, and deciding that is a judgment by the reader until checks report to entries.
+The document SHALL state what a record covers. A record covers a check when the reading that produced it performed that check. The proofread skill has two walks, a derivation walk that lists the L layers and an empirical walk that lists the E layers, and neither includes the other; a record does not name its walk, so the walk is read from the checklist that the record's `evidence_ref` points to, and when the walk cannot be established, what the record covers cannot be established.
+
+The document SHALL also state two limits. First, a verification record names a proposition and a method and not an entry, so a `refuted` or `partial` record fails every entry of that method whose check it covers, preconditions and obligations alike, and every entry of that method for the proposition when what it covers cannot be established. Second, when several entries name the same check, a finding counts for the entry whose `criterion` it violates, and deciding that is a judgment by the reader until checks report to entries.
 
 #### Scenario: A reader derives the same outcome from the rules
 
 - **WHEN** a reader who has only the data file and the document is given a unit, the findings of the checks and the verification records
 - **THEN** the reader reaches the outcome that the four rules give
 
-##### Example: ten units
+##### Example: twelve units
 
 | Entry | Unit and evidence | Outcome |
 | ----- | ----------------- | ------- |
@@ -243,8 +245,10 @@ The document SHALL also state two limits. First, a verification record names a p
 | `check: structure:S7`, `on_warning: info` | the structure validator reports that two arcs cross | `passed`, with the finding listed as information |
 | `check: proofread:L4` | latest `proofread` record `supported` from the derivation walk, no `cross_model` record | `unverified` |
 | `check: proofread:L4` | `proofread` and `cross_model` records both `supported`; the checklist behind the `proofread` record is from the empirical walk | `unverified` |
-| `check: proofread:L1` and `check: proofread:L4` | latest `proofread` record `partial` | `failed` for both |
-| `check: proofread:L4` | `proofread` `supported`, `cross_model` `refuted` | `failed` |
+| `check: proofread:L1` and `check: proofread:L4` | latest `proofread` record `partial`, from the derivation walk or from a walk that cannot be established | `failed` for both |
+| `check: proofread:L4` | `proofread` `supported` from the derivation walk; `cross_model` `refuted`, from a second reading of the derivation | `failed` |
+| `check: proofread:L1`, a proposition of an empirical ledger | `proofread` `supported` from the derivation walk, then on a later day `supported` from the empirical walk; a `cross_model` record `supported` for each of the two readings | `passed` |
+| the two entries whose `check` is `audit:R3` | the code pass reports as `FYI` that the documents refer to a name the code does not define, which is a label of the manuscript | `unverified` for the entry on references the code does not define; the finding is not information under the other entry |
 
 #### Scenario: A warning never passes by default
 
@@ -253,7 +257,7 @@ The document SHALL also state two limits. First, a verification record names a p
 
 ### Requirement: An article is sound only when every applicable entry passes
 
-`plugins/propositions/docs/OBLIGATIONS.md` SHALL define a sound article as one for which every entry has the outcome `passed` or `not_applicable` for every unit, and for which the latest record of no method is `refuted` or `partial` for any proposition, whether or not an entry lists that method. It SHALL state that an `unverified` outcome counts against soundness in the same way as `failed`, and that while any precondition entry is `failed` or `unverified` the outcomes of obligation entries are not to be trusted until the ledger, sidecars or records are corrected.
+`plugins/propositions/docs/OBLIGATIONS.md` SHALL define a sound article as one for which every entry has the outcome `passed` or `not_applicable` for every unit, and SHALL add no condition outside the table. A verdict against a proposition from a method that no entry lists SHALL count through an entry of its own, `truth.not-refuted`, which states that no method's latest record for the proposition is `refuted` or `partial`; that entry is a gap owned by issue 62 until a check reports it. It SHALL state that an `unverified` outcome counts against soundness in the same way as `failed`, and that while any precondition entry is `failed` or `unverified` the outcomes of obligation entries are not to be trusted until the ledger, sidecars or records are corrected.
 
 The document SHALL state that no article is sound yet and SHALL list the three reasons with the issue that owns each: entries whose `check` is `gap`, each owned by the issue in its `owner`; verification records that cannot say what they cover, namely a warning under `on_warning: judge`, for which there is no place to record a judgment, and a `proofread` record, which does not name its walk; and `cross_model` records, which no tool produces yet (issue 21). It SHALL also state that the reading-order check runs on single-file manuscripts only, so its entry stays `unverified` for a multi-file manuscript (issue 59), and that the audit's code pass needs a directory of analysis code, so its two entries stay `unverified` for a manuscript that has none (issue 64).
 
@@ -267,10 +271,10 @@ The document SHALL state that no article is sound yet and SHALL list the three r
 - **WHEN** every entry is `passed` or `not_applicable` and the structure validator reports crossing arcs for the entry whose `check` is `structure:S7`
 - **THEN** the article is sound
 
-#### Scenario: A verdict against a proposition keeps an article from being sound
+#### Scenario: A verdict from a method that no entry lists is not lost
 
-- **WHEN** every entry is `passed` or `not_applicable` and the latest `lean` record for one proposition is `refuted`
-- **THEN** the article is not sound, and the report names that proposition and that method
+- **WHEN** the latest `lean` record for one proposition is `refuted` and no entry lists `lean` in `verified_by`
+- **THEN** the verdict counts under `truth.not-refuted`, which is `unverified` while its `check` is `gap` and `failed` for that proposition once a check reports it
 
 #### Scenario: A failed precondition is corrected first
 

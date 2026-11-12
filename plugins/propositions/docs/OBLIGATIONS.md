@@ -281,9 +281,9 @@ Which unit:
   proposition the entry applies to counts for that proposition.
 - Every other finding counts for every unit the entry applies to: one that
   names nothing, or a retired proposition, a record, a section or a line, or a
-  proposition the entry does not apply to. A cycle that the ledger validator
-  reports is counted this way too, because the validator does not list every
-  proposition that lies on a cycle.
+  proposition the entry does not apply to. A cycle, which the ledger validator
+  reports as an error, is counted this way too, because the validator does not
+  list every proposition that lies on a cycle.
 
 `on_warning` says what a finding that is not an error does to the entry:
 

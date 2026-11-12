@@ -138,7 +138,8 @@ propositions-projects/
 │   │   │   ├── validate-verification.py, proofread-to-verification.py
 │   │   │   ├── migrate-{prop-id-to-uuid,json-to-jsonl,structure-v2}.py
 │   │   │   └── _lib/          # shared parsers and helpers
-│   │   ├── catalog/         # vocabulary.yaml (moves, paragraph types), links.csv (generated)
+│   │   ├── catalog/         # vocabulary.yaml (moves, paragraph types), links.csv (generated),
+│   │   │                    #   obligations.yaml (what a sound article has to satisfy)
 │   │   ├── rules/           # discipline rules (the skills link to these)
 │   │   │   ├── manuscript-jsonl-sync.md
 │   │   │   ├── manuscript-consistency-audit.md
@@ -146,7 +147,7 @@ propositions-projects/
 │   │   ├── templates/ledger/  # Operation D scaffold
 │   │   └── docs/
 │   │       ├── EXTRACTION-PROMPT.md
-│   │       ├── STRUCTURE.md, VERIFICATION.md
+│   │       ├── STRUCTURE.md, VERIFICATION.md, OBLIGATIONS.md
 │   │       └── PLAYBOOK.md
 │   └── tschema-check/       # source-fidelity review (migrated from truth-conditions, #4)
 │       ├── .claude-plugin/plugin.json

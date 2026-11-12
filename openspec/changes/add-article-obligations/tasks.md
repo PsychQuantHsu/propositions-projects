@@ -22,12 +22,12 @@
 
 ## 5. 獨立讀者盲驗
 
-- [ ] 5.1 先把答案寫好，共十六題，存在暫存目錄：規格「twelve units」的十二個情況；Requirement「An article is sound only when every applicable entry passes」裡判定文章是否完全合理的三個 Scenario；再加一題同一條檢查拆成多列的情況（R3 對一筆命題報了孤立的警告、沒有報成環：引用不成環那一列是通過，孤立命題那一列是通過並把發現列為資訊）。再派一個只讀得到資料檔與說明文件的 subagent（不給規格、design 與這份 tasks；兩個檔的內容直接貼進提示，要它不讀任何檔案並回報有沒有讀），給它每一題的單位、檢查的發現與驗證紀錄，請它判定每一列的結果與文章是否完全合理。驗證：十六題的答案全部相同。有不同就改說明文件而不是改答案，再派一個新的 subagent 重跑；把題數、相同的題數與改了什麼記到 #47，不含稿件文字。
+- [ ] 5.1 先把答案寫好，共十六題，存在暫存目錄：規格「twelve units」的十二個情況；Requirement「An article is sound only when every applicable entry passes」裡判定文章是否完全合理的三個 Scenario；再加一題同一條檢查拆成多列的情況（R3 對一筆命題報了孤立的警告、沒有報成環：引用不成環那一列是通過，孤立命題那一列是通過並把發現列為資訊）。再派一個只讀得到資料檔與說明文件的 subagent（不給規格、design 與這份 tasks；兩個檔與題目放在 repo 以外的暫存目錄，要它只讀那三個檔，並回報讀了哪些檔），給它每一題的單位、檢查的發現與驗證紀錄，請它判定每一列的結果與文章是否完全合理。驗證：十六題的答案全部相同。有不同就改說明文件而不是改答案，再派一個新的 subagent 重跑；把題數、相同的題數與改了什麼記到 #47，不含稿件文字。
 
 ## 6. 文件與版本
 
-- [ ] 6.1 [P] 在 `CLAUDE.md` 的 Doc 表加一列，說明義務表與它的說明文件是什麼、現在沒有工具讀它；在 `README.md` 的目錄樹把 `obligations.yaml` 與 `OBLIGATIONS.md` 加進 catalog 與 docs 兩行；在 `plugins/propositions/README.md` 加一條。驗證：三個檔案都找得到 `obligations.yaml` 與 `OBLIGATIONS.md`。
-- [ ] 6.2 [P] 把 `propositions` plugin 升到 0.11.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json`），並在 `marketplace.json` 的描述提到義務表。驗證：`pytest tests/test_marketplace_entries.py tests/test_plugin_payload_tracked.py` 通過，兩處版本相同。
+- [x] 6.1 [P] 在 `CLAUDE.md` 的 Doc 表加一列，說明義務表與它的說明文件是什麼、現在沒有工具讀它；在 `README.md` 的目錄樹把 `obligations.yaml` 與 `OBLIGATIONS.md` 加進 catalog 與 docs 兩行；在 `plugins/propositions/README.md` 加一條。驗證：三個檔案都找得到 `obligations.yaml` 與 `OBLIGATIONS.md`。
+- [x] 6.2 [P] 把 `propositions` plugin 升到 0.11.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json`），並在 `marketplace.json` 的描述提到義務表。驗證：`pytest tests/test_marketplace_entries.py tests/test_plugin_payload_tracked.py` 通過，兩處版本相同。
 
 ## 7. 驗收與交接
 

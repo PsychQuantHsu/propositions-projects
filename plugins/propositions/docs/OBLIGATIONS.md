@@ -311,8 +311,11 @@ reading by another model covers the checks of the reading it repeats.
   whose check it covers, preconditions and obligations alike. To learn which
   entry the reading faulted, read its findings.
 - When several entries name the same check, a finding counts for the entry
-  whose `criterion` it violates. Deciding that is a judgment by the reader
-  until checks report to entries.
+  whose `criterion` it concerns. A finding that is not an error concerns a
+  criterion without yet showing that it is violated: whether it is violated is
+  what a judgment under `judge` decides, also when the script itself calls the
+  finding harmless. Deciding which entry a finding concerns is a judgment by
+  the reader until checks report to entries.
 
 Both limits err on the side of not passing.
 
@@ -334,8 +337,16 @@ says that no method's latest record for the proposition is `refuted` or
 
 While any precondition is `failed` or `unverified`, the outcomes of the
 obligations are not to be trusted: they were computed from an index that is
-not known to be right. Correct the ledger, the sidecars or the records, run the
-checks again, and read the obligations after that.
+not known to be right. Their outcomes are left as computed and marked as not
+to be trusted. Correct the ledger, the sidecars or the records, run the checks
+again, and read the obligations after that.
+
+### What a report names
+
+A report on soundness names, for every outcome that is `failed` or
+`unverified`, the entry and the unit, and for a gap the issue in its `owner`.
+It lists each finding that passed as information under the entry it counts
+for. No format is fixed here.
 
 ### No article is sound yet
 

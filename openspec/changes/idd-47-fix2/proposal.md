@@ -30,7 +30,7 @@
 
 ### Modified Capabilities
 
-- `article-obligations`: 六條 requirement 修改：類別、適用條件、已實作的檢查、四種結果、完全合理、說明文件。
+- `article-obligations`: 七條 requirement 修改：類別、適用條件、已實作的檢查、驗證方式、四種結果、完全合理、說明文件。
 
 ## Impact
 

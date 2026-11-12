@@ -130,7 +130,8 @@ criterion that needs "or" is split into two entries. An entry whose unit is
 the manuscript's ledger.
 
 When the value a key needs cannot be read for a unit, the entry is `unverified`
-for that unit, not `not_applicable`:
+for that unit, not `not_applicable`, unless another key whose value can be read
+already rules the unit out:
 
 - `profile`: the ledger's `_meta.json` declares a profile that the validator
   rejects. A ledger that declares none has the default profile.
@@ -329,8 +330,9 @@ review are the methods of those names.
 An entry has exactly one of four outcomes for a unit: `not_applicable`,
 `unverified`, `failed` or `passed`. The first rule that fits decides.
 
-1. A value that `applies` needs cannot be read for the unit: `unverified`.
-2. The unit does not satisfy `applies`: `not_applicable`.
+1. A value that `applies` needs can be read for the unit and is not in the
+   entry's list: `not_applicable`.
+2. A value that `applies` needs cannot be read for the unit: `unverified`.
 3. `check` is `gap`: `unverified`.
 4. `verified_by` is `[mechanical]`. Only a run of the check made after the
    last change to every file it reads counts.

@@ -51,7 +51,7 @@ The table SHALL hold the precondition `index.profile-fits-manuscript`, which sta
 - `opens`: it opens at least one commitment of a listed kind;
 - `section_role`: the role of the section that contains it.
 
-When the value a key needs cannot be read for a unit, the entry SHALL be `unverified` for that unit and not `not_applicable`. A value cannot be read when the ledger declares a profile that the validator rejects (a ledger that declares none has the default profile); when the proposition's ledger entry has no `claim_type` or no `evidence_class` and the key asks for that field; and, for `opens` and `section_role`, when the proposition has no record in the discourse sidecar or the section plan is missing or invalid. A proposition whose record opens nothing has a value: it opens no commitment.
+When the value a key needs cannot be read for a unit, the entry SHALL be `unverified` for that unit and not `not_applicable`, unless another key whose value can be read already rules the unit out. A value cannot be read when the ledger declares a profile that the validator rejects (a ledger that declares none has the default profile); when the proposition's ledger entry has no `claim_type` or no `evidence_class` and the key asks for that field; and, for `opens` and `section_role`, when the proposition has no record in the discourse sidecar or the section plan is missing or invalid. A proposition whose record opens nothing has a value: it opens no commitment.
 
 An entry without `applies` applies to every unit. An entry with `unit: article` SHALL use no key other than `profile`, and for the article `profile` is the profile of the manuscript's ledger. The file SHALL have no other way to state applicability: no negation and no alternative between keys. Every listed value SHALL belong to the vocabulary of its field: the accepted profiles and the claim types and evidence classes of every profile in the ledger validator, and the commitment kinds and section roles in the structure validator. The move and the paragraph type SHALL NOT be keys: the sidecars leave them optional, so an unannotated proposition would be treated as not applicable. `opens` is optional too and is a key, which is why the table holds the precondition `index.structure-faithful`.
 
@@ -133,12 +133,67 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected 
 - **WHEN** the entry `dependence.cites-backward` is read
 - **THEN** it has `class: obligation`, `group: dependence`, `check: gap`, `owner: 46`, `verified_by: [mechanical]` and `on_warning: judge`
 
+### Requirement: Each entry states how it is verified
+
+`verified_by` SHALL be a non-empty list. It SHALL be either exactly `[mechanical]` or a list drawn from the six built-in verification methods of `plugins/propositions/docs/VERIFICATION.md` (`proofread`, `lean`, `exact_certificate`, `cas`, `cross_model`, `human`); every listed method is required.
+
+- An entry whose `check` comes from the ledger, structure, records, coverage, order or audit sources SHALL have `[mechanical]`.
+- An entry with `unit: article` SHALL have `[mechanical]`, because a verification record names a proposition.
+- An entry whose `check` comes from the proofread source SHALL list `proofread`.
+- Every entry that lists `proofread` SHALL also list `cross_model`: each proofread layer is read by a language model, and a judgment by a language model needs a second reading by another model.
+
+The three kinds of verification that issue 47 names map onto `verified_by` as follows. A check by a script is `mechanical`, whether the script is in this plugin or looks something up in an external source. A judgment by a language model is `proofread` together with `cross_model`. A prover, a certificate, a computer-algebra system and a human review are the methods of those names. The entries that need an external source are the gaps owned by issue 50, and the document SHALL say so.
+
+`on_warning` SHALL be present on every entry whose `verified_by` is `[mechanical]` and absent from every other entry. Its value SHALL be `judge` or `info`, with no third value:
+
+- `judge`: a finding that is not an error leaves the entry unverified until a judgment of it is recorded.
+- `info`: a finding that is not an error is listed in the report and does not count against the entry.
+
+`on_warning: info` SHALL appear only on entries that the maintainer has reviewed for it. The guard holds the list of those entries, each named by its `id` together with its `check`: `index.proposition-is-cited` with `ledger:R3`, `index.arcs-do-not-cross` with `structure:S7`, `consistency.code-symbols-mentioned` with `audit:R3` and `completeness.bibliography-entries-cited` with `audit:R2`. Each of them SHALL have `on_warning: info`. Every other entry SHALL have `judge`, including another entry that names one of those checks, and a listed entry whose `check` has been changed.
+
+#### Scenario: A judgment by a language model needs a second reading
+
+- **WHEN** an entry's `verified_by` lists `proofread` without `cross_model`
+- **THEN** the guard fails and its message names the entry id
+
+#### Scenario: A mechanical entry without a warning rule is refused
+
+- **WHEN** an entry with `verified_by: [mechanical]` has no `on_warning`
+- **THEN** the guard fails and its message names the entry id
+
+#### Scenario: An unreviewed entry cannot set a warning aside
+
+- **WHEN** the entry whose `check` is `ledger:R1.5` has `on_warning: info`
+- **THEN** the guard fails and its message names the entry id
+
+#### Scenario: Another entry of a reviewed check cannot set a warning aside
+
+- **WHEN** the obligation stating that citations form no cycle, whose `check` is `ledger:R3`, has `on_warning: info`
+- **THEN** the guard fails and its message names the entry id
+
+#### Scenario: A warning rule on a non-mechanical entry is refused
+
+- **WHEN** an entry with `verified_by: [proofread, cross_model]` has `on_warning: judge`
+- **THEN** the guard fails and its message names the entry id
+
+##### Example: the entries the maintainer reviewed
+
+| Entry | class | on_warning |
+| ----- | ----- | ---------- |
+| `dependence.cites-backward` | obligation | judge |
+| the entry whose `check` is `structure:S6` | obligation | judge |
+| `index.arcs-do-not-cross`, `check: structure:S7` | precondition | info |
+| `index.proposition-is-cited`, `check: ledger:R3` | precondition | info |
+| `consistency.code-symbols-mentioned`, `check: audit:R3` | obligation | info |
+| `completeness.bibliography-entries-cited`, `check: audit:R2` | obligation | info |
+| the entry whose `check` is `ledger:R1.5` | precondition | judge |
+
 ### Requirement: Each entry has one of four outcomes for a unit
 
 `plugins/propositions/docs/OBLIGATIONS.md` SHALL define the outcome of an entry for one unit as exactly one of `not_applicable`, `unverified`, `failed` and `passed`, decided by the first rule that fits:
 
-1. A value that `applies` needs cannot be read for the unit: `unverified`.
-2. The unit does not satisfy `applies`: `not_applicable`.
+1. A value that `applies` needs can be read for the unit and is not in the entry's list: `not_applicable`.
+2. A value that `applies` needs cannot be read for the unit: `unverified`.
 3. `check` is `gap`: `unverified`.
 4. `verified_by` is `[mechanical]`. Only a run of the check made after the last change to every file it reads counts. With no such run the outcome is `unverified`. Otherwise it is `failed` when a finding that is an error counts for the unit. When a finding that is not an error counts for the unit, the outcome under `on_warning: judge` is `unverified` until a judgment of that finding is recorded, after which a judgment that the criterion is violated makes it `failed` and a judgment that it is not makes the finding stop counting; under `on_warning: info` the finding is listed as information and does not count. When no finding counts, the outcome is `passed` if the report of the run lists the unit among those the check examined, and `unverified` in every other case.
 5. `verified_by` lists methods: `failed` when a record that counts is `refuted` or `partial`; `passed` when, for every listed method, a record that counts is `supported`; `unverified` in every other case.
@@ -180,6 +235,7 @@ The twenty worked cases. Unless a row says otherwise, every check was run after 
 | the entry whose `check` is `proofread:E1` | a proposition in a ledger with the default profile | `not_applicable` |
 | the entry whose `check` is `proofread:E1` | a proposition whose `evidence_class` is `external`, in a ledger with the empirical profile | `not_applicable` |
 | the entry whose `check` is `proofread:E1` | a proposition of a ledger with the empirical profile whose ledger entry has no `evidence_class` | `unverified` |
+| the entry whose `check` is `proofread:E1` | a proposition of a ledger with the default profile whose ledger entry has no `evidence_class` | `not_applicable` |
 | `dependence.cites-backward` | a proposition that cites two others | `unverified` |
 | `dependence.cites-backward` | a proposition whose `cites` list is empty | `not_applicable` |
 | the entry whose `check` is `ledger:R2` | a proposition whose `cites` list holds one id that names no proposition; the ledger validator reports the error under R2 and names this proposition | `failed` |
@@ -193,7 +249,6 @@ The twenty worked cases. Unless a row says otherwise, every check was run after 
 | the two entries whose `check` is `structure:S5` | the structure validator reports under S5, as an error, that a record inside the abstract opens a commitment | `failed` for the article under both entries |
 | the entry whose `check` is `order:ledger` | the reordering dry run reports that three ledger lines move | `failed` for the article |
 | the entry whose `check` is `audit:R1` | the symbol audit reports one finding of the severity `suspicious` | `unverified` |
-| the two entries whose `check` is `audit:R3` | the code pass reports as `FYI` that the documents refer to a name the code does not define, which is a label of the manuscript | `unverified` for the entry on references the code does not define; the finding is not information under the other entry |
 | the entry whose `check` is `ledger:R13` | a report that lists the proposition as examined and has no finding for it | `passed` |
 | the entry whose `check` is `proofread:L4` | a proposition that cites one other; `proofread` and `cross_model` records both `supported` | `unverified` |
 | the entry whose `check` is `proofread:L4` | a proposition that cites one other; the latest `proofread` record is `refuted` | `unverified` |

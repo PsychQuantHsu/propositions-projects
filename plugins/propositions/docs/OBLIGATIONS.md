@@ -471,6 +471,10 @@ examine.
   citation audit reads one bibliography file of a fixed name. Issue #69.
 - The audit's code pass needs a directory of analysis code. Issue #64.
 
+One more limit is a gap of the table itself: numbers are compared with
+artifacts only in a ledger with the empirical profile, and nothing checks yet
+that a ledger's profile fits its manuscript. Issue #70.
+
 ## Changing the table
 
 To add an entry:

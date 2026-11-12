@@ -544,8 +544,8 @@ OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
 OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
 OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70")
 # Words the document needs for the rules the spec asks it to state: the audit
-# severity that is easy to leave out, and what a report has to show for a unit
-# to pass.
+# severity that is easy to leave out, the structure validator's draft mode whose
+# INFO lines are findings, and the mark for an outside source.
 OBL_DOC_WORDS = ("suspicious", "--partial", "external_source")
 # The section of the document that says, for a check named by several entries,
 # which of them a finding counts for. Its table has one group of rows per check.

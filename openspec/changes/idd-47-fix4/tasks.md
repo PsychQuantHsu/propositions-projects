@@ -15,8 +15,8 @@
 
 ## 4. 獨立讀者盲驗
 
-- [ ] 4.1 題目換成留在這個 capability 的部分：規格的十五個範例情況，加上完全合理、缺口、哪些規則不在這份文件裡，答案先存檔；派新的讀者，只給表、文件與題目。把題目、答案、相同的題數與對應的 commit 貼成 #47 上一則新的留言；不覆寫修正輪 3 的盲驗紀錄，#71 指到那一則。驗證：全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
+- [x] 4.1 題目換成留在這個 capability 的部分：規格的十五個範例情況，加上完全合理、缺口、哪些規則不在這份文件裡，答案先存檔；派新的讀者，只給表、文件與題目。把題目、答案、相同的題數與對應的 commit 貼成 #47 上一則新的留言；不覆寫修正輪 3 的盲驗紀錄，#71 指到那一則。驗證：全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
 
 ## 5. 驗收
 
-- [ ] 5.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix4` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。
+- [x] 5.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix4` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。

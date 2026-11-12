@@ -306,9 +306,11 @@ cited (`audit:R2`). Every other mechanical entry says `judge`, including an
 entry whose check reports no warning today: if the check starts to report one,
 the warning has to be judged.
 
-Each kind of finding that is not an error has exactly one entry. Where a
-check's warning concerns the same thing as its error, they share an entry.
-Where it concerns something else, it has its own.
+The table gives each kind of finding that is not an error one entry where it
+can: where a check's warning concerns the same thing as its error, they share
+an entry, and where it concerns something else, it has its own. A check can
+still report a finding that fits the criterion of none of its entries. The
+rule under "Which entry" above says where such a finding counts.
 
 ```yaml
 - id: index.arcs-do-not-cross
@@ -483,6 +485,9 @@ To add an entry:
 6. Write `verified_by`. For a mechanical entry write `on_warning: judge`.
    `info` needs the maintainer's review of that entry, and the guard's list of
    reviewed entries changes in the same commit.
+7. Write `external_source: true` if the check has to consult a source outside
+   the manuscript's repository. The spec and the guard name the entries that
+   carry it, so both change in the same commit.
 
 When a check gains a new kind of warning, give that kind an entry. When a
 vocabulary gains a value, name it in an entry's `applies` or list it in

@@ -29,4 +29,4 @@
 
 - [x] 7.1 改 `.claude/rules/swift-is-the-implementation-language.md`，對應 Requirement「A guard checks the table」：〈例外〉加第 3 類（檢查資料檔與文件內容的守衛測試，加在既有的 pytest 檔，退場條件是 #46），〈觸發過的實例〉加一列。驗證：規則檔的〈例外〉寫「只有三類」，第 3 類有兩個條件與退場條件。
 - [x] 7.2 外部來源的標記，對應 Requirement「The obligations table is a closed data file」「Each entry states how it is verified」：先改守衛（欄位清單加 `external_source`、值只能是 `true`、剛好是規格點名的三列、文件要寫出這個欄位名），看到失敗；再在 `plugins/propositions/catalog/obligations.yaml` 的三列加 `external_source: true`，在 `plugins/propositions/docs/OBLIGATIONS.md` 的欄位表與缺口那一節說明。驗證：改表之前守衛失敗並指名三列；之後 `pytest tests/test_plugin_payload_tracked.py` 全部通過。
-- [ ] 7.3 重跑獨立讀者（文件與表又動過），結果更新到 #47 的盲驗紀錄。驗證：二十五題全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
+- [x] 7.3 重跑獨立讀者（文件與表又動過），結果更新到 #47 的盲驗紀錄。驗證：二十五題全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。

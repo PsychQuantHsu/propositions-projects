@@ -143,8 +143,8 @@ already rules the unit out:
   rejects. A ledger that declares none has the default profile.
 - `claim_type`, `evidence_class`: the proposition's ledger entry has no such
   field.
-- `cites`: the field is present and is not a list. A proposition without the
-  field cites nothing; whether it relies on something it does not declare is
+- `cites`: the field is present with a value that is not a list, such as
+  `null` or a string. A proposition without the field cites nothing; whether it relies on something it does not declare is
   what the entry for the layer L3 asks.
 - `opens`, `section_role`: the proposition has no record in the discourse
   sidecar, its `opens` is not a list of well-formed commitments, or the section
@@ -338,7 +338,7 @@ place counts for every entry that names its check.
 | | is a warning (a proposition that nothing cites) | the entry on uncited propositions |
 | `structure:S4` | gives `setup` as the kind of the commitment | the entry on setups |
 | | gives any other kind | the entry on commitments that have to be kept |
-| `structure:S5` | says that the thesis list is empty | the obligation on the thesis |
+| `structure:S5` | says that the thesis must be a non-empty list or, under `--partial`, that it is not stated yet | the obligation on the thesis |
 | | any other, such as a thesis id that names no live proposition, or a commitment opened inside the abstract | the precondition on the plans |
 | `audit:R2` | is a label inside a citation argument (rule `R2`) | the entry on leaked labels |
 | | is a cited key with no bibliography entry (rule `R2-bis`, `definite`) | the entry on cited keys |
@@ -354,7 +354,8 @@ place counts for every entry that names its check.
 - Any other finding under such an entry counts for the article as a whole: one
   that names nothing, or a retired proposition, a record, a section or a line,
   or a proposition the entry does not apply to. The entry then has the article
-  as one more unit, and its outcome there is decided like any other.
+  as one more unit. `applies` is not asked of the article there; its outcome is
+  decided by rule 4 like any other.
 - A cycle, which the ledger validator reports as an error, counts for the
   propositions its message lists and for the article as well, because the
   validator does not list every proposition that lies on a cycle.

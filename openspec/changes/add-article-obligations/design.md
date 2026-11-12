@@ -55,9 +55,9 @@
 
 同一條檢查拆成多列時，它的一個發現算在哪一列，看那個發現違反的是哪一列的判準。這要靠讀的人判斷；之後的工具要讓檢查回報到列，這裡不處理。
 
-只報資訊的發現不另立類別。維護者看過、定為只是資訊的有兩個：交叉弧（S7）與孤立命題（R3 的警告）。它們各佔一列，類別照「真的要改時改哪裡」定，警告欄寫只是資訊（見「警告由每一列寫明」）。考慮過另立第三類「資訊」，沒有採用：維護者在 #47 定的是兩類，而且這些發現真要處理時，改的都是帳冊或附檔，放在前提說得通。#47 的決定紀錄（comment 6792376873）在「留給 proposal 的細節」寫過這類規則「不算前提也不算義務」，這裡的做法和那句話不同，那則紀錄會跟著更正。
+只報資訊的發現不另立類別。維護者看過、定為只是資訊的有四個：交叉弧（S7）、孤立命題（R3 的警告），以及審表時加的兩個稽核腳本的 FYI（程式定義了但文件沒提到的符號、bib 裡沒被引用的條目）。它們各佔一列，類別照「真的要改時改哪裡」定，警告欄寫只是資訊（見「警告由每一列寫明」）。考慮過另立第三類「資訊」，沒有採用：維護者在 #47 定的是兩類，而且這些發現真要處理時各有要改的地方：前兩個改帳冊或附檔，是前提；後兩個改稿件或 bib，是義務。兩類放得下。#47 的決定紀錄（comment 6792376873）在「留給 proposal 的細節」寫過這類規則「不算前提也不算義務」，這裡的做法和那句話不同，那則紀錄會跟著更正。
 
-章節沒有命題（R1.5）不在那兩個裡面。驗證器把它標成資訊，但維護者沒有看過這一列，而且覆蓋檢查只看抽取過的範圍，R1.5 是唯一看得出整節沒有抽取的訊號。它先寫要判定，在審表的停點由維護者決定。
+章節沒有命題（R1.5）不在那四個裡面。驗證器把它標成資訊，但維護者沒有看過這一列，而且覆蓋檢查只看抽取過的範圍，R1.5 是唯一看得出整節沒有抽取的訊號。它寫要判定；維護者在審表時（2026-11-12）確認維持。
 
 ### 義務依原則分七組，一組對一條公理
 
@@ -83,7 +83,7 @@
 
 鍵只收這六個。`move`、段落類型、`relation` 這三個欄位在附檔裡是選填的，拿來當適用條件，沒標的命題會被默默當成不適用；目前也沒有哪一列需要它們。之後有列需要時再加鍵。
 
-`proofread` 的 E 層（E1 到 E7 的列與 E8 到 E10 的缺口）一律只適用實證 profile 的帳冊：那一套閱讀用到的詞彙只有實證 profile 接受。沒有這一條，數學稿的每一筆命題在 E 層都會是沒檢查，永遠過不了。L 層不綁 profile：技能文件寫的是看主張靠什麼成立來選閱讀方式，混合稿件兩種都跑，所以 L 層各列適用哪些命題在寫表時逐列定，並在審表的停點給維護者看。
+`proofread` 的 E 層（E1 到 E7 的列與 E8 到 E10 的缺口）一律只適用實證 profile 的帳冊：那一套閱讀用到的詞彙只有實證 profile 接受。沒有這一條，數學稿的每一筆命題在 E 層都會是沒檢查，永遠過不了。L 層不綁 profile：技能文件寫的是看主張靠什麼成立來選閱讀方式，混合稿件兩種都跑，所以 L 層各列適用哪些命題在寫表時逐列定。審表時定案：L1、L2、L3、L5 對每一筆命題適用，L4 對有引用的命題適用。實證稿的命題因此兩種閱讀都要走過才會通過。不用 `evidence_class` 來切，因為 `interpretation` 這類命題可能標成 `hypothesized`，切了會漏掉 E6。
 
 每個詞彙值都要有交代：`claim_type`、`evidence_class`、承諾種類、章節角色這四個欄位的每一個值，要嘛被至少一列的 `applies` 點名，要嘛列在檔案的 `unconstrained` 清單裡並寫一句原因。
 
@@ -159,7 +159,14 @@
 
 每一種不算錯誤的發現在表裡剛好有一列。一條檢查的警告和它的錯誤講的是同一件事時共用一列；講的是另一件事時（R3 的孤立命題、S4 的 `setup`、稽核腳本的 `FYI`）另開一列，這樣發現算在哪一列不必靠猜。
 
-`info` 只能出現在維護者看過的列。守衛測試存著這些列的檢查編號，一開始是 `structure:S7` 與 `ledger:R3`；維護者在審表時再定別的列只是資訊，就在同一個 change 把它的檢查編號加進去。
+`info` 只能出現在維護者看過的列。守衛測試存著這些列的編號與各自的檢查：只存檢查編號，同一條檢查的其他列也能寫成資訊；只存列的編號，看過的列可以被改去指另一條檢查。維護者再定別的列只是資訊時，在同一個 change 把它加進去。
+
+**審表的結果（2026-11-12，維護者確認）**
+
+- 只是資訊的共四列：孤立命題（`ledger:R3`）、交叉弧（`structure:S7`）、程式定義了但文件沒提到的符號（`audit:R3` 的 FYI）、bib 裡沒被引用的條目（`audit:R2` 的 FYI）。後兩列是審表時加的，理由是這兩種發現不影響讀者。
+- 章節沒有命題（R1.5）維持要判定。
+- 行序試跑回報「同一行有多筆命題」維持算要判定的發現。逐子句的帳冊常常會觸發，而判定現在沒有地方記（#62），所以那一列在 #62 完成前常常是沒檢查，義務的結果也跟著標成不可信。維護者知道這個代價。
+- L 層與 E 層的適用範圍照「適用條件只用欄位值的清單」那一節寫的，不改。
 
 現在沒有地方記錄「某一列的警告已經判定過」，所以報了警告的 `judge` 列會一直是沒檢查。補上這條路徑要改驗證紀錄的格式，由這個 change 開的 issue 負責。
 
@@ -196,9 +203,9 @@ Swift 規則要新的測試用 Swift Testing，但 repo 還沒有 package。#40 
 **做完之後看得到的事：**
 
 - `plugins/propositions/catalog/obligations.yaml` 存在，最上層只有 `groups`、`entries`、`unconstrained` 三個鍵。44 條已實作的檢查每一條都至少是一列的 `check`。每個 `gap` 的列都有 `owner`。
-- 下面幾列的值固定，因為維護者看過：`dependence.cites-backward` 是義務、屬於 `dependence`、`check` 是 `gap`、`owner` 是 46、`on_warning` 是 `judge`；`check` 是 `structure:S6` 的列是義務、`on_warning` 是 `judge`；`check` 是 `structure:S7` 的列 `on_warning` 是 `info`；`check` 是 `ledger:R3` 的列至少兩列，一列是 `dependence` 組的義務（引用不成環）、`on_warning` 是 `judge`，一列 `on_warning` 是 `info`（孤立命題）；`check` 是 `structure:S5` 的列一列義務、一列前提。
+- 下面幾列的值固定，因為維護者看過：`dependence.cites-backward` 是義務、屬於 `dependence`、`check` 是 `gap`、`owner` 是 46、`on_warning` 是 `judge`；`check` 是 `structure:S6` 的列是義務、`on_warning` 是 `judge`；`check` 是 `ledger:R3` 的列裡有一列是 `dependence` 組的義務（引用不成環）、`on_warning` 是 `judge`；只是資訊的四列 `index.proposition-is-cited`、`index.arcs-do-not-cross`、`consistency.code-symbols-mentioned`、`completeness.bibliography-entries-cited` 的 `on_warning` 是 `info`，檢查依序是 `ledger:R3`、`structure:S7`、`audit:R3`、`audit:R2`；`check` 是 `structure:S5` 的列一列義務、一列前提。
 - `owner` 是 57 的列剛好三列；`owner` 是 49、50、55 的列各至少一列。
-- `check` 是 `proofread:E1` 到 `proofread:E7` 的列與 `owner` 是 57 的列，`applies` 的 `profile` 是 `[empirical]`。`on_warning` 是 `info` 的列，`check` 只會是 `structure:S7` 或 `ledger:R3`。
+- `check` 是 `proofread:E1` 到 `proofread:E7` 的列與 `owner` 是 57 的列，`applies` 的 `profile` 是 `[empirical]`。`on_warning` 是 `info` 的只有上面那四列。
 - `plugins/propositions/docs/OBLIGATIONS.md` 存在，涵蓋 Decisions「說明文件不重抄各列」列的九件事，提到的列編號不超過兩個。
 - `tests/test_plugin_payload_tracked.py` 多了一組以 `test_obligations_` 開頭的案例。把表改壞時它們會失敗，訊息指出是哪一列或哪個值。
 - `CLAUDE.md`、`README.md`、`plugins/propositions/README.md` 列出義務表與說明文件；`propositions` plugin 的版本在兩個 manifest 都是 0.11.0。

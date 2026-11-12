@@ -482,9 +482,17 @@ OBL_APPLIES_KEYS = ("profile", "claim_type", "evidence_class", "cites", "opens",
 OBL_ACCOUNTED_FIELDS = ("claim_type", "evidence_class", "opens", "section_role")
 OBL_WARNING_RULES = ("judge", "info")
 # `info` is the one setting that lets a warning pass, so it is allowed only on
-# the checks the maintainer reviewed for it. Extend this in the same change in
-# which the maintainer approves another one.
-OBL_INFO_REVIEWED_CHECKS = ("structure:S7", "ledger:R3")
+# the entries the maintainer reviewed for it. Each is named by its id together
+# with its check: a list of checks alone would let another entry of the same
+# check pass on a warning, and a list of ids alone would let a reviewed entry be
+# pointed at another check. Extend this in the same change in which the
+# maintainer approves another entry.
+OBL_INFO_REVIEWED_ENTRIES = {
+    "index.proposition-is-cited": "ledger:R3",
+    "index.arcs-do-not-cross": "structure:S7",
+    "consistency.code-symbols-mentioned": "audit:R3",
+    "completeness.bibliography-entries-cited": "audit:R2",
+}
 OBL_MECHANICAL_SOURCES = ("ledger", "structure", "records", "coverage", "order", "audit")
 # The closed inventory of implemented checks (spec: "A check is named only when
 # it is implemented"). A change that implements a check adds its id here.
@@ -664,8 +672,8 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
     if mechanical:
         if rule not in OBL_WARNING_RULES:
             problems.append(f"on_warning {rule!r} is not one of {', '.join(OBL_WARNING_RULES)}")
-        elif rule == "info" and check not in OBL_INFO_REVIEWED_CHECKS:
-            problems.append("on_warning info is allowed only on a check the maintainer reviewed for it")
+        elif rule == "info" and OBL_INFO_REVIEWED_ENTRIES.get(entry_id) != check:
+            problems.append("on_warning info is allowed only on an entry the maintainer reviewed for it, with its check")
     elif "on_warning" in entry:
         problems.append("on_warning is allowed only when verified_by is [mechanical]")
     return problems
@@ -770,17 +778,22 @@ def _reviewed_problems(table) -> list[str]:
     announced = with_check("structure:S6")
     if not announced or any(e.get("class") != "obligation" or e.get("on_warning") != "judge" for e in announced):
         problems.append("the entries whose check is structure:S6 are obligations with on_warning judge, at least one")
-    crossing = with_check("structure:S7")
-    if not crossing or any(e.get("on_warning") != "info" for e in crossing):
-        problems.append("the entries whose check is structure:S7 have on_warning info, at least one")
+    by_id = {entry.get("id"): entry for entry in entries}
+    for entry_id, check in OBL_INFO_REVIEWED_ENTRIES.items():
+        entry = by_id.get(entry_id)
+        if entry is None:
+            problems.append(f"entry {entry_id!r} is missing, reviewed as on_warning info")
+        elif entry.get("on_warning") != "info" or entry.get("check") != check:
+            problems.append(
+                f"entry {entry_id!r}: check is {entry.get('check')!r} and on_warning is "
+                f"{entry.get('on_warning')!r}, reviewed as {check!r} with info"
+            )
     graph = with_check("ledger:R3")
     if not any(
         e.get("class") == "obligation" and e.get("group") == "dependence" and e.get("on_warning") == "judge"
         for e in graph
     ):
         problems.append("no entry whose check is ledger:R3 is a dependence obligation with on_warning judge")
-    if not any(e.get("on_warning") == "info" for e in graph):
-        problems.append("no entry whose check is ledger:R3 has on_warning info")
     if not {"obligation", "precondition"} <= {e.get("class") for e in with_check("structure:S5")}:
         problems.append("the entries whose check is structure:S5 include an obligation and a precondition")
 
@@ -910,6 +923,10 @@ OBL_FORMAT_REFUSALS = [
     ("third warning value", _set(INDEX_ROW, on_warning="none"), [INDEX_ROW, "none"]),
     ("unreviewed entry passing on a warning",
      _set(INDEX_ROW, check="ledger:R1.5", on_warning="info"), [INDEX_ROW, "info"]),
+    ("another entry of a reviewed check passing on a warning",
+     _set(INDEX_ROW, check="ledger:R3", on_warning="info"), [INDEX_ROW, "info"]),
+    ("reviewed entry pointed at another check",
+     _set(INDEX_ROW, id="index.arcs-do-not-cross", on_warning="info"), ["index.arcs-do-not-cross", "info"]),
 ]
 
 
@@ -985,8 +1002,9 @@ def test_obligations_reviewed_entries_are_required():
     problems = _reviewed_problems(_small_table())
     assert _names(problems, ["57", "3"]), problems
     assert _names(problems, ["structure:S6"]), problems
-    assert _names(problems, ["structure:S7"]), problems
     assert _names(problems, ["ledger:R3"]), problems
+    for entry_id in OBL_INFO_REVIEWED_ENTRIES:
+        assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
     for owner in (49, 50, 55):
         assert _names(problems, [f"owner {owner}"]), problems
@@ -996,6 +1014,16 @@ def test_obligations_reviewed_entry_cannot_be_changed():
     table = _small_table()
     _obl_entry(table, GAP_ROW)["on_warning"] = "info"
     assert _names(_reviewed_problems(table), [GAP_ROW, "on_warning"])
+
+
+def test_obligations_reviewed_info_entry_keeps_its_rule():
+    table = _small_table()
+    table["entries"].append({
+        "id": "index.arcs-do-not-cross", "class": "precondition", "unit": "proposition",
+        "criterion": "No two arcs of the proposition's paragraph cross.",
+        "check": "structure:S7", "verified_by": ["mechanical"], "on_warning": "judge",
+    })
+    assert _names(_reviewed_problems(table), ["index.arcs-do-not-cross", "'judge'", "info"])
 
 
 def test_obligations_document_cannot_copy_the_table():

@@ -454,7 +454,7 @@ entries:
     criterion: "Every symbol the analysis code defines is mentioned in the manuscript's documents."
     check: audit:R3
     verified_by: [mechanical]
-    on_warning: judge
+    on_warning: info
 
   # ---- Truth ----
 
@@ -622,7 +622,7 @@ entries:
     criterion: "Every entry in the bibliography is cited in the manuscript."
     check: audit:R2
     verified_by: [mechanical]
-    on_warning: judge
+    on_warning: info
 
 # Vocabulary values that no entry's `applies` names, each with the reason.
 unconstrained:

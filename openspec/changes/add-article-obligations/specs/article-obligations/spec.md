@@ -34,7 +34,7 @@ The article obligations table states, one entry at a time, what a manuscript's l
 
 The class SHALL be written on each entry. It SHALL NOT be derived from which tool runs the check. When one check covers both a precondition and an obligation, the file SHALL hold one entry for each, naming the same check. The `id` prefix SHALL be `index` for a precondition and the group id for an obligation.
 
-A finding that the maintainer has reviewed as information only (crossing arcs under S7, an uncited proposition under R3) SHALL have its own entry with one of the two classes, chosen by what would be corrected if the finding were acted on, and `on_warning: info`.
+A finding that the maintainer has reviewed as information only (crossing arcs under S7, an uncited proposition under R3, a code symbol that the documents never mention under the audit's R3, and a bibliography entry that is never cited under the audit's R2) SHALL have its own entry with one of the two classes, chosen by what would be corrected if the finding were acted on, and `on_warning: info`.
 
 #### Scenario: One check is split by what gets corrected
 
@@ -172,7 +172,7 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 - `judge`: a finding that is not an error leaves the entry unverified until someone judges it.
 - `info`: a finding that is not an error is listed in the report and the entry passes.
 
-`on_warning: info` SHALL appear only on entries that the maintainer has reviewed for it. The guard holds the list of their checks, which starts as `structure:S7` and `ledger:R3`; an entry with any other `check` SHALL have `judge`.
+`on_warning: info` SHALL appear only on entries that the maintainer has reviewed for it. The guard holds the list of those entries, each named by its `id` together with its `check`: `index.proposition-is-cited` with `ledger:R3`, `index.arcs-do-not-cross` with `structure:S7`, `consistency.code-symbols-mentioned` with `audit:R3` and `completeness.bibliography-entries-cited` with `audit:R2`. Each of them SHALL have `on_warning: info`. Every other entry SHALL have `judge`, including another entry that names one of those checks, and a listed entry whose `check` has been changed.
 
 #### Scenario: A judgment by a language model needs a second reading
 
@@ -189,6 +189,11 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 - **WHEN** the entry whose `check` is `ledger:R1.5` has `on_warning: info`
 - **THEN** the guard fails and its message names the entry id
 
+#### Scenario: Another entry of a reviewed check cannot pass on a warning
+
+- **WHEN** the obligation stating that citations form no cycle, whose `check` is `ledger:R3`, has `on_warning: info`
+- **THEN** the guard fails and its message names the entry id
+
 #### Scenario: A warning rule on a non-mechanical entry is refused
 
 - **WHEN** an entry with `verified_by: [proofread, cross_model]` has `on_warning: judge`
@@ -200,8 +205,11 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 | ----- | ----- | ---------- |
 | `dependence.cites-backward` | obligation | judge |
 | the entry whose `check` is `structure:S6` | obligation | judge |
-| the entry whose `check` is `structure:S7` | set per entry | info |
-| the entry for uncited propositions, `check: ledger:R3` | set per entry | info |
+| `index.arcs-do-not-cross`, `check: structure:S7` | precondition | info |
+| `index.proposition-is-cited`, `check: ledger:R3` | precondition | info |
+| `consistency.code-symbols-mentioned`, `check: audit:R3` | obligation | info |
+| `completeness.bibliography-entries-cited`, `check: audit:R2` | obligation | info |
+| the entry whose `check` is `ledger:R1.5` | precondition | judge |
 
 ### Requirement: Each entry has one of four outcomes for a unit
 

@@ -498,6 +498,7 @@ OBL_MECHANICAL_SOURCES = ("ledger", "structure", "records", "coverage", "order",
 # it is implemented"). A change that implements a check adds its id here.
 OBL_INVENTORY = (
     *(f"ledger:R{n}" for n in ("1", "1.5", "2", "3", "4", "7", "8", "9", "10", "11", "12", "13")),
+    "ledger:profile",
     *(f"structure:S{n}" for n in range(1, 10)),
     *(f"records:V{n}" for n in range(1, 7)),
     "coverage:text",
@@ -508,13 +509,34 @@ OBL_INVENTORY = (
 )
 OBL_EMPIRICAL_LAYERS = tuple(f"proofread:E{n}" for n in range(1, 8))
 OBL_UNWALKED_LAYERS_OWNER = 57
-OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62)
+# The three proofread layers that are defined but not walked, by entry. The data
+# file has no field for the layer, so the guard pins which entry stands for which.
+OBL_UNWALKED_LAYERS = {
+    "consistency.variable-roles": "E8",
+    "truth.composite-holds-per-component": "E9",
+    "support.exposures-separable": "E10",
+}
+# The empirical layers apply where a claim rests on data: these classes, in an
+# empirical ledger. Anything wider reaches propositions the walk cannot check
+# (an `external` one, or one with no artifact), which then never pass.
+OBL_EMPIRICAL_APPLIES = {
+    "profile": ["empirical"],
+    "evidence_class": ["measured", "tested", "descriptive", "not_computable"],
+}
+# Gaps the spec pins by entry: (class, owner).
+OBL_PINNED_GAPS = {
+    "truth.not-refuted": ("obligation", 62),
+    "index.structure-faithful": ("precondition", 66),
+}
+OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62, 66)
 # A verdict against a proposition from a method that no entry lists (a Lean
 # refutation, a human review) counts through this entry, so that soundness
 # stays "every entry passes" with no condition outside the table.
 OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
 OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
-OBL_DOC_ISSUES = ("#21", "#59", "#62", "#64")
+OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66")
+# Words the document needs for the rules the spec asks it to state.
+OBL_DOC_WORDS = ("suspicious", "--partial", "evidence_snapshot")
 OBL_DOC_ENTRY_ID_LIMIT = 2
 OBL_ID = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+")
 OBL_AXIOM = re.compile(r"[a-z0-9-]+/[A-Za-z0-9_]+")
@@ -650,8 +672,12 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
     if not is_gap and "owner" in entry:
         problems.append("owner is allowed only when check is gap")
     if check in OBL_EMPIRICAL_LAYERS or owner == OBL_UNWALKED_LAYERS_OWNER:
-        if (applies or {}).get("profile") != ["empirical"]:
-            problems.append("an empirical proofread layer applies with profile [empirical] and no other profile")
+        stated = {key: sorted(values) for key, values in (applies or {}).items() if isinstance(values, list)}
+        if stated != {key: sorted(values) for key, values in OBL_EMPIRICAL_APPLIES.items()}:
+            problems.append(
+                "an empirical proofread layer applies with exactly profile [empirical] and evidence_class "
+                f"[{', '.join(OBL_EMPIRICAL_APPLIES['evidence_class'])}]"
+            )
 
     verified_by = entry.get("verified_by")
     mechanical = verified_by == ["mechanical"]
@@ -802,10 +828,18 @@ def _reviewed_problems(table) -> list[str]:
         problems.append("the entries whose check is structure:S5 include an obligation and a precondition")
 
     unwalked = [entry for entry in entries if entry.get("owner") == OBL_UNWALKED_LAYERS_OWNER]
-    if len(unwalked) != 3:
-        problems.append(
-            f"owner {OBL_UNWALKED_LAYERS_OWNER} is named by {len(unwalked)} entries, not the 3 for E8, E9 and E10"
-        )
+    if {entry.get("id") for entry in unwalked} != set(OBL_UNWALKED_LAYERS):
+        expected = ", ".join(f"{entry_id} ({layer})" for entry_id, layer in OBL_UNWALKED_LAYERS.items())
+        problems.append(f"the entries owned by issue {OBL_UNWALKED_LAYERS_OWNER} are not exactly: {expected}")
+    for entry_id, (kind, owner) in OBL_PINNED_GAPS.items():
+        entry = by_id.get(entry_id)
+        if entry is None:
+            problems.append(f"entry {entry_id!r} is missing; the spec asks for it as a gap owned by issue {owner}")
+        elif (entry.get("class"), entry.get("check"), entry.get("owner")) != (kind, "gap", owner):
+            problems.append(
+                f"entry {entry_id!r}: class {entry.get('class')!r}, check {entry.get('check')!r}, owner "
+                f"{entry.get('owner')!r}; the spec asks for a {kind} that is a gap owned by issue {owner}"
+            )
     for entry in unwalked:
         verified_by = entry.get("verified_by") or []
         if entry.get("check") != "gap" or "proofread" not in verified_by or "cross_model" not in verified_by:
@@ -817,10 +851,8 @@ def _reviewed_problems(table) -> list[str]:
         if not any(entry.get("owner") == owner for entry in entries):
             problems.append(f"owner {owner} is named by no entry")
     verdicts = by_id.get(OBL_UNLISTED_VERDICT_ENTRY)
-    if verdicts is None or verdicts.get("class") != "obligation" or verdicts.get("unit") != "proposition":
-        problems.append(
-            f"entry {OBL_UNLISTED_VERDICT_ENTRY!r} is missing or is not an obligation decided for each proposition"
-        )
+    if verdicts is not None and verdicts.get("unit") != "proposition":
+        problems.append(f"entry {OBL_UNLISTED_VERDICT_ENTRY!r} is decided for each proposition")
     return problems
 
 
@@ -837,6 +869,7 @@ def _document_problems(text: str, table) -> list[str]:
     problems += [f"the document does not name the outcome {outcome}" for outcome in OBL_OUTCOMES if outcome not in text]
     problems += [f"the document does not say why the layer {layer} is a gap" for layer in ("E8", "E9", "E10") if layer not in text]
     problems += [f"the document does not name issue {issue}" for issue in OBL_DOC_ISSUES if issue not in text]
+    problems += [f"the document does not mention {word}" for word in OBL_DOC_WORDS if word not in text]
     if "owner" not in text:
         problems.append("the document does not say that a gap is owned by the issue in its owner")
     return problems
@@ -921,6 +954,8 @@ OBL_FORMAT_REFUSALS = [
      _set(INDEX_ROW, unit="article", applies={"claim_type": ["claim"]}), [INDEX_ROW, "article"]),
     ("empirical layer without the profile limit",
      _then(_set(MODEL_ROW, check="proofread:E3"), _drop(MODEL_ROW, "applies")), [MODEL_ROW, "empirical"]),
+    ("empirical layer that reaches a proposition without data",
+     _set(MODEL_ROW, check="proofread:E3", applies={"profile": ["empirical"]}), [MODEL_ROW, "evidence_class"]),
     ("gap without an owner", _drop(GAP_ROW, "owner"), [GAP_ROW, "owner"]),
     ("owner on an implemented check", _set(INDEX_ROW, owner=46), [INDEX_ROW, "owner"]),
     ("check outside the inventory", _set(INDEX_ROW, check="ledger:R6"), [INDEX_ROW, "ledger:R6"]),
@@ -1020,15 +1055,17 @@ def test_obligations_unconstrained_item_is_checked(item, needles):
 
 def test_obligations_reviewed_entries_are_required():
     problems = _reviewed_problems(_small_table())
-    assert _names(problems, ["57", "3"]), problems
+    for entry_id in OBL_UNWALKED_LAYERS:
+        assert _names(problems, ["57", entry_id]), problems
+    for entry_id in OBL_PINNED_GAPS:
+        assert _names(problems, [entry_id]), problems
     assert _names(problems, ["structure:S6"]), problems
     assert _names(problems, ["ledger:R3"]), problems
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (49, 50, 55, 62):   # 46 is in the small table
+    for owner in (49, 50, 55, 62, 66):   # 46 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
-    assert _names(problems, ["truth.not-refuted"]), problems
 
 
 def test_obligations_reviewed_entry_cannot_be_changed():
@@ -1056,16 +1093,52 @@ def test_obligations_document_cannot_copy_the_table():
 
 def test_obligations_document_has_to_say_the_essentials():
     problems = _document_problems("An empty document.", _small_table())
-    for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, "E8", "E9", "E10"):
+    for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, *OBL_DOC_WORDS, "E8", "E9", "E10"):
         assert _names(problems, [needle]), (needle, problems)
+
+
+def _load_obligations_text(text: str):
+    """Parse the text of a data file, refusing a mapping that holds one key twice.
+
+    PyYAML keeps the last value of a repeated key and drops the first without a
+    message, so a leftover from a merge would replace a reviewed value unseen.
+    """
+    yaml = pytest.importorskip("yaml", reason="the obligations guard parses the table with PyYAML")
+
+    class _NoRepeatedKeys(yaml.SafeLoader):
+        pass
+
+    def construct_mapping(loader, node, deep=False):
+        seen: set = set()
+        for key_node, _ in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in seen:
+                raise ValueError(f"the key {key!r} appears twice in one mapping (line {key_node.start_mark.line + 1})")
+            seen.add(key)
+        return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
+
+    _NoRepeatedKeys.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_mapping)
+    return yaml.load(text, Loader=_NoRepeatedKeys)  # noqa: S506 - a SafeLoader subclass
+
+
+# spec-example: article-obligations / an entry with the same key twice
+def test_obligations_loader_refuses_a_key_given_twice():
+    text = (
+        "groups: []\n"
+        "unconstrained: []\n"
+        "entries:\n"
+        "  - id: index.text-in-manuscript\n"
+        "    check: ledger:R1\n"
+        "    check: ledger:R2\n"
+    )
+    with pytest.raises(ValueError, match="check"):
+        _load_obligations_text(text)
 
 
 @pytest.fixture(scope="module")
 def obligations() -> dict:
-    yaml = pytest.importorskip("yaml", reason="the obligations guard parses the table with PyYAML")
     assert OBLIGATIONS.is_file(), f"missing {_rel(OBLIGATIONS)}"
-    with OBLIGATIONS.open(encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+    return _load_obligations_text(OBLIGATIONS.read_text(encoding="utf-8"))
 
 
 def test_obligations_table_has_no_problem(obligations):

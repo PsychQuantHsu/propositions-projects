@@ -49,10 +49,10 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
-  - id: index.retired-text-absent
+  - id: index.retirements-hold
     class: precondition
     unit: article
-    criterion: "No retired proposition's text is still live in the manuscript."
+    criterion: "Every retirement holds: its block is well formed, and the text is gone from the live manuscript or, for a comment environment, still in the source."
     check: ledger:R1
     verified_by: [mechanical]
     on_warning: judge
@@ -133,10 +133,18 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
+  - id: index.profile-valid
+    class: precondition
+    unit: article
+    criterion: "The ledger declares a profile that the validator accepts."
+    check: ledger:profile
+    verified_by: [mechanical]
+    on_warning: judge
+
   - id: index.location-anchored
     class: precondition
     unit: proposition
-    criterion: "The proposition's location names the file and the lines where its text starts."
+    criterion: "The proposition's location names the file and the lines that hold its text."
     check: ledger:R13
     verified_by: [mechanical]
     on_warning: judge
@@ -144,7 +152,7 @@ entries:
   - id: index.extraction-covers-text
     class: precondition
     unit: article
-    criterion: "No sentence of the manuscript's body is left without a proposition."
+    criterion: "No sentence of the manuscript's body, outside floats and headings, is left without a proposition."
     check: coverage:text
     verified_by: [mechanical]
     on_warning: judge
@@ -206,7 +214,7 @@ entries:
   - id: index.commitments-well-formed
     class: precondition
     unit: proposition
-    criterion: "Commitment ids are well formed and unique, and each discharge names a commitment an earlier record opened."
+    criterion: "The proposition's commitments are well formed: valid ids, kinds and lists, and each discharge names a dischargeable commitment that an earlier record opened."
     check: structure:S3
     verified_by: [mechanical]
     on_warning: judge
@@ -243,12 +251,23 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
+  # Nothing compares the sidecars with the manuscript yet. Until something does,
+  # an entry that applies by `opens` or `section_role` rests on annotations that
+  # no check has read against the text.
+  - id: index.structure-faithful
+    class: precondition
+    unit: proposition
+    criterion: "The structure sidecars record what the proposition does in the manuscript: its commitments, its head and relation, its section's role."
+    check: gap
+    owner: 66
+    verified_by: [proofread, cross_model]
+
   # ---- Preconditions: are the verification records well formed? ----
 
   - id: index.records-well-formed
     class: precondition
     unit: article
-    criterion: "Every verification record is a JSON object with its required keys."
+    criterion: "Every verification record is a JSON object whose required keys are present and hold strings."
     check: records:V1
     verified_by: [mechanical]
     on_warning: judge
@@ -322,7 +341,7 @@ entries:
     class: obligation
     group: dependence
     unit: proposition
-    criterion: "Every symbol the proposition uses is introduced by an earlier proposition."
+    criterion: "Every symbol the proposition uses is introduced by the proposition itself or by an earlier one."
     check: gap
     owner: 55
     verified_by: [mechanical]
@@ -381,6 +400,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "A comparison the proposition claims was estimated, not only described."
     check: proofread:E5
     verified_by: [proofread, cross_model]
@@ -391,6 +411,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "The proposition asserts no more than the test it rests on returned."
     check: proofread:E6
     verified_by: [proofread, cross_model]
@@ -402,6 +423,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "Two exposures the proposition treats as separable are neither nested nor collinear."
     check: gap
     owner: 57
@@ -435,6 +457,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "Each variable the proposition uses plays one role across the manuscript."
     check: gap
     owner: 57
@@ -444,7 +467,7 @@ entries:
     class: obligation
     group: consistency
     unit: article
-    criterion: "Every code symbol the manuscript's documents refer to is defined in the analysis code."
+    criterion: "Every code symbol that the Markdown documents under the manuscript's docs folder refer to is defined in the analysis code."
     check: audit:R3
     verified_by: [mechanical]
     on_warning: judge
@@ -453,7 +476,7 @@ entries:
     class: obligation
     group: consistency
     unit: article
-    criterion: "Every symbol the analysis code defines is mentioned in the manuscript's documents."
+    criterion: "Every symbol the analysis code defines is mentioned in the Markdown documents under the manuscript's docs folder."
     check: audit:R3
     verified_by: [mechanical]
     on_warning: info
@@ -466,6 +489,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "Every number in the proposition matches the artifact it comes from."
     check: proofread:E1
     verified_by: [proofread, cross_model]
@@ -476,6 +500,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "The quantity the proposition claims can be computed from the dataset as collected."
     check: proofread:E2
     verified_by: [proofread, cross_model]
@@ -486,6 +511,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "A figure the proposition cites shows what the proposition says it shows."
     check: proofread:E3
     verified_by: [proofread, cross_model]
@@ -496,6 +522,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "A figure the proposition cites is computed from a fitted model or the data, not from literals."
     check: proofread:E4
     verified_by: [proofread, cross_model]
@@ -506,6 +533,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "The sample the analysis used is the sample the proposition states."
     check: proofread:E7
     verified_by: [proofread, cross_model]
@@ -517,6 +545,7 @@ entries:
     unit: proposition
     applies:
       profile: [empirical]
+      evidence_class: [measured, tested, descriptive, not_computable]
     criterion: "A claim about a composite group holds for each component the proposition names."
     check: gap
     owner: 57
@@ -570,7 +599,7 @@ entries:
     class: obligation
     group: truth
     unit: proposition
-    criterion: "No verification method's latest record for the proposition is refuted or partial."
+    criterion: "No method's most recent verdict on the proposition is refuted or partial; an unresolved or not_attempted record replaces no earlier verdict."
     check: gap
     owner: 62
     verified_by: [mechanical]
@@ -608,7 +637,7 @@ entries:
     class: obligation
     group: completeness
     unit: article
-    criterion: "The article names the propositions that carry its thesis."
+    criterion: "The article has a thesis, and the structure sidecar names the propositions that carry it."
     check: structure:S5
     verified_by: [mechanical]
     on_warning: judge
@@ -684,10 +713,10 @@ unconstrained:
     why: "No check states a requirement that holds for this claim type alone."
   - field: claim_type
     value: result
-    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by claim type."
+    why: "The empirical layers apply by evidence class, to the propositions that rest on data, not by claim type."
   - field: claim_type
     value: interpretation
-    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by claim type."
+    why: "The empirical layers apply by evidence class, to the propositions that rest on data, not by claim type."
   - field: evidence_class
     value: verified
     why: "What this class needs is part of the evidence-class fit entry, which applies to every class."
@@ -703,18 +732,6 @@ unconstrained:
   - field: evidence_class
     value: open
     why: "No check states a requirement that holds for this evidence class alone."
-  - field: evidence_class
-    value: measured
-    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by evidence class."
-  - field: evidence_class
-    value: tested
-    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by evidence class."
-  - field: evidence_class
-    value: descriptive
-    why: "The empirical layers apply by profile, to every proposition of an empirical ledger, not by evidence class."
-  - field: evidence_class
-    value: not_computable
-    why: "It records the finding of the computability layer, which applies by profile."
   - field: opens
     value: future_work
     why: "Future work is never discharged, and the structure validator never reports it as owed."

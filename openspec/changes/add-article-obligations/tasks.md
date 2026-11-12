@@ -18,11 +18,11 @@
 
 ## 4. 說明文件
 
-- [ ] 4.1 新增 `plugins/propositions/docs/OBLIGATIONS.md`（英文，比照同目錄的其他文件）。內容：資料檔的鍵；兩種類別與怎麼分；七組與公理；適用條件怎麼寫；哪些檢查算已實作、沒列入的各是什麼原因；Requirement「Each entry has one of four outcomes for a unit」的四條規則、「錯誤」與「不算錯誤的發現」的定義（照工具自己的嚴重度，不看結束碼）、一筆紀錄涵蓋什麼（`proofread` 的兩種閱讀各走哪幾層、看不出是哪一種時不涵蓋任何一層），以及兩個限制（紀錄指不到列、同一條檢查拆成多列時發現算在哪一列）；Requirement「An article is sound only when every applicable entry passes」的定義，並照 design「驗收是每一條都通過，現在沒有文章過得了」寫出三個原因與各自負責的 issue（缺口的列、`judge` 的警告沒有地方記錄判定、`cross_model` 沒有產生紀錄的工具是 #21），以及多檔稿件的行序檢查（#59）；怎麼新增或修改一列。不列出各列，最多拿兩個編號當例子。驗證：2.4 的案例通過，`pytest tests/test_plugin_payload_tracked.py -k obligations` 全部通過，沒有被跳過的案例。
+- [x] 4.1 新增 `plugins/propositions/docs/OBLIGATIONS.md`（英文，比照同目錄的其他文件）。內容：資料檔的鍵；兩種類別與怎麼分；七組與公理；適用條件怎麼寫；哪些檢查算已實作、沒列入的各是什麼原因；Requirement「Each entry has one of four outcomes for a unit」的四條規則、「錯誤」與「不算錯誤的發現」的定義（照工具自己的嚴重度，不看結束碼）、單位是什麼（已退役的命題不算）、檢查沒跑過的六種情況、一筆紀錄涵蓋什麼（`proofread` 的兩種閱讀各走哪幾層、看不出是哪一種時不涵蓋任何一層），以及兩個限制（紀錄指不到列、同一條檢查拆成多列時發現算在哪一列）；Requirement「An article is sound only when every applicable entry passes」的定義，並照 design「驗收是每一條都通過，現在沒有文章過得了」寫出三個原因與各自負責的 issue（缺口的列、`judge` 的警告沒有地方記錄判定、`cross_model` 沒有產生紀錄的工具是 #21），以及多檔稿件的行序檢查（#59）與沒有分析程式的稿件（#64）；怎麼新增或修改一列。不列出各列，最多拿兩個編號當例子。驗證：2.4 的案例通過，`pytest tests/test_plugin_payload_tracked.py -k obligations` 全部通過，沒有被跳過的案例。
 
 ## 5. 獨立讀者盲驗
 
-- [ ] 5.1 先把答案寫好，共十四題，存在暫存目錄：規格「ten units」的十個情況；Requirement「An article is sound only when every applicable entry passes」的三個 Scenario；再加一題同一條檢查拆成多列的情況（R3 對一筆命題報了孤立的警告、沒有報成環：引用不成環那一列是通過，孤立命題那一列是通過並把發現列為資訊）。再派一個只讀得到資料檔與說明文件的 subagent（不給規格、design 與這份 tasks），給它每一題的單位、檢查的發現與驗證紀錄，請它判定每一列的結果與文章是否完全合理。驗證：十四題的答案全部相同。有不同就改說明文件而不是改答案，再派一個新的 subagent 重跑；把題數、相同的題數與改了什麼記到 #47，不含稿件文字。
+- [ ] 5.1 先把答案寫好，共十五題，存在暫存目錄：規格「ten units」的十個情況；Requirement「An article is sound only when every applicable entry passes」的四個 Scenario；再加一題同一條檢查拆成多列的情況（R3 對一筆命題報了孤立的警告、沒有報成環：引用不成環那一列是通過，孤立命題那一列是通過並把發現列為資訊）。再派一個只讀得到資料檔與說明文件的 subagent（不給規格、design 與這份 tasks），給它每一題的單位、檢查的發現與驗證紀錄，請它判定每一列的結果與文章是否完全合理。驗證：十五題的答案全部相同。有不同就改說明文件而不是改答案，再派一個新的 subagent 重跑；把題數、相同的題數與改了什麼記到 #47，不含稿件文字。
 
 ## 6. 文件與版本
 

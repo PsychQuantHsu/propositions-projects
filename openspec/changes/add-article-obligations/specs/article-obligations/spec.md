@@ -8,7 +8,7 @@ The article obligations table states, one entry at a time, what a manuscript's l
 
 `plugins/propositions/catalog/obligations.yaml` SHALL be a YAML mapping with exactly three keys: `groups`, `entries` and `unconstrained`. Each item of `entries` SHALL be a mapping whose keys come from this closed set: `id`, `class`, `group`, `unit`, `applies`, `criterion`, `check`, `owner`, `verified_by`, `on_warning`. Any other top-level key or entry key SHALL be an error.
 
-`id` SHALL have the form `<prefix>.<name>`, where both parts consist of lowercase letters, digits and hyphens, and SHALL be unique in the file. `unit` SHALL be `proposition` or `article`. `criterion` SHALL be one line of at most 200 characters stating what has to hold; the definition of the check it points to stays in that check's own document.
+`id` SHALL have the form `<prefix>.<name>`, where both parts consist of lowercase letters, digits and hyphens, and SHALL be unique in the file. `unit` SHALL be `proposition` or `article`. A `proposition` unit is a proposition of the ledger that is not retired; a retired proposition is not a unit. The `article` unit is the manuscript as a whole. `criterion` SHALL be one line of at most 200 characters stating what has to hold; the definition of the check it points to stays in that check's own document.
 
 #### Scenario: An unknown entry key is refused
 
@@ -217,7 +217,9 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 
 1. The unit does not satisfy `applies`: `not_applicable`.
 2. `check` is `gap`: `unverified`.
-3. `verified_by` is `[mechanical]`: `unverified` when the check has not been run on the current files; `failed` when it reports an error for the unit; when it reports a finding that is not an error, `unverified` under `on_warning: judge` and `passed` under `on_warning: info`, with the finding listed as information; `passed` when it reports nothing for the unit. The levels are the check's own. An error is an error of a validator, a `definite` finding of an audit script, text that the coverage check reports as uncovered, or a line that the reordering dry run reports as out of place. A finding that is not an error is a warning of a validator, a `likely` or `FYI` finding of an audit script, or the reordering dry run's report of propositions that share a line. A status line or a summary that names no unit is not a finding. The exit status of a check SHALL NOT be used to tell the two apart, because the audit scripts end in failure on any finding.
+3. `verified_by` is `[mechanical]`: `unverified` when the check has not been run on the current files; `failed` when it reports an error for the unit; when it reports a finding that is not an error, `unverified` under `on_warning: judge` and `passed` under `on_warning: info`, with the finding listed as information; `passed` when it reports nothing for the unit. The levels are the check's own. An error is an error of a validator, a `definite` finding of an audit script, or a line that the reordering dry run reports as out of place. A finding that is not an error is a warning of a validator, a `likely` or `FYI` finding of an audit script, a run of text that the coverage check reports as uncovered, or the reordering dry run's report of propositions that share a line. The coverage check has no error level: a finished ledger still leaves runs uncovered (front matter, headings, the bibliography), so each run is judged, and a run judged to be a sentence of the body fails the entry. A status line or a summary that names no unit is not a finding. The exit status of a check SHALL NOT be used to tell the two apart, because the audit scripts end in failure on any finding and the coverage check ends in failure on a finished ledger.
+
+   A check has not been run for a unit in these six cases and no others: it was not executed after the last change to a file it reads; it ended with a tool error; it reports that it skipped the rule because the ledger's schema version predates the rule or the ledger's profile is invalid; it lists the unit as one it could not examine, or reports only how many units it skipped, in which case the entry is `unverified` for every unit it applies to; the structure validator was run with `--partial`; or, for the coverage check, a part of the manuscript's body was in no range it was run on, the body being the main file between the beginning and the end of the document and the whole of every other file of the input tree. The ledger validator's report that the manuscript has no theorem-like environment is not a skip: the entry for R9 passes for a proposition that is not assigned to a theorem-like block and is `unverified` for one that is.
 4. `verified_by` lists methods: take, for each method, the latest record for the proposition as the verification records define latest. `failed` when any of them is `refuted` or `partial`; `passed` when all of them are `supported` and each of them covers the entry's check; otherwise `unverified`.
 
 The document SHALL state what a record covers. A record covers a check when the reading that produced it performed that check. The proofread skill has two walks, a derivation walk that lists the L layers and an empirical walk that lists the E layers, and neither includes the other; a record does not name its walk, so the walk is read from the checklist that the record's `evidence_ref` points to, and a record whose walk cannot be established covers no layer.
@@ -251,9 +253,9 @@ The document SHALL also state two limits. First, a verification record names a p
 
 ### Requirement: An article is sound only when every applicable entry passes
 
-`plugins/propositions/docs/OBLIGATIONS.md` SHALL define a sound article as one for which every entry has the outcome `passed` or `not_applicable` for every unit. It SHALL state that an `unverified` outcome counts against soundness in the same way as `failed`, and that while any precondition entry is `failed` or `unverified` the outcomes of obligation entries are not to be trusted until the ledger, sidecars or records are corrected.
+`plugins/propositions/docs/OBLIGATIONS.md` SHALL define a sound article as one for which every entry has the outcome `passed` or `not_applicable` for every unit, and for which the latest record of no method is `refuted` or `partial` for any proposition, whether or not an entry lists that method. It SHALL state that an `unverified` outcome counts against soundness in the same way as `failed`, and that while any precondition entry is `failed` or `unverified` the outcomes of obligation entries are not to be trusted until the ledger, sidecars or records are corrected.
 
-The document SHALL state that no article is sound yet and SHALL list the three reasons with the issue that owns each: entries whose `check` is `gap`, each owned by the issue in its `owner`; verification records that cannot say what they cover, namely a warning under `on_warning: judge`, for which there is no place to record a judgment, and a `proofread` record, which does not name its walk; and `cross_model` records, which no tool produces yet (issue 21). It SHALL also state that the reading-order check runs on single-file manuscripts only, so its entry stays `unverified` for a multi-file manuscript (issue 59).
+The document SHALL state that no article is sound yet and SHALL list the three reasons with the issue that owns each: entries whose `check` is `gap`, each owned by the issue in its `owner`; verification records that cannot say what they cover, namely a warning under `on_warning: judge`, for which there is no place to record a judgment, and a `proofread` record, which does not name its walk; and `cross_model` records, which no tool produces yet (issue 21). It SHALL also state that the reading-order check runs on single-file manuscripts only, so its entry stays `unverified` for a multi-file manuscript (issue 59), and that the audit's code pass needs a directory of analysis code, so its two entries stay `unverified` for a manuscript that has none (issue 64).
 
 #### Scenario: A forward-citation warning keeps an article from being sound
 
@@ -264,6 +266,11 @@ The document SHALL state that no article is sound yet and SHALL list the three r
 
 - **WHEN** every entry is `passed` or `not_applicable` and the structure validator reports crossing arcs for the entry whose `check` is `structure:S7`
 - **THEN** the article is sound
+
+#### Scenario: A verdict against a proposition keeps an article from being sound
+
+- **WHEN** every entry is `passed` or `not_applicable` and the latest `lean` record for one proposition is `refuted`
+- **THEN** the article is not sound, and the report names that proposition and that method
 
 #### Scenario: A failed precondition is corrected first
 

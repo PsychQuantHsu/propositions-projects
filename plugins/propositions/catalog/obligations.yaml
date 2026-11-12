@@ -51,8 +51,8 @@ entries:
 
   - id: index.retired-text-absent
     class: precondition
-    unit: proposition
-    criterion: "A retired proposition's text is no longer live in the manuscript."
+    unit: article
+    criterion: "No retired proposition's text is still live in the manuscript."
     check: ledger:R1
     verified_by: [mechanical]
     on_warning: judge
@@ -144,7 +144,7 @@ entries:
   - id: index.extraction-covers-text
     class: precondition
     unit: article
-    criterion: "No text in an extracted range of the manuscript is left without a proposition."
+    criterion: "No sentence of the manuscript's body is left without a proposition."
     check: coverage:text
     verified_by: [mechanical]
     on_warning: judge

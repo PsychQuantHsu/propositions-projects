@@ -897,6 +897,7 @@ def _then(*steps):
 
 OBL_FORMAT_REFUSALS = [
     ("unknown top-level key", lambda t: t.update(notes=[]), ["notes"]),
+    # spec-example: article-obligations / an entry key outside the closed set
     ("unknown entry key", _set(INDEX_ROW, example="x"), [INDEX_ROW, "example"]),
     ("repeated id", lambda t: t["entries"].append(copy.deepcopy(_obl_entry(t, GAP_ROW))), [GAP_ROW, "repeated"]),
     ("two-line criterion", _set(INDEX_ROW, criterion="One thing.\nAnother."), [INDEX_ROW, "criterion"]),
@@ -906,11 +907,13 @@ OBL_FORMAT_REFUSALS = [
     ("obligation without its group prefix", _set(MODEL_ROW, id="truth.cites-imply"), ["truth.cites-imply", "support"]),
     ("obligation without a group", _drop(MODEL_ROW, "group"), [MODEL_ROW, "group"]),
     ("precondition with a group", _set(INDEX_ROW, group="support"), [INDEX_ROW, "group"]),
+    # spec-example: article-obligations / an eighth group
     ("eighth group", lambda t: t["groups"].append({"id": "style", "zh": "文", "does": "Protects style."}), ["style"]),
     ("groups out of order", lambda t: t["groups"].reverse(), ["groups", "order"]),
     ("group without its Chinese label", lambda t: t["groups"][2].pop("zh"), ["support", "zh"]),
     ("dependence names another axiom", lambda t: t["groups"][0].update(axiom="academic-writing/A2_other"),
      ["dependence", OBL_DEPENDENCE_AXIOM]),
+    # spec-example: article-obligations / a claim type that no profile accepts
     ("value outside the vocabulary", _set(INDEX_ROW, applies={"claim_type": ["lemma"]}), [INDEX_ROW, "lemma"]),
     ("optional sidecar field as a key", _set(INDEX_ROW, applies={"move": ["define"]}), [INDEX_ROW, "move"]),
     ("empty value list", _set(INDEX_ROW, applies={"claim_type": []}), [INDEX_ROW, "claim_type"]),
@@ -974,7 +977,15 @@ def test_obligations_check_that_no_entry_names_is_reported():
     assert not _names(problems, ["'ledger:R1'"]), problems  # the small table names this one
 
 
-@pytest.mark.parametrize("field, value", [("claim_type", "conjecture"), ("section_role", "afterword")])
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        # spec-example: article-obligations / a claim type added to the ledger validator
+        ("claim_type", "conjecture"),
+        # spec-example: article-obligations / a section role added to the structure validator
+        ("section_role", "afterword"),
+    ],
+)
 def test_obligations_new_vocabulary_value_has_to_be_placed(field, value):
     vocabulary = dict(_obligation_vocabulary())
     vocabulary[field] = (*vocabulary[field], value)
@@ -1036,6 +1047,7 @@ def test_obligations_reviewed_info_entry_keeps_its_rule():
     assert _names(_reviewed_problems(table), ["index.arcs-do-not-cross", "'judge'", "info"])
 
 
+# spec-example: article-obligations / a document that names three entries
 def test_obligations_document_cannot_copy_the_table():
     table = _small_table()
     text = " ".join(entry["id"] for entry in table["entries"])
@@ -1064,6 +1076,61 @@ def test_obligations_table_has_no_problem(obligations):
         + _reviewed_problems(obligations)
     )
     assert problems == [], "\n".join(problems)
+
+
+def _entries_with_check(table: dict, check: str) -> list[dict]:
+    return [entry for entry in table["entries"] if entry.get("check") == check]
+
+
+def _only_entry_with_check(table: dict, check: str) -> dict:
+    found = _entries_with_check(table, check)
+    assert len(found) == 1, f"{check} is named by {len(found)} entries, expected one"
+    return found[0]
+
+
+# spec-example: article-obligations / the two entries for the citation graph
+def test_obligations_citation_graph_has_two_entries(obligations):
+    graph = _entries_with_check(obligations, "ledger:R3")
+    assert len(graph) >= 2, [entry["id"] for entry in graph]
+    cycle = [e for e in graph if e["class"] == "obligation" and e.get("group") == "dependence"]
+    assert [e.get("on_warning") for e in cycle] == ["judge"], cycle
+    assert "cycle" in cycle[0]["criterion"] or "path" in cycle[0]["criterion"], cycle[0]["criterion"]
+    uncited = [e for e in graph if e.get("on_warning") == "info"]
+    assert [e["id"] for e in uncited] == ["index.proposition-is-cited"], uncited
+
+
+# spec-example: article-obligations / the forward-citation obligation
+def test_obligations_forward_citation_entry(obligations):
+    entry = _obl_entry(obligations, "dependence.cites-backward")
+    stated = {key: entry.get(key) for key in ("class", "group", "check", "owner", "verified_by", "on_warning")}
+    assert stated == {
+        "class": "obligation", "group": "dependence", "check": "gap", "owner": 46,
+        "verified_by": ["mechanical"], "on_warning": "judge",
+    }
+
+
+OBL_REVIEWED_ROWS = [
+    ("dependence.cites-backward", None, "obligation", "judge"),
+    (None, "structure:S6", "obligation", "judge"),
+    ("index.arcs-do-not-cross", "structure:S7", "precondition", "info"),
+    ("index.proposition-is-cited", "ledger:R3", "precondition", "info"),
+    ("consistency.code-symbols-mentioned", "audit:R3", "obligation", "info"),
+    ("completeness.bibliography-entries-cited", "audit:R2", "obligation", "info"),
+    (None, "ledger:R1.5", "precondition", "judge"),
+]
+
+
+# spec-example: article-obligations / the entries the maintainer reviewed
+@pytest.mark.parametrize(
+    "entry_id, check, expected_class, expected_rule",
+    OBL_REVIEWED_ROWS,
+    ids=[entry_id or check for entry_id, check, _, _ in OBL_REVIEWED_ROWS],
+)
+def test_obligations_reviewed_entry_has_its_values(obligations, entry_id, check, expected_class, expected_rule):
+    entry = _obl_entry(obligations, entry_id) if entry_id else _only_entry_with_check(obligations, check)
+    if check:
+        assert entry["check"] == check
+    assert (entry["class"], entry.get("on_warning")) == (expected_class, expected_rule), entry["id"]
 
 
 def test_obligations_document_has_no_problem(obligations):

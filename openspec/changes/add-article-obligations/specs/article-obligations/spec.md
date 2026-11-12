@@ -25,6 +25,12 @@ The article obligations table states, one entry at a time, what a manuscript's l
 - **WHEN** an entry's `criterion` spans two lines or is longer than 200 characters
 - **THEN** the guard fails and its message names the entry id
 
+##### Example: an entry key outside the closed set
+
+- **GIVEN** a table in which the entry `index.text-in-manuscript` carries the key `example`
+- **WHEN** the format check runs
+- **THEN** it reports a problem that names `index.text-in-manuscript` and `example`
+
 ### Requirement: Entries are preconditions or obligations
 
 `class` SHALL be `precondition` or `obligation`. There is no third class.
@@ -68,6 +74,12 @@ Every obligation entry SHALL name one of the seven groups in `group`. A precondi
 - **WHEN** `groups` has an item with the id `style`
 - **THEN** the guard fails and its message names `style`
 
+##### Example: an eighth group
+
+- **GIVEN** a table whose `groups` holds the seven groups and an eighth item with the id `style`
+- **WHEN** the format check runs
+- **THEN** it reports a problem that names `style`
+
 ### Requirement: Applicability is a list of field values
 
 `applies` is optional. When present it SHALL be a mapping whose keys come from this closed set: `profile`, `claim_type`, `evidence_class`, `cites`, `opens`, `section_role`. Each value SHALL be a non-empty list. A proposition satisfies `applies` when, for every key present, its own value is in the list:
@@ -101,6 +113,12 @@ Every entry whose `check` is one of `proofread:E1` to `proofread:E7`, and each o
 
 - **WHEN** an entry's `applies` has the key `move`
 - **THEN** the guard fails and its message names the entry id and `move`
+
+##### Example: a claim type that no profile accepts
+
+- **GIVEN** a table in which the entry `index.text-in-manuscript` has `applies` with `claim_type: [lemma]`
+- **WHEN** the format check runs
+- **THEN** it reports a problem that names `index.text-in-manuscript` and `lemma`
 
 ### Requirement: A check is named only when it is implemented
 
@@ -157,6 +175,12 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 
 - **WHEN** `unconstrained` lists the section role `appendix` and an entry's `applies` has `section_role: [appendix]`
 - **THEN** the guard fails and its message names `appendix`
+
+##### Example: a claim type added to the ledger validator
+
+- **GIVEN** the vocabulary of `claim_type` with one more value, `conjecture`, that no entry names and `unconstrained` does not list
+- **WHEN** the accounting check runs
+- **THEN** it reports a problem that names `claim_type` and `conjecture`
 
 ### Requirement: Each entry states how it is verified
 
@@ -233,7 +257,9 @@ The document SHALL also state two limits. First, a verification record names a p
 - **WHEN** a reader who has only the data file and the document is given a unit, the findings of the checks and the verification records
 - **THEN** the reader reaches the outcome that the four rules give
 
-##### Example: twelve units
+No executable check: no program evaluates the outcome rules in this change; the tool that does belongs to the Swift package of issue 46, and a test that evaluated them would be that tool written in the wrong place. An independent reader decided the twelve worked cases below from the data file and the document alone, and the result is recorded on issue 47.
+
+The twelve worked cases:
 
 | Entry | Unit and evidence | Outcome |
 | ----- | ----------------- | ------- |
@@ -260,6 +286,8 @@ The document SHALL also state two limits. First, a verification record names a p
 `plugins/propositions/docs/OBLIGATIONS.md` SHALL define a sound article as one for which every entry has the outcome `passed` or `not_applicable` for every unit, and SHALL add no condition outside the table. A verdict against a proposition from a method that no entry lists SHALL count through an entry of its own, `truth.not-refuted`, which states that no method's latest record for the proposition is `refuted` or `partial`; that entry is a gap owned by issue 62 until a check reports it. It SHALL state that an `unverified` outcome counts against soundness in the same way as `failed`, and that while any precondition entry is `failed` or `unverified` the outcomes of obligation entries are not to be trusted until the ledger, sidecars or records are corrected; those outcomes are left as computed. It SHALL state what a report names: for each outcome that is `failed` or `unverified`, the entry and the unit, and each finding that is listed as information.
 
 The document SHALL state that no article is sound yet and SHALL list the three reasons with the issue that owns each: entries whose `check` is `gap`, each owned by the issue in its `owner`; verification records that cannot say what they cover, namely a warning under `on_warning: judge`, for which there is no place to record a judgment, and a `proofread` record, which does not name its walk; and `cross_model` records, which no tool produces yet (issue 21). It SHALL also state that the reading-order check runs on single-file manuscripts only, so its entry stays `unverified` for a multi-file manuscript (issue 59), and that the audit's code pass needs a directory of analysis code, so its two entries stay `unverified` for a manuscript that has none (issue 64).
+
+No executable check: soundness is a definition that the document states for readers and for later tools, and nothing in this change computes it. The guard checks only that the document names the four outcomes and the issues that own the reasons no article is sound yet.
 
 #### Scenario: A forward-citation warning keeps an article from being sound
 
@@ -290,6 +318,12 @@ The document SHALL state that no article is sound yet and SHALL list the three r
 - **WHEN** the document mentions three or more entry ids of the data file
 - **THEN** the guard fails and its message gives the number found
 
+##### Example: a document that names three entries
+
+- **GIVEN** a table with three entries and a document whose text contains the ids of all three
+- **WHEN** the document check runs
+- **THEN** it reports a problem that gives the number 3
+
 #### Scenario: The document says why a defined layer is a gap
 
 - **WHEN** a reader looks up why the proofread layer E9 is a gap
@@ -308,3 +342,9 @@ The repository SHALL have automated tests that fail when the data file or the do
 
 - **WHEN** the structure validator gains a section role
 - **THEN** the guard fails until an entry names the new role or `unconstrained` lists it, without the guard itself being edited
+
+##### Example: a section role added to the structure validator
+
+- **GIVEN** the vocabulary of `section_role` with one more value, `afterword`, that no entry names and `unconstrained` does not list
+- **WHEN** the accounting check runs
+- **THEN** it reports a problem that names `section_role` and `afterword`

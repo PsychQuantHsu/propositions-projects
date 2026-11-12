@@ -395,6 +395,7 @@ entries:
     check: proofread:E6
     verified_by: [proofread, cross_model]
 
+  # proofread layer E10 (exposure structure), defined but not in the walk
   - id: support.exposures-separable
     class: obligation
     group: support
@@ -427,6 +428,7 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
+  # proofread layer E8 (variable role consistency), defined but not in the walk
   - id: consistency.variable-roles
     class: obligation
     group: consistency
@@ -508,6 +510,7 @@ entries:
     check: proofread:E7
     verified_by: [proofread, cross_model]
 
+  # proofread layer E9 (composite vs component), defined but not in the walk
   - id: truth.composite-holds-per-component
     class: obligation
     group: truth
@@ -544,11 +547,24 @@ entries:
     unit: proposition
     applies:
       evidence_class: [external]
-    criterion: "The support outside the paper that the proposition rests on can be found and says what the proposition says."
+    criterion: "The support outside the paper that the proposition rests on can be found in an external source."
     check: gap
     owner: 50
     verified_by: [mechanical]
     on_warning: judge
+
+  # Whether a source says what is taken from it needs a reading, so it is
+  # separate from whether the source can be found.
+  - id: truth.external-support-agrees
+    class: obligation
+    group: truth
+    unit: proposition
+    applies:
+      evidence_class: [external]
+    criterion: "The support outside the paper says what the proposition takes from it."
+    check: gap
+    owner: 50
+    verified_by: [proofread, cross_model]
 
   - id: truth.not-refuted
     class: obligation

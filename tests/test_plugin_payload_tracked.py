@@ -1026,7 +1026,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (49, 50, 55):
+    for owner in (49, 50, 55, 62):   # 46 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
     assert _names(problems, ["truth.not-refuted"]), problems
 

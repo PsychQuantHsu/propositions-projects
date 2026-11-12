@@ -36,7 +36,7 @@
 
 - Affected specs: `article-obligations`（修改）
 - Affected code:
-  - Modified: `plugins/propositions/catalog/obligations.yaml`、`plugins/propositions/docs/OBLIGATIONS.md`、`plugins/propositions/docs/VERIFICATION.md`、`tests/test_plugin_payload_tracked.py`
+  - Modified: `plugins/propositions/catalog/obligations.yaml`、`plugins/propositions/docs/OBLIGATIONS.md`、`plugins/propositions/docs/VERIFICATION.md`、`tests/test_plugin_payload_tracked.py`、`.claude/rules/swift-is-the-implementation-language.md`
   - New: (none)
   - Removed: (none)
 - GitHub：新開 #71 並加進 #45 的子題清單；更正 #62、#68 上的 note；在 #50 留 note；#47 記錄維護者的決定與盲驗的題目、答案。

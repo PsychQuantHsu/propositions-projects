@@ -283,10 +283,10 @@ the entry:
   passing.
 
 `info` is the one setting that sets a warning aside without a judgment, so it
-is allowed only on entries the maintainer has reviewed for it. There are four:
-an uncited proposition (`ledger:R3`), crossing arcs (`structure:S7`), a code
-symbol that the documents never mention (`audit:R3`) and a bibliography entry
-that is never cited (`audit:R2`). Every other mechanical entry says `judge`,
+is allowed only on entries the maintainer has reviewed for it. There are four,
+one for each of these warnings: an uncited proposition (`ledger:R3`), crossing
+arcs (`structure:S7`), a code symbol that the documents never mention
+(`audit:R3`) and a bibliography entry that is never cited (`audit:R2`). Every other mechanical entry says `judge`,
 including an entry whose check reports no warning today: if the check starts to
 report one, the warning has to be judged.
 
@@ -485,5 +485,6 @@ python3 -m pytest tests/test_plugin_payload_tracked.py -k obligations
 It needs PyYAML. It refuses a data file in which one mapping holds the same key
 twice. It checks the format of the table, that every implemented
 check and every vocabulary value is accounted for, that the entries the
-maintainer reviewed keep their values, and that this document does not turn
-into a second copy of the table.
+maintainer reviewed keep their values, that this document does not turn into
+a second copy of the table, and that `docs/VERIFICATION.md` still points
+here.

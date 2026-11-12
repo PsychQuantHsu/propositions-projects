@@ -604,9 +604,9 @@ def _group_problems(groups) -> list[str]:
             problems.append(f"group {group_id!r} is not one of the seven groups")
     if tuple(ids) != OBL_GROUPS:
         problems.append(f"groups are not the seven in order: {', '.join(OBL_GROUPS)}")
-    for group in groups:
+    for position, group in enumerate(groups, 1):
         if not isinstance(group, dict):
-            problems.append("a group is not a mapping")
+            problems.append(f"group {position} is not a mapping")
             continue
         group_id = group.get("id")
         for key in group:

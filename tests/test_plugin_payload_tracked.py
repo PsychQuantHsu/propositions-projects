@@ -954,6 +954,7 @@ OBL_FORMAT_REFUSALS = [
     ("two-line criterion", _set(INDEX_ROW, criterion="One thing.\nAnother."), [INDEX_ROW, "criterion"]),
     ("criterion over 200 characters", _set(INDEX_ROW, criterion="x" * 201), [INDEX_ROW, "criterion"]),
     ("external_source that is not true", _set(INDEX_ROW, external_source="yes"), [INDEX_ROW, "external_source"]),
+    ("external_source set to false", _set(INDEX_ROW, external_source=False), [INDEX_ROW, "external_source"]),
     ("third class", _set(INDEX_ROW, **{"class": "information"}), [INDEX_ROW, "information"]),
     ("precondition without the index prefix", _set(INDEX_ROW, id="info.text"), ["info.text", "index"]),
     ("obligation without its group prefix", _set(MODEL_ROW, id="truth.cites-imply"), ["truth.cites-imply", "support"]),
@@ -1093,6 +1094,10 @@ def test_obligations_reviewed_entry_cannot_be_changed():
     table = _small_table()
     _obl_entry(table, GAP_ROW)["on_warning"] = "info"
     assert _names(_reviewed_problems(table), [GAP_ROW, "on_warning"])
+    # An entry the spec does not name for it cannot gain the mark for an outside source.
+    table = _small_table()
+    _obl_entry(table, INDEX_ROW)["external_source"] = True
+    assert _names(_reviewed_problems(table), [INDEX_ROW, "external_source"])
 
 
 def test_obligations_reviewed_info_entry_keeps_its_rule():

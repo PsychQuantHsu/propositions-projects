@@ -32,4 +32,4 @@
 ## 7. 驗收與交接
 
 - [x] 7.1 全套 `pytest tests/` 通過，而且名稱以 `test_obligations_` 開頭的案例都是通過、沒有一個是跳過；IDD 的 CI gate 對 head commit 通過；`spectra validate add-article-obligations` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有任何變動。驗證：貼出四項的輸出，以及 obligations 那一組的通過數與跳過數。
-- [ ] 7.2 交接：在 #48 留言，列出還沒有公理的六組與各組保護什麼，作為它要新增的公理清單；在 #47 貼一則以 Implementation Complete 為標題的留言（改了什麼、測試結果、盲驗結果、開了哪幾張 issue），再以這份 tasks 檔跑 idd-update 的 tasks-file 模式，讓 #47 的正文有完成清單。驗證：#47 的 Current Status 出現 Tasks 小節，#48 有那則留言。
+- [x] 7.2 交接：在 #48 留言，列出還沒有公理的六組與各組保護什麼，作為它要新增的公理清單；在 #47 貼一則以 Implementation Complete 為標題的留言（改了什麼、測試結果、盲驗結果、開了哪幾張 issue），再以這份 tasks 檔跑 idd-update 的 tasks-file 模式，讓 #47 的正文有完成清單。驗證：#47 的 Current Status 出現 Tasks 小節，#48 有那則留言。

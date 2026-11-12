@@ -168,7 +168,7 @@ a finding, or leaves a record, for a unit without changing any file.
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
 | `order:ledger` | The dry run of `reorder-ledger.py` | The construct-batch skill |
-| `audit:R1`, `R2`, `R3` | The three audit scripts | `rules/manuscript-consistency-audit.md` |
+| `audit:R1`, `R2`, `R3` | `audit-symbols.py`, `audit-citations.py` and `audit-code-manuscript.py`, in that order | `rules/manuscript-consistency-audit.md` |
 | `proofread:L1` to `L5`, `proofread:E1` to `E7` | The per-proposition walk of the proofread skill | The proofread skill |
 
 ### What is not in the inventory

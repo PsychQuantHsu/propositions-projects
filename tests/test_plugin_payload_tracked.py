@@ -456,8 +456,9 @@ def test_analyze_holds_no_program_of_its_own():
 # names is exercised on a small table held in memory; one case then asserts that
 # the committed file has no problem at all.
 #
-# Exit condition: once the Swift package exists (#46) this guard moves to Swift
-# Testing and these cases are deleted.
+# Exit condition: once the Swift package exists (#46) and the vocabularies this
+# guard reads from the Python validators have a Swift source, the guard moves to
+# Swift Testing and these cases are deleted.
 
 import copy  # noqa: E402
 import functools  # noqa: E402
@@ -467,6 +468,7 @@ import sys  # noqa: E402
 PROPOSITIONS_PLUGIN = REPO_ROOT / "plugins" / "propositions"
 OBLIGATIONS = PROPOSITIONS_PLUGIN / "catalog" / "obligations.yaml"
 OBLIGATIONS_DOC = PROPOSITIONS_PLUGIN / "docs" / "OBLIGATIONS.md"
+VERIFICATION_DOC = PROPOSITIONS_PLUGIN / "docs" / "VERIFICATION.md"
 
 OBL_TOP_KEYS = ("groups", "entries", "unconstrained")
 OBL_ENTRY_KEYS = (
@@ -542,15 +544,11 @@ OBL_EXTERNAL_SOURCE_ENTRIES = (
 # stays "every entry passes" with no condition outside the table.
 OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
 OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
-OBL_DOC_ISSUES = ("#21", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70")
-# Words the document needs for the rules the spec asks it to state: the audit
-# severity that is easy to leave out, the structure validator's draft mode whose
-# INFO lines are findings, and the mark for an outside source.
-OBL_DOC_WORDS = ("suspicious", "--partial", "external_source")
-# The section of the document that says, for a check named by several entries,
-# which of them a finding counts for. Its table has one group of rows per check.
-OBL_ROUTING_HEADING = "### Which entry a finding counts for"
-OBL_CHECK_ID = re.compile(r"`((?:ledger|structure|records|coverage|order|audit|proofread):[A-Za-z0-9.]+)`")
+OBL_DOC_ISSUES = ("#21", "#50", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70", "#71")
+# The key the document has to explain besides the ones its own table lists.
+OBL_DOC_WORDS = ("external_source",)
+# What docs/VERIFICATION.md has to say about records and the obligations table.
+OBL_VERIFICATION_DOC_PHRASES = ("OBLIGATIONS.md", "derivation walk", "for this warning only")
 OBL_DOC_ENTRY_ID_LIMIT = 2
 OBL_ID = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+")
 OBL_AXIOM = re.compile(r"[a-z0-9-]+/[A-Za-z0-9_]+")
@@ -690,8 +688,8 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
     if not is_gap and "owner" in entry:
         problems.append("owner is allowed only when check is gap")
     if check in OBL_EMPIRICAL_LAYERS or owner == OBL_UNWALKED_LAYERS_OWNER:
-        stated = {key: sorted(values) for key, values in (applies or {}).items() if isinstance(values, list)}
-        if stated != {key: sorted(values) for key, values in OBL_EMPIRICAL_APPLIES.items()}:
+        stated = {key: sorted(values, key=repr) for key, values in (applies or {}).items() if isinstance(values, list)}
+        if stated != {key: sorted(values, key=repr) for key, values in OBL_EMPIRICAL_APPLIES.items()}:
             problems.append(
                 "an empirical proofread layer applies with exactly profile [empirical] and evidence_class "
                 f"[{', '.join(OBL_EMPIRICAL_APPLIES['evidence_class'])}]"
@@ -720,7 +718,7 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
     if mechanical:
         if rule not in OBL_WARNING_RULES:
             problems.append(f"on_warning {rule!r} is not one of {', '.join(OBL_WARNING_RULES)}")
-        elif rule == "info" and OBL_INFO_REVIEWED_ENTRIES.get(entry_id) != check:
+        elif rule == "info" and (not isinstance(entry_id, str) or OBL_INFO_REVIEWED_ENTRIES.get(entry_id) != check):
             problems.append("on_warning info is allowed only on an entry the maintainer reviewed for it, with its check")
     elif "on_warning" in entry:
         problems.append("on_warning is allowed only when verified_by is [mechanical]")
@@ -760,7 +758,7 @@ def _obl_entries(table) -> list[dict]:
 def _accounting_problems(table, vocabulary) -> list[str]:
     """Every implemented check has an entry; every vocabulary value is placed exactly once."""
     entries = _obl_entries(table)
-    named_checks = {entry.get("check") for entry in entries}
+    named_checks = {entry.get("check") for entry in entries if isinstance(entry.get("check"), str)}
     problems = [f"inventory check {check!r} is not named by any entry" for check in OBL_INVENTORY if check not in named_checks]
 
     named: dict[str, set] = {field: set() for field in OBL_ACCOUNTED_FIELDS}
@@ -772,7 +770,11 @@ def _accounting_problems(table, vocabulary) -> list[str]:
                 named[field].update(value for value in values if isinstance(value, str))
 
     listed: dict[str, set] = {field: set() for field in OBL_ACCOUNTED_FIELDS}
-    for position, item in enumerate(table.get("unconstrained") or [], 1):
+    unconstrained = table.get("unconstrained") if isinstance(table, dict) else None
+    if not isinstance(unconstrained, list):
+        problems.append("unconstrained is not a list")
+        unconstrained = []
+    for position, item in enumerate(unconstrained, 1):
         label = f"unconstrained item {position}"
         if not isinstance(item, dict) or set(item) != {"field", "value", "why"}:
             problems.append(f"{label} needs exactly field, value and why")
@@ -800,8 +802,8 @@ def _accounting_problems(table, vocabulary) -> list[str]:
 
 
 OBL_REVIEWED_BACKWARD = {
-    "class": "obligation", "group": "dependence", "check": "gap", "owner": 46,
-    "verified_by": ["mechanical"], "on_warning": "judge",
+    "class": "obligation", "group": "dependence", "unit": "proposition", "applies": {"cites": ["present"]},
+    "check": "gap", "owner": 46, "verified_by": ["mechanical"], "on_warning": "judge",
 }
 
 
@@ -826,7 +828,7 @@ def _reviewed_problems(table) -> list[str]:
     announced = with_check("structure:S6")
     if not announced or any(e.get("class") != "obligation" or e.get("on_warning") != "judge" for e in announced):
         problems.append("the entries whose check is structure:S6 are obligations with on_warning judge, at least one")
-    by_id = {entry.get("id"): entry for entry in entries}
+    by_id = {entry["id"]: entry for entry in entries if isinstance(entry.get("id"), str)}
     for entry_id, check in OBL_INFO_REVIEWED_ENTRIES.items():
         entry = by_id.get(entry_id)
         if entry is None:
@@ -842,11 +844,11 @@ def _reviewed_problems(table) -> list[str]:
         for e in graph
     ):
         problems.append("no entry whose check is ledger:R3 is a dependence obligation with on_warning judge")
-    if not {"obligation", "precondition"} <= {e.get("class") for e in with_check("structure:S5")}:
+    if not {"obligation", "precondition"} <= {str(e.get("class")) for e in with_check("structure:S5")}:
         problems.append("the entries whose check is structure:S5 include an obligation and a precondition")
 
     unwalked = [entry for entry in entries if entry.get("owner") == OBL_UNWALKED_LAYERS_OWNER]
-    if {entry.get("id") for entry in unwalked} != set(OBL_UNWALKED_LAYERS):
+    if {str(entry.get("id")) for entry in unwalked} != set(OBL_UNWALKED_LAYERS):
         expected = ", ".join(f"{entry_id} ({layer})" for entry_id, layer in OBL_UNWALKED_LAYERS.items())
         problems.append(f"the entries owned by issue {OBL_UNWALKED_LAYERS_OWNER} are not exactly: {expected}")
     for entry_id, (kind, owner) in OBL_PINNED_GAPS.items():
@@ -859,7 +861,8 @@ def _reviewed_problems(table) -> list[str]:
                 f"{entry.get('owner')!r}; the spec asks for a {kind} that is a gap owned by issue {owner}"
             )
     for entry in unwalked:
-        verified_by = entry.get("verified_by") or []
+        verified_by = entry.get("verified_by")
+        verified_by = verified_by if isinstance(verified_by, list) else []
         if entry.get("check") != "gap" or "proofread" not in verified_by or "cross_model" not in verified_by:
             problems.append(
                 f"entry {entry.get('id')!r}: an entry owned by issue {OBL_UNWALKED_LAYERS_OWNER} is a gap "
@@ -868,7 +871,7 @@ def _reviewed_problems(table) -> list[str]:
     for owner in OBL_REQUIRED_OWNERS:
         if not any(entry.get("owner") == owner for entry in entries):
             problems.append(f"owner {owner} is named by no entry")
-    marked = {entry.get("id") for entry in entries if "external_source" in entry}
+    marked = {str(entry.get("id")) for entry in entries if "external_source" in entry}
     for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
         if entry_id not in marked:
             problems.append(f"entry {entry_id!r} needs an outside source and has no external_source")
@@ -896,31 +899,12 @@ def _document_problems(text: str, table) -> list[str]:
     problems += [f"the document does not mention {word}" for word in OBL_DOC_WORDS if word not in text]
     if "owner" not in text:
         problems.append("the document does not say that a gap is owned by the issue in its owner")
-    problems += _routing_problems(text, table)
     return problems
 
 
-def _routing_problems(text: str, table) -> list[str]:
-    """The document's routing table covers exactly the checks that several entries name."""
-    named: dict[str, int] = {}
-    for entry in _obl_entries(table):
-        check = entry.get("check")
-        if isinstance(check, str) and check != "gap":
-            named[check] = named.get(check, 0) + 1
-    shared = {check for check, count in named.items() if count > 1}
-    if OBL_ROUTING_HEADING not in text:
-        return [f"the document has no section {OBL_ROUTING_HEADING!r}"] if shared else []
-    section = text.split(OBL_ROUTING_HEADING, 1)[1]
-    section = re.split(r"^#{1,6} ", section, maxsplit=1, flags=re.MULTILINE)[0]
-    placed = set()
-    for line in section.splitlines():
-        if line.startswith("|"):
-            placed.update(OBL_CHECK_ID.findall(line.split("|")[1]))
-    problems = [f"the routing table does not place the findings of {check}, which several entries name"
-                for check in sorted(shared - placed)]
-    problems += [f"the routing table places the findings of {check}, which one entry names or none"
-                 for check in sorted(placed - shared)]
-    return problems
+def _verification_doc_problems(text: str) -> list[str]:
+    """docs/VERIFICATION.md sends the reader to the obligations document and keeps its own rule narrow."""
+    return [f"docs/VERIFICATION.md does not say {phrase!r}" for phrase in OBL_VERIFICATION_DOC_PHRASES if phrase not in text]
 
 
 def _small_table() -> dict:
@@ -1126,6 +1110,10 @@ def test_obligations_reviewed_entry_cannot_be_changed():
     table = _small_table()
     _obl_entry(table, GAP_ROW)["on_warning"] = "info"
     assert _names(_reviewed_problems(table), [GAP_ROW, "on_warning"])
+    # The reviewed gap keeps the propositions it is decided for.
+    table = _small_table()
+    _obl_entry(table, GAP_ROW)["applies"] = {"cites": ["absent"]}
+    assert _names(_reviewed_problems(table), [GAP_ROW, "applies"])
     # An entry the spec does not name for it cannot gain the mark for an outside source.
     table = _small_table()
     _obl_entry(table, INDEX_ROW)["external_source"] = True
@@ -1153,18 +1141,59 @@ def test_obligations_document_has_to_say_the_essentials():
     problems = _document_problems("An empty document.", _small_table())
     for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, *OBL_DOC_WORDS, "E8", "E9", "E10"):
         assert _names(problems, [needle]), (needle, problems)
-    # A check that two entries name needs a row in the routing table, and only such a check has one.
+
+
+# spec-example: article-obligations / a verification document without the pointer
+def test_obligations_verification_document_points_to_the_obligations_document():
+    problems = _verification_doc_problems("A record is supported when the reading found nothing.")
+    for phrase in OBL_VERIFICATION_DOC_PHRASES:
+        assert _names(problems, [phrase]), (phrase, problems)
+    assert VERIFICATION_DOC.is_file(), f"missing {_rel(VERIFICATION_DOC)}"
+    problems = _verification_doc_problems(VERIFICATION_DOC.read_text(encoding="utf-8"))
+    assert problems == [], "\n".join(problems)
+
+
+# spec-example: article-obligations / a table that is not a mapping
+@pytest.mark.parametrize(
+    "table, needle",
+    [
+        (None, "not a mapping"),
+        ([], "not a mapping"),
+        ({"groups": None, "entries": "x", "unconstrained": 3}, "not a list"),
+    ],
+    ids=["empty file", "a list", "wrong types at the top"],
+)
+def test_obligations_guard_names_a_malformed_table(table, needle):
+    vocabulary = _obligation_vocabulary()
+    problems = (
+        _format_problems(table, vocabulary, _obligation_methods())
+        + _accounting_problems(table, vocabulary)
+        + _reviewed_problems(table)
+    )
+    assert _names(problems, [needle]), problems
+
+
+@pytest.mark.parametrize(
+    "change, needles",
+    [
+        (_set(INDEX_ROW, id=["a"]), ["id"]),
+        (_set(INDEX_ROW, **{"class": {"a": 1}}), ["class"]),
+        (_set(MODEL_ROW, check="proofread:E3", applies={"profile": [1, "empirical"]}), [MODEL_ROW, "profile"]),
+        (_set(INDEX_ROW, on_warning="info", id=["a"]), ["on_warning info"]),
+        (_set(MODEL_ROW, verified_by="proofread"), [MODEL_ROW, "verified_by"]),
+    ],
+    ids=["id is a list", "class is a mapping", "mixed types in applies", "info on an entry with no id", "verified_by is text"],
+)
+def test_obligations_guard_names_a_value_of_the_wrong_type(change, needles):
     table = _small_table()
-    second = copy.deepcopy(_obl_entry(table, INDEX_ROW))
-    second["id"] = "index.retirements-hold"
-    table["entries"].append(second)
-    assert _names(_routing_problems("No routing section.", table), ["no section"])
-    unplaced = f"{OBL_ROUTING_HEADING}\n\n| Check | Finding |\n|---|---|\n| `proofread:L4` | any |\n"
-    problems = _routing_problems(unplaced, table)
-    assert _names(problems, ["does not place", "ledger:R1"]), problems
-    assert _names(problems, ["proofread:L4", "one entry"]), problems
-    placed = f"{OBL_ROUTING_HEADING}\n\n| Check | Finding |\n|---|---|\n| `ledger:R1` | any |\n\n## Next\n| `audit:R2` | x |\n"
-    assert _routing_problems(placed, table) == []
+    change(table)
+    vocabulary = _obligation_vocabulary()
+    problems = (
+        _format_problems(table, vocabulary, _obligation_methods())
+        + _accounting_problems(table, vocabulary)
+        + _reviewed_problems(table)
+    )
+    assert _names(problems, needles), problems
 
 
 def _load_obligations_text(text: str):
@@ -1245,11 +1274,8 @@ def test_obligations_citation_graph_has_two_entries(obligations):
 # spec-example: article-obligations / the forward-citation obligation
 def test_obligations_forward_citation_entry(obligations):
     entry = _obl_entry(obligations, "dependence.cites-backward")
-    stated = {key: entry.get(key) for key in ("class", "group", "check", "owner", "verified_by", "on_warning")}
-    assert stated == {
-        "class": "obligation", "group": "dependence", "check": "gap", "owner": 46,
-        "verified_by": ["mechanical"], "on_warning": "judge",
-    }
+    stated = {key: entry.get(key) for key in OBL_REVIEWED_BACKWARD}
+    assert stated == OBL_REVIEWED_BACKWARD
 
 
 OBL_REVIEWED_ROWS = [

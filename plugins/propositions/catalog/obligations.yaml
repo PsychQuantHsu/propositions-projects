@@ -752,7 +752,7 @@ unconstrained:
     why: "Future work is never discharged, and the structure validator never reports it as owed."
   - field: section_role
     value: abstract
-    why: "An abstract that opens a commitment is reported under S5, and that finding counts for the precondition on the plans."
+    why: "An abstract that opens a commitment is reported under S5, whose entries are decided for the article, not by section role."
   - field: section_role
     value: introduction
     why: "No check states a requirement that holds for this section role alone."

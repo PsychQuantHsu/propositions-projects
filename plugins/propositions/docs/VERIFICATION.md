@@ -74,10 +74,9 @@ between `proofread` and `lean` is worth reading for exactly this reason.
 
 That describes the derivation walk of the proofread skill. A record from its
 empirical walk means the proposition passed the empirical layers that walk
-lists, and the record does not say which walk produced it. Whether a record
-counts toward an article being sound is decided by `docs/OBLIGATIONS.md`. A
-record of this format shows neither the walk that produced it nor the version
-it read, so by that document none counts yet.
+lists, and the record does not say which walk produced it. How a record counts
+toward an article being sound is not settled yet: `docs/OBLIGATIONS.md` says
+why no record counts today and which issues own what is missing.
 
 ## Validator
 
@@ -114,8 +113,8 @@ Disagreements are warnings, not errors. They show which verdicts need a human
 to read them. `unresolved` and `not_attempted` never count as disagreement.
 
 The latest-record rule of this section is for this warning only. Whether an
-entry of the obligations table passes is decided by `docs/OBLIGATIONS.md`,
-which does not use this rule.
+entry of the obligations table passes is not decided by this rule; see
+`docs/OBLIGATIONS.md`.
 
 ## Connecting a method
 

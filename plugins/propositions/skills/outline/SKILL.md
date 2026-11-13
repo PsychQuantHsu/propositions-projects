@@ -135,7 +135,9 @@ ROOT='<the root, as printed>'
 find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} + && find "$ROOT" -type f -name 'outline-*.jsonl' -not -path '*/.git/*' && echo 'ok listed'
 ```
 
-Only regular files are listed; a symbolic link is not followed.
+Only regular files are listed; a symbolic link is not followed. No `ok listed`: a `_meta.json`
+in the repository could not be read, and the error names it. Tell the author, and ask which
+directory to use, as in case 2 below.
 
 1. When exactly one ledger line names `MAIN` (its path relative to `ROOT`), that is this
    manuscript's ledger and its directory is `OUTDIR`. A ledger is not needed.
@@ -158,15 +160,15 @@ Every command block from here on is written without these two lines and is run a
 the same Bash call. Where a block begins with a line such as `F="$SEC"` or `N=1`, that line
 names what the block works on; change its value as the text says.
 
-Run this once, as soon as `OUTDIR` is chosen, and again whenever `OUTDIR` changes:
+Run this at the start of every action, before anything else of the action:
 
 ```bash
-R=$(realpath "$ROOT") && D=$(realpath "$(dirname "$OUTDIR")") && { [ "$D" = "$R" ] || [ "${D#"$R"/}" != "$D" ]; } && [ ! -L "$OUTDIR" ] && [ ! -L "$SEC" ] && [ ! -L "$PAR" ] && [ ! -L "$APP" ] && echo 'ok the outline directory is inside the repository and no outline file is a symbolic link'
+R=$(realpath "$ROOT") && B=$(basename "$OUTDIR") && [ "$B" != "." ] && [ "$B" != ".." ] && O="$(realpath "$(dirname "$OUTDIR")")/$B" && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && [ ! -L "$OUTDIR" ] && [ ! -L "$SEC" ] && [ ! -L "$PAR" ] && [ ! -L "$APP" ] && echo 'ok the outline directory is inside the repository and no outline file is a symbolic link'
 ```
 
-No `ok`: stop and tell the author. The directory that is to hold `OUTDIR` has to exist inside
-the repository, and this skill does not write outside the repository or through a symbolic
-link.
+No `ok`: stop and tell the author. `OUTDIR` has to be the repository's root or a directory under
+it, written without `.` or `..` as its last part; the directory that is to hold it has to
+exist; and this skill does not write outside the repository or through a symbolic link.
 
 When the stage directory is gone, or the conversation no longer has its path (a new session, a
 conversation that was summarised), make a new one with the `mktemp` line. Whatever was shown
@@ -209,6 +211,9 @@ F="$SEC"
       (.[] | select(.r | type == "object")
            | select([.r | .. | strings | select(explode | any(. < 32))] | length > 0)
            | "line \(.l): a string holds a control character"),
+      (.[] | select(.r | type == "object")
+           | select(.r | has("points") and ((.points | type) != "array"))
+           | "line \(.l): points is not a list"),
       (.[] | select(.r | type == "object")
            | select([.r.id, (.r.points[]? | if type == "object" then .id else null end)] | any(type != "string" or length == 0))
            | "line \(.l): a record or a point has no id"),
@@ -317,8 +322,12 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    find "$ROOT" -type f -name '*.tex' -not -path '*/.git/*' && echo 'ok files listed'
    ```
 
-   An included file that is not in the list is outside the repository, a symbolic link, or
-   missing. Do not read it: tell the author which file it is, and go on without it.
+   The list holds every regular `.tex` file inside the repository. Read an included file only
+   when it is in the list. Any other included file is not read: one outside the repository, a
+   symbolic link, a missing file, or a file that is not `.tex` (a figure, a table, a style
+   file). Tell the author which files were not read, and go on. A figure or a table that comes
+   from such a file is still one record that carries `carry`, named in the file that includes
+   it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
    (`s-` and a short slug), the `heading`, and `says`, one complete sentence stating what the
    section says. A heading or a list of topics is not that sentence. Give `role` only when the
@@ -400,12 +409,17 @@ lines concerned with the Edit tool.
   replace it.
 - **Leave a paragraph out.** When its record has `from`, do not delete the record: give it
   `dropped` with the author's reason and leave it on its line. Delete a record without `from`.
-- **Leave a section out.** Settle the sections under it first, those that name it as `parent`:
-  each is left out with it, or is given another `parent` or none, as the author says. Ask when
-  the author has not said. Then leave out each paragraph record naming the section, by the rule
-  above. Delete the section record when no paragraph record and no section record names it;
-  otherwise keep it and give it `dropped` with the reason. A section record that is part of the
-  article never names a `parent` that carries `dropped` or is gone from the file.
+- **Leave a section out.** Three steps, in this order.
+  1. Settle the sections under it, those that name it as `parent`: each is left out with it, or
+     is given another `parent` or none, as the author says. Ask when the author has not said.
+  2. Leave out each paragraph record naming the section, by the rule above: a record with
+     `from` stays with `dropped`, a record without `from` is deleted.
+  3. Look at what still names the section after steps 1 and 2. When no paragraph record and no
+     section record names it, delete the section record; otherwise keep it and give it
+     `dropped` with the reason.
+
+  A section record that is part of the article never names a `parent` that carries `dropped`
+  or is gone from the file.
 - **Move.** Keep the records of one section on consecutive lines, and the groups in the order of
   the section file. A record moved to another section gets that section's `id` in `section`. A
   section that is moved takes the sections under it along, and a section is never moved to a
@@ -594,7 +608,7 @@ asks, through revise.
 8. Append the record:
 
    ```bash
-   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
+   [ ! -L "$OUTDIR" ] && [ ! -L "$APP" ] && cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
      ($in | split("\n")) as $l
      | ($shown[0] | unique) as $seen
      | (try ($l[0] | fromjson) catch null) as $first
@@ -609,7 +623,8 @@ asks, through revise.
    ' > "$STAGE/approval.json" && { [ -z "$(tail -c 1 "$APP" 2>/dev/null)" ] || printf '\n' >> "$APP"; } && cat "$STAGE/approval.json" >> "$APP" && echo 'ok approval appended'; rm -f "${STAGE:?}/approval-input.txt" "${STAGE:?}/approval.json"
    ```
 
-   The command goes on only while each part holds: the outline files are still what was shown;
+   The command goes on only while each part holds: neither the outline directory nor the
+   approvals file is a symbolic link; the outline files are still what was shown;
    every id listed is the id of a section that was shown, and there is at least one; the
    statement is not empty. It builds the record from the copies that were shown, with `whole`
    true when it covers every section, ends the last line of the approvals file when that line
@@ -636,6 +651,8 @@ in this plugin yet (issue 51).
 ## Hard rules
 
 - Write only the three outline files. Never the manuscript, the ledger or the sidecars.
+- Never write outside the repository or through a symbolic link.
+- Never read a file that the manuscript includes from outside the repository.
 - Never overwrite an outline with derive or draft.
 - Never type text of the manuscript, of an outline file or of the author into a command.
 - Never treat a check as passed unless it printed its `ok` line.

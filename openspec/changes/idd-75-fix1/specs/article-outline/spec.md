@@ -362,7 +362,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 ### Requirement: Derive and draft build an outline without inventing content
 
-The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It SHALL follow the files that the manuscript includes only when they are inside the repository; a file included from outside it is named to the author and not read. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. The action writes no `lines`. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: its `label` is defined exactly once, or its `starts` occurs exactly once, in the file it names.
+The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It SHALL follow the `.tex` files that the manuscript includes only when they are regular files inside the repository. Any other included file is named to the author and not read: one outside the repository, a symbolic link, a missing file, or a file that is not `.tex`. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. The action writes no `lines`. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: its `label` is defined exactly once, or its `starts` occurs exactly once, in the file it names.
 
 The draft action SHALL produce section and paragraph records from a title and ideas, or from an outline the author supplies. A point that would report a result, a number or a citation the author has not supplied SHALL say what will be reported without stating it, and SHALL carry `pending`.
 
@@ -409,9 +409,7 @@ Merging, splitting and leaving a paragraph out SHALL keep every source on record
 
 Leaving a section out and moving a section SHALL leave every `parent` naming a section record on an earlier line.
 
-- When the author leaves a section out, the sections under it are settled first: each is left out with it, or is given another `parent` or none, as the author says. The skill asks when the author has not said.
-- Each paragraph record naming the section is then left out by the rule above.
-- A section record is deleted from the file when no paragraph record and no section record names it; otherwise it stays and is given `dropped` with the reason.
+- When the author leaves a section out, three things happen in this order. First, the sections under it are settled: each is left out with it, or is given another `parent` or none, as the author says; the skill asks when the author has not said. Second, each paragraph record naming the section is left out by the rule above. Third, the skill looks at what still names the section: when no paragraph record and no section record names it any more, the section record is deleted from the file; otherwise it stays and is given `dropped` with the reason.
 - A section that is moved takes the sections under it along, so that they stay on later lines than it. A section is not moved to a line before its own `parent`: it is given another `parent`, or none, first, as the author says. The skill asks when the author has not said.
 
 After a revision the skill SHALL say which sections no longer stand as approved.
@@ -435,7 +433,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 ### Requirement: The outline skill writes only the three outline files
 
-The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be inside the repository, and the skill SHALL NOT write through a symbolic link. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
+The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be the repository's root or a directory under it, and SHALL NOT be a symbolic link. The skill SHALL NOT write through a symbolic link. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
 
 After every write to an outline file the skill SHALL confirm that every line of that file that is not empty parses as a JSON object. After a write to the section file or the paragraph file it SHALL also confirm that every record and every point has an `id`, that no `id` repeats among the section records or among the paragraph records and points, and that no string holds a control character. When any of these fails, it SHALL report the file and the line and SHALL NOT report the write as done. The check SHALL NOT report a pass for a file that holds no record. An empty section file is always a mistake. An empty paragraph file is a mistake except when no section of the outline has a paragraph yet; in that case the skill says in its report that the paragraph file is empty, and goes on. Its report SHALL say that no other check of the format exists until issue 78.
 
@@ -448,7 +446,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 #### Scenario: An outline file that is a symbolic link
 
-- **WHEN** `outline-sections.jsonl` in the outline directory is a symbolic link that leads outside the repository
+- **WHEN** `outline-sections.jsonl` in the outline directory is a symbolic link, wherever it leads
 - **THEN** the skill writes nothing through it, stops, and tells the author
 
 #### Scenario: A repeated id stops the report

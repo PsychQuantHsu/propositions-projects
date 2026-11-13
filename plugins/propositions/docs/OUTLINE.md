@@ -25,7 +25,8 @@ uses that ledger's directory. In every other case it asks the author which
 directory to use: when the manuscript has neither a ledger nor outline files,
 when more than one ledger names it, and also when the repository holds outline
 files in a directory that has no such ledger, because they can belong to
-another manuscript. The directory is always inside the repository.
+another manuscript. The directory is always the repository's root or a
+directory under it, and it is not a symbolic link.
 
 ```
 manuscript/propositions/
@@ -387,8 +388,10 @@ stops and tells the author.
 
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. It follows the
-files that the manuscript includes only when they are inside the repository; a
-file included from outside it is named to the author and not read. Every paragraph
+`.tex` files that the manuscript includes only when they are regular files
+inside the repository. Any other included file is named to the author and not
+read: one outside the repository, a symbolic link, a missing file, or a file
+that is not `.tex`. Every paragraph
 record it produces has `from` naming the passage it comes from, and every point
 states only what that passage states. It writes no `lines`. Before it shows the
 outline, it confirms that every locator it wrote resolves.
@@ -419,13 +422,14 @@ use.
 - When the author leaves a paragraph out of the article and its record has
   `from`, the record is not deleted: it is given `dropped` with the reason. A
   record without `from` that the author leaves out is deleted from the file.
-- When the author leaves a section out, the sections under it are settled
-  first: each is left out with it, or is given another `parent` or none, as the
-  author says. The skill asks when the author has not said. Each paragraph
-  record naming the section is then left out by the rule above.
-- A section record is deleted from the file when no paragraph record and no
-  section record names it; otherwise it stays and is given `dropped` with the
-  reason.
+- When the author leaves a section out, three things happen in this order.
+  First, the sections under it are settled: each is left out with it, or is
+  given another `parent` or none, as the author says; the skill asks when the
+  author has not said. Second, each paragraph record naming the section is left
+  out by the rule above. Third, the skill looks at what still names the
+  section: when no paragraph record and no section record names it any more,
+  the section record is deleted from the file; otherwise it stays and is given
+  `dropped` with the reason.
 - A section that is moved takes the sections under it along, so that they stay
   on later lines than it. A section is not moved to a line before its own
   `parent`: it is given another `parent`, or none, first, as the author says.

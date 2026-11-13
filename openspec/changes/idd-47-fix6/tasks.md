@@ -18,8 +18,8 @@
 
 ## 5. 獨立讀者盲驗
 
-- [ ] 5.1 題目沿用修正輪 5 的 40 題，加上這一輪改到的情形（`opens` 的 `id` 不被接受、id 是 `null`、帳冊有一行壞掉、兩列新列）。答案先存檔；派新的讀者，只給表、文件與題目。紀錄貼成 #47 上一則新的留言。驗證：全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
+- [x] 5.1 題目沿用修正輪 5 的 40 題，加上這一輪改到的情形（`opens` 的 `id` 不被接受、id 是 `null`、帳冊有一行壞掉、兩列新列）。答案先存檔；派新的讀者，只給表、文件與題目。紀錄貼成 #47 上一則新的留言。驗證：全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
 
 ## 6. 驗收
 
-- [ ] 6.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix6` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。
+- [x] 6.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix6` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有變動。驗證：貼出三項的輸出。

@@ -222,7 +222,7 @@ No executable check: a check of this requirement has to be a Swift test, and the
 
 ### Requirement: A premise check runs before an outline is shown for approval
 
-Before the approve action shows sections for approval, the skill SHALL have those sections examined by an agent that is given the outline files and the files their locators name, and nothing of the conversation.
+Before the approve action shows sections for approval, the skill SHALL have those sections examined by an agent that is given the section file, the paragraph file and the files their locators name, and nothing of the conversation.
 
 The check reports findings of these six kinds and no others.
 

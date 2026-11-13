@@ -157,6 +157,7 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
 - pytest 7+ for test suite
+- `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`（實跑過 jq 1.7.1 與 1.8.2；skill 開頭會先確認兩個工具都在）；其他 skill 不需要
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)
 - Schema versions: v1.0 – v1.7 — validator handles all with backward-compat skip for v1.2+-only rules (R7 / R11 / R12)；v1.4 = `retired`、v1.5 = `retired.superseded_mechanism`、v1.6 = multi-file（file-qualified location + `source.parts`）、v1.7 = `_meta.json` `profile`（`default` / `empirical`，決定 R11／R12 詞彙）。完整版本史見 `docs/SCHEMA.md` §Versioning
 

@@ -180,6 +180,7 @@ schema contract travels with each manuscript's ledger, so the plugin vendors no 
 
 - Python 3.10+
 - pytest 7+
+- `jq` and `realpath`, for `/propositions:outline` only (its commands were run with jq 1.7.1 and 1.8.2; the skill tests for both tools before anything else)
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` layout (paths configurable via skill args)
 - Schema versions v1.0 / v1.1 / v1.2 / v1.3
 

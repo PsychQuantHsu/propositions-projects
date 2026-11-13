@@ -197,6 +197,14 @@ Article structure is stored in two sidecar files in the ledger's directory, next
 
 This follows the precedent of `verification.jsonl` (`plugins/propositions/docs/VERIFICATION.md`): the ledger stays an index of claims, and annotations that can be redone without touching it live beside it.
 
+## Article outline (beside the ledger, outside its schema)
+
+The three outline files (`outline-sections.jsonl`, `outline-paragraphs.jsonl`, `outline-approvals.jsonl`) hold what an article is planned to say before it is written, and the author's approvals of that plan. All three are optional, and a manuscript can have them without having a ledger.
+
+- **The ledger schema does not change.** The outline files add no field to `main.jsonl` or `_meta.json`, and adding, changing or removing them does not change either. `schema_version` does not cover them, so adding them needs no version bump or migration. They carry no version of their own yet.
+- **`validate-propositions.py` does not read them**, and no other validator does until issue #78.
+- **Full format**: `plugins/propositions/docs/OUTLINE.md`.
+
 ## `_meta.json` schema (root metadata)
 
 ```json

@@ -61,9 +61,14 @@ A unit is what an entry is decided for.
   `null` or a malformed block is a unit.
 - `article`: the manuscript as a whole, once.
 
-A proposition is named by its id. Where a line of the ledger has no id, or two
-propositions that are not retired share one, the id does not single out a
-unit, and such a unit is named by its line in the ledger.
+A proposition is named by its id. Where a proposition has no `id` that is a
+non-empty string, or two propositions that are not retired share one, the id
+does not single out a unit, and such a unit is named by its line in the
+ledger.
+
+The precondition on retirements is decided for the article and covers every
+`retired` key, also one that holds a malformed block: that entry is where a
+malformed block is reported.
 
 ## Two classes
 
@@ -152,7 +157,8 @@ A value is read from the ledger and the sidecars themselves. No run of a
 validator is needed to read it, and a run that was not given a file, or that
 stopped before it reported anything, changes nothing about what can be read.
 A value can be read only under the conditions below. In every other case it
-cannot be read.
+cannot be read, and a condition that cannot be established counts as not
+holding.
 
 The conditions use two terms.
 
@@ -160,9 +166,11 @@ The conditions use two terms.
   That is the structure validator's test. It is narrower than the test for a
   unit: a proposition whose `retired` key holds `null` or a malformed block is
   a unit and is not live.
-- The ledger's ids are **usable** when every proposition in the ledger,
-  retired or not, has an `id`, and no two live propositions share one. The
-  sidecars refer to a proposition by its id. Two propositions that share an id
+- The ledger's ids are **usable** when three things hold: each line of the
+  ledger that is not blank and does not start with `//` is a JSON object;
+  every proposition in the ledger, retired or not, has an `id` that is a
+  non-empty string; and no two live propositions share an id. The sidecars
+  refer to a proposition by its id. Two propositions that share an id
   leave the ids usable when at most one of them is live; a value that needs
   usable ids can then be read for the live one, and not for the other, which
   is not live.
@@ -172,7 +180,7 @@ The conditions use two terms.
 | `profile` | The ledger has no `_meta.json`, or its `_meta.json` is a JSON object without a `profile` key: the profile is then `default`. Or its `_meta.json` is a JSON object with a `profile` that the ledger validator accepts: the profile is then the one declared |
 | `claim_type`, `evidence_class` | The field holds a value of its vocabulary for the ledger's profile. When the profile cannot be read, a value of the vocabulary of either profile can be read |
 | `cites` | The field is absent, which reads as `absent`, or it holds a list |
-| `opens` | All of these hold: the ledger's ids are usable; the proposition is live; the discourse sidecar exists and each of its lines that is not blank is a JSON object; exactly one of its records names the proposition; and that record has no `opens` key, or its `opens` is a list in which every item is an object with an `id` and a `kind` that the structure validator accepts |
+| `opens` | All of these hold: the ledger's ids are usable; the proposition is live; the discourse sidecar exists and each of its lines that is not blank is a JSON object; exactly one of its records names the proposition; and that record has no `opens` key, or its `opens` is a list in which every item is an object whose `id` and `kind` the structure validator both accepts |
 | `section_role` | All of these hold: the ledger's ids are usable; the proposition is live; `structure.json` can be parsed as a JSON object and carries the structure version that the structure validator reads; and its section list is usable |
 
 Some cases that follow from the table, since they have been misread before:
@@ -187,9 +195,11 @@ Some cases that follow from the table, since they have been misread before:
   and the copy of `SCHEMA.md` pinned next to each ledger lists them. The
   evidence classes `measured`, `tested`, `descriptive`, `not_computable` and
   `external`, and the claim types `result` and `interpretation`, are values of
-  the empirical profile only. Which propositions may leave either field out is
-  not settled (issue #70); until it is, a field that is left out cannot be
-  read.
+  the empirical profile only. `SCHEMA.md` requires `claim_type` and leaves
+  `evidence_class` optional, and no validator reports a proposition that
+  leaves either out. Issue #70 settles what a field that is left out means,
+  also for the two preconditions that ask for a known value. Until then such
+  a field cannot be read.
 - `cites`: `null` and a string cannot be read. A proposition without the field
   cites nothing; whether it relies on something it does not declare is what
   the entry for the layer L3 asks.
@@ -248,10 +258,11 @@ the evidence classes, every proposition of an empirical ledger that has no
 artifact would stay unverified.
 
 A proposition of an empirical ledger that carries any other evidence class is
-outside these entries, also when its text interprets data. No check decides
-yet whether a claim about data that carries another class should carry one of
-the four: the layer L5 states a test for `derived` and for `verified` and none
-for the four (issue #57). The derivation layers are not limited by profile, so
+outside these entries, also when its text interprets data. That a claim about
+data carries one of the four is asked by a precondition of its own, decided
+for every proposition of an empirical ledger. It is a gap (issue #70): the
+layer L5 states a test for `derived` and for `verified` and none for the four
+(issue #57). The derivation layers are not limited by profile, so
 a proposition of an empirical ledger that rests on data has to pass both
 walks.
 
@@ -269,7 +280,9 @@ criterion asks nothing is part of issue #68.
 `unconstrained` at the end of the table lists every value of `claim_type`,
 `evidence_class`, the commitment kinds and the section roles that no entry's
 `applies` names, with the reason. A value is either named by an entry or listed
-there, never both, so a value added to a vocabulary cannot go unnoticed.
+there, never both, so a value added to one of these four vocabularies cannot
+go unnoticed. The profiles and the two values of `cites` are not accounted for
+in this way.
 
 ## Checks
 
@@ -285,7 +298,7 @@ findings, or leaves records, about units under an id of its own.
 | Ids | Reported by | Defined in |
 |---|---|---|
 | `ledger:R1`, `R1.5`, `R2`, `R3`, `R4`, `R7` to `R13` | `validate-propositions.py` | The copy of `SCHEMA.md` pinned next to each ledger |
-| `ledger:profile` | `validate-propositions.py`, its check that `_meta.json` declares a profile it accepts | The same |
+| `ledger:profile` | `validate-propositions.py`, its check that a profile declared in `_meta.json` is one it accepts under the ledger's schema version. It reports nothing for a ledger that declares none | The same |
 | `structure:S1` to `S9` | `validate-structure.py` | `docs/STRUCTURE.md` |
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
@@ -538,9 +551,9 @@ again, and read the obligations after that.
 A report on soundness names, for every outcome that is `failed` or
 `unverified`, the entry and the unit, and for a gap the issue in its `owner`.
 It names a proposition by its id, and by its line in the ledger when the
-proposition has no id or shares its id with another proposition that is not
-retired. What else a report lists, and its format, are part of the outcome
-rules (issue #71). One example of what is left open: a `refuted` record of a
+proposition has no id that is a non-empty string or shares its id with another
+proposition that is not retired. What else a report lists, and its format, are
+part of the outcome rules (issue #71). One example of what is left open: a `refuted` record of a
 method that no entry lists changes no outcome while the entry on such verdicts
 is a gap, so whether a report lists the record is for those rules to say.
 
@@ -569,10 +582,12 @@ examine.
   citation audit reads one bibliography file of a fixed name. Issue #69.
 - The audit's code pass needs a directory of analysis code. Issue #64.
 
-One more limit is about what the table reaches, and an article could be called
-sound without it being checked: numbers are compared with artifacts only in a
-ledger with the empirical profile, and nothing checks yet that a ledger's
-profile fits its manuscript. Issue #70.
+One limit is about what the table reaches. Numbers are compared with artifacts
+only in a ledger with the empirical profile. A ledger with the default profile
+has no artifacts to compare with, and no entry asks about the numbers in its
+manuscript. A manuscript that reports data is expected to have the empirical
+profile; that is what the precondition on the profile asks, a gap owned by
+issue #70. The maintainer accepted this scope on 2026-11-13.
 
 ## Changing the table
 
@@ -614,7 +629,7 @@ python3 -m pytest tests/test_plugin_payload_tracked.py -k obligations
 
 It needs PyYAML. It refuses a data file in which one mapping holds the same key
 twice. It checks the format of the table, that every implemented
-check and every vocabulary value is accounted for, that the entries the
+check and every value of the four accounted vocabularies is placed, that the entries the
 maintainer reviewed keep their values, that this document does not turn into
 a second copy of the table, and that `docs/VERIFICATION.md` still points
 here.

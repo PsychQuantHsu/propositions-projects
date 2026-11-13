@@ -142,7 +142,7 @@ entries:
   - id: index.profile-valid
     class: precondition
     unit: article
-    criterion: "The ledger declares a profile that the validator accepts."
+    criterion: "The ledger's profile, the one it declares or the default when it declares none, is one the validator accepts."
     check: ledger:profile
     verified_by: [mechanical]
     on_warning: judge
@@ -155,6 +155,19 @@ entries:
     owner: 70
     verified_by: [mechanical]
     on_warning: judge
+
+  # The empirical layers apply by evidence class. A claim about data that is
+  # tagged with another class would fall outside all of them, so that the tag
+  # is right is asked here.
+  - id: index.data-claims-carry-data-class
+    class: precondition
+    unit: proposition
+    applies:
+      profile: [empirical]
+    criterion: "A proposition whose claim rests on data carries one of the evidence classes for data: measured, tested, descriptive or not_computable."
+    check: gap
+    owner: 70
+    verified_by: [proofread, cross_model]
 
   - id: index.location-anchored
     class: precondition
@@ -238,6 +251,16 @@ entries:
     class: precondition
     unit: article
     criterion: "The section plan and the paragraph plan are complete and well formed."
+    check: structure:S5
+    verified_by: [mechanical]
+    on_warning: judge
+
+  - id: index.abstract-opens-nothing
+    class: precondition
+    unit: proposition
+    applies:
+      section_role: [abstract]
+    criterion: "A proposition in the abstract opens no commitment."
     check: structure:S5
     verified_by: [mechanical]
     on_warning: judge
@@ -769,9 +792,6 @@ unconstrained:
   - field: opens
     value: future_work
     why: "Future work is never discharged, and the structure validator never reports it as owed."
-  - field: section_role
-    value: abstract
-    why: "An abstract that opens a commitment is reported under S5, whose entries are decided for the article, not by section role."
   - field: section_role
     value: introduction
     why: "No check states a requirement that holds for this section role alone."

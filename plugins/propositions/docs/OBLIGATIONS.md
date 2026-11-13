@@ -195,7 +195,8 @@ Some cases that follow from the table, since they have been misread before:
   and the copy of `SCHEMA.md` pinned next to each ledger lists them. The
   evidence classes `measured`, `tested`, `descriptive`, `not_computable` and
   `external`, and the claim types `result` and `interpretation`, are values of
-  the empirical profile only. `SCHEMA.md` requires `claim_type` and leaves
+  the empirical profile only. Every value of the default profile is also a
+  value of the empirical profile. `SCHEMA.md` requires `claim_type` and leaves
   `evidence_class` optional, and no validator reports a proposition that
   leaves either out. Issue #70 settles what a field that is left out means,
   also for the two preconditions that ask for a known value. Until then such

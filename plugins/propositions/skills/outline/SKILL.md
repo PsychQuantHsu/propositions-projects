@@ -71,7 +71,8 @@ Four rules hold for every command in this skill.
    nothing at all, it has failed. A command that lists things (files, ids, the status of each
    section) prints its lines and then an `ok` line; without the `ok` line the list is not
    complete. Do not go on, and do not report a write as done, after a command that did not
-   print `ok`.
+   print `ok`. The one exception is `EMPTY` from the write check, for a paragraph file, in the
+   case that section describes.
 
 The commands need `jq` and `realpath`; they were run with jq 1.7.1 and 1.8.2. The first call
 below tests that both tools are there.
@@ -111,8 +112,8 @@ the directory the author names.
 ```bash
 DIR='<the directory, in single quotes>'
 command -v jq >/dev/null && command -v realpath >/dev/null && echo 'ok tools'
-ROOT=$(git -C "$DIR" rev-parse --show-toplevel) && echo "ROOT=$ROOT"
-STAGE=$(mktemp -d "${TMPDIR:-/tmp}/outline-XXXXXX") && echo "STAGE=$STAGE"
+ROOT=$(git -C "$DIR" rev-parse --show-toplevel) && printf 'ROOT=%s\n' "$ROOT"
+STAGE=$(mktemp -d "${TMPDIR:-/tmp}/outline-XXXXXX") && printf 'STAGE=%s\n' "$STAGE"
 R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "${S#"$R"/}" = "$S" ] && echo 'ok the stage directory is outside the repository'
 ```
 
@@ -131,16 +132,17 @@ belongs to, and every outline file.
 
 ```bash
 ROOT='<the root, as printed>'
-find "$ROOT" -name _meta.json -not -path '*/.git/*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} \;
-find "$ROOT" -name 'outline-*.jsonl' -not -path '*/.git/*'
-echo 'ok listed'
+find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} + && find "$ROOT" -type f -name 'outline-*.jsonl' -not -path '*/.git/*' && echo 'ok listed'
 ```
 
-1. A ledger whose line names `MAIN` (its path relative to `ROOT`) is this manuscript's ledger:
-   its directory is `OUTDIR`. A ledger is not needed.
+Only regular files are listed; a symbolic link is not followed.
+
+1. When exactly one ledger line names `MAIN` (its path relative to `ROOT`), that is this
+   manuscript's ledger and its directory is `OUTDIR`. A ledger is not needed.
 2. In every other case, ask the author which directory to use (AskUserQuestion), and do not
-   choose one without asking. Outline files in the list can belong to another manuscript of the
-   same repository, so a directory that holds them is offered, not taken. When there is nothing
+   choose one without asking: no ledger names `MAIN`, or more than one does. Outline files in
+   the list can belong to another manuscript of the same repository, so a directory that holds
+   them is offered, not taken. When there is nothing
    to offer, propose `propositions/` beside `MAIN`, where a ledger is put by convention, and
    say that the outline belongs in the ledger's directory, so that if a ledger is created
    somewhere else later the three files move there.
@@ -155,6 +157,16 @@ SEC="$OUTDIR/outline-sections.jsonl"; PAR="$OUTDIR/outline-paragraphs.jsonl"; AP
 Every command block from here on is written without these two lines and is run after them, in
 the same Bash call. Where a block begins with a line such as `F="$SEC"` or `N=1`, that line
 names what the block works on; change its value as the text says.
+
+Run this once, as soon as `OUTDIR` is chosen, and again whenever `OUTDIR` changes:
+
+```bash
+R=$(realpath "$ROOT") && D=$(realpath "$(dirname "$OUTDIR")") && { [ "$D" = "$R" ] || [ "${D#"$R"/}" != "$D" ]; } && [ ! -L "$OUTDIR" ] && [ ! -L "$SEC" ] && [ ! -L "$PAR" ] && [ ! -L "$APP" ] && echo 'ok the outline directory is inside the repository and no outline file is a symbolic link'
+```
+
+No `ok`: stop and tell the author. The directory that is to hold `OUTDIR` has to exist inside
+the repository, and this skill does not write outside the repository or through a symbolic
+link.
 
 When the stage directory is gone, or the conversation no longer has its path (a new session, a
 conversation that was summarised), make a new one with the `mktemp` line. Whatever was shown
@@ -174,11 +186,13 @@ from the old one no longer counts as shown: an approval needs the sections shown
 Derive and draft start with this:
 
 ```bash
-[ ! -e "$SEC" ] && [ ! -e "$PAR" ] && echo 'ok no outline files yet'
+[ ! -e "$SEC" ] && [ ! -e "$PAR" ] && rm -f "${STAGE:?}/outline-sections.jsonl" "${STAGE:?}/outline-paragraphs.jsonl" && echo 'ok no outline files yet'
 ```
 
 No `ok`: an outline exists. Say so and that revise is the action to use. Do not overwrite the
-files and do not add to them.
+files and do not add to them. The command also removes what an earlier derive or draft of this
+session left in the stage directory, so that nothing of another outline can be written into
+this one.
 
 ## The write check
 
@@ -196,7 +210,7 @@ F="$SEC"
            | select([.r | .. | strings | select(explode | any(. < 32))] | length > 0)
            | "line \(.l): a string holds a control character"),
       (.[] | select(.r | type == "object")
-           | select([.r.id, (.r.points[]? | objects | .id)] | any(type != "string" or length == 0))
+           | select([.r.id, (.r.points[]? | if type == "object" then .id else null end)] | any(type != "string" or length == 0))
            | "line \(.l): a record or a point has no id"),
       (map(select(.r | type == "object") | .l as $l | (.r.id, (.r.points[]? | objects | .id)) | strings | {l: $l, id: .})
            | group_by(.id)[] | select(length > 1)
@@ -296,8 +310,15 @@ and draft it is a mistake of this skill: correct the staged record and run the c
 ## derive — an outline from a finished manuscript
 
 1. Run the command of "Pick the action"; stop when it does not print `ok`.
-2. Read the manuscript from `\begin{document}` on, following `\input` and `\include`. Work one
-   section at a time.
+2. Read the manuscript from `\begin{document}` on, following `\input` and `\include`, one
+   section at a time. Follow them only to files inside the repository. This lists them:
+
+   ```bash
+   find "$ROOT" -type f -name '*.tex' -not -path '*/.git/*' && echo 'ok files listed'
+   ```
+
+   An included file that is not in the list is outside the repository, a symbolic link, or
+   missing. Do not read it: tell the author which file it is, and go on without it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
    (`s-` and a short slug), the `heading`, and `says`, one complete sentence stating what the
    section says. A heading or a list of topics is not that sentence. Give `role` only when the
@@ -326,17 +347,19 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    `$STAGE/outline-sections.jsonl` and `$STAGE/outline-paragraphs.jsonl` (the full path written
    out). Run the write check on both, then "Locators: do they resolve" with
    `P="$STAGE/outline-paragraphs.jsonl"`. Correct the staged files until every check prints `ok`;
-`EMPTY` is accepted only for the paragraph file, in the one case the write check describes.
+   `EMPTY` is accepted only for the paragraph file, in the one case the write check describes.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
    points, with carried blocks marked. Say how many sections, paragraph records and carried
    blocks there are.
 9. Ask whether to write the files into `OUTDIR` (AskUserQuestion). Only after the author agrees:
 
    ```bash
-   [ ! -e "$SEC" ] && [ ! -e "$PAR" ] && mkdir -p "$OUTDIR" && cp "$STAGE/outline-sections.jsonl" "$SEC" && cp "$STAGE/outline-paragraphs.jsonl" "$PAR" && echo 'ok outline files written'
+   [ ! -e "$SEC" ] && [ ! -L "$SEC" ] && [ ! -e "$PAR" ] && [ ! -L "$PAR" ] && mkdir -p "$OUTDIR" && cp "$STAGE/outline-sections.jsonl" "$SEC" && cp "$STAGE/outline-paragraphs.jsonl" "$PAR" && echo 'ok outline files written'
    ```
 
-   Then run the write check on `"$SEC"` and on `"$PAR"`.
+   No `ok` although neither file existed before: the copy failed part way. Tell the author
+   which of the two files is there and what `cp` printed, and do not go on. Then run the write
+   check on `"$SEC"` and on `"$PAR"`.
 10. Say that agreeing to have the files written is not an approval of the outline, and that the
     next actions are revise, check and approve.
 
@@ -520,7 +543,7 @@ asks, through revise.
    follows is shown from this copy.
 
    ```bash
-   cp "$SEC" "$STAGE/shown-sections.jsonl" && cp "$PAR" "$STAGE/shown-paragraphs.jsonl" && rm -f "$STAGE/shown-ids.json" "$STAGE/statement.txt" "$STAGE/approved-ids.json" && echo 'ok shown copies kept'
+   cp "$SEC" "$STAGE/shown-sections.jsonl" && cp "$PAR" "$STAGE/shown-paragraphs.jsonl" && rm -f "${STAGE:?}/shown-ids.json" "${STAGE:?}/approval-input.txt" && echo 'ok shown copies kept'
    ```
 
    Then record which sections will be shown, in `$STAGE/shown-ids.json`. For the whole outline:
@@ -558,32 +581,32 @@ asks, through revise.
 
    When the message asks for changes, go to revise, and return to step 1 afterwards. When it is
    none of the above and not an approval, say what is still needed and wait.
-7. On an approval, write two files into the stage directory with the Write tool.
-   - `$STAGE/statement.txt`: the sentences of the author's message that state the approval,
+7. On an approval, write one file into the stage directory with the Write tool:
+   `$STAGE/approval-input.txt` (the full path written out). Write it anew for every approval.
+   - Its first line names the sections the author states are approved: a JSON list of their
+     ids, such as `["s-intro", "s-method"]`, or the JSON string `"all-shown"` when the author
+     approves everything that was shown. The sections can be fewer than those shown. Leave out
+     a section that was not shown, even when the author names it: say that it was not shown,
+     and show it in the next round. When no section is left, do not write the file and append
+     nothing.
+   - From its second line on: the sentences of the author's message that state the approval,
      copied character for character. Nothing this skill wrote.
-   - `$STAGE/approved-ids.json`: a JSON list of the ids of the sections the author states are
-     approved, such as `["s-intro", "s-method"]`. They can be fewer than the sections shown.
-     Leave out a section that was not shown, even when the author names it: say that it was
-     not shown, and show it in the next round. When no section is left, append nothing. When
-     the author approves everything that was shown, make the list with this command instead:
-
-     ```bash
-     cp "$STAGE/shown-ids.json" "$STAGE/approved-ids.json" && echo 'ok every section shown is listed as approved'
-     ```
 8. Append the record:
 
    ```bash
-   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile st "$STAGE/statement.txt" --slurpfile want "$STAGE/approved-ids.json" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
-     ($want[0] | unique) as $ids
+   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
+     ($in | split("\n")) as $l
      | ($shown[0] | unique) as $seen
+     | (try ($l[0] | fromjson) catch null) as $first
+     | (if $first == "all-shown" then $seen elif ($first | type) == "array" then ($first | unique) else [] end) as $ids
      | [$secs[] | select(.id as $i | any($ids[]; . == $i))] as $got
-     | ($st | rtrimstr("\n")) as $words
+     | ($l[1:] | join("\n") | sub("\\n+$"; "")) as $words
      | if ($ids | length) == 0 or ($got | length) != ($ids | length) or (($ids - $seen) | length) != 0 then error("the ids listed are not ids of sections that were shown")
        elif ($words | test("\\S") | not) then error("the statement is empty")
        else {approved_at: $at, statement: $words, sections: [$got[] | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}]}
             + (if ($got | length) == ($secs | length) then {whole: true} else {} end)
        end
-   ' > "$STAGE/approval.json" && { [ -z "$(tail -c 1 "$APP" 2>/dev/null)" ] || printf '\n' >> "$APP"; } && cat "$STAGE/approval.json" >> "$APP" && echo 'ok approval appended'; rm -f "$STAGE/statement.txt" "$STAGE/approved-ids.json" "$STAGE/approval.json"
+   ' > "$STAGE/approval.json" && { [ -z "$(tail -c 1 "$APP" 2>/dev/null)" ] || printf '\n' >> "$APP"; } && cat "$STAGE/approval.json" >> "$APP" && echo 'ok approval appended'; rm -f "${STAGE:?}/approval-input.txt" "${STAGE:?}/approval.json"
    ```
 
    The command goes on only while each part holds: the outline files are still what was shown;
@@ -591,13 +614,13 @@ asks, through revise.
    statement is not empty. It builds the record from the copies that were shown, with `whole`
    true when it covers every section, ends the last line of the approvals file when that line
    has no line break, and appends the record as a line of its own. The time has its offset from
-   UTC, as in `2026-11-13T16:30:00+08:00`. Whether or not it appended, it removes the statement
-   and the list of approved ids, so that neither can be used for another approval.
+   UTC, as in `2026-11-13T16:30:00+08:00`. Whether or not it appended, it removes the input
+   file, so that it cannot be used for another approval.
 
    No `ok approval appended`: nothing was appended. When `cmp` reported a difference or a
    missing file, the outline changed after it was shown or the copies are gone: say so and
-   return to step 1. When `jq` reported an error, write the two files of step 7 again,
-   corrected, and run the command again. Only ever append. Do not edit or remove an earlier
+   return to step 1. When `jq` reported an error, write the file of step 7 again, corrected,
+   and run the command again. Only ever append. Do not edit or remove an earlier
    line of the approvals file.
 9. Run the check for the approvals file from "The write check", then status, and report which
    sections now stand as approved and whether the outline does.

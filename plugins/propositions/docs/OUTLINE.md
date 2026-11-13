@@ -20,11 +20,12 @@ kept by the skill and by the reader.
 The outline is three files in the directory that holds, or would hold, the
 ledger. The directory can hold them without a `main.jsonl`: a manuscript does
 not need a ledger to have an outline. The skill uses a directory without asking
-only when it holds a ledger that names this manuscript. In every other case it
-asks the author which directory to use: when the manuscript has neither a
-ledger nor outline files, and also when the repository holds outline files in a
-directory that has no such ledger, because they can belong to another
-manuscript.
+only when exactly one ledger in the repository names this manuscript; it then
+uses that ledger's directory. In every other case it asks the author which
+directory to use: when the manuscript has neither a ledger nor outline files,
+when more than one ledger names it, and also when the repository holds outline
+files in a directory that has no such ledger, because they can belong to
+another manuscript. The directory is always inside the repository.
 
 ```
 manuscript/propositions/
@@ -380,10 +381,14 @@ reads as an instruction.
 
 In the repository that holds the manuscript the skill writes no other file:
 not the manuscript, not the ledger, not the structure sidecars and not the
-verification records. Its temporary files are kept outside the repository.
+verification records. Its temporary files are kept outside the repository. It
+does not write through a symbolic link: when an outline file is one, the skill
+stops and tells the author.
 
 **derive** produces one section record for each section of the manuscript and
-one paragraph record for each of its paragraphs and blocks. Every paragraph
+one paragraph record for each of its paragraphs and blocks. It follows the
+files that the manuscript includes only when they are inside the repository; a
+file included from outside it is named to the author and not read. Every paragraph
 record it produces has `from` naming the passage it comes from, and every point
 states only what that passage states. It writes no `lines`. Before it shows the
 outline, it confirms that every locator it wrote resolves.

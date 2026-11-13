@@ -24,7 +24,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 The outline SHALL consist of three files in the directory that holds, or would hold, the manuscript's ledger: `outline-sections.jsonl`, `outline-paragraphs.jsonl` and `outline-approvals.jsonl`. In each file every line that is not empty SHALL be one JSON object.
 
-The outline SHALL NOT depend on a ledger: the directory can hold the three files without a `main.jsonl`. The skill SHALL use a directory without asking only when that directory holds a ledger that names this manuscript. In every other case it SHALL ask the author which directory to use and SHALL NOT choose one without asking: when the manuscript has neither a ledger nor outline files, and also when the repository holds outline files in a directory that has no such ledger, because they can belong to another manuscript. Adding, changing or removing the outline files SHALL NOT change the ledger, its metadata, the structure sidecars or the verification records. The ledger's schema version does not cover the outline files.
+The outline SHALL NOT depend on a ledger: the directory can hold the three files without a `main.jsonl`. The skill SHALL use a directory without asking only when exactly one ledger in the repository names this manuscript; it then uses that ledger's directory. In every other case it SHALL ask the author which directory to use and SHALL NOT choose one without asking: when the manuscript has neither a ledger nor outline files, when more than one ledger names it, and also when the repository holds outline files in a directory that has no such ledger, because they can belong to another manuscript. Adding, changing or removing the outline files SHALL NOT change the ledger, its metadata, the structure sidecars or the verification records. The ledger's schema version does not cover the outline files.
 
 A section record, a paragraph record, a point and a locator are allowed to carry keys that this capability does not define. An approval record SHALL carry no key other than the four this capability defines for it.
 
@@ -362,7 +362,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 ### Requirement: Derive and draft build an outline without inventing content
 
-The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. The action writes no `lines`. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: its `label` is defined exactly once, or its `starts` occurs exactly once, in the file it names.
+The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It SHALL follow the files that the manuscript includes only when they are inside the repository; a file included from outside it is named to the author and not read. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. The action writes no `lines`. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: its `label` is defined exactly once, or its `starts` occurs exactly once, in the file it names.
 
 The draft action SHALL produce section and paragraph records from a title and ideas, or from an outline the author supplies. A point that would report a result, a number or a citation the author has not supplied SHALL say what will be reported without stating it, and SHALL carry `pending`.
 
@@ -384,6 +384,11 @@ No executable check: this change adds no test target; the examples and tests of 
 
 - **WHEN** the derive action is asked to run and `outline-paragraphs.jsonl` exists
 - **THEN** the action writes nothing and says that revise is the action to use
+
+#### Scenario: A file included from outside the repository
+
+- **WHEN** the manuscript includes a file by a path that leads outside the repository
+- **THEN** the derive action does not read that file, tells the author which file it is, and goes on with the rest of the manuscript
 
 #### Scenario: A displayed formula inside a paragraph
 
@@ -430,7 +435,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 ### Requirement: The outline skill writes only the three outline files
 
-The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
+The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be inside the repository, and the skill SHALL NOT write through a symbolic link. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
 
 After every write to an outline file the skill SHALL confirm that every line of that file that is not empty parses as a JSON object. After a write to the section file or the paragraph file it SHALL also confirm that every record and every point has an `id`, that no `id` repeats among the section records or among the paragraph records and points, and that no string holds a control character. When any of these fails, it SHALL report the file and the line and SHALL NOT report the write as done. The check SHALL NOT report a pass for a file that holds no record. An empty section file is always a mistake. An empty paragraph file is a mistake except when no section of the outline has a paragraph yet; in that case the skill says in its report that the paragraph file is empty, and goes on. Its report SHALL say that no other check of the format exists until issue 78.
 
@@ -440,6 +445,11 @@ No executable check: this change adds no test target; the examples and tests of 
 
 - **WHEN** the author, during a revision, asks the skill to rewrite a paragraph of the manuscript to match a point
 - **THEN** the skill writes nothing to the manuscript and says that writing from an outline is not one of its actions
+
+#### Scenario: An outline file that is a symbolic link
+
+- **WHEN** `outline-sections.jsonl` in the outline directory is a symbolic link that leads outside the repository
+- **THEN** the skill writes nothing through it, stops, and tells the author
 
 #### Scenario: A repeated id stops the report
 

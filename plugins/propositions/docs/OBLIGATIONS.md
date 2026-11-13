@@ -205,7 +205,10 @@ Some cases that follow from the table, since they have been misread before:
   the entry for the layer L3 asks.
 - `opens`: the value is the kinds in the record's list. A record without
   `opens`, or with an empty list, opens nothing, and that is a value. A
-  proposition with no record, or with two, has no value that can be read.
+  proposition with no record, or with two, has no value that can be read. The
+  structure validator accepts an `id` of at most 64 lower-case letters, digits
+  and hyphens that does not start with a hyphen, and a `kind` of its
+  vocabulary; a list with one item it does not accept cannot be read.
   Whether the commitments are otherwise in order, for instance an id opened
   twice or a commitment opened inside the abstract, is asked by other entries
   and does not change what is read.

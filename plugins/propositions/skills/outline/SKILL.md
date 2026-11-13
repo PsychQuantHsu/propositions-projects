@@ -125,7 +125,9 @@ ROOT='<the root, as printed>'
 find "$ROOT" \( -name 'outline-*.jsonl' -o -name _meta.json \) -not -path '*/.git/*'
 ```
 
-Take the first of these that applies.
+Take the first of these that applies. When the list shows outline files in more than one
+directory, or more than one `_meta.json`, the repository holds more than one manuscript: ask the
+author which directory belongs to this one, and do not pick.
 
 1. The directory that already holds outline files.
 2. The ledger directory: the one that holds `_meta.json`. A ledger is not needed.
@@ -184,16 +186,20 @@ F="$SEC"
       (.[] | select(.r | type == "object")
            | select([.r | .. | strings | select(explode | any(. < 32))] | length > 0)
            | "line \(.l): a string holds a control character"),
-      (map(select(.r | type == "object") | .l as $l | (.r.id, (.r.points[]? | objects | .id)) | {l: $l, id: .})
+      (.[] | select(.r | type == "object")
+           | select([.r.id, (.r.points[]? | objects | .id)] | any(type != "string" or length == 0))
+           | "line \(.l): a record or a point has no id"),
+      (map(select(.r | type == "object") | .l as $l | (.r.id, (.r.points[]? | objects | .id)) | strings | {l: $l, id: .})
            | group_by(.id)[] | select(length > 1)
-           | "id \(.[0].id | tojson) is on lines \(map(.l | tostring) | join(", "))") ]
-  | if length == 0 then "ok write check" else .[] end
+           | "id \(.[0].id | tojson) is on lines \(map(.l | tostring) | join(", "))") ] as $bad
+  | if ($bad | length) == 0 then "ok write check: \(length) records" else $bad[] end
 ' "$F"
 ```
 
 It confirms three things: every line that is not empty is a JSON object; no string holds a
-control character; no `id` repeats among the records of the file and their points. `id null`
-means that two or more records or points have no `id`.
+control character; every record and every point has an `id`, and no `id` repeats among the
+records of the file and their points. The `ok` line says how many records the file holds: look
+at the number, because a file that was just derived or drafted and holds none is a mistake.
 
 After a write to the approvals file, run this instead. An approval record has no `id` of its
 own, and its `statement` can hold line breaks.
@@ -224,11 +230,12 @@ file.
 ```bash
 P="$PAR"
 [ -f "$P" ] && jq -s -r '[.[] | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | .file | strings | if (explode | all(. >= 32)) then . else tojson end] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && cat -n "$STAGE/locator-files.txt" && echo 'ok locator files listed'
-[ -f "$P" ] && jq -s -r '[.[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | select(.file | type == "string") | {f: .file, id: $r.id}] | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))"' "$P"
+[ -f "$P" ] && jq -s -r '[.[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | {id: $r.id, loc: .}] | (.[] | select((.loc | type) != "object" or (.loc.file | type) != "string") | "\(.id | tojson) has a locator without a file"), (map(select((.loc | type) == "object" and (.loc.file | type) == "string") | {f: .loc.file, id: .id}) | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))")' "$P"
 ```
 
 No `ok locator files listed`: the paragraph file is missing or a line of it is not JSON; do not
-go on. A list with no file means that no locator names one, and there is nothing to resolve.
+go on. A list with no file means that no locator names one, and there is nothing to resolve. A
+line saying that a record has a locator without a file is a locator that does not resolve.
 
 Then run this once for each number in the list, with `N` set to the number. Do not type the
 name of the file: the command reads it from the list.
@@ -237,9 +244,11 @@ name of the file: the command reads it from the list.
 P="$PAR"
 N=1
 FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
-[ -f "$P" ] && R=$(realpath "$ROOT") && T=$(realpath "$ROOT/$FILE") && [ "${T#"$R"/}" != "$T" ] && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
+[ -f "$P" ] && [ "${FILE#/}" = "$FILE" ] && R=$(realpath "$ROOT") && T=$(realpath "$ROOT/$FILE") && [ "${T#"$R"/}" != "$T" ] && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
   [ .[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | select(.file == $f)
-    | (if has("starts") then
+    | (if (has("starts") or has("label")) | not then "\($r.id | tojson): a locator has neither label nor starts" else empty end),
+      (if has("lines") and (has("commit") | not) then "\($r.id | tojson): a locator has lines without commit" else empty end),
+      (if has("starts") then
          (.starts | tostring | gsub("[ \\t\\r\\n]+"; " ") | sub("^ "; "") | sub(" $"; "")) as $s
          | (if ($s | length) == 0 then 0 else ($t | indices($s) | length) end) as $n
          | select($n != 1) | "\($r.id | tojson): starts occurs \($n) times, not once"
@@ -252,15 +261,16 @@ FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
 ' "$P"
 ```
 
-The command takes the real path of the file, follows symbolic links, and goes on only when that
-path is inside the repository. It then counts, in the text of the file with every run of spaces,
-tabs and line breaks turned into one space, how often each `starts` occurs and how often each
-`label` is defined.
+The command refuses a name that begins with `/`, takes the real path of the file, following
+symbolic links, and goes on only when that path is inside the repository. It then counts, in the
+text of the file with every run of spaces, tabs and line breaks turned into one space, how often
+each `starts` occurs and how often each `label` is defined. It also reports a locator that has
+neither, and one that has `lines` without `commit`.
 
 | It prints | Meaning |
 |---|---|
 | `ok locators in <file>` | Every locator naming that file resolves |
-| Lines naming a record | Those locators do not resolve: the count is not 1 |
+| Lines naming a record | Those locators do not resolve: the count is not 1, or the object is not a locator |
 | Nothing, or an error from `realpath` or `tr` | The file is missing or leads outside the repository: no locator naming it resolves. The file was not read. Do not read it by other means |
 
 A locator that does not resolve is a finding of the sixth kind of the premise check. In derive
@@ -279,11 +289,12 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    an `id` (`p-1`, `p-2`, …), its `section`, and one or more points with ids `p-1.1`, `p-1.2`, ….
    Each point is one complete sentence stating one key point of the paragraph, in the order the
    paragraph makes them. A paragraph that makes one point gets one point. State only what the
-   passage states: no inference, no result it does not report. A displayed formula that is part
-   of a paragraph, with no blank line setting it apart, belongs to that paragraph's record.
-5. For each theorem-like statement, proof, figure and table, and for each displayed derivation
-   that is set apart from the prose around it, write one record that carries `carry`, with one
-   point saying what the block is.
+   passage states: no inference, no result it does not report. A displayed formula or derivation
+   that no blank line separates from the sentences around it is part of the paragraph and
+   belongs to that paragraph's record.
+5. For each theorem-like statement, proof, figure and table, and for each displayed formula or
+   derivation that blank lines separate from the prose before and after it, write one record
+   that carries `carry`, with one point saying what the block is.
 6. Give every paragraph record `from`.
    - A theorem, a figure, a table or a section that has a label of its own gets `label`.
    - A paragraph of prose gets `starts`: its opening words as they are in the file, enough of
@@ -292,15 +303,8 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    - Runs of white space count as one space. When a passage opens like another one (every proof
      opens with the same command on a line of its own), go on into its next line, with one
      space where the file has the line break, until the words occur once.
-   - Add `lines` only together with `commit`, and only when the file is committed and unchanged:
-     the first command below prints nothing for such a file, and the second prints the commit.
-     `N` is the number of the file in the list of "Locators: do they resolve".
-
-     ```bash
-     N=1
-     FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
-     git -C "$ROOT" status --porcelain -- "$FILE"; git -C "$ROOT" rev-parse --short HEAD
-     ```
+   - Do not write `lines`. Line numbers are optional in the format, and this skill does not
+     record them.
 7. Write the two files into the stage directory with the Write tool, as
    `$STAGE/outline-sections.jsonl` and `$STAGE/outline-paragraphs.jsonl` (the full path written
    out). Run the write check on both, then "Locators: do they resolve" with
@@ -344,10 +348,11 @@ lines concerned with the Edit tool.
   every `id` in use, in the files and in the approval records:
 
   ```bash
-  cat "$SEC" "$PAR" "$APP" 2>/dev/null | jq -r '.. | objects | .id? | strings' | sort -u | tr '\n' ' '
+  [ -f "$SEC" ] && [ -f "$PAR" ] && cat "$SEC" "$PAR" "$APP" 2>/dev/null | jq -s -r '([.. | objects | .id? | strings] | unique | join(" ")), "ok ids listed"'
   ```
 
-  A new `id` is one that is not in that list.
+  A new `id` is one that is not in that list. No `ok ids listed`: the list is not complete; do
+  not choose an `id` from it.
 - **Merge.** The `from` of the record that replaces the merged records holds every locator of
   the records it replaces.
 - **Split.** Each locator of the original is in the `from` of at least one of the records that
@@ -357,13 +362,14 @@ lines concerned with the Edit tool.
 - **Leave a section out.** Settle the sections under it first, those that name it as `parent`:
   each is left out with it, or is given another `parent` or none, as the author says. Ask when
   the author has not said. Then leave out each paragraph record naming the section, by the rule
-  above. Delete the section record only when no paragraph record and no section record names
-  it; otherwise keep it and give it `dropped` with the reason. A section record that is part of
-  the article never names a `parent` that carries `dropped` or is gone from the file.
+  above. Delete the section record when no paragraph record and no section record names it;
+  otherwise keep it and give it `dropped` with the reason. A section record that is part of the
+  article never names a `parent` that carries `dropped` or is gone from the file.
 - **Move.** Keep the records of one section on consecutive lines, and the groups in the order of
   the section file. A record moved to another section gets that section's `id` in `section`. A
-  section that is moved takes the sections under it along, so that each `parent` stays on an
-  earlier line.
+  section that is moved takes the sections under it along, and a section is never moved to a
+  line before its own `parent`: give it another `parent`, or none, first. Each `parent` stays on
+  an earlier line.
 - **Keys this skill does not know.** Keep them exactly as they are.
 - **`uses`.** After a move, a merge, a split, or leaving a record out, an id in `uses` can end
   up on a later line, name a record that has left the file, or name a record that carries
@@ -444,8 +450,8 @@ resolved: the files for which the command printed `ok` or lines naming a record.
 **The other five, by a separate agent**, so that the outline is read by something that did not
 write it. Start one agent with the Agent tool: a fresh agent (not a fork), `model: "sonnet"`,
 and `effort: "high"` where the tool takes an effort. Give it this brief and nothing of the
-conversation. Fill in the two paths, the sections to examine, and the files that resolved, each
-as a full path under `ROOT`.
+conversation. Fill in `S` and `P` as full paths, the sections to examine, and the files that
+resolved, each as a full path under `ROOT`.
 
 > Examine an article outline. Read these two files: `<S>` and `<P>`. Of the files their locators
 > name, read only these: `<the files that resolved>`. Read nothing else.
@@ -476,6 +482,7 @@ as a full path under `ROOT`.
 > 5. Section not carried: a section whose `says` is neither stated nor supported by the points
 >    of its paragraph records and of the paragraph records of the sections under it. The sections
 >    under a section are those that name it as `parent`, directly or through other sections.
+>    The points of a record that carries `dropped` do not count.
 >
 > Do not examine a record that carries `dropped`. Check every other record and every point of
 > the sections named; when a section has no finding, say so by its `id`. End with the number of
@@ -493,8 +500,17 @@ asks, through revise.
    follows is shown from this copy.
 
    ```bash
-   cp "$SEC" "$STAGE/shown-sections.jsonl" && cp "$PAR" "$STAGE/shown-paragraphs.jsonl" && echo 'ok shown copies kept'
+   cp "$SEC" "$STAGE/shown-sections.jsonl" && cp "$PAR" "$STAGE/shown-paragraphs.jsonl" && rm -f "$STAGE/shown-ids.json" "$STAGE/statement.txt" "$STAGE/approved-ids.json" && echo 'ok shown copies kept'
    ```
+
+   Then record which sections will be shown, in `$STAGE/shown-ids.json`. For the whole outline:
+
+   ```bash
+   jq -s 'map(.id)' "$STAGE/shown-sections.jsonl" > "$STAGE/shown-ids.json" && echo 'ok every section will be shown'
+   ```
+
+   For particular sections, write the file with the Write tool instead: a JSON list of their
+   ids, such as `["s-intro", "s-method"]`.
 2. Run both commands of status.
 3. Run check on the sections to be shown, with `S="$STAGE/shown-sections.jsonl"` and
    `P="$STAGE/shown-paragraphs.jsonl"`. Run it every time, also when it ran before.
@@ -527,24 +543,27 @@ asks, through revise.
      copied character for character. Nothing this skill wrote.
    - `$STAGE/approved-ids.json`: a JSON list of the ids of the sections the author states are
      approved, such as `["s-intro", "s-method"]`. They can be fewer than the sections shown.
-     When the author approves the whole outline, make the list with this command instead:
+     Leave out a section that was not shown, even when the author names it: say that it was
+     not shown, and show it in the next round. When no section is left, append nothing. When
+     the author approves everything that was shown, make the list with this command instead:
 
      ```bash
-     jq -s 'map(.id)' "$STAGE/shown-sections.jsonl" > "$STAGE/approved-ids.json" && echo 'ok ids of every section listed'
+     cp "$STAGE/shown-ids.json" "$STAGE/approved-ids.json" && echo 'ok every section shown is listed as approved'
      ```
 8. Append the record:
 
    ```bash
-   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile st "$STAGE/statement.txt" --slurpfile want "$STAGE/approved-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
+   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile st "$STAGE/statement.txt" --slurpfile want "$STAGE/approved-ids.json" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
      ($want[0] | unique) as $ids
+     | ($shown[0] | unique) as $seen
      | [$secs[] | select(.id as $i | any($ids[]; . == $i))] as $got
      | ($st | rtrimstr("\n")) as $words
-     | if ($ids | length) == 0 or ($got | length) != ($ids | length) then error("the ids listed are not ids of section records that were shown")
+     | if ($ids | length) == 0 or ($got | length) != ($ids | length) or (($ids - $seen) | length) != 0 then error("the ids listed are not ids of sections that were shown")
        elif ($words | length) == 0 then error("the statement is empty")
        else {approved_at: $at, statement: $words, sections: [$got[] | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}]}
             + (if ($got | length) == ($secs | length) then {whole: true} else {} end)
        end
-   ' > "$STAGE/approval.json" && { [ -z "$(tail -c 1 "$APP" 2>/dev/null)" ] || printf '\n' >> "$APP"; } && cat "$STAGE/approval.json" >> "$APP" && echo 'ok approval appended'
+   ' > "$STAGE/approval.json" && { [ -z "$(tail -c 1 "$APP" 2>/dev/null)" ] || printf '\n' >> "$APP"; } && cat "$STAGE/approval.json" >> "$APP" && echo 'ok approval appended'; rm -f "$STAGE/statement.txt" "$STAGE/approved-ids.json" "$STAGE/approval.json"
    ```
 
    The command goes on only while each part holds: the outline files are still what was shown;
@@ -552,12 +571,14 @@ asks, through revise.
    statement is not empty. It builds the record from the copies that were shown, with `whole`
    true when it covers every section, ends the last line of the approvals file when that line
    has no line break, and appends the record as a line of its own. The time has its offset from
-   UTC, as in `2026-11-13T16:30:00+08:00`.
+   UTC, as in `2026-11-13T16:30:00+08:00`. Whether or not it appended, it removes the statement
+   and the list of approved ids, so that neither can be used for another approval.
 
    No `ok approval appended`: nothing was appended. When `cmp` reported a difference or a
    missing file, the outline changed after it was shown or the copies are gone: say so and
-   return to step 1. When `jq` reported an error, correct the file it names and run the command
-   again. Only ever append. Do not edit or remove an earlier line of the approvals file.
+   return to step 1. When `jq` reported an error, write the two files of step 7 again,
+   corrected, and run the command again. Only ever append. Do not edit or remove an earlier
+   line of the approvals file.
 9. Run the check for the approvals file from "The write check", then status, and report which
    sections now stand as approved and whether the outline does.
 

@@ -162,7 +162,10 @@ The conditions use two terms.
   a unit and is not live.
 - The ledger's ids are **usable** when every proposition in the ledger,
   retired or not, has an `id`, and no two live propositions share one. The
-  sidecars refer to a proposition by its id.
+  sidecars refer to a proposition by its id. Two propositions that share an id
+  leave the ids usable when at most one of them is live; a value that needs
+  usable ids can then be read for the live one, and not for the other, which
+  is not live.
 
 | Key | Its value can be read when |
 |---|---|
@@ -207,7 +210,7 @@ itself.
 2. an item is not an object;
 3. an item's `id` is not a non-empty string;
 4. two items share an id;
-5. an item's `heading` is not a string, or is blank;
+5. an item's `heading` is not a string, or is empty or holds only white space;
 6. an item's `role` is not a value of the vocabulary;
 7. an item's `first_prop` is not the id of a live proposition;
 8. an item with the role `abstract` is not the first item;

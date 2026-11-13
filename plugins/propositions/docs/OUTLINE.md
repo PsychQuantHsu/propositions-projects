@@ -253,8 +253,10 @@ others.
 4. **Relies on something later**: a point that needs a term, a result or a
    claim that only a later record introduces, or a `uses` entry that names an
    id which is missing or is not on an earlier line.
-5. **Section not carried**: a section whose `says` the points of its paragraph
-   records neither state nor support.
+5. **Section not carried**: a section whose `says` is neither stated nor
+   supported by the points of its paragraph records and of the paragraph
+   records of the sections under it. The sections under a section are those
+   that name it as `parent`, directly or through other sections.
 6. **Locator does not resolve**: a locator whose file is missing, whose `label`
    is not defined in the file, or whose `starts` does not occur exactly once in
    the file.

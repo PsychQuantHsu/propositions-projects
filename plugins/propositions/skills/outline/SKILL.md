@@ -174,8 +174,9 @@ Change the files only as the author instructs. Read both outline files first.
 - **Move.** Keep the records of one section on consecutive lines, and the groups in the order of
   the section file. A record moved to another section gets that section's `id` in `section`.
 - **Keys this skill does not know.** Keep them exactly as they are.
-- **`uses`.** After a move, an id in `uses` can end up on a later line. Tell the author; do not
-  delete the entry yourself.
+- **`uses`.** After a move, a merge, a split or a deletion, an id in `uses` can end up on a later
+  line or name a record that has left the file. Tell the author; do not delete the entry
+  yourself.
 
 Edit the lines concerned, run the write check, then run status and say which sections no longer
 stand as approved.
@@ -239,8 +240,9 @@ the sections to examine.
 > 4. Relies on something later: a point that needs a term, a result or a claim that only a later
 >    record introduces, or a `uses` entry that names an id which is missing or is not on an
 >    earlier line.
-> 5. Section not carried: a section whose `says` the points of its paragraph records neither
->    state nor support.
+> 5. Section not carried: a section whose `says` is neither stated nor supported by the points
+>    of its paragraph records and of the paragraph records of the sections under it. The sections
+>    under a section are those that name it as `parent`, directly or through other sections.
 > 6. Locator does not resolve: a locator whose file is missing, whose `label` is not defined in
 >    the file, or whose `starts` does not occur exactly once in the file.
 >

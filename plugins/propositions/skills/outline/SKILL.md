@@ -209,10 +209,10 @@ F="$SEC"
 
 It confirms three things: every line that is not empty is a JSON object; no string holds a
 control character; every record and every point has an `id`, and no `id` repeats among the
-records of the file and their points. A file with no record prints `EMPTY`, which is not a
-pass: a section file always holds at least one record, and a paragraph file holds none only
-when no section of the outline has a paragraph yet. In that one case say in the report that
-the paragraph file is empty; in every other case the write went wrong.
+records of the file and their points. A file with no record prints `EMPTY`, which is never a
+pass. An empty section file is always a mistake. An empty paragraph file is a mistake except
+when no section of the outline has a paragraph yet: in that one case say in the report that the
+paragraph file is empty, and go on.
 
 After a write to the approvals file, run this instead. An approval record has no `id` of its
 own, and its `statement` can hold line breaks.
@@ -325,7 +325,8 @@ and draft it is a mistake of this skill: correct the staged record and run the c
 7. Write the two files into the stage directory with the Write tool, as
    `$STAGE/outline-sections.jsonl` and `$STAGE/outline-paragraphs.jsonl` (the full path written
    out). Run the write check on both, then "Locators: do they resolve" with
-   `P="$STAGE/outline-paragraphs.jsonl"`. Correct the staged files until every check prints `ok`.
+   `P="$STAGE/outline-paragraphs.jsonl"`. Correct the staged files until every check prints `ok`;
+`EMPTY` is accepted only for the paragraph file, in the one case the write check describes.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
    points, with carried blocks marked. Say how many sections, paragraph records and carried
    blocks there are.

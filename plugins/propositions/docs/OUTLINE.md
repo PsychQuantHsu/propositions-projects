@@ -453,10 +453,13 @@ section file or the paragraph file it also confirms that every record and
 every point has an `id`, that no `id` repeats among the section records or
 among the paragraph records and points, and that no string holds a control
 character. When any of these fails, it reports the file and the line and does
-not report the write as done. A file that holds no record does not pass either:
-a section file always holds at least one record, and a paragraph file holds
-none only when no section has a paragraph yet, which the skill then says in its
-report.
+not report the write as done.
+
+The check never reports a pass for a file that holds no record. An empty
+section file is always a mistake. An empty paragraph file is a mistake too,
+with one exception: when no section of the outline has a paragraph yet, the
+paragraph file is rightly empty. The check still does not report a pass for it;
+the skill says in its report that the paragraph file is empty, and goes on.
 
 The control-character test catches some backslashes that were written once
 instead of twice, not all of them.

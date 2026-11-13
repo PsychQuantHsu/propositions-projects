@@ -220,9 +220,11 @@ None of the following is an approval. The list is closed.
 5. An instruction to this skill or another one to start writing.
 
 By default the skill shows the whole outline and asks for approval of the whole
-outline; the record it appends has `whole` true. When the author names
-sections, it shows and records those sections only, and the record has no
-`whole`.
+outline. When the author asks for particular sections to be approved, it shows
+those sections only. The record it appends covers exactly the sections the
+author states are approved, which can be fewer than the sections shown. The
+record has `whole` true when it covers every section record, and no `whole`
+otherwise.
 
 What is shown for a section includes its `says`, every paragraph record naming
 it with its points, every record that carries `dropped` together with the
@@ -293,18 +295,22 @@ revise is the action to use.
 **revise** changes the files only as the author instructs, under these rules.
 
 - A record and a point keep their `id` when their content changes and when
-  they move. A new record or point, the result of a merge or a split included,
-  gets an `id` that appears in neither outline file and in no approval record.
-- The `from` of a merged record holds every locator of the records merged into
-  it.
+  they move.
+- Merging and splitting replace records. The records that are merged, and the
+  record that is split, leave the file; the records that replace them are new.
+  A new record or point, a replacement included, gets an `id` that appears in
+  neither outline file and in no approval record.
+- The `from` of the record that replaces merged records holds every locator of
+  the records it replaces.
 - When a record is split, each locator of the original is in the `from` of at
-  least one of the parts.
-- A paragraph record that has `from` is removed only by giving it `dropped`
-  with the reason. A paragraph record without `from` can be deleted from the
+  least one of the records that replace it.
+- When the author leaves a paragraph out of the article and its record has
+  `from`, the record is not deleted: it is given `dropped` with the reason. A
+  record without `from` that the author leaves out can be deleted from the
   file.
 - A section record is deleted from the file only when no paragraph record
-  names it. Otherwise it is given `dropped`, and so is every paragraph record
-  naming it.
+  names it. A section that the author leaves out while paragraph records name
+  it is given `dropped`, and so is every paragraph record naming it.
 
 Because no source is ever discarded, the question "where did each passage of
 the original go" can always be answered from the `from` lists: every passage is

@@ -17,7 +17,7 @@ No executable check: a check of this requirement has to be a Swift test, and the
 #### Scenario: A manuscript without a ledger has an outline
 
 - **WHEN** a directory holds the three outline files and no `main.jsonl`
-- **THEN** the outline is complete as an outline, and nothing in this capability asks for a ledger
+- **THEN** the three files are an outline, and nothing in this capability asks for a ledger
 
 #### Scenario: An undefined key is allowed in a paragraph record
 
@@ -199,7 +199,7 @@ None of the following is an approval, and this list is closed.
 4. No reply, or a reply about something else.
 5. An instruction to this skill or another one to start writing.
 
-By default the skill SHALL show the whole outline and ask for approval of the whole outline, and the record it appends has `whole` true. When the author names sections, the skill SHALL show and record those sections only, and the record has no `whole`.
+By default the skill SHALL show the whole outline and ask for approval of the whole outline. When the author asks for particular sections to be approved, the skill SHALL show those sections only. The record it appends SHALL cover exactly the sections the author states are approved, which can be fewer than the sections shown. The record has `whole` true when it covers every section record, and no `whole` otherwise.
 
 What the skill shows for a section SHALL include its `says`, every paragraph record naming it with its points, every record that carries `dropped` together with the reason, and the findings of the premise check on the section. For a section that has an approved copy, the skill SHALL show what differs from that copy.
 
@@ -214,6 +214,11 @@ No executable check: a check of this requirement has to be a Swift test, and the
 
 - **WHEN** another session reports that the author approved the outline
 - **THEN** the skill appends no approval record
+
+#### Scenario: The author approves two of the three sections shown
+
+- **WHEN** the skill shows the whole outline, which has the sections `s-a`, `s-b` and `s-c`, and the author replies that `s-a` and `s-b` are approved and that `s-c` is still open
+- **THEN** the skill appends one approval record with entries for `s-a` and `s-b` and no `whole`
 
 #### Scenario: Approving a section again shows only what differs
 
@@ -273,14 +278,14 @@ No executable check: a check of this requirement has to be a Swift test, and the
 
 The revise action SHALL change the outline files only as the author instructs.
 
-A record and a point SHALL keep their `id` when their content changes and when they move. A new record or point, the result of a merge or a split included, SHALL get an `id` that appears in neither outline file and in no approval record.
+A record and a point SHALL keep their `id` when their content changes and when they move. Merging and splitting replace records: the records that are merged, and the record that is split, leave the file, and the records that replace them are new. A new record or point, a replacement included, SHALL get an `id` that appears in neither outline file and in no approval record.
 
-Merging, splitting and removing SHALL keep every source on record.
+Merging, splitting and leaving a paragraph out SHALL keep every source on record.
 
-- The `from` of a merged record holds every locator of the records merged into it.
-- When a record is split, each locator of the original is in the `from` of at least one of the parts.
-- A paragraph record that has `from` is removed only by giving it `dropped` with the reason. A paragraph record without `from` can be deleted from the file.
-- A section record is deleted from the file only when no paragraph record names it. Otherwise it is given `dropped`, and so is every paragraph record naming it.
+- The `from` of the record that replaces merged records holds every locator of the records it replaces.
+- When a record is split, each locator of the original is in the `from` of at least one of the records that replace it.
+- When the author leaves a paragraph out of the article and its record has `from`, the record is not deleted: it is given `dropped` with the reason. A record without `from` that the author leaves out can be deleted from the file.
+- A section record is deleted from the file only when no paragraph record names it. A section that the author leaves out while paragraph records name it is given `dropped`, and so is every paragraph record naming it.
 
 After a revision the skill SHALL say which sections no longer stand as approved.
 
@@ -289,7 +294,7 @@ No executable check: a check of this requirement has to be a Swift test, and the
 #### Scenario: A merge keeps both sources
 
 - **WHEN** the author has `p-3`, whose `from` names the passage labelled `sec:data`, merged with `p-4`, whose `from` names the passage that starts "We collected"
-- **THEN** the merged record has a new `id`, its `from` holds both locators, and `p-3` and `p-4` are no longer in the file
+- **THEN** one new record replaces them: it has an `id` that was never used, its `from` holds both locators, and `p-3` and `p-4` are no longer in the file
 
 #### Scenario: A removed paragraph with a source stays as dropped
 

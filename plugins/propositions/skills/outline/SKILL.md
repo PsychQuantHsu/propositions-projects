@@ -152,20 +152,26 @@ that these two things were confirmed and that no other check of the format exist
 Change the files only as the author instructs. Read both outline files first.
 
 - **Ids are stable.** A record and a point keep their `id` when their content changes and when
-  they move. A new record or point, the result of a merge or a split included, gets an `id` that
-  appears in neither outline file and in no approval record:
+  they move. Merging and splitting replace records: the records that are merged, and the record
+  that is split, leave the file, and the records that replace them are new. A new record or
+  point, a replacement included, gets an `id` that appears in neither outline file and in no
+  approval record:
 
   ```bash
   grep -c -F -- "\"$NEW_ID\"" "$SEC" "$PAR" "$APP"
   ```
 
   Every count has to be 0 (a file that does not exist counts as 0).
-- **Merge.** The `from` of the merged record holds every locator of the records merged into it.
-- **Split.** Each locator of the original is in the `from` of at least one of the parts.
-- **Remove a paragraph.** A record that has `from` is not deleted: give it `dropped` with the
-  author's reason and leave it on its line. A record without `from` can be deleted.
-- **Remove a section.** Delete the section record only when no paragraph record names it.
-  Otherwise give it `dropped`, and give `dropped` to every paragraph record naming it.
+- **Merge.** The `from` of the record that replaces the merged records holds every locator of
+  the records it replaces.
+- **Split.** Each locator of the original is in the `from` of at least one of the records that
+  replace it.
+- **Leave a paragraph out.** When its record has `from`, do not delete the record: give it
+  `dropped` with the author's reason and leave it on its line. A record without `from` can be
+  deleted.
+- **Leave a section out.** Delete the section record only when no paragraph record names it.
+  While paragraph records name it, give it `dropped`, and give `dropped` to every paragraph
+  record naming it.
 - **Move.** Keep the records of one section on consecutive lines, and the groups in the order of
   the section file. A record moved to another section gets that section's `id` in `section`.
 - **Keys this skill does not know.** Keep them exactly as they are.
@@ -248,8 +254,8 @@ propose a change when one is obvious, and make it only when the author asks, thr
 
 ## approve — record the author's approval
 
-1. Run status. Decide what is to be approved: the whole outline, unless the author named
-   sections.
+1. Run status. Decide what is to be shown: the whole outline, unless the author asked for
+   particular sections to be approved.
 2. Run check on those sections, unless it has run since their last change.
 3. Show the sections. For each one: its heading and `says`; every paragraph record naming it,
    with its points, `pending` notes and carried blocks marked; every record that carries
@@ -269,13 +275,14 @@ propose a change when one is obvious, and make it only when the author asks, thr
    When the reply asks for changes, go to revise, and return to step 1 afterwards. When it is
    none of the above and not an approval, say what is still needed and wait.
 6. On an approval, write the author's approving words, exactly, to `$STAGE/statement.txt` and
-   append one record. For the whole outline:
+   append one record. The record covers exactly the sections the author states are approved,
+   which can be fewer than the sections shown. When it covers every section record:
 
    ```bash
    jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z)" --rawfile st "$STAGE/statement.txt" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '{approved_at: $at, statement: ($st | rtrimstr("\n")), sections: [$secs[] | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}], whole: true}' >> "$APP"
    ```
 
-   For named sections, pass their ids as a JSON list and leave `whole` out:
+   When it covers some of the sections, pass their ids as a JSON list and leave `whole` out:
 
    ```bash
    jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z)" --rawfile st "$STAGE/statement.txt" --argjson ids "$IDS" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '{approved_at: $at, statement: ($st | rtrimstr("\n")), sections: [$secs[] | select(.id as $i | $ids | index($i)) | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}]}' >> "$APP"

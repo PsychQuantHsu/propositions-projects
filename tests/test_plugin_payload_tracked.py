@@ -764,7 +764,9 @@ def _format_problems(table, vocabulary, methods) -> list[str]:
 
 def _obl_entries(table) -> list[dict]:
     entries = table.get("entries") if isinstance(table, dict) else None
-    return [entry for entry in entries or [] if isinstance(entry, dict)]
+    if not isinstance(entries, list):  # the format check reports it; nothing here to walk
+        return []
+    return [entry for entry in entries if isinstance(entry, dict)]
 
 
 def _accounting_problems(table, vocabulary) -> list[str]:
@@ -924,7 +926,7 @@ def _document_problems(text: str, table) -> list[str]:
     problems += [f"the document does not mention {word}" for word in OBL_DOC_WORDS if not _mentions(text, word)]
     flat = " ".join(text.split())  # a phrase may run over a line break
     for statement, phrases in OBL_DOC_STATEMENTS.items():
-        missing = [phrase for phrase in phrases if phrase not in flat]
+        missing = [phrase for phrase in phrases if not _mentions(flat, phrase)]
         if missing:
             problems.append(f"the document does not say {statement}: it lacks {', '.join(map(repr, missing))}")
     return problems
@@ -1061,6 +1063,22 @@ def test_obligations_format_refusal_names_what_is_wrong(mutate, needles):
     assert _names(problems, needles), problems
 
 
+def test_obligations_each_refusal_case_names_one_message_of_its_own():
+    """A refusal case goes red when the guard stops reporting that refusal.
+
+    For every case of the two lists: the unchanged table gives no message that
+    holds all the case's needles, and the changed table gives exactly one.
+    """
+    vocabulary, methods = _obligation_vocabulary(), _obligation_methods()
+    unchanged = _format_problems(_small_table(), vocabulary, methods)
+    for label, mutate, needles in [*OBL_FORMAT_REFUSALS, *OBL_WRONG_TYPES]:
+        assert not _names(unchanged, needles), label
+        table = _small_table()
+        mutate(table)
+        hits = [p for p in _format_problems(table, vocabulary, methods) if all(n in p for n in needles)]
+        assert len(hits) == 1, (label, hits)
+
+
 def test_obligations_guard_reads_vocabularies_from_their_source():
     vocabulary = _obligation_vocabulary()
     assert vocabulary["profile"] == ("default", "empirical")
@@ -1122,7 +1140,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_UNWALKED_LAYERS:
         assert _names(problems, ["57", entry_id]), problems
     for entry_id in OBL_PINNED_GAPS:
-        assert _names(problems, [entry_id]), problems
+        assert _names(problems, [entry_id, "gap owned by issue"]), problems
     assert _names(problems, ["structure:S6"]), problems
     assert _names(problems, ["ledger:R3"]), problems
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
@@ -1158,6 +1176,10 @@ def test_obligations_reviewed_entry_cannot_be_changed():
     table = _small_table()
     table["entries"].append({**cited, "applies": {"evidence_class": ["external"]}})
     assert _names(_reviewed_problems(table), ["truth.cited-work-agrees", "applies"])
+    # A pinned gap keeps its owner.
+    table = _small_table()
+    table["entries"].append({**cited, "owner": 49})
+    assert _names(_reviewed_problems(table), ["truth.cited-work-agrees", "owner 49", "gap owned by issue 50"])
 
 
 def test_obligations_reviewed_info_entry_keeps_its_rule():
@@ -1196,6 +1218,9 @@ def test_obligations_document_terms_are_matched_whole():
     table = _small_table()
     longer = " ".join(f"{entry['id']}-more" for entry in table["entries"])
     assert not _names(_document_problems(longer, table), ["entry ids"])
+    # A statement is not made by a phrase that runs on into a longer term.
+    longer_layer = "The proofread layers E8, E9 and E100: the walk does not list them."
+    assert _names(_document_problems(longer_layer, _small_table()), ["E8, E9 and E10"])
 
 
 # spec-example: article-obligations / a verification document without the pointer
@@ -1210,22 +1235,27 @@ def test_obligations_verification_document_points_to_the_obligations_document():
 
 # spec-example: article-obligations / a table that is not a mapping
 @pytest.mark.parametrize(
-    "table, needle",
+    "table, messages",
     [
-        (None, "not a mapping"),
-        ([], "not a mapping"),
-        ({"groups": None, "entries": "x", "unconstrained": 3}, "not a list"),
+        (None, ["the table is not a mapping"]),
+        ([], ["the table is not a mapping"]),
+        ({"groups": None, "entries": "x", "unconstrained": 3},
+         ["groups is not a list", "entries is not a list", "unconstrained is not a list"]),
+        ({"groups": [], "entries": 1, "unconstrained": []}, ["entries is not a list"]),
+        ({"groups": [], "entries": True, "unconstrained": []}, ["entries is not a list"]),
     ],
-    ids=["empty file", "a list", "wrong types at the top"],
+    ids=["empty file", "a list", "wrong types at the top", "entries is a number", "entries is a boolean"],
 )
-def test_obligations_guard_names_a_malformed_table(table, needle):
+def test_obligations_guard_names_a_malformed_table(table, messages):
     vocabulary = _obligation_vocabulary()
     problems = (
         _format_problems(table, vocabulary, _obligation_methods())
         + _accounting_problems(table, vocabulary)
         + _reviewed_problems(table)
     )
-    assert _names(problems, [needle]), problems
+    # Each message is asserted whole: "not a list" alone would be met by any of the three.
+    for message in messages:
+        assert message in problems, (message, problems)
 
 
 # Each case names the message the format check gives for one value of the wrong

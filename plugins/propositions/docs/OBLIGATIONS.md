@@ -167,10 +167,12 @@ The conditions use two terms.
   unit: a proposition whose `retired` key holds `null` or a malformed block is
   a unit and is not live.
 - The ledger's ids are **usable** when three things hold: each line of the
-  ledger that is not blank and does not start with `//` is a JSON object;
-  every proposition in the ledger, retired or not, has an `id` that is a
-  non-empty string; and no two live propositions share an id. The sidecars
-  refer to a proposition by its id. Two propositions that share an id
+  ledger is a JSON object, apart from a line that is empty or starts with `//`
+  once the white space around it is removed; every proposition in the ledger,
+  retired or not, has an `id` that is a non-empty string; and no two live
+  propositions share an id. A line that holds the `id` key twice is read as
+  the validators read it, with the last value. The sidecars refer to a
+  proposition by its id. Two propositions that share an id
   leave the ids usable when at most one of them is live; a value that needs
   usable ids can then be read for the live one, and not for the other, which
   is not live.
@@ -262,9 +264,12 @@ the evidence classes, every proposition of an empirical ledger that has no
 artifact would stay unverified.
 
 A proposition of an empirical ledger that carries any other evidence class is
-outside these entries, also when its text interprets data. That a claim about
-data carries one of the four is asked by a precondition of its own, decided
-for every proposition of an empirical ledger. It is a gap (issue #70): the
+outside these entries, also when its text interprets data. That a proposition
+which reports a number or a result from the manuscript's own data carries one
+of the four is asked by a precondition of its own, decided for every
+proposition of an empirical ledger. That precondition asks nothing of a
+sentence that reports another work's result, which is `external`, or of one
+that only interprets a result and reports none. It is a gap (issue #70): the
 layer L5 states a test for `derived` and for `verified` and none for the four
 (issue #57). The derivation layers are not limited by profile, so
 a proposition of an empirical ledger that rests on data has to pass both
@@ -587,11 +592,12 @@ examine.
 - The audit's code pass needs a directory of analysis code. Issue #64.
 
 One limit is about what the table reaches. Numbers are compared with artifacts
-only in a ledger with the empirical profile. A ledger with the default profile
-has no artifacts to compare with, and no entry asks about the numbers in its
-manuscript. A manuscript that reports data is expected to have the empirical
-profile; that is what the precondition on the profile asks, a gap owned by
-issue #70. The maintainer accepted this scope on 2026-11-13.
+only in a ledger with the empirical profile: no entry compares the numbers of
+a manuscript whose ledger has the default profile with an artifact. A
+manuscript that reports data is expected to have the empirical profile;
+whether it has is asked by the precondition that the profile fits the
+manuscript, a gap owned by issue #70. The maintainer accepted this scope on
+2026-11-13.
 
 ## Changing the table
 
@@ -632,8 +638,9 @@ python3 -m pytest tests/test_plugin_payload_tracked.py -k obligations
 ```
 
 It needs PyYAML. It refuses a data file in which one mapping holds the same key
-twice. It checks the format of the table, that every implemented
-check and every value of the four accounted vocabularies is placed, that the entries the
-maintainer reviewed keep their values, that this document does not turn into
-a second copy of the table, and that `docs/VERIFICATION.md` still points
-here.
+twice. It checks the format of the table, that every implemented check and
+every value of the four accounted vocabularies is placed, that the entries the
+maintainer reviewed keep their values, that this document does not turn into a
+second copy of the table, and that `docs/VERIFICATION.md` still carries the
+three phrases the spec asks of it: one points here, and two narrow its own
+statements.

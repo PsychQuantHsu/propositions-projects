@@ -142,7 +142,7 @@ entries:
   - id: index.profile-valid
     class: precondition
     unit: article
-    criterion: "The ledger's profile, the one it declares or the default when it declares none, is one the validator accepts."
+    criterion: "The ledger's profile, the one it declares or the default when it declares none, is one the validator accepts under the ledger's schema version."
     check: ledger:profile
     verified_by: [mechanical]
     on_warning: judge
@@ -156,15 +156,17 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
-  # The empirical layers apply by evidence class. A claim about data that is
-  # tagged with another class would fall outside all of them, so that the tag
-  # is right is asked here.
+  # The empirical layers apply by evidence class. A number or a result of the
+  # manuscript's own data that is tagged with another class would fall outside
+  # all of them, so that the tag is right is asked here. A sentence that
+  # reports another work's result is `external`, and one that only interprets
+  # a result reports none: this entry asks nothing of either.
   - id: index.data-claims-carry-data-class
     class: precondition
     unit: proposition
     applies:
       profile: [empirical]
-    criterion: "A proposition whose claim rests on data carries one of the evidence classes for data: measured, tested, descriptive or not_computable."
+    criterion: "A proposition that reports a number or a result from the manuscript's own data carries one of the evidence classes for data: measured, tested, descriptive or not_computable."
     check: gap
     owner: 70
     verified_by: [proofread, cross_model]

@@ -484,12 +484,12 @@ OBL_UNITS = ("proposition", "article")
 OBL_APPLIES_KEYS = ("profile", "claim_type", "evidence_class", "cites", "opens", "section_role")
 OBL_ACCOUNTED_FIELDS = ("claim_type", "evidence_class", "opens", "section_role")
 OBL_WARNING_RULES = ("judge", "info")
-# `info` is the one setting that lets a warning pass, so it is allowed only on
-# the entries the maintainer reviewed for it. Each is named by its id together
-# with its check: a list of checks alone would let another entry of the same
-# check pass on a warning, and a list of ids alone would let a reviewed entry be
-# pointed at another check. Extend this in the same change in which the
-# maintainer approves another entry.
+# `info` is the one setting that sets a warning aside without a judgment, so it
+# is allowed only on the entries the maintainer reviewed for it. Each is named
+# by its id together with its check: a list of checks alone would let another
+# entry of the same check set its warning aside, and a list of ids alone would
+# let a reviewed entry be pointed at another check. Extend this in the same
+# change in which the maintainer approves another entry.
 OBL_INFO_REVIEWED_ENTRIES = {
     "index.proposition-is-cited": "ledger:R3",
     "index.arcs-do-not-cross": "structure:S7",
@@ -521,7 +521,7 @@ OBL_UNWALKED_LAYERS = {
 }
 # The empirical layers apply where a claim rests on data: these classes, in an
 # empirical ledger. Anything wider reaches propositions the walk cannot check
-# (an `external` one, or one with no artifact), which then never pass.
+# (an `external` one, or one with no artifact), which then stay unverified.
 OBL_EMPIRICAL_APPLIES = {
     "profile": ["empirical"],
     "evidence_class": ["measured", "tested", "descriptive", "not_computable"],
@@ -531,22 +531,34 @@ OBL_PINNED_GAPS = {
     "truth.not-refuted": ("obligation", 62),
     "index.structure-faithful": ("precondition", 66),
     "index.profile-fits-manuscript": ("precondition", 70),
+    "truth.cited-work-agrees": ("obligation", 50),
 }
 OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62, 66, 70)
 # The entries whose check has to consult a source outside the manuscript's
-# repository. The mark is a key of its own, not a value of verified_by: one of
-# the three is decided by a reading, and the mark has to outlive the gap.
+# repository. The mark is a key of its own, not a value of verified_by: two of
+# the four are decided by a reading, and the mark has to outlive the gap.
 OBL_EXTERNAL_SOURCE_ENTRIES = (
     "truth.references-exist", "truth.external-support-found", "truth.external-support-agrees",
+    "truth.cited-work-agrees",
 )
+# The entry on cited works is decided for every proposition. Only the empirical
+# profile has an evidence class for support outside the paper, so `applies`
+# would leave the propositions of a default ledger out again.
+OBL_EVERY_PROPOSITION_ENTRIES = ("truth.cited-work-agrees",)
 # A verdict against a proposition from a method that no entry lists (a Lean
 # refutation, a human review) counts through this entry, so that soundness
 # stays "every entry passes" with no condition outside the table.
 OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
-OBL_OUTCOMES = ("not_applicable", "unverified", "failed", "passed")
+OBL_OUTCOMES = ("`not_applicable`", "`unverified`", "`failed`", "`passed`")
 OBL_DOC_ISSUES = ("#21", "#50", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70", "#71")
 # The key the document has to explain besides the ones its own table lists.
-OBL_DOC_WORDS = ("external_source",)
+OBL_DOC_WORDS = ("`external_source`",)
+# Two statements the document has to make, each by the phrases that carry it.
+# A layer name or the word "owner" somewhere in the text does not make them.
+OBL_DOC_STATEMENTS = {
+    "why the layers E8, E9 and E10 are gaps": ("layers E8, E9 and E10", "walk does not list them"),
+    "that a gap is owned by the issue in its `owner`": ("Its `owner` is the issue that will supply the check",),
+}
 # What docs/VERIFICATION.md has to say about records and the obligations table.
 OBL_VERIFICATION_DOC_PHRASES = ("OBLIGATIONS.md", "derivation walk", "for this warning only")
 OBL_DOC_ENTRY_ID_LIMIT = 2
@@ -868,6 +880,13 @@ def _reviewed_problems(table) -> list[str]:
                 f"entry {entry.get('id')!r}: an entry owned by issue {OBL_UNWALKED_LAYERS_OWNER} is a gap "
                 "verified by proofread and cross_model"
             )
+    for entry_id in OBL_EVERY_PROPOSITION_ENTRIES:
+        entry = by_id.get(entry_id)
+        if entry is not None and (entry.get("unit") != "proposition" or "applies" in entry):
+            problems.append(
+                f"entry {entry_id!r}: unit {entry.get('unit')!r}, applies {entry.get('applies')!r}; the spec asks "
+                "for an entry decided for each proposition, with no applies"
+            )
     for owner in OBL_REQUIRED_OWNERS:
         if not any(entry.get("owner") == owner for entry in entries):
             problems.append(f"owner {owner} is named by no entry")
@@ -883,22 +902,31 @@ def _reviewed_problems(table) -> list[str]:
     return problems
 
 
+def _mentions(text: str, term: str) -> bool:
+    """Whether the text holds the term whole, not as part of a longer id, number or word."""
+    return re.search(rf"(?<![A-Za-z0-9_#.-]){re.escape(term)}(?![A-Za-z0-9_-])", text) is not None
+
+
 def _document_problems(text: str, table) -> list[str]:
     """The document explains the table without holding a second copy of it."""
     problems: list[str] = []
     ids = sorted({entry["id"] for entry in _obl_entries(table) if isinstance(entry.get("id"), str)})
-    mentioned = [entry_id for entry_id in ids if entry_id in text]
+    mentioned = [entry_id for entry_id in ids if _mentions(text, entry_id)]
     if len(mentioned) > OBL_DOC_ENTRY_ID_LIMIT:
         problems.append(
             f"the document mentions {len(mentioned)} entry ids, more than the {OBL_DOC_ENTRY_ID_LIMIT} allowed "
             f"as examples: {', '.join(mentioned)}"
         )
-    problems += [f"the document does not name the outcome {outcome}" for outcome in OBL_OUTCOMES if outcome not in text]
-    problems += [f"the document does not say why the layer {layer} is a gap" for layer in ("E8", "E9", "E10") if layer not in text]
-    problems += [f"the document does not name issue {issue}" for issue in OBL_DOC_ISSUES if issue not in text]
-    problems += [f"the document does not mention {word}" for word in OBL_DOC_WORDS if word not in text]
-    if "owner" not in text:
-        problems.append("the document does not say that a gap is owned by the issue in its owner")
+    problems += [
+        f"the document does not name the outcome {outcome}" for outcome in OBL_OUTCOMES if not _mentions(text, outcome)
+    ]
+    problems += [f"the document does not name issue {issue}" for issue in OBL_DOC_ISSUES if not _mentions(text, issue)]
+    problems += [f"the document does not mention {word}" for word in OBL_DOC_WORDS if not _mentions(text, word)]
+    flat = " ".join(text.split())  # a phrase may run over a line break
+    for statement, phrases in OBL_DOC_STATEMENTS.items():
+        missing = [phrase for phrase in phrases if phrase not in flat]
+        if missing:
+            problems.append(f"the document does not say {statement}: it lacks {', '.join(map(repr, missing))}")
     return problems
 
 
@@ -1118,6 +1146,18 @@ def test_obligations_reviewed_entry_cannot_be_changed():
     table = _small_table()
     _obl_entry(table, INDEX_ROW)["external_source"] = True
     assert _names(_reviewed_problems(table), [INDEX_ROW, "external_source"])
+    # The entry on cited works asks every proposition: a default ledger has no class to key it on.
+    cited = {
+        "id": "truth.cited-work-agrees", "class": "obligation", "group": "truth", "unit": "proposition",
+        "criterion": "Each work outside the manuscript that the proposition's text cites says what it takes from it.",
+        "check": "gap", "owner": 50, "verified_by": ["proofread", "cross_model"], "external_source": True,
+    }
+    table = _small_table()
+    table["entries"].append(dict(cited))
+    assert not _names(_reviewed_problems(table), ["truth.cited-work-agrees"])
+    table = _small_table()
+    table["entries"].append({**cited, "applies": {"evidence_class": ["external"]}})
+    assert _names(_reviewed_problems(table), ["truth.cited-work-agrees", "applies"])
 
 
 def test_obligations_reviewed_info_entry_keeps_its_rule():
@@ -1139,8 +1179,23 @@ def test_obligations_document_cannot_copy_the_table():
 
 def test_obligations_document_has_to_say_the_essentials():
     problems = _document_problems("An empty document.", _small_table())
-    for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, *OBL_DOC_WORDS, "E8", "E9", "E10"):
+    for needle in (*OBL_OUTCOMES, *OBL_DOC_ISSUES, *OBL_DOC_WORDS, "E8, E9 and E10", "`owner`"):
         assert _names(problems, [needle]), (needle, problems)
+
+
+# spec-example: article-obligations / an issue number inside a longer one
+def test_obligations_document_terms_are_matched_whole():
+    text = (
+        "See #210 and #5000. The layers E1-E8 are walked. The owner of a gap is someone. "
+        "An entry passed, failed or went unverified, or was not_applicable. external_source is a key."
+    )
+    problems = _document_problems(text, _small_table())
+    for needle in ("issue #21", "issue #50", "E8, E9 and E10", "`owner`", "outcome `passed`", "`external_source`"):
+        assert _names(problems, [needle]), (needle, problems)
+    # An entry id counts when it stands alone, not as part of a longer id.
+    table = _small_table()
+    longer = " ".join(f"{entry['id']}-more" for entry in table["entries"])
+    assert not _names(_document_problems(longer, table), ["entry ids"])
 
 
 # spec-example: article-obligations / a verification document without the pointer
@@ -1173,27 +1228,37 @@ def test_obligations_guard_names_a_malformed_table(table, needle):
     assert _names(problems, [needle]), problems
 
 
+# Each case names the message the format check gives for one value of the wrong
+# type. The needles are tied to the entry and to that message, and the unchanged
+# table is checked first: a needle that some other message already satisfies
+# would let the case pass after the guard stopped reporting the problem.
+OBL_WRONG_TYPES = [
+    ("id is a list", _set(INDEX_ROW, id=["a"]), ["entry 1", "id is not"]),
+    ("class is a mapping", _set(INDEX_ROW, **{"class": {"a": 1}}), [INDEX_ROW, "class {'a': 1}"]),
+    ("mixed types in applies",
+     _set(MODEL_ROW, check="proofread:E3", applies={"profile": [1, "empirical"]}), [MODEL_ROW, "profile value 1"]),
+    ("info on an entry with no id", _set(INDEX_ROW, on_warning="info", id=["a"]), ["entry 1", "on_warning info"]),
+    ("verified_by is text", _set(MODEL_ROW, verified_by="proofread"), [MODEL_ROW, "verified_by is not"]),
+]
+
+
+# spec-example: article-obligations / a value of the wrong type
 @pytest.mark.parametrize(
     "change, needles",
-    [
-        (_set(INDEX_ROW, id=["a"]), ["id"]),
-        (_set(INDEX_ROW, **{"class": {"a": 1}}), ["class"]),
-        (_set(MODEL_ROW, check="proofread:E3", applies={"profile": [1, "empirical"]}), [MODEL_ROW, "profile"]),
-        (_set(INDEX_ROW, on_warning="info", id=["a"]), ["on_warning info"]),
-        (_set(MODEL_ROW, verified_by="proofread"), [MODEL_ROW, "verified_by"]),
-    ],
-    ids=["id is a list", "class is a mapping", "mixed types in applies", "info on an entry with no id", "verified_by is text"],
+    [(change, needles) for _, change, needles in OBL_WRONG_TYPES],
+    ids=[label for label, _, _ in OBL_WRONG_TYPES],
 )
 def test_obligations_guard_names_a_value_of_the_wrong_type(change, needles):
+    vocabulary, methods = _obligation_vocabulary(), _obligation_methods()
+    unchanged = _format_problems(_small_table(), vocabulary, methods)
+    assert not _names(unchanged, needles), unchanged
     table = _small_table()
     change(table)
-    vocabulary = _obligation_vocabulary()
-    problems = (
-        _format_problems(table, vocabulary, _obligation_methods())
-        + _accounting_problems(table, vocabulary)
-        + _reviewed_problems(table)
-    )
+    problems = _format_problems(table, vocabulary, methods)
     assert _names(problems, needles), problems
+    # The other two checks return their problems for the same table; they do not raise.
+    assert isinstance(_accounting_problems(table, vocabulary), list)
+    assert isinstance(_reviewed_problems(table), list)
 
 
 def _load_obligations_text(text: str):

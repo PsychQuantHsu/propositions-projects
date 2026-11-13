@@ -155,7 +155,7 @@ Change the files only as the author instructs. Read both outline files first.
   they move. Merging and splitting replace records: the records that are merged, and the record
   that is split, leave the file, and the records that replace them are new. A new record or
   point, a replacement included, gets an `id` that appears in neither outline file and in no
-  approval record:
+  approval record, and a replacement never takes the `id` of a record it replaces:
 
   ```bash
   grep -c -F -- "\"$NEW_ID\"" "$SEC" "$PAR" "$APP"
@@ -167,11 +167,10 @@ Change the files only as the author instructs. Read both outline files first.
 - **Split.** Each locator of the original is in the `from` of at least one of the records that
   replace it.
 - **Leave a paragraph out.** When its record has `from`, do not delete the record: give it
-  `dropped` with the author's reason and leave it on its line. A record without `from` can be
-  deleted.
-- **Leave a section out.** Delete the section record only when no paragraph record names it.
-  While paragraph records name it, give it `dropped`, and give `dropped` to every paragraph
-  record naming it.
+  `dropped` with the author's reason and leave it on its line. Delete a record without `from`.
+- **Leave a section out.** Leave out each paragraph record naming it, by the rule above. If any
+  of them stays in the file, keep the section record and give it `dropped` with the reason. If
+  none stays, delete the section record.
 - **Move.** Keep the records of one section on consecutive lines, and the groups in the order of
   the section file. A record moved to another section gets that section's `id` in `section`.
 - **Keys this skill does not know.** Keep them exactly as they are.

@@ -81,7 +81,7 @@ A record with one point states, in that point, what the whole paragraph says. A 
 
 A record that carries `carry` SHALL carry `from`. Its points say what the block is, and the text of the block is not rewritten.
 
-The paragraph records SHALL be grouped by section: the records naming one section are on consecutive lines, and the groups come in the order of the section file. Inside a group, the order of the lines is the order of the paragraphs in the section. A paragraph record that carries `dropped` is not part of the article and keeps its line in its group.
+The paragraph records SHALL be grouped by section: the records naming one section are on consecutive lines, and the groups come in the order of the section file. Inside a group, the order of the lines is the order of the paragraphs in the section. A paragraph record that carries `dropped` is not part of the article and keeps its line in its group. A section is allowed to have no paragraph record.
 
 No executable check: a check of this requirement has to be a Swift test, and the repository has no Swift package yet (issue 46); issue 78 adds the examples and tests.
 
@@ -278,14 +278,14 @@ No executable check: a check of this requirement has to be a Swift test, and the
 
 The revise action SHALL change the outline files only as the author instructs.
 
-A record and a point SHALL keep their `id` when their content changes and when they move. Merging and splitting replace records: the records that are merged, and the record that is split, leave the file, and the records that replace them are new. A new record or point, a replacement included, SHALL get an `id` that appears in neither outline file and in no approval record.
+A record and a point SHALL keep their `id` when their content changes and when they move. Merging and splitting replace records: the records that are merged, and the record that is split, leave the file, and the records that replace them are new. A new record or point, a replacement included, SHALL get an `id` that appears in neither outline file and in no approval record. A replacement SHALL NOT take the `id` of a record it replaces.
 
 Merging, splitting and leaving a paragraph out SHALL keep every source on record.
 
 - The `from` of the record that replaces merged records holds every locator of the records it replaces.
 - When a record is split, each locator of the original is in the `from` of at least one of the records that replace it.
-- When the author leaves a paragraph out of the article and its record has `from`, the record is not deleted: it is given `dropped` with the reason. A record without `from` that the author leaves out can be deleted from the file.
-- A section record is deleted from the file only when no paragraph record names it. A section that the author leaves out while paragraph records name it is given `dropped`, and so is every paragraph record naming it.
+- When the author leaves a paragraph out of the article and its record has `from`, the record is not deleted: it is given `dropped` with the reason. A record without `from` that the author leaves out is deleted from the file.
+- When the author leaves a section out, each paragraph record naming it is left out by the rule above. If any of them stays in the file, the section record stays and is given `dropped` with the reason. If none stays, the section record is deleted from the file.
 
 After a revision the skill SHALL say which sections no longer stand as approved.
 

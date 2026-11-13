@@ -101,7 +101,8 @@ nothing says which block is moved.
 section are on consecutive lines, and the groups come in the order of the
 section file. Inside a group, the order of the lines is the order of the
 paragraphs in the section. A paragraph record that carries `dropped` is not
-part of the article and keeps its line in its group.
+part of the article and keeps its line in its group. A section can have no
+paragraph record.
 
 **`uses`.** A record can list what it relies on. Every id in `uses` belongs to
 a record on an earlier line or to a point of such a record, so a paragraph
@@ -299,18 +300,19 @@ revise is the action to use.
 - Merging and splitting replace records. The records that are merged, and the
   record that is split, leave the file; the records that replace them are new.
   A new record or point, a replacement included, gets an `id` that appears in
-  neither outline file and in no approval record.
+  neither outline file and in no approval record. A replacement never takes
+  the `id` of a record it replaces.
 - The `from` of the record that replaces merged records holds every locator of
   the records it replaces.
 - When a record is split, each locator of the original is in the `from` of at
   least one of the records that replace it.
 - When the author leaves a paragraph out of the article and its record has
   `from`, the record is not deleted: it is given `dropped` with the reason. A
-  record without `from` that the author leaves out can be deleted from the
-  file.
-- A section record is deleted from the file only when no paragraph record
-  names it. A section that the author leaves out while paragraph records name
-  it is given `dropped`, and so is every paragraph record naming it.
+  record without `from` that the author leaves out is deleted from the file.
+- When the author leaves a section out, each paragraph record naming it is
+  left out by the rule above. If any of them stays in the file, the section
+  record stays and is given `dropped` with the reason. If none stays, the
+  section record is deleted from the file.
 
 Because no source is ever discarded, the question "where did each passage of
 the original go" can always be answered from the `from` lists: every passage is

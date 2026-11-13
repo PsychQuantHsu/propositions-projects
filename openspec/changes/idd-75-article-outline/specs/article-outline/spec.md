@@ -159,7 +159,7 @@ The **order of sections stands as approved** when the ids of the section records
 
 The **outline stands as approved** when every section stands as approved and the order of sections stands as approved.
 
-The status action SHALL report, for each section, whether it stands as approved, and for a section that does not, whether it was never approved or differs from its latest approved copy. It SHALL report whether the order of sections stands as approved, the number of points that carry `pending` and the number of records that carry `dropped`. It SHALL write nothing.
+The status action SHALL report, for each section, whether it stands as approved, and for a section that does not, whether it was never approved or differs from its latest approved copy. It SHALL report whether the order of sections stands as approved, the number of points that carry `pending` and the number of records that carry `dropped`. It SHALL write nothing to the repository.
 
 These three conditions are what a later capability uses to decide whether text can be written from an outline (issue 51). This capability writes no text.
 
@@ -185,7 +185,7 @@ No executable check: a check of this requirement has to be a Swift test, and the
 #### Scenario: Status after a change
 
 - **WHEN** the status action runs on that outline after the text of a point of `p-2` was reworded
-- **THEN** it reports that `s-a` differs from its latest approved copy, that `s-b` stands as approved and that the order of sections stands as approved, and it writes no file
+- **THEN** it reports that `s-a` differs from its latest approved copy, that `s-b` stands as approved and that the order of sections stands as approved, and it writes no file in the repository
 
 ### Requirement: Only the author's explicit statement in the current message approves
 
@@ -199,7 +199,7 @@ None of the following is an approval, and this list is closed.
 4. No reply, or a reply about something else.
 5. An instruction to this skill or another one to start writing.
 
-By default the skill SHALL show the whole outline and ask for approval of the whole outline. When the author asks for particular sections to be approved, the skill SHALL show those sections only. The record it appends SHALL cover exactly the sections the author states are approved, which can be fewer than the sections shown. The record has `whole` true when it covers every section record, and no `whole` otherwise.
+By default the skill SHALL show the whole outline and ask for approval of the whole outline. When the author asks for particular sections to be approved, the skill SHALL show those sections only. The record it appends SHALL cover exactly the sections the author states are approved, which can be fewer than the sections shown, and SHALL hold them as they were shown. When the outline files have changed since the sections were shown, the skill SHALL append nothing and show the sections again. The record has `whole` true when it covers every section record, and no `whole` otherwise.
 
 What the skill shows for a section SHALL include its `says`, every paragraph record naming it with its points, every record that carries `dropped` together with the reason, and the findings of the premise check on the section. For a section that has an approved copy, the skill SHALL show what differs from that copy.
 
@@ -219,6 +219,11 @@ No executable check: a check of this requirement has to be a Swift test, and the
 
 - **WHEN** the skill shows the whole outline, which has the sections `s-a`, `s-b` and `s-c`, and the author replies that `s-a` and `s-b` are approved and that `s-c` is still open
 - **THEN** the skill appends one approval record with entries for `s-a` and `s-b` and no `whole`
+
+#### Scenario: The files changed between showing and approving
+
+- **WHEN** the skill shows the whole outline, a point is then changed in `outline-paragraphs.jsonl`, and the author replies that the outline is approved
+- **THEN** the skill appends no approval record, says that the outline changed after it was shown, and shows it again
 
 #### Scenario: Approving a section again shows only what differs
 
@@ -303,7 +308,7 @@ No executable check: a check of this requirement has to be a Swift test, and the
 
 ### Requirement: The outline skill writes only the three outline files
 
-The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. It SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing.
+The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
 
 After every write to an outline file the skill SHALL confirm that every line of that file that is not empty parses as a JSON object and that no `id` repeats among the section records or among the paragraph records and points. When either fails, it SHALL report the file and the line and SHALL NOT report the write as done. Its report SHALL say that no other check of the format exists until issue 78.
 

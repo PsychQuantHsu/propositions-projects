@@ -41,9 +41,10 @@ This skill holds how each action is carried out; it does not restate the format.
 
 ## What this skill writes
 
-It writes the three outline files and nothing else. It does not write the manuscript, the ledger,
-the structure sidecars or the verification records, and it does not change or remove a line of
-`outline-approvals.jsonl`. The check and status actions write nothing.
+In the repository that holds the manuscript it writes the three outline files and nothing else.
+It does not write the manuscript, the ledger, the structure sidecars or the verification records,
+and it does not change or remove a line of `outline-approvals.jsonl`. The check and status
+actions write nothing to the repository. Temporary files go to `$STAGE`, which is outside it.
 
 When the author asks for manuscript text to be written or rewritten to match the outline, say
 that writing from an outline is not one of this skill's actions and that no skill of this plugin
@@ -89,14 +90,14 @@ Run this after every write to an outline file, on the file that was written.
 
 ```bash
 jq -R 'select(length > 0) | fromjson | if type != "object" then error("this line is not a JSON object") else empty end' "$F"
-jq -r '.id // "MISSING-ID"' "$SEC" | sort | uniq -d
-jq -r '(.id // "MISSING-ID"), (.points[]?.id // "MISSING-ID")' "$PAR" | sort | uniq -d
+jq -r '.id' "$SEC" | sort | uniq -d
+jq -r '.id, (.points[]? | .id)' "$PAR" | sort | uniq -d
 ```
 
 The first command prints nothing when every non-empty line parses as a JSON object, and names
 the file and the line otherwise. The second and third print each `id` that repeats among the
 section records, and among the paragraph records and points; for each one printed, find its lines
-with `grep -n -F`.
+with `grep -n -F`. A line `null` means that two or more records or points have no `id`.
 
 When any command prints something, report the file and the lines, and do not report the write as
 done: correct the file and run the check again. When all three print nothing, say in the report
@@ -220,8 +221,8 @@ jq -s '[.[] | select(has("dropped"))] | length' "$SEC" "$PAR"
 
 The check is done by a separate agent, so that the outline is read by something that did not
 write it. Start one agent with the Agent tool: a fresh agent (not a fork), `model: "sonnet"`,
-`effort: "high"`. Give it this brief and nothing of the conversation; fill in the three paths and
-the sections to examine.
+and `effort: "high"` where the tool takes an effort. Give it this brief and nothing of the
+conversation; fill in the three paths and the sections to examine.
 
 > Examine an article outline. Read `<SEC>` and `<PAR>` and the files their locators name, which
 > are paths relative to `<ROOT>`. Read nothing else and change nothing. Examine these sections:
@@ -261,7 +262,12 @@ propose a change when one is obvious, and make it only when the author asks, thr
 3. Show the sections. For each one: its heading and `says`; every paragraph record naming it,
    with its points, `pending` notes and carried blocks marked; every record that carries
    `dropped`, with the reason; the findings of the check. For a section that has an approved
-   copy, show what differs from that copy and say that the rest is unchanged.
+   copy, show what differs from that copy and say that the rest is unchanged. Keep a copy of
+   the two files as they are when shown:
+
+   ```bash
+   cp "$SEC" "$STAGE/shown-sections.jsonl"; cp "$PAR" "$STAGE/shown-paragraphs.jsonl"
+   ```
 4. Ask whether the outline, or those sections, are approved. Then stop and wait for the author's
    reply. Write nothing yet.
 5. Read the reply. It is an approval only when the author states in it that what was shown is
@@ -275,21 +281,29 @@ propose a change when one is obvious, and make it only when the author asks, thr
 
    When the reply asks for changes, go to revise, and return to step 1 afterwards. When it is
    none of the above and not an approval, say what is still needed and wait.
-6. On an approval, write the author's approving words, exactly, to `$STAGE/statement.txt` and
-   append one record. The record covers exactly the sections the author states are approved,
-   which can be fewer than the sections shown. When it covers every section record:
+6. On an approval, first confirm that the files are still what was shown:
 
    ```bash
-   jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z)" --rawfile st "$STAGE/statement.txt" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '{approved_at: $at, statement: ($st | rtrimstr("\n")), sections: [$secs[] | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}], whole: true}' >> "$APP"
+   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl"
+   ```
+
+   When either differs, append nothing: say that the outline changed after it was shown, and
+   return to step 1. Otherwise write the author's approving words, exactly, to
+   `$STAGE/statement.txt` and append one record, built from the copies that were shown. The
+   record covers exactly the sections the author states are approved, which can be fewer than
+   the sections shown. When it covers every section record:
+
+   ```bash
+   jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile st "$STAGE/statement.txt" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '{approved_at: $at, statement: ($st | rtrimstr("\n")), sections: [$secs[] | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}], whole: true}' >> "$APP"
    ```
 
    When it covers some of the sections, pass their ids as a JSON list and leave `whole` out:
 
    ```bash
-   jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z)" --rawfile st "$STAGE/statement.txt" --argjson ids "$IDS" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '{approved_at: $at, statement: ($st | rtrimstr("\n")), sections: [$secs[] | select(.id as $i | $ids | index($i)) | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}]}' >> "$APP"
+   jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile st "$STAGE/statement.txt" --argjson ids "$IDS" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '{approved_at: $at, statement: ($st | rtrimstr("\n")), sections: [$secs[] | select(.id as $i | $ids | index($i)) | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}]}' >> "$APP"
    ```
 
-   Only ever append. Do not edit or remove an earlier line of the approvals file.
+   The time has its offset from UTC, as in `2026-11-13T16:30:00+08:00`. Only ever append. Do not edit or remove an earlier line of the approvals file.
 7. Run the first command of the write check on `$APP`, then run status, and report which
    sections now stand as approved and whether the outline does.
 

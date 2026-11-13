@@ -147,7 +147,7 @@ ever added; the skill does not change or remove one.
 
 | Key | Required | Value |
 |---|---|---|
-| `approved_at` | yes | The time of the approval, with its offset from UTC |
+| `approved_at` | yes | The time of the approval, with its offset from UTC, such as `2026-11-13T16:30:00+08:00` |
 | `statement` | yes | The author's approving words, copied exactly |
 | `sections` | yes | A list of one or more entries |
 | `whole` | no | `true` when `sections` has an entry for every section record of the section file as it was, in file order |
@@ -223,9 +223,11 @@ None of the following is an approval. The list is closed.
 By default the skill shows the whole outline and asks for approval of the whole
 outline. When the author asks for particular sections to be approved, it shows
 those sections only. The record it appends covers exactly the sections the
-author states are approved, which can be fewer than the sections shown. The
-record has `whole` true when it covers every section record, and no `whole`
-otherwise.
+author states are approved, which can be fewer than the sections shown, and
+holds them as they were shown. When the outline files have changed since the
+sections were shown, the skill appends nothing and shows the sections again.
+The record has `whole` true when it covers every section record, and no
+`whole` otherwise.
 
 What is shown for a section includes its `says`, every paragraph record naming
 it with its points, every record that carries `dropped` together with the
@@ -279,8 +281,9 @@ is the author's plan.
 | approve | The outline files and the author's reply | One line added to the approvals file |
 | status | The three outline files | Nothing |
 
-The skill writes no other file: not the manuscript, not the ledger, not the
-structure sidecars and not the verification records.
+In the repository that holds the manuscript the skill writes no other file:
+not the manuscript, not the ledger, not the structure sidecars and not the
+verification records. Its temporary files are kept outside the repository.
 
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. Every paragraph

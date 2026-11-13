@@ -22,3 +22,11 @@
 - [x] 4.2 全套 pytest 通過；spectra validate 對這個 change 通過；相對於 main，plugins/propositions/scripts、plugins/tschema-check 與 tests 三個目錄沒有變動。驗證：貼出三項的輸出。
 - [x] 4.3 一位只拿到驗證報告第 2 到 29 項清單與改過的檔案的獨立 agent，逐項回報每一項是否已經處理、在哪一句。完成時：沒有一項回報為未處理；有的話先修再重跑。
 - [x] 4.4 獨立讀者重讀最後的 OUTLINE.md。題目沿用第一輪的題組，加上這一輪改過的規則（來源指標在 repo 外、開頭文字跨行、同一行重複、一節一節確認後的順序、節底下的節、uses 指到 dropped）。驗證：讀者的答案與預存的答案全部相同；有不同就改文件、換新的讀者重跑；題數與結果記到 #75。
+
+## 5. 獨立核對之後新增的規則
+
+- [x] 5.1 綱要目錄的守門，對應 Requirement「The outline skill writes only the three outline files」「The outline is three files beside the ledger」。完成時：每一段會讀寫綱要檔的指令都以同樣的三行開頭；第二行在三個路徑不是從根目錄寫起、目錄解析所有 symbolic link 之後不在 repo 裡、或任何一個綱要檔本身是 symbolic link 時，印出 STOP 並結束整個指令；之後的指令只用解析後的路徑；修改在開頭與作者每次回覆之後各確認一次。驗證：逐段實跑裡綱要目錄與路徑的各種寫法（在 repo 外、含兩個點、結尾加斜線的 link、中間一層是 link、空的與相對的路徑、指到不存在位置的 link），每一種都停下，repo 以外沒有被寫入。
+- [x] 5.2 選綱要目錄，對應 Requirement「The outline is three files beside the ledger」。完成時：只有恰好一份帳冊指到這份稿件時不問就用它的目錄，其他情況問作者；列帳冊時不讀是 symbolic link 的 _meta.json。驗證：兩份帳冊各指到不同稿件時各列一行；名為 _meta.json 的 symbolic link 不列入。
+- [x] 5.3 反推讀哪些檔，對應 Requirement「Derive and draft build an outline without inventing content」。完成時：只跟著讀 repo 裡是一般檔案的 .tex；寫入之前清掉暫存目錄裡別份綱要留下的檔；不寫 lines。驗證：稿件目錄裡指到 repo 外的 .tex 連結不在列出的檔裡；暫存目錄裡留下的段落檔在寫入前被清掉。
+- [x] 5.4 確認的輸入與目錄，對應 Requirement「Only the author's explicit statement in the current message approves」「An approval record stores what the author approved」。完成時：一次確認只用一個輸入檔，第一行是點名的節、其餘是作者的話，每次嘗試之後與每次重新給作者看時刪掉；給作者看時記下目錄解析後的路徑，追加之前比對。驗證：沿用上一次的輸入、目錄換成內容相同的另一個、記下的路徑不見了，三種情況都不追加。
+- [x] 5.5 寫入檢查補上的項目，對應 Requirement「The outline skill writes only the three outline files」。完成時：沒有任何紀錄的檔不回報通過，段落檔在還沒有任何段落時印出 EMPTY 而不是通過；每一筆紀錄與每一個要點都要有 id；points 要是清單。驗證：空的檔、缺 id 的紀錄、points 是字串的紀錄，三種輸入都不印通過。

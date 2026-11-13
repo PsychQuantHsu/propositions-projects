@@ -72,6 +72,10 @@ The repository and marketplace were renamed from `propositions` to `propositions
 /propositions:proofread          # per-prop L1-L5 semantic walk (is each claim true & faithful?)
 /propositions:manuscript-audit   # cross-artifact drift across tex / jsonl / code / bib
 /propositions:clarity-audit      # prose readability — can a human reader follow it?
+/propositions:outline            # plan before writing: one sentence per section
+                                 # (outline-sections.jsonl), at least one per paragraph
+                                 # (outline-paragraphs.jsonl), approved by the author
+                                 # (outline-approvals.jsonl). Needs no ledger.
 ```
 
 ## Architecture
@@ -124,6 +128,7 @@ propositions-projects/
 │   │   │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
 │   │   │   ├── construct/SKILL.md         # article structure, explain, next
 │   │   │   ├── construct-batch/SKILL.md   # long-manuscript structure batches
+│   │   │   ├── outline/SKILL.md           # the outline: what the article will say, before it is written
 │   │   │   └── clarity-audit/SKILL.md     # prose readability
 │   │   ├── scripts/         # validator, audit, extraction and structure tooling
 │   │   │   ├── validate-propositions.py
@@ -147,7 +152,7 @@ propositions-projects/
 │   │   ├── templates/ledger/  # Operation D scaffold
 │   │   └── docs/
 │   │       ├── EXTRACTION-PROMPT.md
-│   │       ├── STRUCTURE.md, VERIFICATION.md, OBLIGATIONS.md
+│   │       ├── STRUCTURE.md, VERIFICATION.md, OBLIGATIONS.md, OUTLINE.md
 │   │       └── PLAYBOOK.md
 │   └── tschema-check/       # source-fidelity review (migrated from truth-conditions, #4)
 │       ├── .claude-plugin/plugin.json

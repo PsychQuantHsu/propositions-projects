@@ -43,6 +43,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | `/propositions:construct` | 建構軸,整篇文章的層次:標註承諾(研究問題、目的、假設、章節計畫、近距離承諾)、章節角色與三層依存樹(句在段內的頭、段在節內的頭、節的 parent),存成帳冊旁的 `structure.json`／`discourse.jsonl`(格式 2.0,S1–S9 檢查);寫到一半的稿件則依右邊緣與未兌現的承諾提出下一句的候選,每個候選寫出預期的 `move`,並參考連結清單的走法(提示不是規則,不改候選順序,#36);也能解釋一段裡句子之間的關係(`structure-explain.py`,#33)(#26、#30) |
 | `/propositions:construct-batch` | 長稿的建構軸標註:先把帳冊排成閱讀順序(`reorder-ledger.py`,dry-run gated),再依段落切批、分給 subagent、合併回暫存附檔(`structure-batch.py`;依存樹已有時用 `--moves-only` 只標 `move`、`type`);審查與寫入仍回 `/propositions:construct` |
 | `/propositions:clarity-audit` | 可讀性軸,散文層級的 stumble 掃描與改寫(不需要 JSONL) |
+| `/propositions:outline` | 綱要軸,動筆之前的計畫:文章層每節一句、段落層每段至少一句要點,存成帳冊旁的 `outline-sections.jsonl`、`outline-paragraphs.jsonl`,作者的確認存成 `outline-approvals.jsonl`。六個動作:從寫完的稿反推、從題目起草、依作者指示修改(合併與刪除都不丟來源)、由另一個 agent 做前提檢查、記錄作者當次明說的確認、回報哪些節仍照通過時的內容。只寫這三個檔,不寫稿件與帳冊;不需要先有帳冊(#75) |
 
 | Rule (shipped) | When applies |
 |----------------|--------------|
@@ -57,6 +58,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | `plugins/propositions/catalog/vocabulary.yaml`、`plugins/propositions/scripts/structure-explain.py`、`build-link-catalog.py`、`structure-links.py` | 每一句「在做什麼」的封閉詞彙（手寫，帶 `move`／`type` 的附檔由 S9 檢查，需要 PyYAML）；讀法工具把一段讀成「第幾句、在做什麼、掛在第幾句、什麼關係」；`catalog/links.csv` 由工具從附檔產生：六種連結（下一句、頭、`also`、引用、承諾兌現、段落頭）一種一列，只含次數，是觀察到的走法不是規則，可以有環；`structure-links.py` 列出一句的所有連結，以及某個步驟看過與沒看過的走法（沒看過的由詞彙算出，不儲存）；`structure-batch.py --moves-only` 只標步驟不動依存樹，`structure-metrics.py --compare-moves` 報告兩份標註的 Cohen's κ（#33）|
 | `plugins/propositions/scripts/validate-verification.py`、`proofread-to-verification.py` + `docs/VERIFICATION.md` | 驗證紀錄 sidecar（`verification.jsonl`）：帳冊只當索引，proofread／Lean／CAS 等方法的判定記在旁邊；轉換只認完整 proposition id（#12） |
 | `plugins/propositions/catalog/obligations.yaml` + `docs/OBLIGATIONS.md` | 義務表：一列一條，寫明帳冊與附檔要對什麼（前提）、文章欠讀者什麼（義務，依原則分七組），以及驗證它的檢查；還沒有檢查的標成缺口並指到 issue。說明文件定義每一列對一個單位（一筆命題或整篇文章）的四種結果，以及「完全合理」＝每一列都是通過或不適用。現在沒有工具讀這張表，由 `tests/test_plugin_payload_tracked.py` 的 `test_obligations_` 案例守住格式與完整性（#47） |
+| `plugins/propositions/docs/OUTLINE.md` | 綱要的三個檔：每一個鍵、來源指標（label 或開頭文字）、確認紀錄，以及「一節仍照通過時的內容」的判定。現在沒有機械檢查（#78，等 #46）；照綱要把文字寫進稿件是 #51（#75） |
 
 同一個 marketplace 另有第二個 plugin `plugins/tschema-check/`（#4）：文件對外部來源的忠實度查核，validator 自帶、不 import 本 plugin（安裝後 plugin 彼此隔離）。
 

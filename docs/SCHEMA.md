@@ -169,6 +169,9 @@ manuscript/propositions/
 ├── main.jsonl             # 1 prop per line, in main.tex reading order
 ├── structure.json         # optional sidecar — thesis, section and paragraph plans (see §Structure sidecars)
 ├── discourse.jsonl        # optional sidecar — 1 record per prop: head, relation, commitments (see §Structure sidecars)
+├── outline-sections.jsonl   # optional — the outline, article layer: 1 section per line (plugin docs/OUTLINE.md)
+├── outline-paragraphs.jsonl # optional — the outline, paragraph layer: 1 paragraph per line
+├── outline-approvals.jsonl  # optional — 1 approval of the outline per line
 ├── _smoke_tests/
 │   ├── rollback_60.tex
 │   ├── rollback_60_meta.json

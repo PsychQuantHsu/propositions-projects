@@ -169,8 +169,10 @@ real path of the outline directory, with every symbolic link resolved, and goes 
 that path is the repository's root or a directory under it and none of the three outline
 files is itself a symbolic link. `SEC`, `PAR` and `APP` are built from the real path. When
 `OUTDIR` does not exist yet, the directory that is to hold it has to exist inside the
-repository. When the call prints `STOP`, nothing after the guard has run: stop and tell the
-author. This skill does not read or write an outline file outside the repository, or one that
+repository. A symbolic link that leads to a place that does not exist cannot be resolved, and
+the call can stop for it too (this depends on the machine's `realpath`): have the author make
+the directory, or name its real path. When the call prints `STOP`, nothing after the guard
+has run: stop and tell the author. This skill does not read or write an outline file outside the repository, or one that
 is itself a symbolic link. A symbolic link in the path of the directory is resolved, not
 refused: what counts is where it leads.
 

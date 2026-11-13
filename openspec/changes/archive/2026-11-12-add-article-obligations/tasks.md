@@ -1,0 +1,35 @@
+## 1. 缺口的 issue（先開，表才寫得出負責人）
+
+- [x] 1.1 依 design「沒有負責 issue 的缺口在這個 change 裡開」，開三張 issue 並掛在 #45 底下（正文開頭寫 Part of #45 與 Blocked by #47，並加進 #45 正文的 Children）：章節角色的檢查（`discussion` 不開新的假設、`method` 不解讀結果，目前只在 `construct` 提下一句時用，沒有對寫完的稿檢查）；一般性的矛盾檢查（現在只有 R4 一種寫死的樣式）；讓驗證紀錄說得出它涵蓋什麼（指得到義務表的某一列，`judge` 的警告才有地方記錄判定，一筆 `partial` 也才分得出是哪一列沒過；並記下 `proofread` 的判定走的是哪一種閱讀）。同時把已經開好的 #59（多檔稿件的行序檢查）加進 #45 的 Children。內文過隱私自審，不寫稿件文字。三個新編號之後寫進 3.3 的 `owner` 與 4.1 的說明文件。驗證：三張 issue 的正文都有 Part of #45；#45 的 Children 多了四列。
+
+## 2. 守衛測試（先寫，要看到失敗）
+
+- [x] 2.1 在 `tests/test_plugin_payload_tracked.py` 加一個讀表的 fixture 與一組名稱以 `test_obligations_` 開頭的案例，對應 Requirement「A guard checks the table」與 design「守衛測試加在既有的 pytest 檔」：用 PyYAML 讀 `plugins/propositions/catalog/obligations.yaml`，沒有 PyYAML 時只跳過這一組；不新建測試檔，不新增腳本或 `_lib` 模組；每個失敗訊息都指名是哪一列、哪個值或哪條檢查。這一項先釘住三條：Requirement「The obligations table is a closed data file」（最上層只有三個鍵、列的鍵是封閉集合、`id` 的形式與不重複、`unit` 的兩個值、`criterion` 一行且不超過 200 字元）；Requirement「Entries are preconditions or obligations」與 design「類別只有前提與義務」（`class` 只有 `precondition` 與 `obligation`，第三個值被拒絕；前綴是 `index` 或所屬的組；`check` 是 `structure:S5` 的列有一列義務、一列前提）；Requirement「Obligations are grouped by principle」（七組的編號與順序、每組有 `zh` 與 `does`、`dependence` 的公理是 `academic-writing/A1_no_forward_dependence`、義務列一定有 `group`、前提列沒有）。驗證：資料檔還不存在時，`pytest tests/test_plugin_payload_tracked.py -k obligations` 失敗，訊息指出缺的是哪個檔。
+- [x] 2.2 同一個檔案加案例，釘住 Requirement「Applicability is a list of field values」與 design「適用條件只用欄位值的清單」（`applies` 只有六個鍵：`profile`、`claim_type`、`evidence_class`、`cites`、`opens`、`section_role`；`move` 這類選填欄位當鍵會被拒絕；值是非空清單；每個值都在該欄位的詞彙內；以文章為單位的列只用 `profile`；`check` 是 `proofread:E1` 到 `proofread:E7` 的列與 `owner` 是 57 的列，`applies` 的 `profile` 是 `[empirical]`），以及 Requirement「Every implemented check and every vocabulary value is accounted for」（44 條檢查每一條至少是一列的 `check`；`claim_type`、`evidence_class`、`opens`、`section_role` 的每個值被某一列的 `applies` 點名或列在 `unconstrained`，不能兩邊都有；`unconstrained` 的每一項有 `field`、`value`、`why`）。詞彙從來源讀，測試裡不另抄一份：帳冊驗證器的 `PROFILE_VOCABULARIES`，結構驗證器的 `KINDS` 與 `ROLES`。完整性的判斷寫成吃「表加詞彙」的函式，另有一個案例餵它多一個章節角色的詞彙，確認它回報 `section_role` 與那個值。驗證：同上的 pytest 指令在資料檔寫好之前失敗；餵入多一個值的案例通過。
+- [x] 2.3 同一個檔案加案例，釘住 Requirement「A check is named only when it is implemented」與 design「檢查欄只填已實作的檢查，其餘標成缺口並指到 issue」（`check` 只能是 `gap` 或規格列的 44 個編號之一，`ledger:R6` 這種清單外的編號被拒絕；`gap` 的列有正整數的 `owner`，其餘的列沒有 `owner`；`owner` 是 57 的列剛好三列，每列的 `check` 是 `gap`、`verified_by` 有 `proofread` 與 `cross_model`；`owner` 是 46、49、50、55 的列各至少一列），以及 Requirement「Each entry states how it is verified」與 design「警告由每一列寫明」（`verified_by` 是 `[mechanical]` 或六個內建驗證方法的清單；`check` 來自帳冊、結構、驗證紀錄、覆蓋、行序、稽核的列與以文章為單位的列是 `[mechanical]`；`check` 來自 `proofread` 的列有 `proofread`；凡是列了 `proofread` 的列都有 `cross_model`；`on_warning` 在每一個 `[mechanical]` 的列都要有、其他列不能有，值只有 `judge` 與 `info`；`info` 只能出現在維護者看過的列，測試裡存著這些列的編號與各自的檢查，`ledger:R1.5` 的列寫 `info` 會被拒絕，同一條檢查的另一列寫 `info` 也會被拒絕）。再釘住維護者看過的列：`dependence.cites-backward` 是義務、屬於 `dependence`、`check` 是 `gap`、`owner` 是 46、`on_warning` 是 `judge`；`check` 是 `structure:S6` 的列是義務、`on_warning` 是 `judge`；只是資訊的四列（孤立命題、交叉弧、程式定義了但文件沒提到的符號、bib 裡沒被引用的條目）`on_warning` 是 `info`、檢查沒有被換掉；`check` 是 `ledger:R3` 的列裡有一列是 `dependence` 組的義務、`on_warning` 是 `judge`。驗證：同上的 pytest 指令在資料檔寫好之前失敗。
+- [x] 2.4 同一個檔案加案例，釘住 Requirement「The explanatory document describes the table without restating it」與 design「說明文件不重抄各列」：`plugins/propositions/docs/OBLIGATIONS.md` 存在；它提到的列編號不超過兩個，超過時訊息寫出數目；它寫出四種結果的名稱 `not_applicable`、`unverified`、`failed`、`passed`；它說明 E8、E9、E10 為什麼不算已實作；它在過不了的三個原因各寫出負責的 issue 號，並寫出多檔稿件的限制與 #59。驗證：文件還不存在時，同上的 pytest 指令失敗。
+
+## 3. 義務表
+
+- [x] 3.1 新增 `plugins/propositions/catalog/obligations.yaml`，照 design「一列一條義務，存成資料檔加說明文件」寫 `groups` 的七組與前提類的列：帳冊、結構附檔、驗證紀錄是不是稿件的忠實索引（例如文字對得上稿件、行號對得上、紀錄指到的命題存在、範圍內沒有漏掉的文字、帳冊的行序就是閱讀順序）。維護者定為只是資訊的發現（交叉弧、孤立命題，以及審表時加的兩個稽核腳本的 FYI）各佔一列，類別照「真的要改時改哪裡」定，`on_warning` 寫 `info`；章節沒有命題（R1.5）寫 `judge`。每一種不算錯誤的發現在表裡剛好有一列（design「警告由每一列寫明」）。每一列的 `criterion` 只寫一句要成立的事，不重抄檢查的定義。驗證：2.1 的案例通過。
+- [x] 3.2 加入義務類的列，照 design「義務依原則分七組，一組對一條公理」分到七組，包含 `dependence.cites-backward`、S5 的「主旨有寫出來」、R3 的「引用不成環」；一條檢查同時有前提與義務時拆成兩列。每一列照 design「驗證方式與四種結果」寫 `verified_by`（列了 `proofread` 就同時列 `cross_model`），照 design「警告由每一列寫明」寫 `on_warning`：不會報警告的檢查也寫 `judge`，只有維護者看過、確定只是資訊的發現寫 `info`。驗證：2.3 裡維護者看過的列的案例通過。
+- [x] 3.3 加入缺口的列與 `unconstrained`。缺口照 design 的缺口表：引用只指向前面（#46）、符號先被引入（#55）、E8 到 E10 各一列（#57）、文獻查得到（#50）、稿件沒有佔位（#49）、章節角色的兩條與一般性的矛盾（1.1 開的編號）、沒有任何方法判定這筆命題為假（#62）。寫表時再發現沒有負責 issue 的缺口，照 1.1 的做法再開一張。四個欄位裡沒有被任何列點名的值列進 `unconstrained`，各寫一句原因。驗證：`pytest tests/test_plugin_payload_tracked.py -k obligations` 除了 2.4 的文件案例之外全部通過。
+- [x] 3.4 停下來給維護者審表（design 的 Implementation Contract「停下來的地方」）：把每一列的編號、類別、組、`check`、`verified_by`、`on_warning` 列成一張表貼在對話裡，另外標出 `on_warning` 是 `info` 的每一列（那是唯一會把警告算成通過的設定），並列出 `unconstrained` 的每一項。把 R1.5 那一列單獨提出來問：它是唯一看得出整節沒有抽取的訊號，現在寫 `judge`；維護者要把哪一列改成 `info`，就在同一個 commit 把那一列加進測試的清單。L 層各列的 `applies` 也單獨列出來。等維護者確認或修改才繼續。驗證：維護者回覆確認；有修改就改表，重跑 3.3 的指令到通過。
+
+## 4. 說明文件
+
+- [x] 4.1 新增 `plugins/propositions/docs/OBLIGATIONS.md`（英文，比照同目錄的其他文件）。內容：資料檔的鍵；兩種類別與怎麼分；七組與公理；適用條件怎麼寫；哪些檢查算已實作、沒列入的各是什麼原因；Requirement「Each entry has one of four outcomes for a unit」的四條規則、「錯誤」與「不算錯誤的發現」的定義（照工具自己的嚴重度，不看結束碼）、單位是什麼（已退役的命題不算）、檢查沒跑過的六種情況、一筆紀錄涵蓋什麼（`proofread` 的兩種閱讀各走哪幾層、看不出是哪一種時不涵蓋任何一層），以及兩個限制（紀錄指不到列、同一條檢查拆成多列時發現算在哪一列）；Requirement「An article is sound only when every applicable entry passes」的定義，並照 design「驗收是每一條都通過，現在沒有文章過得了」寫出三個原因與各自負責的 issue（缺口的列、`judge` 的警告沒有地方記錄判定、`cross_model` 沒有產生紀錄的工具是 #21），以及多檔稿件的行序檢查（#59）與沒有分析程式的稿件（#64）；怎麼新增或修改一列。不列出各列，最多拿兩個編號當例子。驗證：2.4 的案例通過，`pytest tests/test_plugin_payload_tracked.py -k obligations` 全部通過，沒有被跳過的案例。
+
+## 5. 獨立讀者盲驗
+
+- [x] 5.1 先把答案寫好，共十六題，存在暫存目錄：規格「twelve units」的十二個情況；Requirement「An article is sound only when every applicable entry passes」裡判定文章是否完全合理的三個 Scenario；再加一題同一條檢查拆成多列的情況（R3 對一筆命題報了孤立的警告、沒有報成環：引用不成環那一列是通過，孤立命題那一列是通過並把發現列為資訊）。再派一個只讀得到資料檔與說明文件的 subagent（不給規格、design 與這份 tasks；兩個檔與題目放在 repo 以外的暫存目錄，要它只讀那三個檔，並回報讀了哪些檔），給它每一題的單位、檢查的發現與驗證紀錄，請它判定每一列的結果與文章是否完全合理。驗證：十六題的答案全部相同。有不同就改說明文件而不是改答案，再派一個新的 subagent 重跑；把題數、相同的題數與改了什麼記到 #47，不含稿件文字。
+
+## 6. 文件與版本
+
+- [x] 6.1 [P] 在 `CLAUDE.md` 的 Doc 表加一列，說明義務表與它的說明文件是什麼、現在沒有工具讀它；在 `README.md` 的目錄樹把 `obligations.yaml` 與 `OBLIGATIONS.md` 加進 catalog 與 docs 兩行；在 `plugins/propositions/README.md` 加一條。驗證：三個檔案都找得到 `obligations.yaml` 與 `OBLIGATIONS.md`。
+- [x] 6.2 [P] 把 `propositions` plugin 升到 0.11.0（`plugins/propositions/.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json`），並在 `marketplace.json` 的描述提到義務表。驗證：`pytest tests/test_marketplace_entries.py tests/test_plugin_payload_tracked.py` 通過，兩處版本相同。
+
+## 7. 驗收與交接
+
+- [x] 7.1 全套 `pytest tests/` 通過，而且名稱以 `test_obligations_` 開頭的案例都是通過、沒有一個是跳過；IDD 的 CI gate 對 head commit 通過；`spectra validate add-article-obligations` 通過；`plugins/propositions/scripts` 與 `plugins/tschema-check` 相對於 main 沒有任何變動。驗證：貼出四項的輸出，以及 obligations 那一組的通過數與跳過數。
+- [x] 7.2 交接：在 #48 留言，列出還沒有公理的六組與各組保護什麼，作為它要新增的公理清單；在 #47 貼一則以 Implementation Complete 為標題的留言（改了什麼、測試結果、盲驗結果、開了哪幾張 issue），再以這份 tasks 檔跑 idd-update 的 tasks-file 模式，讓 #47 的正文有完成清單。驗證：#47 的 Current Status 出現 Tasks 小節，#48 有那則留言。

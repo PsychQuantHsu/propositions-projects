@@ -72,6 +72,11 @@ evidence class is consistent, and the location is right. It checks the ledger
 entry and the argument's chain. **It is not a formal proof.** A disagreement
 between `proofread` and `lean` is worth reading for exactly this reason.
 
+That describes the derivation walk of the proofread skill. A record does not
+say which walk produced it. How a record counts toward an article being sound
+is not settled yet: `docs/OBLIGATIONS.md` says why no record can make an entry
+pass today and which issues own what is missing.
+
 ## Validator
 
 ```bash
@@ -105,6 +110,10 @@ validator prints
 
 Disagreements are warnings, not errors. They show which verdicts need a human
 to read them. `unresolved` and `not_attempted` never count as disagreement.
+
+The latest-record rule of this section is for this warning only. Whether an
+entry of the obligations table passes is not decided by this rule; see
+`docs/OBLIGATIONS.md`.
 
 ## Connecting a method
 

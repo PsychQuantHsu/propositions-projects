@@ -38,7 +38,7 @@ plugin 目錄或其他位置另建 package。
 
 ## 例外：可以不是 Swift 的程式碼
 
-這是封閉列舉，只有兩類，不得依性質相似類推出第三類。
+這是封閉列舉，只有三類，不得依性質相似類推出第四類。
 
 1. **Swift binary 還不存在、或使用端沒有 binary 時才需要的殼層。** 這一類只有三種：
    - plugin 下載 binary 的 wrapper，照 Akashic-Library 的 `plugin/bin/akashic-mcp-wrapper.sh` 寫；
@@ -56,6 +56,20 @@ plugin 目錄或其他位置另建 package。
    - 修 bug 時要補的回歸測試，加進已經涵蓋那支腳本的 pytest 檔。沒有任何 pytest 檔涵蓋它時（目前
      `reorder-ledger.py`、`structure-batch.py` 的案例在 `test_structure_tools.py`），加進最接近的那一個；
      不要為了它新建 `test_*.py`。
+3. **指名的守衛測試，在 Swift package 建好之前。** 這是封閉清單，目前只有一組：
+   - `tests/test_plugin_payload_tracked.py` 裡名稱以 `test_obligations_` 開頭的案例（義務表的守衛，#47）。
+     它檢查的是 `plugins/propositions/catalog/obligations.yaml` 與
+     `plugins/propositions/docs/OBLIGATIONS.md` 的內容，以及 `plugins/propositions/docs/VERIFICATION.md`
+     的三個字句（一個指到義務表文件，兩個限縮它自己的說法），不是任何腳本的行為。
+
+   清單裡的這一組可以修改，也可以在同一組裡加案例；不新建 `test_*.py`，不新增腳本或 `_lib` 模組。
+   要把別的守衛加進這份清單，先在這裡加一列、寫明它檢查哪些檔，並由維護者決定。不得因為「它也是檢查
+   資料檔的守衛」就比照辦理。
+
+   **退場條件**：#46 建好 Swift package、而且守衛讀的詞彙在 Swift 裡有了來源之後，把這一組連同
+   `spec-example:` 標記搬到 `Tests/` 的 Swift Testing target，然後刪掉這一條例外。現在不寫成 Swift 的原因
+   是守衛直接從 Python 的驗證器讀詞彙（`PROFILE_VOCABULARIES`、`KINDS`、`ROLES`、`METHODS`）；驗證器移植之前，
+   Swift 版只能另抄一份，抄的那一份不會跟著驗證器更新。
 
 ## 不適用
 
@@ -170,6 +184,7 @@ plugin 目錄或其他位置另建 package。
 |---|---|---|
 | 2026-11-04 | #33 新增三支 Python 工具（`structure-explain.py`、`structure-links.py`、`build-link-catalog.py`），並新增 PyYAML 依賴；合併後使用者說要和 Akashic 一樣完全用 Swift | 寫下本規則；#33 的檔案列入〈既有檔〉 |
 | 2026-11-04 | 本規則第一版交給獨立讀者盲審，找到三個會讓照著做的人出錯的缺口：(1) SKILL.md 裡用 heredoc 寫的 Python 被當成「指令列」，可以照樣新增；(2) 移植步驟沒有考慮腳本之間互相載入，刪掉一支就弄壞三支；(3) 換呼叫端之前沒有發布 binary 這一步 | 加了〈什麼算可執行程式碼〉，〈移植〉改成依賴先移、先發布再換、沒人載入才刪；「新功能」改成封閉列舉。**不要把〈什麼算可執行程式碼〉簡化回「新增的檔案」**：缺口 (1) 就是那樣出現的 |
+| 2026-11-12 | #47 的義務表守衛是加在既有 pytest 檔裡的 18 個 `test_obligations_` 函式。兩輪驗證都指出本檔沒有記這個例外，規格卻明文要求這樣做 | 維護者同意改規則（「如果需要swift的話也可以swift，幫我改規則」）：加〈例外〉第 3 類，退場條件是 #46。**不要把第 3 類改寫成用性質定義的一類**：#47 第三輪驗證指出第一版寫成「檢查資料檔與文件內容的守衛」，任何這種守衛都符合；現在是指名的清單，只有義務表這一組 |
 
 ## 語言組成（2026-11-04 量，只計受追蹤的檔）
 

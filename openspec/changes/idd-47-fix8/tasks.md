@@ -12,8 +12,8 @@
 
 ## 4. 獨立讀者盲驗
 
-- [ ] 4.1 題目沿用修正輪 7 的 52 題，加上這一輪改到的情形（兩種結果都有的句子、模擬的結果、資料算不出來的量、沒有宣告 profile 而 schema 版本較舊的帳冊）。答案先存檔；派新的讀者，只給表、文件與題目。紀錄貼成 #47 上一則新的留言。驗證：全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
+- [x] 4.1 題目沿用修正輪 7 的 52 題，加上這一輪改到的情形（兩種結果都有的句子、模擬的結果、資料算不出來的量、沒有宣告 profile 而 schema 版本較舊的帳冊）。答案先存檔；派新的讀者，只給表、文件與題目。紀錄貼成 #47 上一則新的留言。驗證：全部相同，紀錄上的 commit 是最後一個改到表或文件的 commit。
 
 ## 5. 驗收
 
-- [ ] 5.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix8` 通過；`plugins/propositions/scripts`、`plugins/tschema-check` 與 `tests/` 相對於上一個封存的 commit 沒有變動。驗證：貼出三項的輸出。
+- [x] 5.1 全套 `pytest tests/` 通過，`test_obligations_` 的案例沒有被跳過；`spectra validate idd-47-fix8` 通過；`plugins/propositions/scripts`、`plugins/tschema-check` 與 `tests/` 相對於上一個封存的 commit 沒有變動。驗證：貼出三項的輸出。

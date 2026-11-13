@@ -11,7 +11,7 @@
 ## 3. 文件
 
 - [ ] 3.1 改 `plugins/propositions/docs/OBLIGATIONS.md`，對應 Requirement「Each entry has one of four outcomes for a unit」「Each entry states how it is verified」：四種結果的定義；規則要守住的七點；規則 2 是定義的結果，檢查印了什麼都一樣；`on_warning` 的兩個值與「警告」的意思；可以是 `info` 的四列在判準不成立時也能通過；拿掉「錯誤是說判準被違反」與像是對照規則的那一段。驗證：文件裡找不到「An error says that the criterion is violated」。
-- [ ] 3.2 同一個檔案，對應 Requirement「Applicability is a list of field values」「A check is named only when it is implemented」「An article is sound only when every applicable entry passes」：五個鍵各自讀不出來的情形（封閉列舉）；結構驗證器怎麼算未退役；`relation`、`profile` 鍵、L5 三處理由；行號更新試跑的排除理由；要查外部來源的四列與新列為什麼沒有 `applies`；報告怎麼指名沒有自己的 id 的命題；拿掉 default 帳冊與外部文獻的限制；「怎麼改表」的列數。驗證：1.3 的文件案例通過。
+- [ ] 3.2 同一個檔案，對應 Requirement「Applicability is a list of field values」「A check is named only when it is implemented」「An article is sound only when every applicable entry passes」：五個鍵各自讀得到的條件（其餘一律讀不出來）、值從檔案本身讀；`live` 與 id 可用兩個用語；章節清單不可用的十一種情形；`relation`、`profile` 鍵、L5 三處理由；行號更新試跑的排除理由；要查外部來源的四列與新列為什麼沒有 `applies`；報告怎麼指名沒有自己的 id 的命題；拿掉 default 帳冊與外部文獻的限制；「怎麼改表」的列數。驗證：1.3 的文件案例通過。
 - [ ] 3.3 改 `plugins/propositions/docs/VERIFICATION.md` 指到義務表文件的那一段：寫「今天沒有紀錄能讓一列通過」，拿掉實證閱讀的紀錄代表什麼那一句。驗證：`pytest tests/test_plugin_payload_tracked.py -k obligations` 與 `pytest tests/test_verification_records.py` 通過。
 - [ ] 3.4 改 `.claude/rules/swift-is-the-implementation-language.md` 例外第 3 類列的詞彙，補上 `METHODS`。驗證：那一段列出四組詞彙。
 

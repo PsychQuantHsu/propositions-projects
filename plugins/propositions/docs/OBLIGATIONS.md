@@ -5,8 +5,10 @@ ledger and sidecars have to get right and what the article owes its reader. For
 each entry it names the check that verifies it. This document explains how to
 read the table and what it means for an article to be **sound**.
 
-No program reads the table yet. The rules that compute an entry's outcome from
-the output of the checks are not in this document: they are written with the
+No tool computes anything from the table yet; the only program that reads it
+is the guard described under [Changing the table](#changing-the-table). The
+rules that compute an entry's outcome from the output of the checks are not in
+this document: they are written with the
 tool that applies them, where tests can hold them (issue #71). This document
 holds the definitions those rules have to keep, so that "sound" means the same
 thing wherever it is used.
@@ -54,8 +56,9 @@ from it will have to be judged before the entry passes.
 A unit is what an entry is decided for.
 
 - `proposition`: each proposition of the ledger that is not retired. A
-  proposition is retired only when its `retired` block is well formed by the
-  ledger validator's test, so one whose block is malformed is a unit.
+  proposition is retired only when its `retired` key holds a block that is
+  well formed by the ledger validator's test, so one whose `retired` key holds
+  `null` or a malformed block is a unit.
 - `article`: the manuscript as a whole, once.
 
 A proposition is named by its id. Where a line of the ledger has no id, or two
@@ -143,64 +146,80 @@ the manuscript's ledger.
 
 When the value a key needs cannot be read for a unit, the entry is `unverified`
 for that unit, not `not_applicable`, unless another key whose value can be read
-already rules the unit out. A value cannot be read in the cases below, and in
-no other.
+already rules the unit out.
 
-- `profile`: the ledger's `_meta.json` cannot be parsed as a JSON object, or it
-  declares a profile that the ledger validator rejects. A ledger without
-  `_meta.json`, and one whose `_meta.json` declares no profile, has the default
-  profile.
-- `claim_type`, `evidence_class`: the proposition's ledger entry has no such
-  field, or the field holds anything other than a value of that field's
-  vocabulary for the ledger's profile. A misspelled class is such a case: it
-  is not read as a value outside the entry's list. When the profile cannot be
-  read, a value of the vocabulary of either profile can be read.
-- `cites`: the field is present with a value that is not a list, such as
-  `null` or a string. A proposition without the field cites nothing; whether
-  it relies on something it does not declare is what the entry for the layer
-  L3 asks.
-- `opens`: the structure validator cannot load the discourse sidecar; or the
-  proposition has no record in it or more than one; or its record's `opens` is
-  present and is not a list of commitments that the structure validator
-  accepts; or the proposition has no id, or shares its id with another
-  proposition that is not retired, because the sidecar refers to a proposition
-  by id. A record without `opens`, or with an empty list, opens nothing, and
-  that is a value.
-- `section_role`: the structure validator cannot load `structure.json` (the
-  file is missing, is not a JSON object, or does not carry the structure
-  version the validator reads), or the section list in it is unusable. The
-  list and the ledger's order place a proposition in a section; a discourse
-  record is not needed for that.
+A value is read from the ledger and the sidecars themselves. No run of a
+validator is needed to read it, and a run that was not given a file, or that
+stopped before it reported anything, changes nothing about what can be read.
+A value can be read only under the conditions below. In every other case it
+cannot be read.
 
-The section list is unusable exactly when the structure validator reports one
-of these eleven errors under S5:
+The conditions use two terms.
+
+- A proposition is **live** when its ledger entry carries no `retired` key.
+  That is the structure validator's test. It is narrower than the test for a
+  unit: a proposition whose `retired` key holds `null` or a malformed block is
+  a unit and is not live.
+- The ledger's ids are **usable** when every proposition in the ledger,
+  retired or not, has an `id`, and no two live propositions share one. The
+  sidecars refer to a proposition by its id.
+
+| Key | Its value can be read when |
+|---|---|
+| `profile` | The ledger has no `_meta.json`, or its `_meta.json` is a JSON object without a `profile` key: the profile is then `default`. Or its `_meta.json` is a JSON object with a `profile` that the ledger validator accepts: the profile is then the one declared |
+| `claim_type`, `evidence_class` | The field holds a value of its vocabulary for the ledger's profile. When the profile cannot be read, a value of the vocabulary of either profile can be read |
+| `cites` | The field is absent, which reads as `absent`, or it holds a list |
+| `opens` | All of these hold: the ledger's ids are usable; the proposition is live; the discourse sidecar exists and each of its lines that is not blank is a JSON object; exactly one of its records names the proposition; and that record has no `opens` key, or its `opens` is a list in which every item is an object with an `id` and a `kind` that the structure validator accepts |
+| `section_role` | All of these hold: the ledger's ids are usable; the proposition is live; `structure.json` can be parsed as a JSON object and carries the structure version that the structure validator reads; and its section list is usable |
+
+Some cases that follow from the table, since they have been misread before:
+
+- `profile`: the ledger validator rejects a `profile` key that holds `null`,
+  a name that is not one of its profiles, and a profile declared under a
+  schema version that does not allow one. In all three the profile cannot be
+  read.
+- `claim_type`, `evidence_class`: a field that is left out, one that holds
+  `null` and a misspelled class cannot be read. A misspelled class is not a
+  value outside the entry's list. The vocabularies are the ledger validator's,
+  and the copy of `SCHEMA.md` pinned next to each ledger lists them. The
+  evidence classes `measured`, `tested`, `descriptive`, `not_computable` and
+  `external`, and the claim types `result` and `interpretation`, are values of
+  the empirical profile only. Which propositions may leave either field out is
+  not settled (issue #70); until it is, a field that is left out cannot be
+  read.
+- `cites`: `null` and a string cannot be read. A proposition without the field
+  cites nothing; whether it relies on something it does not declare is what
+  the entry for the layer L3 asks.
+- `opens`: the value is the kinds in the record's list. A record without
+  `opens`, or with an empty list, opens nothing, and that is a value. A
+  proposition with no record, or with two, has no value that can be read.
+  Whether the commitments are otherwise in order, for instance an id opened
+  twice or a commitment opened inside the abstract, is asked by other entries
+  and does not change what is read.
+- `section_role`: the list and the ledger's order place a proposition in a
+  section; a discourse record is not needed for that.
+
+The section list is unusable exactly when one of these eleven holds. They are
+the errors that the structure validator reports under S5 about the list
+itself.
 
 1. `sections` is not a non-empty list;
 2. an item is not an object;
 3. an item's `id` is not a non-empty string;
 4. two items share an id;
-5. an item's `heading` is not a non-empty string;
-6. an item's role is outside the vocabulary;
-7. an item's `first_prop` is not a proposition that the structure validator
-   counts as not retired;
-8. an item with the role `abstract` is not the first;
-9. two sections are out of ledger order;
-10. the ledger has no proposition that the structure validator counts as not
-    retired;
-11. the first section does not start at the first such proposition.
+5. an item's `heading` is not a string, or is blank;
+6. an item's `role` is not a value of the vocabulary;
+7. an item's `first_prop` is not the id of a live proposition;
+8. an item with the role `abstract` is not the first item;
+9. an item's `first_prop` does not come after the `first_prop` of the item
+   before it in the ledger's order;
+10. the ledger has no live proposition;
+11. the first item's `first_prop` is not the first live proposition.
 
-An S5 error about anything else leaves the section list usable. There are four
-kinds: about the thesis, about a section's `parent`, about a commitment opened
-inside the abstract, and about the paragraph plan.
-
-The structure validator counts a proposition as retired when its ledger entry
-carries a `retired` key, whether or not the block is well formed. A
-proposition whose `retired` block is malformed is a unit (see [Units](#units)),
-and the structure validator leaves it out of the order it works on, so neither
-`opens` nor `section_role` can be read for it.
-
-Which propositions may leave `claim_type` or `evidence_class` out is not
-settled (issue #70).
+Nothing else that the structure validator reports under S5 makes the section
+list unusable. There are four kinds: about the thesis, about a section's
+`parent`, about a commitment opened inside the abstract, and about the
+paragraph plan.
 
 The relation of a record is not a key. The root of a paragraph has none, and
 no entry's requirement differs by the relation of the other records except
@@ -220,9 +239,9 @@ do not apply to an `external` proposition, which has no artifact to re-run;
 the table gives the entries for E9 and E10 the same limit. `not_computable`
 is one of the four because it marks a quantity the data cannot produce, and
 the entry for E2 is the one that fails it. Without the `profile` key, a
-proposition of a mathematical manuscript that leaves `evidence_class` out
-would be unverified under these entries instead of not applicable; without the
-evidence classes, every proposition of an empirical ledger that has no
+proposition of a ledger with the default profile that leaves `evidence_class`
+out would be unverified under these entries instead of not applicable; without
+the evidence classes, every proposition of an empirical ledger that has no
 artifact would stay unverified.
 
 A proposition of an empirical ledger that carries any other evidence class is
@@ -239,8 +258,10 @@ precondition described under [Two classes](#two-classes).
 
 Some criteria concern only propositions with a feature that no key selects:
 one assigned to a theorem-like block, one with a `basis` edge, one that cites a
-figure, one whose text cites a work. The entry still applies to every proposition. How a check reports a
-unit of which the criterion asks nothing is part of issue #68.
+figure, one whose text cites a work. Such an entry is not narrowed to those
+propositions. It applies to every proposition that its `applies` admits, and
+to every proposition when it has none. How a check reports a unit of which the
+criterion asks nothing is part of issue #68.
 
 `unconstrained` at the end of the table lists every value of `claim_type`,
 `evidence_class`, the commitment kinds and the section roles that no entry's
@@ -276,19 +297,20 @@ findings, or leaves records, about units under an id of its own.
   reports environments it could not close and propositions whose block it
   could not resolve, which R9 passes over in silence; that difference belongs
   to issue #68.
-- The dry run of the location refresh. It has no rule id of its own, and it
-  looks at what `ledger:R13` looks at: the lines that a proposition's
-  `location` names. It reports more than R13, which allows a start within two
-  lines and passes over a proposition whose text it does not find; what R13
-  passes over in silence belongs to issue #68.
+- The dry run of the location refresh. It has no rule id of its own. It
+  searches the manuscript for each proposition's text and reports every
+  `location` that differs from where it finds the text, which is more than
+  `ledger:R13`, the check on that field, reports. What R13 passes over in
+  silence belongs to issue #68.
 - The link catalog's currency check. Its subject is a file of this plugin, not
   a manuscript.
 - The checks of the `tschema-check` plugin. They belong to another plugin.
 - The stumble categories of the clarity audit, the counts in the construct
   skill's summary and the states of the analyze skill. None of them leaves a
   finding or a record for a unit under an id.
-- The `location` layer of the proofread walk. The proofread skill defines it
-  as the R13 check of the ledger validator.
+- The `location` layer of the proofread walk. It is a spot-check of the field
+  that `ledger:R13` checks, and the skill's layer table names R13 as its
+  mechanical form.
 - The records validator's warning that two methods disagree on a proposition.
   It has no rule id of its own. It reports part of what the entry on verdicts
   against a proposition states; where it counts is left to the outcome rules
@@ -319,11 +341,18 @@ supplied.
 
 The last of the four has no `applies`. The two entries on support outside the
 paper apply by the evidence class `external`, which only the empirical profile
-has; a proposition of a mathematical manuscript that relies on a theorem of
-another paper has to be asked too. In an empirical ledger, an `external`
+has; a proposition of a ledger with the default profile that relies on a
+theorem of another paper has to be asked too. In an empirical ledger, an `external`
 proposition whose text cites a work falls under the last entry and under the
 one before it. Whether those two are merged is for issue #50 to decide when
 it supplies the checks.
+
+The two entries on support outside the paper are keyed on the evidence class
+alone, without `profile`. A proposition of a ledger with the default profile
+that leaves `evidence_class` out is therefore `unverified` under them and not
+`not_applicable`, although no value of that ledger's vocabulary would make
+them apply. The entries are left as the maintainer reviewed them; issue #50
+settles their keys together with the question of merging.
 
 ## How an entry is verified
 
@@ -346,7 +375,8 @@ of is that the criterion does not hold.
 
 `info` is the one setting that sets a warning aside without a judgment, so it
 is allowed only on entries the maintainer has reviewed for it. There are four,
-one for each of these warnings: an uncited proposition (`ledger:R3`), crossing
+one for each of these warnings: a proposition that no other cites and whose
+claim type the orphan check does not exempt (`ledger:R3`), crossing
 arcs (`structure:S7`), a code symbol that the documents never mention
 (`audit:R3`) and a bibliography entry that is never cited (`audit:R2`). Every
 other mechanical entry says `judge`, including an entry whose check reports no

@@ -5,8 +5,9 @@
 # How to read an entry, what the four outcomes mean and what "sound" means:
 #   plugins/propositions/docs/OBLIGATIONS.md
 # The rules that compute an outcome from what the checks print are issue 71.
-# No program reads this file yet. tests/test_plugin_payload_tracked.py keeps it
-# well formed and complete.
+# No tool computes anything from this file yet. The guard in
+# tests/test_plugin_payload_tracked.py reads it and keeps it well formed and
+# complete.
 #
 # check        gap, or one id of the closed inventory of implemented checks
 # owner        only on a gap: the issue that will supply the check

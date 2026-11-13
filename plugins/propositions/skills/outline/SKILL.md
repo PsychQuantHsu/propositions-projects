@@ -56,8 +56,8 @@ does it yet (issue 51). Do not write the text.
 Four rules hold for every command in this skill.
 
 1. **Each Bash call is a new shell.** A variable set in one call is gone in the next, and the
-   author's reply always arrives in a later call. Begin every Bash call with the two lines of
-   "The two lines that begin every call" below, with the three paths written out.
+   author's reply always arrives in a later call. Begin every Bash call with the lines of "The
+   lines that begin every call" below, with the three paths written out.
 2. **Paths go in single quotes.** Inside single quotes the shell changes nothing. When a path
    contains a single quote, stop and say that this skill cannot work with that path.
 3. **Text never goes on a command line.** Text taken from the manuscript, from an outline file
@@ -149,26 +149,26 @@ directory to use, as in case 2 below.
    say that the outline belongs in the ledger's directory, so that if a ledger is created
    somewhere else later the three files move there.
 
-### The two lines that begin every call
+### The lines that begin every call
 
 ```bash
 ROOT='<the root, as printed>'; OUTDIR='<the directory of the outline files>'; STAGE='<the stage directory, as printed>'
-SEC="$OUTDIR/outline-sections.jsonl"; PAR="$OUTDIR/outline-paragraphs.jsonl"; APP="$OUTDIR/outline-approvals.jsonl"
+R=$(realpath "$ROOT") && { O=$(realpath "$OUTDIR" 2>/dev/null) || O="$(realpath "$(dirname "$OUTDIR")" 2>/dev/null)/$(basename "$OUTDIR")"; } && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP the outline directory is not inside the repository, or an outline file is a symbolic link'; exit 1; }
+SEC="$O/outline-sections.jsonl"; PAR="$O/outline-paragraphs.jsonl"; APP="$O/outline-approvals.jsonl"
 ```
 
-Every command block from here on is written without these two lines and is run after them, in
-the same Bash call. Where a block begins with a line such as `F="$SEC"` or `N=1`, that line
-names what the block works on; change its value as the text says.
+Every command block from here on is written without these lines and is run after them, in the
+same Bash call. Where a block begins with a line such as `F="$SEC"` or `N=1`, that line names
+what the block works on; change its value as the text says.
 
-Run this at the start of every action, before anything else of the action:
-
-```bash
-R=$(realpath "$ROOT") && B=$(basename "$OUTDIR") && [ "$B" != "." ] && [ "$B" != ".." ] && O="$(realpath "$(dirname "$OUTDIR")")/$B" && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && [ ! -L "$OUTDIR" ] && [ ! -L "$SEC" ] && [ ! -L "$PAR" ] && [ ! -L "$APP" ] && echo 'ok the outline directory is inside the repository and no outline file is a symbolic link'
-```
-
-No `ok`: stop and tell the author. `OUTDIR` has to be the repository's root or a directory under
-it, written without `.` or `..` as its last part; the directory that is to hold it has to
-exist; and this skill does not write outside the repository or through a symbolic link.
+The second line is a guard, and it runs in every call, so also in the call that writes. It
+takes the real path of the outline directory, with every symbolic link resolved, and goes on
+only when that path is the repository's root or a directory under it and none of the three
+outline files is a symbolic link. `SEC`, `PAR` and `APP` are built from the real path. When
+`OUTDIR` does not exist yet, the directory that is to hold it has to exist inside the
+repository. When the call prints `STOP`, nothing after the guard has run: stop and tell the
+author. This skill does not read or write outline files outside the repository or through a
+symbolic link.
 
 When the stage directory is gone, or the conversation no longer has its path (a new session, a
 conversation that was summarised), make a new one with the `mktemp` line. Whatever was shown
@@ -363,7 +363,7 @@ and draft it is a mistake of this skill: correct the staged record and run the c
 9. Ask whether to write the files into `OUTDIR` (AskUserQuestion). Only after the author agrees:
 
    ```bash
-   [ ! -e "$SEC" ] && [ ! -L "$SEC" ] && [ ! -e "$PAR" ] && [ ! -L "$PAR" ] && mkdir -p "$OUTDIR" && cp "$STAGE/outline-sections.jsonl" "$SEC" && cp "$STAGE/outline-paragraphs.jsonl" "$PAR" && echo 'ok outline files written'
+   [ ! -e "$SEC" ] && [ ! -e "$PAR" ] && { [ -d "$O" ] || mkdir "$O"; } && cp "$STAGE/outline-sections.jsonl" "$SEC" && cp "$STAGE/outline-paragraphs.jsonl" "$PAR" && echo 'ok outline files written'
    ```
 
    No `ok` although neither file existed before: the copy failed part way. Tell the author
@@ -387,8 +387,14 @@ and draft it is a mistake of this skill: correct the staged record and run the c
 
 ## revise — the author's edits
 
-Change the files only as the author instructs. Read both outline files first, and edit the
-lines concerned with the Edit tool.
+Change the files only as the author instructs. Start every revise with this, and read and edit
+the two outline files under the directory it prints, by that path and no other spelling of it:
+
+```bash
+echo "ok outline directory: $O"
+```
+
+Read both outline files first, and edit the lines concerned with the Edit tool.
 
 - **Ids are stable.** A record and a point keep their `id` when their content changes and when
   they move. Merging and splitting replace records: the records that are merged, and the record
@@ -608,7 +614,7 @@ asks, through revise.
 8. Append the record:
 
    ```bash
-   [ ! -L "$OUTDIR" ] && [ ! -L "$APP" ] && cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
+   cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
      ($in | split("\n")) as $l
      | ($shown[0] | unique) as $seen
      | (try ($l[0] | fromjson) catch null) as $first
@@ -623,8 +629,8 @@ asks, through revise.
    ' > "$STAGE/approval.json" && { [ -z "$(tail -c 1 "$APP" 2>/dev/null)" ] || printf '\n' >> "$APP"; } && cat "$STAGE/approval.json" >> "$APP" && echo 'ok approval appended'; rm -f "${STAGE:?}/approval-input.txt" "${STAGE:?}/approval.json"
    ```
 
-   The command goes on only while each part holds: neither the outline directory nor the
-   approvals file is a symbolic link; the outline files are still what was shown;
+   The command goes on only while each part holds: the guard of the opening lines (it runs in
+   this call too); the outline files are still what was shown;
    every id listed is the id of a section that was shown, and there is at least one; the
    statement is not empty. It builds the record from the copies that were shown, with `whole`
    true when it covers every section, ends the last line of the approvals file when that line

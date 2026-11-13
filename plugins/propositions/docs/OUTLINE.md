@@ -26,7 +26,9 @@ directory to use: when the manuscript has neither a ledger nor outline files,
 when more than one ledger names it, and also when the repository holds outline
 files in a directory that has no such ledger, because they can belong to
 another manuscript. The directory is always the repository's root or a
-directory under it, and it is not a symbolic link.
+directory under it: the skill resolves every symbolic link in its path before
+it decides, and it decides again each time before it reads or writes an outline
+file.
 
 ```
 manuscript/propositions/

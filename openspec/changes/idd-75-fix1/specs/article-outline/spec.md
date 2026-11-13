@@ -433,7 +433,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 ### Requirement: The outline skill writes only the three outline files
 
-The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be the repository's root or a directory under it, and SHALL NOT be a symbolic link. The skill SHALL NOT write through a symbolic link. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
+The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be the repository's root or a directory under it once every symbolic link in its path is resolved, and the skill SHALL confirm this again each time before it reads or writes an outline file. The skill SHALL NOT write to an outline file that is a symbolic link. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
 
 After every write to an outline file the skill SHALL confirm that every line of that file that is not empty parses as a JSON object. After a write to the section file or the paragraph file it SHALL also confirm that every record and every point has an `id`, that no `id` repeats among the section records or among the paragraph records and points, and that no string holds a control character. When any of these fails, it SHALL report the file and the line and SHALL NOT report the write as done. The check SHALL NOT report a pass for a file that holds no record. An empty section file is always a mistake. An empty paragraph file is a mistake except when no section of the outline has a paragraph yet; in that case the skill says in its report that the paragraph file is empty, and goes on. Its report SHALL say that no other check of the format exists until issue 78.
 
@@ -443,6 +443,11 @@ No executable check: this change adds no test target; the examples and tests of 
 
 - **WHEN** the author, during a revision, asks the skill to rewrite a paragraph of the manuscript to match a point
 - **THEN** the skill writes nothing to the manuscript and says that writing from an outline is not one of its actions
+
+#### Scenario: The outline directory resolves to a place outside the repository
+
+- **WHEN** the path of the outline directory, with its symbolic links resolved, is outside the repository, however the path is written
+- **THEN** the skill reads and writes no outline file there, stops, and tells the author
 
 #### Scenario: An outline file that is a symbolic link
 

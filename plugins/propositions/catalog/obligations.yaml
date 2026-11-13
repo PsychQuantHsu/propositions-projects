@@ -11,10 +11,11 @@
 # check        gap, or one id of the closed inventory of implemented checks
 # owner        only on a gap: the issue that will supply the check
 # verified_by  [mechanical], or the verification methods, all of them required
-# on_warning   on mechanical entries, what a finding short of an error does once
-#              a unit can pass: judge (it keeps the unit from passing until
-#              someone judges it) or info (it is listed and does not; only on
-#              entries reviewed for it)
+# on_warning   on mechanical entries, what a warning does (a warning is what a
+#              check reports about a unit without reporting it as an error):
+#              judge (the unit cannot pass until someone has judged it) or info
+#              (it is listed, and neither keeps the unit from passing nor makes
+#              the entry fail; only on entries reviewed for it)
 # external_source  true on an entry whose check has to consult a source outside
 #              the manuscript's repository, whoever decides it
 
@@ -606,6 +607,22 @@ entries:
     applies:
       evidence_class: [external]
     criterion: "The support outside the paper says what the proposition takes from it."
+    check: gap
+    owner: 50
+    verified_by: [proofread, cross_model]
+    external_source: true
+
+  # A ledger with the default profile has no evidence class for support outside
+  # the paper, so this entry is not keyed on one: it is decided for every
+  # proposition, and asks nothing of one whose text cites no work. In an
+  # empirical ledger an `external` proposition whose text cites a work falls
+  # under this entry and under truth.external-support-agrees; issue 50 decides
+  # whether the two are merged when it supplies the checks.
+  - id: truth.cited-work-agrees
+    class: obligation
+    group: truth
+    unit: proposition
+    criterion: "Each work outside the manuscript that the proposition's text cites says what the proposition takes from it."
     check: gap
     owner: 50
     verified_by: [proofread, cross_model]

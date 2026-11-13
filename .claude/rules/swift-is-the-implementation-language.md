@@ -68,7 +68,7 @@ plugin 目錄或其他位置另建 package。
 
    **退場條件**：#46 建好 Swift package、而且守衛讀的詞彙在 Swift 裡有了來源之後，把這一組連同
    `spec-example:` 標記搬到 `Tests/` 的 Swift Testing target，然後刪掉這一條例外。現在不寫成 Swift 的原因
-   是守衛直接從 Python 的驗證器讀詞彙（`PROFILE_VOCABULARIES`、`KINDS`、`ROLES`）；驗證器移植之前，
+   是守衛直接從 Python 的驗證器讀詞彙（`PROFILE_VOCABULARIES`、`KINDS`、`ROLES`、`METHODS`）；驗證器移植之前，
    Swift 版只能另抄一份，抄的那一份不會跟著驗證器更新。
 
 ## 不適用

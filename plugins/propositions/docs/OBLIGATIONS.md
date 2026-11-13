@@ -53,10 +53,14 @@ from it will have to be judged before the entry passes.
 
 A unit is what an entry is decided for.
 
-- `proposition`: each proposition of the ledger that is not retired. A proposition is retired only when its
-  `retired` block is well formed by the ledger validator's test, so one whose
-  block is malformed is a unit.
+- `proposition`: each proposition of the ledger that is not retired. A
+  proposition is retired only when its `retired` block is well formed by the
+  ledger validator's test, so one whose block is malformed is a unit.
 - `article`: the manuscript as a whole, once.
+
+A proposition is named by its id. Where a line of the ledger has no id, or two
+propositions that are not retired share one, the id does not single out a
+unit, and such a unit is named by its line in the ledger.
 
 ## Two classes
 
@@ -139,30 +143,69 @@ the manuscript's ledger.
 
 When the value a key needs cannot be read for a unit, the entry is `unverified`
 for that unit, not `not_applicable`, unless another key whose value can be read
-already rules the unit out:
+already rules the unit out. A value cannot be read in the cases below, and in
+no other.
 
-- `profile`: the ledger's `_meta.json` declares a profile that the validator
-  rejects. A ledger that declares none has the default profile.
+- `profile`: the ledger's `_meta.json` cannot be parsed as a JSON object, or it
+  declares a profile that the ledger validator rejects. A ledger without
+  `_meta.json`, and one whose `_meta.json` declares no profile, has the default
+  profile.
 - `claim_type`, `evidence_class`: the proposition's ledger entry has no such
-  field, or the field holds something other than a string.
+  field, or the field holds anything other than a value of that field's
+  vocabulary for the ledger's profile. A misspelled class is such a case: it
+  is not read as a value outside the entry's list. When the profile cannot be
+  read, a value of the vocabulary of either profile can be read.
 - `cites`: the field is present with a value that is not a list, such as
   `null` or a string. A proposition without the field cites nothing; whether
   it relies on something it does not declare is what the entry for the layer
   L3 asks.
-- `opens`: the proposition has no record in the discourse sidecar or more
-  than one, or the record's `opens` is present and is not a list of
-  commitments that the structure validator accepts. A record without `opens`,
-  or with an empty list, opens nothing, and that is a value.
-- `section_role`: the section plan of the structure sidecar is missing or
-  invalid. The plan and the ledger's order place a proposition in a section; a
-  discourse record is not needed for that.
+- `opens`: the structure validator cannot load the discourse sidecar; or the
+  proposition has no record in it or more than one; or its record's `opens` is
+  present and is not a list of commitments that the structure validator
+  accepts; or the proposition has no id, or shares its id with another
+  proposition that is not retired, because the sidecar refers to a proposition
+  by id. A record without `opens`, or with an empty list, opens nothing, and
+  that is a value.
+- `section_role`: the structure validator cannot load `structure.json` (the
+  file is missing, is not a JSON object, or does not carry the structure
+  version the validator reads), or the section list in it is unusable. The
+  list and the ledger's order place a proposition in a section; a discourse
+  record is not needed for that.
+
+The section list is unusable exactly when the structure validator reports one
+of these eleven errors under S5:
+
+1. `sections` is not a non-empty list;
+2. an item is not an object;
+3. an item's `id` is not a non-empty string;
+4. two items share an id;
+5. an item's `heading` is not a non-empty string;
+6. an item's role is outside the vocabulary;
+7. an item's `first_prop` is not a proposition that the structure validator
+   counts as not retired;
+8. an item with the role `abstract` is not the first;
+9. two sections are out of ledger order;
+10. the ledger has no proposition that the structure validator counts as not
+    retired;
+11. the first section does not start at the first such proposition.
+
+An S5 error about anything else leaves the section list usable. There are four
+kinds: about the thesis, about a section's `parent`, about a commitment opened
+inside the abstract, and about the paragraph plan.
+
+The structure validator counts a proposition as retired when its ledger entry
+carries a `retired` key, whether or not the block is well formed. A
+proposition whose `retired` block is malformed is a unit (see [Units](#units)),
+and the structure validator leaves it out of the order it works on, so neither
+`opens` nor `section_role` can be read for it.
 
 Which propositions may leave `claim_type` or `evidence_class` out is not
 settled (issue #70).
 
-The relation of a record is not a key. Every record has one, and no entry's
-requirement differs by its value except that a `basis` edge needs a citation,
-which one entry asks of every proposition.
+The relation of a record is not a key. The root of a paragraph has none, and
+no entry's requirement differs by the relation of the other records except
+that a `basis` edge needs a citation, which one entry asks of every
+proposition.
 
 The move and the paragraph type are not keys. The sidecars leave them optional,
 so an entry keyed on one of them would treat an unannotated proposition as not
@@ -176,17 +219,19 @@ classes mark a claim made about data. The skill says that its layers E1 to E8
 do not apply to an `external` proposition, which has no artifact to re-run;
 the table gives the entries for E9 and E10 the same limit. `not_computable`
 is one of the four because it marks a quantity the data cannot produce, and
-the entry for E2 is the one that fails it. Without the profile, every
-proposition of a mathematical manuscript would stay unverified under these
-entries; without the evidence classes, every proposition without an artifact
-would.
+the entry for E2 is the one that fails it. Without the `profile` key, a
+proposition of a mathematical manuscript that leaves `evidence_class` out
+would be unverified under these entries instead of not applicable; without the
+evidence classes, every proposition of an empirical ledger that has no
+artifact would stay unverified.
 
 A proposition of an empirical ledger that carries any other evidence class is
 outside these entries, also when its text interprets data. No check decides
-yet whether such a tag is right: the layer L5 is not defined for these classes
-(issue #57). The derivation layers are
-not limited by profile, so a proposition of an empirical ledger that rests on
-data has to pass both walks.
+yet whether a claim about data that carries another class should carry one of
+the four: the layer L5 states a test for `derived` and for `verified` and none
+for the four (issue #57). The derivation layers are not limited by profile, so
+a proposition of an empirical ledger that rests on data has to pass both
+walks.
 
 Numbers are compared with artifacts only in a ledger with the empirical
 profile. Whether a manuscript that reports data has that profile is the second
@@ -194,7 +239,7 @@ precondition described under [Two classes](#two-classes).
 
 Some criteria concern only propositions with a feature that no key selects:
 one assigned to a theorem-like block, one with a `basis` edge, one that cites a
-figure. The entry still applies to every proposition. How a check reports a
+figure, one whose text cites a work. The entry still applies to every proposition. How a check reports a
 unit of which the criterion asks nothing is part of issue #68.
 
 `unconstrained` at the end of the table lists every value of `claim_type`,
@@ -231,15 +276,19 @@ findings, or leaves records, about units under an id of its own.
   reports environments it could not close and propositions whose block it
   could not resolve, which R9 passes over in silence; that difference belongs
   to issue #68.
-- The dry run of the location refresh. It is the same check as `ledger:R13`.
+- The dry run of the location refresh. It has no rule id of its own, and it
+  looks at what `ledger:R13` looks at: the lines that a proposition's
+  `location` names. It reports more than R13, which allows a start within two
+  lines and passes over a proposition whose text it does not find; what R13
+  passes over in silence belongs to issue #68.
 - The link catalog's currency check. Its subject is a file of this plugin, not
   a manuscript.
 - The checks of the `tschema-check` plugin. They belong to another plugin.
 - The stumble categories of the clarity audit, the counts in the construct
   skill's summary and the states of the analyze skill. None of them leaves a
   finding or a record for a unit under an id.
-- The `location` layer of the proofread walk. It is the same check as
-  `ledger:R13`.
+- The `location` layer of the proofread walk. The proofread skill defines it
+  as the R13 check of the ledger validator.
 - The records validator's warning that two methods disagree on a proposition.
   It has no rule id of its own. It reports part of what the entry on verdicts
   against a proposition states; where it counts is left to the outcome rules
@@ -259,12 +308,22 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected
 to be verified. They are provisional: the change that supplies the check sets
 them to what the check does.
 
-Three entries need a source outside the manuscript's repository: that the cited
-works exist, that the support outside the paper can be found, and that it says
-what is taken from it. Each carries `external_source: true`. The mark is a key
-of its own because it says where the check looks, not who decides: two of the
-three are decided by a script and one by a reading. All three are gaps today,
-owned by issue #50, and each keeps the mark when its check is supplied.
+Four entries need a source outside the manuscript's repository: that the cited
+works exist, that the support outside the paper can be found, that it says
+what is taken from it, and that each work a proposition's text cites says what
+the proposition takes from it. Each carries `external_source: true`. The mark
+is a key of its own because it says where the check looks, not who decides:
+two of the four are decided by a script and two by a reading. All four are
+gaps today, owned by issue #50, and each keeps the mark when its check is
+supplied.
+
+The last of the four has no `applies`. The two entries on support outside the
+paper apply by the evidence class `external`, which only the empirical profile
+has; a proposition of a mathematical manuscript that relies on a theorem of
+another paper has to be asked too. In an empirical ledger, an `external`
+proposition whose text cites a work falls under the last entry and under the
+one before it. Whether those two are merged is for issue #50 to decide when
+it supplies the checks.
 
 ## How an entry is verified
 
@@ -273,26 +332,32 @@ owned by issue #50, and each keeps the mark when its check is supplied.
 `verified_by: [mechanical]` means that a script decides, whether the script is
 in this plugin or looks something up in an external source.
 
-A check can report a problem at two levels. An error says that the criterion
-is violated. Anything it reports short of that is called a warning here,
-whatever the script itself calls it. `on_warning` says what a warning does to
-the entry:
+A warning, in this document, is what a check reports about a unit without
+reporting it as an error, whatever the script itself calls it: a warning, an
+FYI, information. The level says how the script treats what it reports, not
+whether the criterion is violated. Some checks only warn, and what they warn
+of is that the criterion does not hold.
 
-- `judge`: the warning has to be judged before the unit can pass.
-- `info`: the warning is listed in a report and does not keep the unit from
-  passing.
+`on_warning` records what the maintainer decided a warning does to the entry:
+
+- `judge`: the unit cannot pass until someone has judged the warning.
+- `info`: the warning is listed in a report. It neither keeps the unit from
+  passing nor makes the entry fail for the unit.
 
 `info` is the one setting that sets a warning aside without a judgment, so it
 is allowed only on entries the maintainer has reviewed for it. There are four,
 one for each of these warnings: an uncited proposition (`ledger:R3`), crossing
 arcs (`structure:S7`), a code symbol that the documents never mention
-(`audit:R3`) and a bibliography entry that is never cited (`audit:R2`). Every other mechanical entry says `judge`,
-including an entry whose check reports no warning today: if the check starts to
-report one, the warning has to be judged.
+(`audit:R3`) and a bibliography entry that is never cited (`audit:R2`). Every
+other mechanical entry says `judge`, including an entry whose check reports no
+warning today: if the check starts to report one, the warning has to be
+judged.
 
-The table gives each kind of warning one entry where it can: where a check's
-warning concerns the same thing as its error, they share an entry, and where it
-concerns something else, it has its own.
+The criterion of each of the four states the condition that its warning
+reports. A unit can therefore pass one of these entries while the criterion
+does not hold for it. That is the maintainer's decision: the condition is
+worth listing, and an article can be sound without it. The entry is in the
+table so that the finding has a place there.
 
 ```yaml
 - id: index.arcs-do-not-cross
@@ -304,10 +369,17 @@ concerns something else, it has its own.
   on_warning: info
 ```
 
+`info` covers that one warning and nothing else that the check reports. Three
+of the four checks are also named by entries that say `judge`, so the rule
+that says which entry a line of output counts for has to keep the four
+warnings on the four entries reviewed for them. That rule is not in this
+document.
+
 This document does not say which lines of a check's output are errors and
 which are warnings, which entry a finding counts for when several entries name
-its check, or which unit it counts for. Those rules compute an outcome from
-what the checks print, and belong to issue #71.
+its check, which unit it counts for, or what a judgment does to the outcome.
+Those rules compute an outcome from what the checks print, and belong to
+issue #71.
 
 ### Entries verified by methods
 
@@ -325,13 +397,35 @@ An entry has exactly one of four outcomes for a unit.
 | Outcome | Meaning |
 |---|---|
 | `not_applicable` | The entry does not apply to the unit |
-| `passed` | The named check examined the unit and reported nothing against it |
-| `failed` | The named check reported that the criterion is violated for the unit |
+| `passed` | The entry applies to the unit and is settled in the unit's favour |
+| `failed` | The entry applies to the unit and is settled against it |
 | `unverified` | None of the other three is established |
 
-`passed` is not proof that the criterion holds. A check can be weaker than the
-criterion it serves, and that difference is corrected in the check, not by
-rewording the criterion to follow the code.
+What settles an entry in a unit's favour or against it, that is, what the
+entry's check has to print or its verification records have to hold, is not
+defined in this document. Those are the outcome rules (issue #71).
+
+### What the outcome rules have to keep
+
+Seven points are fixed here, whatever the rules turn out to be.
+
+1. `unverified` is what remains. Whenever none of the other three outcomes is
+   established, the outcome is `unverified`.
+2. `passed` needs the entry's check to have examined the unit. It is not
+   proof that the criterion holds: a check can be weaker than the criterion it
+   serves, and that difference is corrected in the check, not by rewording the
+   criterion to follow the code.
+3. `failed` needs a finding of the entry's check, or a record of one of its
+   methods, that stands against the unit. Where there is none, the outcome is
+   not `failed`.
+4. Under `on_warning: info`, the warning that the entry was reviewed for is no
+   reason against `passed` and no reason for `failed`.
+5. Under `on_warning: judge`, a warning that nobody has judged keeps the unit
+   from `passed`.
+6. A `supported` record counts only for the checks that its reading
+   performed.
+7. Today no outcome is `passed`.
+   [Why nothing passes yet](#why-nothing-passes-yet) gives the reason.
 
 ### What the table decides by itself
 
@@ -343,19 +437,25 @@ sidecars, without the output of any check. The first rule that fits decides.
 2. A value that `applies` needs cannot be read for the unit: `unverified`.
 3. `check` is `gap`: `unverified`.
 
-For every other entry and unit, the outcome depends on what the check reported
-or on the verification records. Today it is never `passed`. By the definitions
-above it is `failed` when the check reported that the criterion is violated
-for the unit, and `unverified` otherwise.
+Rule 2 follows from the definitions. When the value cannot be read, whether
+the entry applies to the unit is not established, so none of the other three
+outcomes is. That holds also when a check printed something about the unit.
+The ledger validator, for example, reports every character of a `cites` that
+is a string as an id that does not resolve; the entry on resolving ids is
+still `unverified` for that proposition.
 
-Deciding that from a check's output or from a record is the work of the
-outcome rules (issue #71): which outputs are errors and which are warnings,
-which entry and which unit a finding counts for, when a run still counts, what
-a recorded judgment does, and when an entry is `passed`.
+For every other entry and unit, the outcome is `passed`, `failed` or
+`unverified`, and the outcome rules (issue #71) decide which: which outputs
+are errors and which are warnings, which entry and which unit a finding counts
+for, when a run still counts, what a judgment does, and when an entry is
+`passed`. By points 3 and 7, the outcome is today `unverified` wherever no
+finding and no record stands against the unit. Elsewhere it is `failed` or
+`unverified`.
 
 ### Why nothing passes yet
 
-Nothing shows today that a check examined a unit.
+An entry is settled in a unit's favour only by a check that examined the unit
+(point 2), and nothing shows today that a check examined a unit.
 
 - **Mechanical checks.** A check names a unit when it has a finding for it or
   sets it aside. It does not say which units it examined. A line that says a
@@ -373,9 +473,8 @@ Nothing shows today that a check examined a unit.
   was read. Issue #62 owns the record format.
 
 The condition under which an entry passes is therefore not written yet. It is
-part of the outcome rules (issue #71) and needs what issues #68 and #62 will
-supply. One decision already binds it: a `supported` record counts only for
-the checks that its reading performed.
+part of the outcome rules (issue #71), it needs what issues #68 and #62 will
+supply, and it has to keep the seven points above.
 
 ## When an article is sound
 
@@ -405,8 +504,12 @@ again, and read the obligations after that.
 
 A report on soundness names, for every outcome that is `failed` or
 `unverified`, the entry and the unit, and for a gap the issue in its `owner`.
-What else a report lists, and its format, are part of the outcome rules
-(issue #71).
+It names a proposition by its id, and by its line in the ledger when the
+proposition has no id or shares its id with another proposition that is not
+retired. What else a report lists, and its format, are part of the outcome
+rules (issue #71). One example of what is left open: a `refuted` record of a
+method that no entry lists changes no outcome while the entry on such verdicts
+is a gap, so whether a report lists the record is for those rules to say.
 
 ### No article is sound yet
 
@@ -433,16 +536,10 @@ examine.
   citation audit reads one bibliography file of a fixed name. Issue #69.
 - The audit's code pass needs a directory of analysis code. Issue #64.
 
-Two more limits are about what the table reaches, and an article could be
-called sound without them being checked:
-
-- Numbers are compared with artifacts only in a ledger with the empirical
-  profile, and nothing checks yet that a ledger's profile fits its manuscript.
-  Issue #70.
-- The two entries on support outside the paper apply by the evidence class
-  `external`, which only the empirical profile has. In a ledger with the
-  default profile, no entry asks whether a cited work says what a proposition
-  takes from it. Issue #50.
+One more limit is about what the table reaches, and an article could be called
+sound without it being checked: numbers are compared with artifacts only in a
+ledger with the empirical profile, and nothing checks yet that a ledger's
+profile fits its manuscript. Issue #70.
 
 ## Changing the table
 
@@ -465,8 +562,8 @@ To add an entry:
    carry it, so both change in the same commit.
 
 The spec and the guard also name the four entries that say `info`, several of
-the entries that are gaps today, the three that carry `external_source`, and
-the owners that have to appear. Changing one of them, for instance when a
+the entries that are gaps today, the four that carry `external_source`, the
+one of them that has no `applies`, and the owners that have to appear. Changing one of them, for instance when a
 gap's check is supplied, changes the spec requirement and the guard in the
 same commit; the guard's message says which entry it expected.
 

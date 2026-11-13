@@ -72,11 +72,10 @@ evidence class is consistent, and the location is right. It checks the ledger
 entry and the argument's chain. **It is not a formal proof.** A disagreement
 between `proofread` and `lean` is worth reading for exactly this reason.
 
-That describes the derivation walk of the proofread skill. A record from its
-empirical walk means the proposition passed the empirical layers that walk
-lists, and the record does not say which walk produced it. How a record counts
-toward an article being sound is not settled yet: `docs/OBLIGATIONS.md` says
-why no record counts today and which issues own what is missing.
+That describes the derivation walk of the proofread skill. A record does not
+say which walk produced it. How a record counts toward an article being sound
+is not settled yet: `docs/OBLIGATIONS.md` says why no record can make an entry
+pass today and which issues own what is missing.
 
 ## Validator
 

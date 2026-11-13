@@ -24,7 +24,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 The outline SHALL consist of three files in the directory that holds, or would hold, the manuscript's ledger: `outline-sections.jsonl`, `outline-paragraphs.jsonl` and `outline-approvals.jsonl`. In each file every line that is not empty SHALL be one JSON object.
 
-The outline SHALL NOT depend on a ledger: the directory can hold the three files without a `main.jsonl`. When the manuscript has neither a ledger nor outline files, the skill SHALL ask the author which directory to use and SHALL NOT choose one without asking. Adding, changing or removing the outline files SHALL NOT change the ledger, its metadata, the structure sidecars or the verification records. The ledger's schema version does not cover the outline files.
+The outline SHALL NOT depend on a ledger: the directory can hold the three files without a `main.jsonl`. The skill SHALL use a directory without asking only when that directory holds a ledger that names this manuscript. In every other case it SHALL ask the author which directory to use and SHALL NOT choose one without asking: when the manuscript has neither a ledger nor outline files, and also when the repository holds outline files in a directory that has no such ledger, because they can belong to another manuscript. Adding, changing or removing the outline files SHALL NOT change the ledger, its metadata, the structure sidecars or the verification records. The ledger's schema version does not cover the outline files.
 
 A section record, a paragraph record, a point and a locator are allowed to carry keys that this capability does not define. An approval record SHALL carry no key other than the four this capability defines for it.
 
@@ -46,6 +46,11 @@ No executable check: this change adds no test target; the examples and tests of 
 
 - **WHEN** the author asks for an outline of a manuscript that has no ledger and no outline files
 - **THEN** the skill asks which directory the outline files go in before it writes them
+
+#### Scenario: Outline files of another manuscript in the same repository
+
+- **WHEN** the repository holds outline files in a directory that has no ledger naming this manuscript, and the author asks for an outline of this manuscript
+- **THEN** the skill offers that directory to the author and asks which directory to use, and does not read or write the outline files there before the author answers
 
 #### Scenario: A backslash that was written as a JSON escape
 

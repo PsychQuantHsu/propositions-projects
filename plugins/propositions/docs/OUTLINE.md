@@ -19,9 +19,12 @@ kept by the skill and by the reader.
 
 The outline is three files in the directory that holds, or would hold, the
 ledger. The directory can hold them without a `main.jsonl`: a manuscript does
-not need a ledger to have an outline. When the manuscript has neither a ledger
-nor outline files, the skill asks the author which directory to use; it does
-not choose one without asking.
+not need a ledger to have an outline. The skill uses a directory without asking
+only when it holds a ledger that names this manuscript. In every other case it
+asks the author which directory to use: when the manuscript has neither a
+ledger nor outline files, and also when the repository holds outline files in a
+directory that has no such ledger, because they can belong to another
+manuscript.
 
 ```
 manuscript/propositions/

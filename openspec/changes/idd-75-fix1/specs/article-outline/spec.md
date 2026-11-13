@@ -262,7 +262,7 @@ None of the following is an approval, and this list is closed.
 
 By default the skill SHALL show the whole outline and ask for approval of the whole outline. When the author asks for particular sections to be approved, the skill SHALL show those sections only. The record it appends SHALL cover the sections the author states are approved, which can be fewer than the sections shown, SHALL have at least one entry, and SHALL hold the sections as they were shown. It SHALL NOT have an entry for a section that was not shown: when the author names such a section, the skill leaves it out of the record, says that it was not shown, and shows it. When none of the sections the author names was shown, the skill appends nothing. The record has `whole` true when it covers every section record, and no `whole` otherwise.
 
-The skill SHALL keep, outside the repository, a copy of the outline files as they were when shown, so that the approval can be recorded when the author's reply arrives in a later message. When the outline files differ from that copy at the time of the approval, or the copy is no longer available, the skill SHALL append nothing and show the sections again.
+The skill SHALL keep, outside the repository, a copy of the outline files as they were when shown, so that the approval can be recorded when the author's reply arrives in a later message. When the outline files differ from that copy at the time of the approval, when the outline directory is no longer the directory the copy was taken from, or when the copy is no longer available, the skill SHALL append nothing and show the sections again.
 
 The skill SHALL append the record as a line of its own: when the last line of the approvals file is not ended by a line break, the skill ends that line first. The line break that ends a line is not part of its content, and the skill SHALL NOT change the content of an earlier line. What the skill writes down for one approval, the author's words and the sections approved, SHALL NOT be used for a later one.
 
@@ -295,6 +295,11 @@ No executable check: this change adds no test target; the examples and tests of 
 
 - **WHEN** the skill shows the whole outline, a point is then changed in `outline-paragraphs.jsonl`, and the author replies that the outline is approved
 - **THEN** the skill appends no approval record, says that the outline changed after it was shown, and shows it again
+
+#### Scenario: The outline directory changed between showing and approving
+
+- **WHEN** the skill shows the whole outline, the path of the outline directory is then made to lead to another directory of the repository that holds outline files with the same content, and the author replies that the outline is approved
+- **THEN** the skill appends no approval record to either directory and shows the outline again
 
 #### Scenario: Approving a section again shows only what differs
 
@@ -433,7 +438,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 ### Requirement: The outline skill writes only the three outline files
 
-The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be the repository's root or a directory under it once every symbolic link in its path is resolved, and the skill SHALL confirm this again each time before it reads or writes an outline file. The skill SHALL NOT write to an outline file that is a symbolic link. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
+The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository that holds the manuscript it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside that repository are not covered by this rule. The directory of the outline files SHALL be the repository's root or a directory under it once every symbolic link in its path is resolved, and the skill SHALL confirm this again in every command that reads or writes an outline file, and, in the revise action, before its first edit and again after every reply of the author. The skill SHALL NOT read or write an outline file that is itself a symbolic link. A symbolic link in the path of the directory is a different case: it is resolved, and what counts is where it leads. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
 
 After every write to an outline file the skill SHALL confirm that every line of that file that is not empty parses as a JSON object. After a write to the section file or the paragraph file it SHALL also confirm that every record and every point has an `id`, that no `id` repeats among the section records or among the paragraph records and points, and that no string holds a control character. When any of these fails, it SHALL report the file and the line and SHALL NOT report the write as done. The check SHALL NOT report a pass for a file that holds no record. An empty section file is always a mistake. An empty paragraph file is a mistake except when no section of the outline has a paragraph yet; in that case the skill says in its report that the paragraph file is empty, and goes on. Its report SHALL say that no other check of the format exists until issue 78.
 
@@ -452,7 +457,7 @@ No executable check: this change adds no test target; the examples and tests of 
 #### Scenario: An outline file that is a symbolic link
 
 - **WHEN** `outline-sections.jsonl` in the outline directory is a symbolic link, wherever it leads
-- **THEN** the skill writes nothing through it, stops, and tells the author
+- **THEN** the skill does not read it, writes nothing through it, stops, and tells the author
 
 #### Scenario: A repeated id stops the report
 

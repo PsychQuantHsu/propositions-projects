@@ -27,8 +27,9 @@ when more than one ledger names it, and also when the repository holds outline
 files in a directory that has no such ledger, because they can belong to
 another manuscript. The directory is always the repository's root or a
 directory under it: the skill resolves every symbolic link in its path before
-it decides, and it decides again each time before it reads or writes an outline
-file.
+it decides. It decides again in every command that reads or writes an outline
+file, and, when it revises, before its first edit and again after every reply
+of the author.
 
 ```
 manuscript/propositions/
@@ -298,7 +299,8 @@ otherwise.
 The skill keeps, outside the repository, a copy of the outline files as they
 were when shown, so that the approval can be recorded when the author's reply
 arrives in a later message. When the outline files differ from that copy at the
-time of the approval, or the copy is no longer available, the skill appends
+time of the approval, when the outline directory is no longer the directory the
+copy was taken from, or when the copy is no longer available, the skill appends
 nothing and shows the sections again.
 
 The record is appended as a line of its own: when the last line of the
@@ -385,8 +387,10 @@ reads as an instruction.
 In the repository that holds the manuscript the skill writes no other file:
 not the manuscript, not the ledger, not the structure sidecars and not the
 verification records. Its temporary files are kept outside the repository. It
-does not write through a symbolic link: when an outline file is one, the skill
-stops and tells the author.
+does not read or write an outline file that is itself a symbolic link: when one
+of the three is, the skill stops and tells the author. A symbolic link in the
+path of the directory is a different case: it is resolved, as said under "The
+three files", and what counts is where it leads.
 
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. It follows the

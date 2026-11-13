@@ -268,12 +268,27 @@ outside these entries, also when its text interprets data. That a proposition
 which reports a number or a result from the manuscript's own data carries one
 of the four is asked by a precondition of its own, decided for every
 proposition of an empirical ledger. That precondition asks nothing of a
-sentence that reports another work's result, which is `external`, or of one
-that only interprets a result and reports none. It is a gap (issue #70): the
-layer L5 states a test for `derived` and for `verified` and none for the four
-(issue #57). The derivation layers are not limited by profile, so
-a proposition of an empirical ledger that rests on data has to pass both
-walks.
+sentence that reports no number and no result from the manuscript's own data:
+one that only reports another work's result, which is `external`, or one that
+only interprets a result. A sentence that reports both a result of its own and
+another work's is asked, because of its own result. It is a gap (issue #70):
+the layer L5 states a test for `derived` and for `verified` and none for the
+four (issue #57).
+
+Three points say what counts as reporting a result from the manuscript's own
+data.
+
+- To report a result is to present it as coming from the manuscript's data,
+  whether or not the data can produce it. A quantity that cannot be computed
+  from the dataset is reported in this sense, and `not_computable` is the
+  class for it.
+- The manuscript's own data includes the output of its own models and
+  simulations.
+- A number computed from the manuscript's own numbers, such as the difference
+  of two means, is a number from its data.
+
+The derivation layers are not limited by profile, so a proposition of an
+empirical ledger that carries one of the four has to pass both walks.
 
 Numbers are compared with artifacts only in a ledger with the empirical
 profile. Whether a manuscript that reports data has that profile is the second

@@ -142,7 +142,7 @@ entries:
   - id: index.profile-valid
     class: precondition
     unit: article
-    criterion: "The ledger's profile, the one it declares or the default when it declares none, is one the validator accepts under the ledger's schema version."
+    criterion: "The ledger declares no profile, which gives the default, or it declares one whose name the validator accepts under a schema version that allows a profile to be declared."
     check: ledger:profile
     verified_by: [mechanical]
     on_warning: judge
@@ -158,9 +158,11 @@ entries:
 
   # The empirical layers apply by evidence class. A number or a result of the
   # manuscript's own data that is tagged with another class would fall outside
-  # all of them, so that the tag is right is asked here. A sentence that
-  # reports another work's result is `external`, and one that only interprets
-  # a result reports none: this entry asks nothing of either.
+  # all of them, so that the tag is right is asked here. The entry asks
+  # nothing of a sentence that reports no number and no result from the
+  # manuscript's own data: one that only reports another work's result, which
+  # is `external`, or one that only interprets a result. A sentence that
+  # reports both a result of its own and another work's is asked.
   - id: index.data-claims-carry-data-class
     class: precondition
     unit: proposition

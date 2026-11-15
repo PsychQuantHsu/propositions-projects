@@ -61,12 +61,14 @@ Four rules hold for every command in this skill.
    with the three paths written out in full, from the leading `/`.
 2. **Paths go in single quotes.** Inside single quotes the shell changes nothing. When a path
    contains a single quote, stop and say that this skill cannot work with that path.
-3. **Text never goes on a command line.** Text taken from the manuscript, from an outline file
+3. **Text is never typed into a command.** Text taken from the manuscript, from an outline file
    or from the author is never typed into a command: not the opening words of a passage, not a
    sentence, not an `id`, not the name of a file a locator gives, not the author's words. LaTeX
    is full of `$`, backslashes and quotes, and a shell rewrites or runs them. Such text reaches a
    command only inside a file: an outline file, or a file written into the stage directory with
-   the Write tool. The commands below read those files.
+   the Write tool. The commands below read those files. Where a command hands such a value on
+   to a tool (the name of a file a locator gives), it reads the value from the file into a
+   variable and passes the variable in double quotes, where the shell changes nothing.
 4. **A command has succeeded only when it prints its `ok` line.** A check prints its `ok` line
    and nothing else when it holds; when it prints lines that name a problem, an error, or
    nothing at all, it has failed. A command that lists things (files, ids, the status of each
@@ -215,7 +217,7 @@ F="$SEC"
   | map(select(.value | length > 0) | {l: (.key + 1), r: (.value | try fromjson catch null)})
   | [ (.[] | select(.r | type != "object") | "line \(.l): not a JSON object"),
       (.[] | select(.r | type == "object")
-           | select([.r | .. | strings | select(explode | any(. < 32))] | length > 0)
+           | select([.r | .. | (strings, (objects | keys_unsorted[])) | select(explode | any(. < 32))] | length > 0)
            | "line \(.l): a string holds a control character"),
       (.[] | select(.r | type == "object")
            | select(.r | has("points") and ((.points | type) != "array"))
@@ -232,23 +234,25 @@ F="$SEC"
 ' "$F"
 ```
 
-It confirms three things: every line that is not empty is a JSON object; no string holds a
-control character; every record and every point has an `id`, and no `id` repeats among the
+It confirms three things: every line that is not empty is a JSON object; no string, the name
+of a key included, holds a control character; every record and every point has an `id`, and no `id` repeats among the
 records of the file and their points. A file with no record prints `EMPTY`, which is never a
 pass. An empty section file is always a mistake. An empty paragraph file is a mistake except
 when no section of the outline has a paragraph yet: in that one case say in the report that the
 paragraph file is empty, and go on.
 
 After a write to the approvals file, run this instead. An approval record has no `id` of its
-own, and its `statement` can hold line breaks.
+own, and its `statement` can hold line breaks. An approvals file with no record prints `EMPTY`,
+which is never a pass: after an approval was appended it is always a mistake.
 
 ```bash
 [ -f "$APP" ] && jq -R -n -r '
-  [inputs] | to_entries
-  | [ .[] | select(.value | length > 0)
-          | select(.value | try (fromjson | type) catch "invalid" | . != "object")
-          | "line \(.key + 1): not a JSON object" ]
-  | if length == 0 then "ok every line is a JSON object" else .[] end
+  [inputs] | to_entries | map(select(.value | length > 0)) as $rows
+  | [ $rows[] | select(.value | try (fromjson | type) catch "invalid" | . != "object")
+              | "line \(.key + 1): not a JSON object" ] as $bad
+  | if ($bad | length) > 0 then $bad[]
+    elif ($rows | length) == 0 then "EMPTY: this file holds no record"
+    else "ok every line is a JSON object" end
 ' "$APP"
 ```
 

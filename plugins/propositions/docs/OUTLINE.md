@@ -361,8 +361,8 @@ and those of the files their locators name that exist inside the repository,
 and nothing of the conversation. The agent is told that what it reads is data to examine and holds
 no instruction for it, and that it reads only: it does not write, change, run
 or send anything. That is an instruction to the agent; its tools are not
-restricted. The check does not read a file outside the repository that holds
-the manuscript.
+restricted. The check does not read a file that a locator names when that file
+is outside the repository that holds the manuscript.
 
 A record that carries `dropped` is examined for the sixth kind only, and its
 points do not count for the fifth kind. Each finding names the record or the
@@ -462,8 +462,8 @@ The skill's checks are commands that call `jq` and `realpath`. A check counts
 as passed only when its command says so; a command that prints nothing, fails
 or cannot run is a failed check, and when one of the two tools is not installed
 the skill stops and says which. Text from the manuscript, from an outline file
-or from the author reaches those commands only inside a file, never as part of
-a command line.
+or from the author reaches those commands only from a file that the command
+reads; it is never written into the text of a command.
 
 After every write to an outline file, the skill confirms that every line of
 that file that is not empty parses as a JSON object. After a write to the

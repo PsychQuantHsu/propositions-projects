@@ -27,7 +27,14 @@ repository it is checked out in, up to two levels of submodules; with more
 levels the skill asks the author which directory is the top. A repository that
 sits inside another without being its submodule is a repository of its own.
 Everything this document says is inside the repository is inside this one, and
-every path a locator gives is relative to its root.
+every path a locator gives is relative to its root. An outline kept inside a
+submodule therefore does not resolve in a checkout of the submodule alone.
+
+A ledger names this manuscript when its `source.file`, which is a path from the
+root of the git repository that holds the ledger (see `docs/SCHEMA.md`), is the
+manuscript's main file once both are resolved to real paths. That root is not
+always the root of the repository above: a ledger inside a submodule gives the
+path from the submodule's root.
 
 The skill uses a directory without asking only when exactly one ledger in the
 repository names this manuscript; it then uses that ledger's directory. In
@@ -35,7 +42,8 @@ every other case, when no ledger names the manuscript or more than one does, it
 asks the author which directory to use. Outline files elsewhere in the
 repository are then offered, not taken, because they can belong to another
 manuscript. The directory is always the repository's root or a directory under
-it, and it is a directory or does not exist yet: the skill resolves every
+it, not inside a `.git` directory, and it is a directory or does not exist yet:
+the skill resolves every
 symbolic link in its path, the last part included, before it decides. It
 decides again in every command that reads or writes an outline file, and, when
 it revises, before its first edit and again after every reply of the author.
@@ -194,8 +202,9 @@ leading `/`, by `..` or through a symbolic link, is not a locator, and the skill
 does not read that file. A file inside a `.git` directory, or the `.git` file of
 a submodule, is not a locator's file either.
 
-`from` and `basis` are lists. A `from` or a `basis` that is not a list names no
-passage and is reported like an object that is not a locator.
+`from` and `basis` are lists of one or more locators. A `from` or a `basis`
+that is not such a list, an empty list included, names no passage and is
+reported like an object that is not a locator.
 
 | Object | Is a locator |
 |---|---|
@@ -384,8 +393,8 @@ reports findings of six kinds and no others.
    outside the repository or is inside a `.git` directory, whose `label` text
    does not occur exactly once in the file, or whose `starts` does not occur
    exactly once in the file. An object in `from` or `basis` that is not a
-   locator, and a `from` or a `basis` that is not a list, are reported as this
-   kind too.
+   locator, and a `from` or a `basis` that is not a list of one or more
+   locators, are reported as this kind too.
 
 The sixth kind is established by the skill itself, by resolving each path and
 counting, so that it is decided the same way every time. The first five are
@@ -528,8 +537,10 @@ section file or the paragraph file it also confirms that every record has an
 `id`, that no `id` repeats among the section records or among the paragraph
 records and points, and that no string holds a control character. In the
 paragraph file it also confirms that every point has an `id` and that `points`,
-where a record has it, is a list. Keys of a section record that this document
-does not define are not looked at, a key named `points` included. When any of
+where a record has it, is a list. The shape of a key that a section record
+carries and this document does not define is not checked, a key named `points`
+included; the control-character test still reads every string and key name.
+When any of
 these fails, it reports the file and the line and does not report the write as
 done.
 
@@ -558,13 +569,14 @@ and not inside a `.git` directory, the text of the `label` occurs exactly once,
 the `starts` occurs exactly once. It reports an object that is not a locator:
 one without a `file`, one with neither `label` nor `starts`, one whose `label`
 or `starts` is not a string, one with `lines` and no `commit`. It reports a
-`from` or a `basis` that is not a list.
+`from` or a `basis` that is not a list of one or more locators.
 
 Status reports every paragraph record whose `section` names no section record,
 and the approve action appends nothing while there is one.
 
 That is all. Until issue #78 no tool checks whether a required key is missing
-(a point without `text`, a section record without `says`), whether a `parent`
+(a point without `text`, a section record without `says`), whether a record
+that carries `carry` has `from`, whether a `parent`
 names a section record on an earlier line, or whether the groups of paragraph
 records are in the order of the section file; only the author's reading stands
 in for these. Whether a `uses` entry names a record or a point on an earlier

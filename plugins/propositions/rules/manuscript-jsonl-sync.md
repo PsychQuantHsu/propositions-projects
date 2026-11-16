@@ -4,6 +4,8 @@
 
 本專案的 `manuscript/main.tex` 與 `manuscript/propositions/main.jsonl` (+ `_stage2/*.jsonl` + `_pilot/*.jsonl`) 是**單一 source of truth 的兩面**，不是兩個獨立 deliverable。
 
+本規則說的 JSONL 是帳冊：`main.jsonl`，以及 `_stage2/`、`_pilot/` 底下的 `*.jsonl`。同一個目錄裡的綱要檔（`outline-*.jsonl`，見 `docs/OUTLINE.md`）不是帳冊，不在本規則範圍內。
+
 任何 `main.tex` 內容改動（rewording / restructure / 加減 sentence / line shift）都**必須**在同一個 commit / change cluster 內審視並更新對應的 propositions JSONL props。**禁止**「先改 main.tex 等之後再 sync jsonl」— 那等於把 R1 drift 變成 latent debt。
 
 對應的 macro-level rule 是 [`code-and-manuscript-sync.md`](code-and-manuscript-sync.md)（manuscript ↔ code 跨 repo PR scope）。本 rule 是 **finer-grained**：manuscript 內部 main.tex ↔ JSONL sync。兩條 rule 互補不重疊。
@@ -98,7 +100,7 @@ JSONL 結構是 **manuscript 的 structural representation** — 每個 prop 對
 
 `/idd-diagnose` 對任何 `manuscript/main.tex` 改動 (`scope:manuscript` label) **必須**在 Strategy 段顯式回答：
 
-1. 此 main.tex 改動會 invalidate 哪些 `manuscript/propositions/*.jsonl` 的 props？(grep prop.text 對應段落)
+1. 此 main.tex 改動會 invalidate 哪些帳冊 JSONL（`main.jsonl` 與 `_stage2/`、`_pilot/` 的 jsonl）的 props？(grep prop.text 對應段落)
 2. 此改動屬於上方哪種 sync 範圍類型（wording / line shift / add / delete / restructure / cite-only）？
 3. 對應的 sync action 是否在本 cluster 的 implementation plan 內？如否，**升級** scope 或 abort 重新 diagnose。
 
@@ -116,7 +118,7 @@ JSONL 結構是 **manuscript 的 structural representation** — 每個 prop 對
 
 `/idd-verify` 的 Regression Reviewer **必須**額外驗證：
 
-- diff 中 main.tex 的改動 line range，grep `manuscript/propositions/*.jsonl` 的 `location` field 看是否有對應 prop
+- diff 中 main.tex 的改動 line range，grep 帳冊 JSONL（`main.jsonl` 與 `_stage2/`、`_pilot/` 的 jsonl）的 `location` field 看是否有對應 prop
 - 若 main.tex shifted N lines (insert/delete) — 確認 jsonl 內後段 props 的 `location` 已對應 shift
 - R1 prop-subset-check：所有 props 仍 verbatim found in updated main.tex
 - 若 manuscript edit cluster 沒有 jsonl 對應 commit → **blocking finding**，verify FAIL

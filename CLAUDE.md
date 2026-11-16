@@ -43,7 +43,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | `/propositions:construct` | 建構軸,整篇文章的層次:標註承諾(研究問題、目的、假設、章節計畫、近距離承諾)、章節角色與三層依存樹(句在段內的頭、段在節內的頭、節的 parent),存成帳冊旁的 `structure.json`／`discourse.jsonl`(格式 2.0,S1–S9 檢查);寫到一半的稿件則依右邊緣與未兌現的承諾提出下一句的候選,每個候選寫出預期的 `move`,並參考連結清單的走法(提示不是規則,不改候選順序,#36);也能解釋一段裡句子之間的關係(`structure-explain.py`,#33)(#26、#30) |
 | `/propositions:construct-batch` | 長稿的建構軸標註:先把帳冊排成閱讀順序(`reorder-ledger.py`,dry-run gated),再依段落切批、分給 subagent、合併回暫存附檔(`structure-batch.py`;依存樹已有時用 `--moves-only` 只標 `move`、`type`);審查與寫入仍回 `/propositions:construct` |
 | `/propositions:clarity-audit` | 可讀性軸,散文層級的 stumble 掃描與改寫(不需要 JSONL) |
-| `/propositions:outline` | 綱要軸,動筆之前的計畫:文章層每節一句、段落層每段至少一句要點,存成帳冊旁的 `outline-sections.jsonl`、`outline-paragraphs.jsonl`,作者的確認存成 `outline-approvals.jsonl`。六個動作:從寫完的稿反推、從題目起草、依作者指示修改(合併與刪除都不丟來源)、由另一個 agent 做前提檢查、記錄作者當次明說的確認、回報哪些節仍照通過時的內容。只寫這三個檔,不寫稿件與帳冊;不需要先有帳冊(#75) |
+| `/propositions:outline` | 綱要軸,動筆之前的計畫:文章層每節一句、段落層每段至少一句要點,存成帳冊旁的 `outline-sections.jsonl`、`outline-paragraphs.jsonl`,作者的確認存成 `outline-approvals.jsonl`。六個動作:從寫完的稿反推、從題目起草、依作者指示修改(合併與刪除都不丟來源)、前提檢查(五類由只有 Read 工具的 agent `propositions:outline-checker` 判斷,定義在 `plugins/propositions/agents/outline-checker.md`)、記錄作者當次明說的確認、回報哪些節仍照通過時的內容。只寫這三個檔,不寫稿件與帳冊;不需要先有帳冊(#75) |
 
 | Rule (shipped) | When applies |
 |----------------|--------------|
@@ -157,13 +157,13 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
 - pytest 7+ for test suite
-- `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`（實跑過 jq 1.7.1 與 1.8.2；skill 開頭會先確認兩個工具都在）；其他 skill 不需要
+- `/propositions:outline` 的指令另外需要 `jq`、`realpath` 與 `git`（實跑過 jq 1.7.1 與 1.8.2；skill 開頭會先確認三個工具都在）；其他 skill 不需要
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)
 - Schema versions: v1.0 – v1.7 — validator handles all with backward-compat skip for v1.2+-only rules (R7 / R11 / R12)；v1.4 = `retired`、v1.5 = `retired.superseded_mechanism`、v1.6 = multi-file（file-qualified location + `source.parts`）、v1.7 = `_meta.json` `profile`（`default` / `empirical`，決定 R11／R12 詞彙）。完整版本史見 `docs/SCHEMA.md` §Versioning
 
 ## Hard rules for contributors
 
-- **不修 user 的 main.jsonl 不問**:任何會 write jsonl 的 skill (e.g., refresh-locations) 必須先 dry-run + AskUserQuestion 確認再寫
+- **不修 user 的帳冊不問**:任何會寫帳冊(`main.jsonl`,以及 `_stage2/`、`_pilot/` 底下的 jsonl)的 skill (e.g., refresh-locations) 必須先 dry-run + AskUserQuestion 確認再寫。綱要的三個檔(`outline-*.jsonl`)不是帳冊,什麼時候寫、寫之前問什麼,照 `/propositions:outline` 的 skill
 - **Loud failure over silent fix**:寧可 anchor_failed 不要亂猜 line number
 - **Schema 升級走 spec 流程**:不要 ad-hoc 加 enum 值;先改 `docs/SCHEMA.md` 確定新 canonical set,再更 validator + tests
 - **Test 覆蓋每條 rule**:R1-R13 各自有獨立 fixture;改 normalize_for_match 等 shared helper 必跑全 R-rule test suite

@@ -19,11 +19,11 @@
 
 - [x] 4.1 規格、說明文件與 skill 的句子，對應 Requirement「The explanatory document describes the outline」以及各列所屬的 Requirement，與第 5、10、11、12、18、25、26、27、28、29、32、36 列。完成時：目錄的比對是實際路徑；缺少的必填鍵只有作者的閱讀把關；原樣搬動區塊的要點是完整的句子；「去向」一句有反推沒有記 commit 的限制；skill 讀到的都是資料；空的段落檔只在作者給的綱要還沒有段落時；「另一份稿件」只在沒有帳冊指到這份稿件時；範例路徑從 repo 根目錄寫起；節的 label 不用在紀錄上；symbolic link 連最後一層都解析；拆開時每一筆新紀錄都帶一個原來的來源；摘要與規則一致。驗證：4.3 的對照表與 5.2 的逐列核對。
 - [x] 4.2 [P] CLAUDE.md、README.md、plugins/propositions/README.md、plugins/propositions/rules/manuscript-jsonl-sync.md，對應第 20、21、36 列。完成時：CLAUDE.md 的硬規則與同步規則寫明說的是帳冊；相容性清單列出 git；兩個 README 說前提檢查的五種由只有 Read 的 agent 判斷，README 的目錄樹列出 agents。驗證：四個檔各自找得到改過的句子。
-- [ ] 4.3 規格對指令的對照表。完成時：一位獨立 agent 列出規格說會檢查或會擋下的每一件事對到的指令，以及指令做的每一項檢查對到的規格句子；兩個方向都沒有對不上的。驗證：對照表記到 #75 的 Implementation Complete（只寫結果與對不上的項，不貼稿件文字）。
+- [x] 4.3 規格對指令的對照表。完成時：一位獨立 agent 列出規格說會檢查或會擋下的每一件事對到的指令，以及指令做的每一項檢查對到的規格句子；兩個方向都沒有對不上的。驗證：對照表記到 #75 的 Implementation Complete（只寫結果與對不上的項，不貼稿件文字）。
 
 ## 5. 驗證
 
-- [x] 5.1 SKILL.md 的 18 段指令照寫法逐段實跑，zsh 與 bash、Homebrew 的 jq 與系統內建的 jq，四種組合。完成時：四種組合都是 165 項全部符合預期。驗證：把跑了哪些情境、結果如何記到 #75，不含任何真實稿件的文字。
-- [ ] 5.2 一位獨立 agent 對照第二輪報告要處理的 31 列，逐列回報已處理與在哪一句。完成時：沒有一列回報為未處理；有的話先修再重跑。
-- [ ] 5.3 獨立讀者重讀最後的 OUTLINE.md，題目沿用第一輪修正的題組，加上這一輪改過的規則（submodule 的 repo、指不到節的段落、註解裡的 label、.git 底下的檔、節的紀錄帶 points、只剩確認紀錄檔、前提檢查的 agent）。完成時：答案與預存的答案全部相同；有不同就改文件、換新的讀者重跑。驗證：題數與結果記到 #75。
+- [x] 5.1 SKILL.md 的 18 段指令照寫法逐段實跑，zsh 與 bash、Homebrew 的 jq 與系統內建的 jq，四種組合。完成時：四種組合都是 168 項全部符合預期。驗證：把跑了哪些情境、結果如何記到 #75，不含任何真實稿件的文字。
+- [x] 5.2 一位獨立 agent 對照第二輪報告要處理的 31 列，逐列回報已處理與在哪一句。完成時：沒有一列回報為未處理；有的話先修再重跑。
+- [x] 5.3 獨立讀者重讀最後的 OUTLINE.md，題目沿用第一輪修正的題組，加上這一輪改過的規則（submodule 的 repo、指不到節的段落、註解裡的 label、.git 底下的檔、節的紀錄帶 points、只剩確認紀錄檔、前提檢查的 agent）。完成時：答案與預存的答案全部相同；有不同就改文件、換新的讀者重跑。驗證：題數與結果記到 #75。
 - [x] 5.4 全套 pytest 通過；spectra validate 與 spectra analyze 對這個 change 沒有錯誤；相對於 main，plugins/propositions/scripts、plugins/tschema-check 與 tests 三個目錄沒有變動。驗證：貼出三項的結果。

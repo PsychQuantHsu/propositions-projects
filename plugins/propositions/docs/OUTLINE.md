@@ -22,19 +22,27 @@ ledger. The directory can hold them without a `main.jsonl`: a manuscript does
 not need a ledger to have an outline.
 
 **The repository** is the git repository that holds the manuscript, or, when
-that repository is checked out as a submodule of another, the outermost
-repository it is checked out in, up to two levels of submodules; with more
+that repository is checked out as a submodule of another (as git reports it,
+from the index of the outer repository), the outermost repository it is
+checked out in, up to two levels of submodules; with more
 levels the skill asks the author which directory is the top. A repository that
 sits inside another without being its submodule is a repository of its own.
 Everything this document says is inside the repository is inside this one, and
 every path a locator gives is relative to its root. An outline kept inside a
-submodule therefore does not resolve in a checkout of the submodule alone.
+submodule therefore does not resolve in a checkout of the submodule alone. When
+the manuscript's repository sits inside another without being its submodule, a
+ledger of the outer repository is outside the repository: it does not name the
+manuscript for the skill, the outline cannot go beside it, and the skill asks
+the author which directory of the inner repository to use. The other way round,
+a directory under the repository's root counts as inside it even when it holds
+a git repository of its own.
 
 A ledger names this manuscript when its `source.file`, which is a path from the
 root of the git repository that holds the ledger (see `docs/SCHEMA.md`), is the
 manuscript's main file once both are resolved to real paths. That root is not
 always the root of the repository above: a ledger inside a submodule gives the
-path from the submodule's root.
+path from the submodule's root. A `_meta.json` that is a symbolic link is not
+read.
 
 The skill uses a directory without asking only when exactly one ledger in the
 repository names this manuscript; it then uses that ledger's directory. In
@@ -42,9 +50,11 @@ every other case, when no ledger names the manuscript or more than one does, it
 asks the author which directory to use. Outline files elsewhere in the
 repository are then offered, not taken, because they can belong to another
 manuscript. The directory is always the repository's root or a directory under
-it, not inside a `.git` directory, and it is a directory or does not exist yet:
-the skill resolves every
-symbolic link in its path, the last part included, before it decides. It
+it, not inside a `.git` directory, and it is a directory or does not exist yet,
+in which case the directory that is to hold it exists. The skill resolves every
+symbolic link in its path, the last part included, before it decides; a link
+that leads to a place that does not exist can stop it, depending on the
+machine's `realpath`. It
 decides again in every command that reads or writes an outline file, and, when
 it revises, before its first edit and again after every reply of the author.
 
@@ -170,7 +180,8 @@ A locator carries `label`, `starts` or both. Line numbers stop being right as
 soon as the file is edited, so they locate nothing by themselves: `lines` is
 allowed only together with `commit`, as a record of where the passage was. When
 `label` and `starts` are both present and name different passages, `label`
-decides.
+decides. When both are present, each is counted and each has to occur exactly
+once.
 
 **How `starts` is counted.** Occurrences are counted in the text of the file,
 not in its lines: words that occur twice on one line occur twice. In the
@@ -187,19 +198,25 @@ line. White space at either end of `starts` is ignored.
   `starts` of "It repeats." does not name a passage: it occurs twice.
 
 **How `label` is counted.** The text `\label{` followed by the value of `label`
-and `}` is counted in the text of the file as it is written. An occurrence in a
-LaTeX comment counts too, and a label written with a space between `\label`
-and its brace is not found.
+and `}` is counted in the text of the file the way `starts` is: every run of
+spaces, tabs and line breaks, in the file and in `label`, counts as one space.
+An occurrence in a LaTeX comment counts too, and a label written with a space
+between `\label` and its brace is not found.
 
 **A label names what it is attached to.** A label inside a passage does not
 name the passage: a paragraph of prose that contains a labelled equation is
 named by `starts`.
 
 **The file is inside the repository.** It can be outside the manuscript, such
-as a note in the same repository, and it can be a file that git ignores. It
+as a note in the same repository, and it can be a file that git ignores. Such a
+file is read like any other and handed to the agent of the premise check, so a
+locator is not the place to name a file whose contents the author would not
+show that agent, such as one that holds credentials. It
 cannot be outside the repository: an object whose `file` leads outside it, by a
 leading `/`, by `..` or through a symbolic link, is not a locator, and the skill
-does not read that file. A file inside a `.git` directory, or the `.git` file of
+does not read that file. What counts is where the path leads: a path whose `..`
+lead out and back into the repository is taken, though it then depends on the
+name of the repository's directory; derive writes no `..`. A file inside a `.git` directory, or the `.git` file of
 a submodule, is not a locator's file either.
 
 `from` and `basis` are lists of one or more locators. A `from` or a `basis`
@@ -335,8 +352,8 @@ otherwise.
 
 The skill keeps, outside the repository, a copy of the outline files as they
 were when shown, so that the approval can be recorded when the author's reply
-arrives in a later message. When the outline files differ from that copy at the
-time of the approval, when the real path of the outline directory differs from
+arrives in a later message. When the section file or the paragraph file differs
+from that copy at the time of the approval, when the real path of the outline directory differs from
 the one recorded when the copy was taken, or when the copy is no longer
 available, the skill appends nothing and shows the sections again. When a
 paragraph record of the copy names no section record, the skill appends nothing
@@ -518,9 +535,10 @@ approved copy. It reports whether the order of sections stands as approved,
 the paragraph records that name no section record, the number of points that
 carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does
 not, it says that an approval of the whole outline is still needed. It decides
-equality on JSON values, not on the text of the lines. When the approvals file
-exists but cannot be read or is not JSON, status fails and says so; it does not
-report the outline as never approved.
+equality on JSON values, not on the text of the lines. An approvals file that
+is empty or holds only blank lines holds no approval record. When the approvals
+file exists but cannot be read, or holds a line that is not JSON, status fails
+and says so; it does not report the outline as never approved.
 
 ## What is checked today
 
@@ -529,13 +547,16 @@ counts as passed only when its command says so; a command that prints nothing,
 fails or cannot run is a failed check, and when one of the three tools is not
 installed the skill stops and says which. Text from the manuscript, from an outline file
 or from the author reaches those commands only from a file that the command
-reads; it is never written into the text of a command.
+reads; it is never written into the text of a command. The three paths the
+skill writes into its commands begin with `/`: an empty path, or one not
+written out in full, stops it.
 
 After every write to an outline file, the skill confirms that every line of
 that file that is not empty parses as a JSON object. After a write to the
 section file or the paragraph file it also confirms that every record has an
 `id`, that no `id` repeats among the section records or among the paragraph
-records and points, and that no string holds a control character. In the
+records and points, that no string holds a control character, and that no
+number is one that JSON does not have, such as the `nan` that jq reads. In the
 paragraph file it also confirms that every point has an `id` and that `points`,
 where a record has it, is a list. The shape of a key that a section record
 carries and this document does not define is not checked, a key named `points`
@@ -575,8 +596,10 @@ Status reports every paragraph record whose `section` names no section record,
 and the approve action appends nothing while there is one.
 
 That is all. Until issue #78 no tool checks whether a required key is missing
-(a point without `text`, a section record without `says`), whether a record
-that carries `carry` has `from`, whether a `parent`
+(a record whose `points` is missing or an empty list, a point without `text`, a
+section record without `says`), whether a record
+that carries `carry` has `from`, what `lines` and `commit` hold, whether a
+`parent`
 names a section record on an earlier line, or whether the groups of paragraph
 records are in the order of the section file; only the author's reading stands
 in for these. Whether a `uses` entry names a record or a point on an earlier

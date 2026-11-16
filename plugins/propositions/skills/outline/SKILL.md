@@ -111,11 +111,15 @@ the action when it is not clear).
 
 - `MAIN` — the manuscript's main `.tex` file. The draft action can run without one.
 - `ROOT` — the root of the repository. The repository is the git repository that holds the
-  manuscript, or, when that repository is checked out as a submodule of another, the outermost
+  manuscript, or, when that repository is checked out as a submodule of another (as git reports
+  it, from the index of the outer repository), the outermost
   repository it is checked out in, up to two levels of submodules. A repository that sits inside
   another without being its submodule is a repository of its own. Every `file` of a locator is a
   path relative to `ROOT`; an outline kept inside a submodule therefore does not resolve in a
-  checkout of the submodule alone.
+  checkout of the submodule alone. When the manuscript's repository sits inside another without
+  being its submodule, a ledger of the outer repository is outside `ROOT`: it is not listed below,
+  and the outline cannot go beside it. The other way round, a directory under `ROOT` counts as
+  inside it even when it holds a git repository of its own.
 - `OUTDIR` — the directory of the outline files.
 - `STAGE` — a directory outside the repository for this session's temporary files.
 
@@ -124,14 +128,14 @@ the directory the author names.
 
 ```bash
 DIR='<the directory, in single quotes>'
-command -v jq >/dev/null && command -v realpath >/dev/null && command -v git >/dev/null && echo 'ok tools'
+command -v jq >/dev/null || echo 'missing jq'; command -v realpath >/dev/null || echo 'missing realpath'; command -v git >/dev/null || echo 'missing git'; command -v jq >/dev/null && command -v realpath >/dev/null && command -v git >/dev/null && echo 'ok tools'
 T=$(git -C "${DIR:?}" rev-parse --show-toplevel) && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && [ -z "$U" ] && ROOT=$T && printf 'ROOT=%s\n' "$ROOT"
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/outline-XXXXXX") && printf 'STAGE=%s\n' "$STAGE"
 R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "${S#"$R"/}" = "$S" ] && echo 'ok the stage directory is outside the repository'
 ```
 
 - No `ok tools`: stop and tell the author that this skill needs `jq`, `realpath` and `git`, and
-  which of the three `command -v` does not find.
+  which of them the `missing` lines name.
 - The `ROOT=` line gives `ROOT`. When git prints an error instead, the directory is not in a git
   repository: ask the author which directory is the top of the manuscript's files and use that.
   When there is neither a `ROOT=` line nor an error from git, the manuscript is in a submodule
@@ -143,19 +147,21 @@ R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "${S#"$R"/}" = "$S" ] && ec
   sure yourself that `STAGE` is not under it.
 
 Then find `OUTDIR`. The command lists every ledger in the repository with the manuscript it
-belongs to, and every outline file.
+belongs to, and every file whose name begins with `outline-` and ends in `.jsonl`.
 
 ```bash
 ROOT='<the root, as printed>'
-find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -not -path $'*\n*' -exec printf 'meta\t%s\n' {} + && find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -not -path $'*\n*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} + && find "$ROOT" -type f -name 'outline-*.jsonl' -not -path '*/.git/*' -not -path $'*\n*' && echo 'ok listed'
+find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -not -path $'*\n*' -exec printf 'meta\t%s\n' {} + && find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -not -path $'*\n*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} \; && find "$ROOT" -type f -name 'outline-*.jsonl' -not -path '*/.git/*' -not -path $'*\n*' && echo 'ok listed'
 ```
 
 Only regular files are listed; a symbolic link is not followed, and a path that holds a line
-break is not listed. Each `meta` line is a `_meta.json`. A `_meta.json` that was read as one
-ledger has exactly one `ledger` line with the same path. No `ok listed`, or a `meta` line with no
-`ledger` line or with more than one: a `_meta.json` could not be read as one ledger (it is not
-JSON, it is empty, or it holds two values). Tell the author which one, and ask which directory to
-use, as in case 2 below.
+break is not listed. Each `meta` line is a `_meta.json`. Each `_meta.json` is read by itself, so
+one that cannot be read does not stop the others. A `_meta.json` that was read as one ledger has
+exactly one `ledger` line with the same path. A `meta` line with no `ledger` line or with more
+than one: that `_meta.json` could not be read as one ledger (it is not JSON, it is empty, or it
+holds two values), and jq may name it in an error. Tell the author which one, and ask which
+directory to use, as in case 2 below. No `ok listed`: `find` itself failed; ask in the same
+way.
 
 Then run this once for each `ledger` line, with `L` set to the path of its `_meta.json` and `M`
 to `MAIN`, both written out in full.
@@ -254,6 +260,9 @@ F="$SEC"
       (.[] | select(.r | type == "object")
            | select([.r | .. | (strings, (objects | keys_unsorted[])) | select(explode | any(. < 32))] | length > 0)
            | "line \(.l): a string holds a control character"),
+      (.[] | select(.r | type == "object")
+           | select([.r | .. | numbers | select(isnan)] | length > 0)
+           | "line \(.l): a number is not a JSON number"),
       (.[] | select($para and (.r | type == "object"))
            | select(.r | has("points") and ((.points | type) != "array"))
            | "line \(.l): points is not a list"),
@@ -269,7 +278,8 @@ F="$SEC"
 ' "$F"
 ```
 
-It confirms four things: every line that is not empty is a JSON object; no string, the name of
+It confirms four things: every line that is not empty is a JSON object, with no number that
+JSON does not have (jq also reads `nan`); no string, the name of
 a key included, holds a control character; every record has an `id`, and in the paragraph file
 every point has one too, and no `id` repeats among the records of the file and, in the paragraph
 file, their points; in the paragraph file, `points`, where a record has it, is a list. The
@@ -340,7 +350,7 @@ FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
          | select($n != 1) | "\($r.id | tojson): starts occurs \($n) times, not once"
        else empty end),
       (if (.label | type) == "string" then
-         ("\\label{" + .label + "}") as $l | ($t | indices($l) | length) as $n
+         ("\\label{" + (.label | gsub("[ \\t\\r\\n]+"; " ")) + "}") as $l | ($t | indices($l) | length) as $n
          | select($n != 1) | "\($r.id | tojson): the text \\label{\(.label)} occurs \($n) times, not once"
        else empty end) ]
   | if length == 0 then "ok locators in \($f)" else .[] end
@@ -349,13 +359,17 @@ FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
 
 The command refuses a name that begins with `/`, takes the real path of the file, following
 symbolic links, and goes on only when that path is inside the repository and not inside a
-`.git` directory. It then counts, in the text of the file with every run of spaces, tabs and line
+`.git` directory; a name whose `..` lead out and back into the repository is taken by where it
+leads. It then counts, in the text of the file with every run of spaces, tabs and line
 breaks turned into one space, how often each `starts` occurs and how often the text
-`\label{<label>}` of each `label` occurs. White space at either end of a `starts` is ignored. The
-text of a label is counted as it is written: an occurrence in a LaTeX comment counts too, and a
-label written with a space before its brace is not found. Any other file inside the repository
-can be named, one that git ignores included. It also reports a locator that has neither, one whose `starts` or `label`
-is not a string, and one that has `lines` without `commit`.
+`\label{<label>}` of each `label` occurs. White space at either end of a `starts` is ignored. Runs of
+white space inside a label count as one space too, in the file and in `label`. An occurrence of a
+label in a LaTeX comment counts, and a label written with a space before its brace is not found. Any other file inside the repository
+can be named, one that git ignores included: such a file is read and handed to the checker agent
+like any other. It also reports a locator that has neither, one whose `starts` or `label`
+is not a string, and one that has `lines` without `commit`. When a locator has both `label`
+and `starts`, each is counted and each has to occur once. The values of `lines` and `commit` are
+not checked.
 
 | It prints | Meaning |
 |---|---|
@@ -467,7 +481,8 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   approval record, and a replacement never takes the `id` of a record it replaces. This prints
   every `id` in use, one per line: the ids of the records and points in the files and in the
   approval records, and the ids that `section`, `parent` and `uses` name, also when no record
-  has them any more:
+  has them any more. It takes these keys from every object in the three files, keys this skill
+  does not define included, so it can list more than it needs to; that only rules out more ids:
 
   ```bash
   [ -f "$SEC" ] && [ -f "$PAR" ] && jq -n -r --slurpfile a "$SEC" --slurpfile b "$PAR" --slurpfile c "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" '([$a[], $b[], $c[] | .. | objects | (.id?, .section?, .parent?, (.uses? | arrays | .[])) | strings] | unique | .[] | tojson), "ok ids listed"'
@@ -535,9 +550,10 @@ It prints one line for each section, one for the order of sections, one for the 
 records that name no section, the two counts, and `ok status`. A section is compared with the
 copies in the last approval record that has an entry for it. The comparison is of JSON values:
 the order of keys does not count, and `1` and `1.0` are the same number. When there is no
-approvals file, every section was never approved. When the approvals file exists but cannot be
-read or is not JSON, the command fails and prints no `ok status`; the same holds for the command
-below and for the list of ids in use.
+approvals file, or when it is empty or holds only blank lines, every section was never
+approved. When the approvals file exists but cannot be read, or holds a line that is not JSON,
+the command fails and prints no `ok status`; the same holds for the command below and for the
+list of ids in use.
 
 A paragraph record whose `section` names no section record belongs to no section: it is in no
 approved copy and is never shown with a section. While the paragraph file holds one, the outline
@@ -687,13 +703,14 @@ asks, through revise.
 
    The command goes on only while each part holds: the guard of the opening lines (it runs in
    this call too); the real path of the outline directory is the one recorded when the copies
-   were taken; the outline files are still what was shown; no paragraph record of the copy names
+   were taken; the section file and the paragraph file are still what was shown; no paragraph record of the copy names
    no section; every id listed is the id of a section that was shown, and there is at least one;
    the statement is not empty. It builds the record from the copies that were shown, with `whole`
    true when it covers every section, ends the last line of the approvals file when that line
    has no line break, and appends the record as a line of its own. The time has its offset from
-   UTC, as in `2026-11-13T16:30:00+08:00`. Whether or not it appended, it removes the input
-   file, so that it cannot be used for another approval.
+   UTC, as in `2026-11-13T16:30:00+08:00`. Unless the guard stopped the call, it removes the
+   input file whether or not it appended, so that it cannot be used for another approval. After a
+   `STOP` the file stays until step 1 runs again, and step 1 runs before any other approval.
 
    No `ok approval appended`: nothing was appended. When `cmp` reported a difference or a
    missing file, the outline or the real path of its directory changed after it was shown, or

@@ -133,14 +133,15 @@ DIR='<the directory, in single quotes>'
 command -v jq >/dev/null || echo 'missing jq'; command -v realpath >/dev/null || echo 'missing realpath'; command -v git >/dev/null || echo 'missing git'; command -v jq >/dev/null && command -v realpath >/dev/null && command -v git >/dev/null && echo 'ok tools'
 [ "${DIR#/}" != "$DIR" ] || echo 'STOP the directory does not begin with /'
 [ "${DIR#/}" != "$DIR" ] && T=$(git -C "$DIR" rev-parse --show-toplevel) && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && { [ -z "$U" ] || echo 'STOP the manuscript is in a submodule more than two levels deep'; } && [ -z "$U" ] && ROOT=$T && printf 'ROOT=%s\n' "$ROOT"
-STAGE=$(mktemp -d "${TMPDIR:-/tmp}/outline-XXXXXX") && printf 'STAGE=%s\n' "$STAGE"
+[ -n "${ROOT:-}" ] && STAGE=$(mktemp -d "${TMPDIR:-/tmp}/outline-XXXXXX") && printf 'STAGE=%s\n' "$STAGE"
 R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "${S#"$R"/}" = "$S" ] && echo 'ok the stage directory is outside the repository'
 ```
 
 - No `ok tools`: stop and tell the author that this skill needs `jq`, `realpath` and `git`, and
   which of them the `missing` lines name.
 - The `ROOT=` line gives `ROOT`. When there is none, a line that begins with `STOP` names why, or
-  git prints an error: the directory is not in a git repository. In each of these cases stop and
+  git prints an error: the directory does not exist or is not in a git repository. In each of
+  these cases stop and
   tell the author why. This skill works only on a manuscript inside a git repository, at most two
   levels of submodules deep: the repository's root is the boundary of the outline files and of
   every file it reads as a source, and it does not take that boundary from an answer. Its own
@@ -590,10 +591,11 @@ and is not one JSON object written as JSON on its own (a record spread over seve
 records on one line, a line of spaces, a value such as `nan`), the command fails and prints no
 `ok status`; the same holds for the command below and for the list of ids in use. An approval
 record whose keys do not have the shapes the format gives them can also make the command fail
-part way, after some lines. Whenever there is no `ok status`, the lines printed are not a status:
-tell the author that the approvals file could not be read as approval records, that status
-cannot be reported until the author decides what to do with that file, and that this skill does
-not change it.
+part way, after some lines. Whenever there is no `ok status`, the lines printed are not a status. Say which file jq names in
+its error. When it is the approvals file, tell the author that it could not be read as approval
+records, that status cannot be reported until the author decides what to do with it, and that
+this skill does not change it; when it is the section file or the paragraph file, run the write
+check on that file.
 
 A paragraph record whose `section` names no section record belongs to no section: it is in no
 approved copy and is never shown with a section. While the paragraph file holds one, the outline

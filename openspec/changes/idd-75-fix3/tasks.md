@@ -12,7 +12,7 @@
 ## 3. 句子與規則
 
 - [x] 3.1 規格、說明文件與 skill 的句子，對應 Requirement「Revising keeps ids stable and never loses a source」「Derive and draft build an outline without inventing content」「The explanatory document describes the outline」與第 5、11、15、16、17、21、22 列。完成時：搬動要點時來源放進 `basis`；`uses` 不影響一節是否照通過時的內容；經由連結目錄引入的 `.tex` 不讀；第二種可以接受的空檔；checker 的定義有 `note`；Scenario 的條件；寫進指令的路徑有哪幾個。
-- [x] 3.2 [P] Swift 規則、`CLAUDE.md`、`README.md`、`manuscript-jsonl-sync.md`，對應第 7、8、9、13、14 列。完成時：第 2 類的 jq 只算 SKILL.md 裡的；〈不適用〉第 1 類的接法清單；第 4 類的退場條件；硬規則與同步規則只排除綱要檔；需要 git 的不只綱要 skill。驗證：五個檔各自找得到改過的句子。
+- [x] 3.2 [P] Swift 規則、`CLAUDE.md`、`README.md`、`manuscript-jsonl-sync.md`，對應第 7、8、9、13、14 列。完成時：第 2 類的 jq 只算 SKILL.md 裡的；〈不適用〉第 1 類的接法清單；第 4 類的退場條件；硬規則與同步規則只排除綱要檔；需要 git 的不只綱要 skill。驗證：四個檔各自找得到改過的句子。
 
 ## 4. 驗證
 

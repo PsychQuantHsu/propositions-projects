@@ -350,12 +350,13 @@ none of the sections the author names was shown, the skill appends nothing. The
 record has `whole` true when it covers every section record, and no `whole`
 otherwise.
 
-The skill keeps, outside the repository, a copy of the outline files as they
-were when shown, so that the approval can be recorded when the author's reply
-arrives in a later message. When the section file or the paragraph file differs
-from that copy at the time of the approval, when the real path of the outline directory differs from
-the one recorded when the copy was taken, or when the copy is no longer
-available, the skill appends nothing and shows the sections again. When a
+The skill keeps, outside the repository, a copy of the section file and the
+paragraph file as they were when shown, so that the approval can be recorded
+when the author's reply arrives in a later message. The premise check that runs
+before the sections are shown reads this copy, and what is shown comes from it.
+When the section file or the paragraph file differs from that copy at the time
+of the approval, when the real path of the outline directory differs from the
+one recorded when the copy was taken, or when the copy is no longer available, the skill appends nothing and shows the sections again. When a
 paragraph record of the copy names no section record, the skill appends nothing
 either: it shows that record first, and the record is corrected through revise
 before the outline is shown again.
@@ -595,7 +596,8 @@ or `starts` is not a string, one with `lines` and no `commit`. It reports a
 Status reports every paragraph record whose `section` names no section record,
 and the approve action appends nothing while there is one.
 
-That is all. Until issue #78 no tool checks whether a required key is missing
+That is all: the checks of a write, the resolving of locators, and what status
+reports. Until issue #78 no tool checks whether a required key is missing
 (a record whose `points` is missing or an empty list, a point without `text`, a
 section record without `says`), whether a record
 that carries `carry` has `from`, what `lines` and `commit` hold, whether a

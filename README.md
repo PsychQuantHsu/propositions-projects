@@ -131,7 +131,7 @@ propositions-projects/
 │   │   │   ├── outline/SKILL.md           # the outline: what the article will say, before it is written
 │   │   │   └── clarity-audit/SKILL.md     # prose readability
 │   │   ├── agents/          # subagents that skills start
-│   │   │   └── outline-checker.md         # the outline's premise check; its only tool is Read
+│   │   │   └── outline-checker.md         # judges five of the six kinds of the outline's premise check; its only tool is Read
 │   │   ├── scripts/         # validator, audit, extraction and structure tooling
 │   │   │   ├── validate-propositions.py
 │   │   │   ├── refresh-prop-locations.py

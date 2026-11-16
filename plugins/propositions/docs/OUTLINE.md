@@ -24,25 +24,30 @@ not need a ledger to have an outline.
 **The repository** is the git repository that holds the manuscript, or, when
 that repository is checked out as a submodule of another (as git reports it,
 from the index of the outer repository), the outermost repository it is
-checked out in, up to two levels of submodules; with more
-levels the skill asks the author which directory is the top. A repository that
+checked out in, up to two levels of submodules. The skill works only on a
+manuscript inside a git repository: with more levels of submodules, or when
+the manuscript is in no git repository, it stops and says why. The
+repository's root is the boundary of everything it reads and writes, and it
+does not take that boundary from an answer of the author. A repository that
 sits inside another without being its submodule is a repository of its own.
 Everything this document says is inside the repository is inside this one, and
 every path a locator gives is relative to its root. An outline kept inside a
 submodule therefore does not resolve in a checkout of the submodule alone. When
 the manuscript's repository sits inside another without being its submodule, a
 ledger of the outer repository is outside the repository: it does not name the
-manuscript for the skill, the outline cannot go beside it, and the skill asks
-the author which directory of the inner repository to use. The other way round,
+manuscript for the skill, and the outline cannot go beside it. When no ledger
+of the inner repository names the manuscript either, the skill asks the author
+which directory of the inner repository to use. The other way round,
 a directory under the repository's root counts as inside it even when it holds
 a git repository of its own.
 
-A ledger names this manuscript when its `source.file`, which is a path from the
-root of the git repository that holds the ledger (see `docs/SCHEMA.md`), is the
-manuscript's main file once both are resolved to real paths. That root is not
-always the root of the repository above: a ledger inside a submodule gives the
-path from the submodule's root. A `_meta.json` that is a symbolic link is not
-read.
+A ledger names this manuscript when its `source.file` is the manuscript's main
+file once both are resolved to real paths. `docs/SCHEMA.md` does not say from
+which root `source.file` is written, and two are in use: the root of the git
+repository that holds the ledger (for a ledger inside a submodule, the
+submodule's root), and the root of the repository above. The skill reads it
+from both, and the ledger names the manuscript when either one leads to its
+main file. A `_meta.json` that is a symbolic link is not read.
 
 The skill uses a directory without asking only when exactly one ledger in the
 repository names this manuscript; it then uses that ledger's directory. In
@@ -50,7 +55,8 @@ every other case, when no ledger names the manuscript or more than one does, it
 asks the author which directory to use. Outline files elsewhere in the
 repository are then offered, not taken, because they can belong to another
 manuscript. The directory is always the repository's root or a directory under
-it, not inside a `.git` directory, and it is a directory or does not exist yet,
+it, not inside a `.git` directory in any letter case, and it is a directory or
+does not exist yet,
 in which case the directory that is to hold it exists. The skill resolves every
 symbolic link in its path, the last part included, before it decides; a link
 that leads to a place that does not exist can stop it, depending on the
@@ -170,7 +176,7 @@ A locator names a passage. `from` and `basis` use the same object.
 
 | Key | Required | Value |
 |---|---|---|
-| `file` | yes | The path of a file inside the repository, relative to its root, and not inside a `.git` directory |
+| `file` | yes | The path of a file inside the repository, relative to its root, and not inside a `.git` directory in any letter case |
 | `label` | one of `label` and `starts` | A LaTeX label whose text `\label{…}` occurs exactly once in that file. It names the section or the environment the label is attached to |
 | `starts` | one of `label` and `starts` | The opening words of the passage, copied from the file, enough of them to occur exactly once in it |
 | `lines` | no | A list of two line numbers, the first and the last line of the passage |
@@ -295,6 +301,10 @@ of the whole outline is still needed.
 Any difference counts. The skill does not judge whether a change is a change
 of substance or of wording: a section that differs from its approved copy goes
 back to the author.
+
+A section is compared with its own records only. When a point of another
+section that one of its records names in `uses` changes, the section still
+stands as approved: no tool follows `uses` (issue #78).
 
 An outline has the sections `s-a` (paragraph records `p-1`, `p-2`) and `s-b`
 (paragraph record `p-3`) and one approval record with `whole` true that covers
@@ -466,8 +476,8 @@ one paragraph record for each of its paragraphs and blocks. It follows the
 `.tex` files that the manuscript includes only when they are regular files
 inside the repository whose path holds no line break. Any other included file
 is named to the author and not read: one outside the repository, a symbolic
-link, a missing file, a file whose path holds a line break, or a file that is
-not `.tex`. Every paragraph record it produces has `from` naming the passage it
+link, a file reached through a directory that is a symbolic link, a missing
+file, a file whose path holds a line break, or a file that is not `.tex`. Every paragraph record it produces has `from` naming the passage it
 comes from, and every point states only what that passage states. A
 theorem-like statement, a figure or a table is named by its own label; the
 label of a section names the whole section and is not used for a record. It
@@ -503,6 +513,9 @@ that file is the author's decision.
 - When a record that has `from` is split, each record that replaces it has in
   its `from` at least one locator of the original, and each locator of the
   original is in the `from` of at least one of them.
+- When a point moves to another paragraph record and the record it leaves has
+  `from`, each locator of that `from` is added to the point's `basis`, so that
+  the point keeps its source.
 - When the author leaves a paragraph out of the article and its record has
   `from`, the record is not deleted: it is given `dropped` with the reason. A
   record without `from` that the author leaves out is deleted from the file.
@@ -538,8 +551,14 @@ carry `pending` and the number of records that carry `dropped`. When every secti
 not, it says that an approval of the whole outline is still needed. It decides
 equality on JSON values, not on the text of the lines. An approvals file that
 is empty or holds only blank lines holds no approval record. When the approvals
-file exists but cannot be read, or holds a line that is not JSON, status fails
-and says so; it does not report the outline as never approved.
+file exists but cannot be read, or holds a line that is not empty and is not
+one JSON object written as JSON on its own (a record spread over several
+lines, two records on one line, a line of spaces, a value such as `nan`),
+status fails and says so; it does not report the outline as never approved.
+The approve action checks the file the same way before it appends, and appends
+nothing when the file fails: the file was changed by hand, the skill says so,
+and what to do with it is the author's decision. The skill never changes a
+line of it.
 
 ## What is checked today
 
@@ -548,16 +567,23 @@ counts as passed only when its command says so; a command that prints nothing,
 fails or cannot run is a failed check, and when one of the three tools is not
 installed the skill stops and says which. Text from the manuscript, from an outline file
 or from the author reaches those commands only from a file that the command
-reads; it is never written into the text of a command. The three paths the
-skill writes into its commands begin with `/`: an empty path, or one not
-written out in full, stops it.
+reads; it is never written into the text of a command. The paths the skill
+writes into its commands are the repository's root, the outline directory, the
+stage directory, the directory that holds the manuscript and the manuscript's
+main file. Each begins with `/`: an empty path, or one not written out in
+full, stops the skill, and so does a path that holds a single quote. The paths
+of the ledgers' `_meta.json` files are read from a list in the stage directory,
+not written into a command.
 
 After every write to an outline file, the skill confirms that every line of
-that file that is not empty parses as a JSON object. After a write to the
+that file that is not empty is a JSON object written as JSON. jq also reads
+`nan`, `Infinity` and numbers such as `01` or `.5`, none of which is JSON; the
+check reads the text of the line to report them. After a write to the
 section file or the paragraph file it also confirms that every record has an
 `id`, that no `id` repeats among the section records or among the paragraph
 records and points, that no string holds a control character, and that no
-number is one that JSON does not have, such as the `nan` that jq reads. In the
+number is too large for jq to keep (such as `1e400`, which is JSON but which jq
+reads as infinite). In the
 paragraph file it also confirms that every point has an `id` and that `points`,
 where a record has it, is a list. The shape of a key that a section record
 carries and this document does not define is not checked, a key named `points`
@@ -568,10 +594,12 @@ done.
 
 The check never reports a pass for a file that holds no record. An empty
 section file is always a mistake. An empty paragraph file is a mistake too,
-with one exception: when the outline the author gave to draft has sections and
-no paragraph yet, the skill writes no paragraph record and the paragraph file
-is rightly empty. The check still does not report a pass for it; the skill
-says in its report that the paragraph file is empty, and goes on.
+with two exceptions, and only these two: the outline the author gave to draft
+has sections and no paragraph yet, so the skill writes no paragraph record; or
+the author, through revise, leaves out every paragraph record and none of them
+has `from`, so each is deleted. Then the paragraph file is rightly empty. The
+check still does not report a pass for it; the skill says in its report that
+the paragraph file is empty, and goes on.
 
 The control-character test catches some backslashes that were written once
 instead of twice, not all of them.
@@ -587,7 +615,8 @@ words no longer occur in the file. In a `says` or a `text` nothing catches it.
 
 When derive or draft has written locators, and each time the premise check
 runs, the skill resolves every locator: the file exists inside the repository
-and not inside a `.git` directory, the text of the `label` occurs exactly once,
+and not inside a `.git` directory in any letter case, the text of the `label`
+occurs exactly once,
 the `starts` occurs exactly once. It reports an object that is not a locator:
 one without a `file`, one with neither `label` nor `starts`, one whose `label`
 or `starts` is not a string, one with `lines` and no `commit`. It reports a

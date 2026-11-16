@@ -113,7 +113,8 @@ the action when it is not clear).
 - `ROOT` — the root of the repository. The repository is the git repository that holds the
   manuscript, or, when that repository is checked out as a submodule of another (as git reports
   it, from the index of the outer repository), the outermost
-  repository it is checked out in, up to two levels of submodules. A repository that sits inside
+  repository it is checked out in, up to two levels of submodules. With more levels, or when the
+  manuscript is in no git repository, the skill stops. A repository that sits inside
   another without being its submodule is a repository of its own. Every `file` of a locator is a
   path relative to `ROOT`; an outline kept inside a submodule therefore does not resolve in a
   checkout of the submodule alone. When the manuscript's repository sits inside another without
@@ -124,57 +125,62 @@ the action when it is not clear).
 - `STAGE` — a directory outside the repository for this session's temporary files.
 
 Run this first. `DIR` is the directory that holds `MAIN`, or, when there is no manuscript yet,
-the directory the author names.
+the directory the author names, written out in full from the leading `/`.
 
 ```bash
 DIR='<the directory, in single quotes>'
 command -v jq >/dev/null || echo 'missing jq'; command -v realpath >/dev/null || echo 'missing realpath'; command -v git >/dev/null || echo 'missing git'; command -v jq >/dev/null && command -v realpath >/dev/null && command -v git >/dev/null && echo 'ok tools'
-T=$(git -C "${DIR:?}" rev-parse --show-toplevel) && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && [ -z "$U" ] && ROOT=$T && printf 'ROOT=%s\n' "$ROOT"
+[ "${DIR#/}" != "$DIR" ] || echo 'STOP the directory does not begin with /'
+[ "${DIR#/}" != "$DIR" ] && T=$(git -C "$DIR" rev-parse --show-toplevel) && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && { [ -z "$U" ] || echo 'STOP the manuscript is in a submodule more than two levels deep'; } && [ -z "$U" ] && ROOT=$T && printf 'ROOT=%s\n' "$ROOT"
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/outline-XXXXXX") && printf 'STAGE=%s\n' "$STAGE"
 R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "${S#"$R"/}" = "$S" ] && echo 'ok the stage directory is outside the repository'
 ```
 
 - No `ok tools`: stop and tell the author that this skill needs `jq`, `realpath` and `git`, and
   which of them the `missing` lines name.
-- The `ROOT=` line gives `ROOT`. When git prints an error instead, the directory is not in a git
-  repository: ask the author which directory is the top of the manuscript's files and use that.
-  When there is neither a `ROOT=` line nor an error from git, the manuscript is in a submodule
-  more than two levels deep: ask the author which directory is the top, in the same way.
+- The `ROOT=` line gives `ROOT`. When there is none, a line that begins with `STOP` names why, or
+  git prints an error: the directory is not in a git repository. In each of these cases stop and
+  tell the author why. This skill works only on a manuscript inside a git repository, at most two
+  levels of submodules deep: the repository's root is the boundary of everything it reads and
+  writes, and it does not take that boundary from an answer.
 - The `STAGE=` line gives `STAGE`.
-- No `ok the stage directory is outside the repository`: when `ROOT` came from git, the
-  temporary directory of this machine is inside the repository; stop and say so, because the
-  skill's temporary files would be written into it. When `ROOT` comes from the author, make
-  sure yourself that `STAGE` is not under it.
+- No `ok the stage directory is outside the repository`: the temporary directory of this machine
+  is inside the repository; stop and say so, because the skill's temporary files would be
+  written into it.
 
 Then find `OUTDIR`. The command lists every ledger in the repository with the manuscript it
 belongs to, and every file whose name begins with `outline-` and ends in `.jsonl`.
 
 ```bash
-ROOT='<the root, as printed>'
-find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -not -path $'*\n*' -exec printf 'meta\t%s\n' {} + && find "$ROOT" -type f -name _meta.json -not -path '*/.git/*' -not -path $'*\n*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} \; && find "$ROOT" -type f -name 'outline-*.jsonl' -not -path '*/.git/*' -not -path $'*\n*' && echo 'ok listed'
+ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
+find "$ROOT" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' > "$STAGE/meta-files.txt" && cat -n "$STAGE/meta-files.txt" && find "$ROOT" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} \; && find "$ROOT" -type f -name 'outline-*.jsonl' -not -ipath '*/.git/*' -not -path $'*\n*' && echo 'ok listed'
 ```
 
 Only regular files are listed; a symbolic link is not followed, and a path that holds a line
-break is not listed. Each `meta` line is a `_meta.json`. Each `_meta.json` is read by itself, so
-one that cannot be read does not stop the others. A `_meta.json` that was read as one ledger has
-exactly one `ledger` line with the same path. A `meta` line with no `ledger` line or with more
-than one: that `_meta.json` could not be read as one ledger (it is not JSON, it is empty, or it
+break is not listed. Each numbered line is a `_meta.json`; the list is kept in the stage
+directory for the next command. Each `_meta.json` is read by itself, so one that cannot be read
+does not stop the others. A `_meta.json` that was read as one ledger has exactly one `ledger` line
+with the same path. A numbered `_meta.json` with no `ledger` line or with more than one: that `_meta.json` could not be read as one ledger (it is not JSON, it is empty, or it
 holds two values), and jq may name it in an error. Tell the author which one, and ask which
 directory to use, as in case 2 below. No `ok listed`: `find` itself failed; ask in the same
 way.
 
-Then run this once for each `ledger` line, with `L` set to the path of its `_meta.json` and `M`
-to `MAIN`, both written out in full.
+Then run this once for each numbered `_meta.json` that has a `ledger` line, with `N` set to its
+number and `M` to `MAIN`, written out in full. Do not type the path of the `_meta.json`: the
+command reads it from the list.
 
 ```bash
-L='<the path of a _meta.json, as printed>'; M='<MAIN, written out in full>'
-T=$(git -C "$(dirname "$L")" rev-parse --show-toplevel) && F=$(jq -r '.source.file | strings' "$L") && [ -n "$F" ] && A=$(realpath "$T/$F") && B=$(realpath "$M") && { [ "$A" = "$B" ] && echo 'ok this ledger names MAIN' || echo 'ok this ledger names another manuscript'; }
+ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
+M='<MAIN, written out in full>'
+N=1
+L=$(sed -n "${N}p" "$STAGE/meta-files.txt") && [ -n "$L" ] && [ "${M#/}" != "$M" ] && T=$(git -C "$(dirname "$L")" rev-parse --show-toplevel) && F=$(jq -r '.source.file | strings' "$L") && [ -n "$F" ] && B=$(realpath "$M") && A1=$(realpath "$T/$F" 2>/dev/null || echo none) && A2=$(realpath "$ROOT/$F" 2>/dev/null || echo none) && { { [ "$A1" = "$B" ] || [ "$A2" = "$B" ]; } && echo 'ok this ledger names MAIN' || echo 'ok this ledger names another manuscript'; }
 ```
 
-A ledger's `source.file` is a path from the root of the git repository that holds the ledger
-(`docs/SCHEMA.md`), which is not always `ROOT`: a ledger inside a submodule gives it from the
-submodule's root. The command resolves it from there and compares the real paths. No `ok` line:
-the ledger names no file that can be found, and it does not name `MAIN`.
+`docs/SCHEMA.md` does not say from which root a ledger's `source.file` is written, and both are
+in use. The command reads it both ways: from the root of the git repository that holds the
+ledger (for a ledger inside a submodule, the submodule's root) and from `ROOT`. The ledger names
+`MAIN` when either resolves to the real path of `MAIN`. No `ok` line: the number is past the
+list, `MAIN` does not begin with `/`, or the ledger names no file; it does not name `MAIN`.
 
 1. When exactly one ledger printed `ok this ledger names MAIN`, that is this manuscript's ledger
    and its directory is `OUTDIR`. A ledger is not needed.
@@ -190,7 +196,7 @@ the ledger names no file that can be found, and it does not name `MAIN`.
 
 ```bash
 ROOT='<the root, as printed>'; OUTDIR='<the directory of the outline files>'; STAGE='<the stage directory, as printed>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && { O=$(realpath "$OUTDIR" 2>/dev/null) || O="$(realpath "$(dirname "$OUTDIR")" 2>/dev/null)/$(basename "$OUTDIR")"; } && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X="${O#"$R"}/" && [ "${X#*/.git/}" = "$X" ] && { [ ! -e "$O" ] || [ -d "$O" ]; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is missing or inside the repository, the outline directory is not a directory inside the repository and outside .git, or an outline file is a symbolic link'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && { O=$(realpath "$OUTDIR" 2>/dev/null) || O="$(realpath "$(dirname "$OUTDIR")" 2>/dev/null)/$(basename "$OUTDIR")"; } && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ ! -e "$O" ] || [ -d "$O" ]; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is missing or inside the repository, the outline directory is not a directory inside the repository and outside .git, or an outline file is a symbolic link'; exit 1; }
 SEC="$O/outline-sections.jsonl"; PAR="$O/outline-paragraphs.jsonl"; APP="$O/outline-approvals.jsonl"
 ```
 
@@ -204,7 +210,7 @@ written out in full, would be taken from wherever the shell happens to be. It go
 the stage directory exists and is outside the repository. It then takes the real path of the
 outline directory, with every symbolic link in its path resolved, the last part included, and
 goes on only when that path is the repository's root or a directory under it, is not inside a
-`.git` directory, is a directory or does not exist yet, and none of the three outline files is
+`.git` directory in any letter case, is a directory or does not exist yet, and none of the three outline files is
 itself a symbolic link. `SEC`, `PAR` and `APP` are built from the real path. When
 `OUTDIR` does not exist yet, the directory that is to hold it has to exist inside the
 repository. A symbolic link that leads to a place that does not exist cannot be resolved, and
@@ -255,14 +261,17 @@ F="$SEC"
 [ -f "$F" ] && jq -R -n -r --arg f "$F" '
   ($f | endswith("outline-paragraphs.jsonl")) as $para
   | [inputs] | to_entries
-  | map(select(.value | length > 0) | {l: (.key + 1), r: (.value | try fromjson catch null)})
+  | map(select(.value | length > 0) | {l: (.key + 1), v: .value, r: (.value | try fromjson catch null)})
   | [ (.[] | select(.r | type != "object") | "line \(.l): not a JSON object"),
       (.[] | select(.r | type == "object")
            | select([.r | .. | (strings, (objects | keys_unsorted[])) | select(explode | any(. < 32))] | length > 0)
            | "line \(.l): a string holds a control character"),
       (.[] | select(.r | type == "object")
-           | select([.r | .. | numbers | select(isnan)] | length > 0)
-           | "line \(.l): a number is not a JSON number"),
+           | select(.v | gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"") | [splits("[\\s{}\\[\\]:,\"]+")] | map(select(length > 0)) | all(test("^(true|false|null|-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?)$")) | not)
+           | "line \(.l): a value is not written as JSON"),
+      (.[] | select(.r | type == "object")
+           | select([.r | .. | numbers | select(isinfinite)] | length > 0)
+           | "line \(.l): a number is too large for jq to keep"),
       (.[] | select($para and (.r | type == "object"))
            | select(.r | has("points") and ((.points | type) != "array"))
            | "line \(.l): points is not a list"),
@@ -278,36 +287,44 @@ F="$SEC"
 ' "$F"
 ```
 
-It confirms four things: every line that is not empty is a JSON object, with no number that
-JSON does not have (jq also reads `nan`); no string, the name of
+It confirms four things: every line that is not empty is a JSON object written as JSON (jq also
+reads `nan`, `Infinity` and numbers such as `01` or `.5`, none of which is JSON) and holds no
+number too large for jq to keep; no string, the name of
 a key included, holds a control character; every record has an `id`, and in the paragraph file
 every point has one too, and no `id` repeats among the records of the file and, in the paragraph
 file, their points; in the paragraph file, `points`, where a record has it, is a list. The
 shape of a key that a section record carries and this skill does not define is not checked, a
 key named `points` included; the control-character test still reads every string and every key
 name. A file with no record prints `EMPTY`, which is never a pass. An empty section file is
-always a mistake. An empty paragraph file is a mistake except in one case: the outline the
-author gave has sections and no paragraph yet, so this skill wrote no paragraph record on
-purpose. In that case say in the report that the paragraph file is empty, and go on. A derive of
+always a mistake. An empty paragraph file is a mistake except in two cases, and only these two:
+the outline the author gave to draft has sections and no paragraph yet, so this skill wrote no
+paragraph record on purpose; or the author, through revise, left out every paragraph record and
+none of them had `from`, so each was deleted. In those cases say in the report that the
+paragraph file is empty, and go on. A derive of
 a manuscript that has paragraphs never leaves the paragraph file empty.
 
-After a write to the approvals file, run this instead. An approval record has no `id` of its
-own, and its `statement` can hold line breaks. An approvals file with no record prints `EMPTY`,
+After a write to the approvals file, run this instead. It confirms that every line that is not
+empty is a JSON object written as JSON. An approval record has no `id` of its own, and its `statement` can hold line breaks. An approvals file with no record prints `EMPTY`,
 which is never a pass: after an approval was appended it is always a mistake.
 
 ```bash
 [ -f "$APP" ] && jq -R -n -r '
   [inputs] | to_entries | map(select(.value | length > 0)) as $rows
-  | [ $rows[] | select(.value | try (fromjson | type) catch "invalid" | . != "object")
-              | "line \(.key + 1): not a JSON object" ] as $bad
+  | [ ($rows[] | select(.value | try (fromjson | type) catch "invalid" | . != "object")
+               | "line \(.key + 1): not a JSON object"),
+      ($rows[] | select(.value | try (fromjson | type) catch "invalid" | . == "object")
+               | select(.value | gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"") | [splits("[\\s{}\\[\\]:,\"]+")] | map(select(length > 0)) | all(test("^(true|false|null|-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?)$")) | not)
+               | "line \(.key + 1): a value is not written as JSON") ] as $bad
   | if ($bad | length) > 0 then $bad[]
     elif ($rows | length) == 0 then "EMPTY: this file holds no record"
     else "ok every line is a JSON object" end
 ' "$APP"
 ```
 
-When a check prints anything other than its `ok` line, report the file and the lines, correct
-the file and run the check again. When it prints `ok`, say in the report what was confirmed and
+When a check of the section file or the paragraph file prints anything other than its `ok`
+line, report the file and the lines, correct the file and run the check again. When the check of
+the approvals file does, do not correct that file: this skill never changes a line of it. Say
+that the file was changed by hand, and leave what to do with it to the author. When it prints `ok`, say in the report what was confirmed and
 that no other check of the format exists until issue 78, apart from resolving the locators.
 
 ## Locators: do they resolve
@@ -338,7 +355,7 @@ name of the file: the command reads it from the list.
 P="$PAR"
 N=1
 FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
-[ -f "$P" ] && [ "${FILE#/}" = "$FILE" ] && R=$(realpath "$ROOT") && T=$(realpath "$ROOT/$FILE") && [ "${T#"$R"/}" != "$T" ] && X="${T#"$R"}/" && [ "${X#*/.git/}" = "$X" ] && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
+[ -f "$P" ] && [ "${FILE#/}" = "$FILE" ] && R=$(realpath "$ROOT") && T=$(realpath "$ROOT/$FILE") && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
   [ .[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | select(.file == $f)
     | (if (has("starts") or has("label")) | not then "\($r.id | tojson): a locator has neither label nor starts" else empty end),
       (if has("lines") and (has("commit") | not) then "\($r.id | tojson): a locator has lines without commit" else empty end),
@@ -359,7 +376,7 @@ FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
 
 The command refuses a name that begins with `/`, takes the real path of the file, following
 symbolic links, and goes on only when that path is inside the repository and not inside a
-`.git` directory; a name whose `..` lead out and back into the repository is taken by where it
+`.git` directory in any letter case; a name whose `..` lead out and back into the repository is taken by where it
 leads. It then counts, in the text of the file with every run of spaces, tabs and line
 breaks turned into one space, how often each `starts` occurs and how often the text
 `\label{<label>}` of each `label` occurs. White space at either end of a `starts` is ignored. Runs of
@@ -387,13 +404,14 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    section at a time. Follow them only to files inside the repository. This lists them:
 
    ```bash
-   find "$ROOT" -type f -name '*.tex' -not -path '*/.git/*' -not -path $'*\n*' && echo 'ok files listed'
+   find "$ROOT" -type f -name '*.tex' -not -ipath '*/.git/*' -not -path $'*\n*' && echo 'ok files listed'
    ```
 
    The list holds every regular `.tex` file inside the repository whose path holds no line
    break. Read an included file only when it is in the list. Any other included file is not
-   read: one outside the repository, a symbolic link, a missing file, a file whose path holds a
-   line break, or a file that is not `.tex` (a figure, a table, a style file). Tell the author which files were not read, and go on. A figure or a table that comes
+   read: one outside the repository, a symbolic link, a file reached through a directory that is
+   a symbolic link, a missing file, a file whose path holds a line break, or a file that is not
+   `.tex` (a figure, a table, a style file). Tell the author which files were not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
    it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
@@ -451,8 +469,8 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    paragraph records as in derive, steps 3 and 4. Records have no `from` unless the author points
    to a file (a note, an earlier draft) that a record comes from; a point can name what supports
    it in `basis`. When the author's outline has sections and no paragraph yet, write no
-   paragraph record: the staged paragraph file is empty, and this is the one case in which
-   `EMPTY` is accepted for it.
+   paragraph record: the staged paragraph file is empty, and this is one of the two cases in
+   which `EMPTY` is accepted for it (the write check names both).
 3. Do not invent content. A point that would report a result, a number or a citation the author
    has not supplied says what will be reported without stating it ("A simulation will report how
    the two methods compare."), and carries `pending` naming what is still missing.
@@ -485,7 +503,7 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   does not define included, so it can list more than it needs to; that only rules out more ids:
 
   ```bash
-  [ -f "$SEC" ] && [ -f "$PAR" ] && jq -n -r --slurpfile a "$SEC" --slurpfile b "$PAR" --slurpfile c "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" '([$a[], $b[], $c[] | .. | objects | (.id?, .section?, .parent?, (.uses? | arrays | .[])) | strings] | unique | .[] | tojson), "ok ids listed"'
+  [ -f "$SEC" ] && [ -f "$PAR" ] && jq -n -r --slurpfile a "$SEC" --slurpfile b "$PAR" --rawfile c "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" '($c | split("\n") | map(select(length > 0) | if (gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"") | [splits("[\\s{}\\[\\]:,\"]+")] | map(select(length > 0)) | all(test("^(true|false|null|-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?)$"))) then fromjson else error("a line of the approvals file is not written as JSON") end) | if all(type == "object") then . else error("a line of the approvals file is not a JSON object") end) as $apps | ([$a[], $b[], $apps[] | .. | objects | (.id?, .section?, .parent?, (.uses? | arrays | .[])) | strings] | unique | .[] | tojson), "ok ids listed"'
   ```
 
   A new `id` is one that is not in that list. No `ok ids listed`: the list is not complete; do
@@ -497,6 +515,8 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   least one of them.
 - **Leave a paragraph out.** When its record has `from`, do not delete the record: give it
   `dropped` with the author's reason and leave it on its line. Delete a record without `from`.
+  When this leaves the paragraph file with no record, the write check prints `EMPTY`; that is
+  the second of the two cases it accepts.
 - **Leave a section out.** Three steps, in this order.
   1. Settle the sections under it, those that name it as `parent`: each is left out with it, or
      is given another `parent` or none, as the author says. Ask when the author has not said.
@@ -513,6 +533,10 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   section that is moved takes the sections under it along, and a section is never moved to a
   line before its own `parent`: it is given another `parent`, or none, first, as the author
   says. Ask when the author has not said. Each `parent` stays on an earlier line.
+- **Move a point.** When a point moves to another paragraph record and the record it leaves has
+  `from`, add each locator of that `from` to the point's `basis` (a locator already there is
+  not added again), so that the point keeps its source. When the record it leaves has no
+  `from`, nothing is added.
 - **Keys this skill does not know.** Keep them exactly as they are.
 - **`uses`.** After a move, a merge, a split, or leaving a record out, an id in `uses` can end
   up on a later line, name a record that has left the file, or name a record that carries
@@ -527,8 +551,9 @@ no longer stand as approved.
 Status writes nothing to the repository.
 
 ```bash
-jq -n -r --slurpfile apps "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '
-  ($secs[] | . as $s
+jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '
+  ($a | split("\n") | map(select(length > 0) | if (gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"") | [splits("[\\s{}\\[\\]:,\"]+")] | map(select(length > 0)) | all(test("^(true|false|null|-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?)$"))) then fromjson else error("a line of the approvals file is not written as JSON") end) | if all(type == "object") then . else error("a line of the approvals file is not a JSON object") end) as $apps
+  | ($secs[] | . as $s
       | [$pars[] | select(.section == $s.id)] as $cur
       | ([$apps[] | .sections[]? | select(.section.id == $s.id)] | last) as $e
       | if $e == null then "\($s.id | tojson)\tnever approved"
@@ -551,19 +576,25 @@ records that name no section, the two counts, and `ok status`. A section is comp
 copies in the last approval record that has an entry for it. The comparison is of JSON values:
 the order of keys does not count, and `1` and `1.0` are the same number. When there is no
 approvals file, or when it is empty or holds only blank lines, every section was never
-approved. When the approvals file exists but cannot be read, or holds a line that is not JSON,
-the command fails and prints no `ok status`; the same holds for the command below and for the
+approved. When the approvals file exists but cannot be read, or holds a line that is not empty
+and is not one JSON object written as JSON on its own (a record spread over several lines, two
+records on one line, a line of spaces, a value such as `nan`), the command fails and prints no `ok status`; the same holds for the command below and for the
 list of ids in use.
 
 A paragraph record whose `section` names no section record belongs to no section: it is in no
 approved copy and is never shown with a section. While the paragraph file holds one, the outline
 does not stand as approved, whatever the approval records say.
 
+A section is compared with its own records only. When a point of another section that one of its
+records names in `uses` changes, the section still stands as approved: status does not follow
+`uses`.
+
 For the sections that differ from their approved copy, this prints what differs:
 
 ```bash
-jq -n -r --slurpfile apps "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '
-  ($secs[] | . as $s
+jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '
+  ($a | split("\n") | map(select(length > 0) | if (gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"") | [splits("[\\s{}\\[\\]:,\"]+")] | map(select(length > 0)) | all(test("^(true|false|null|-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?)$"))) then fromjson else error("a line of the approvals file is not written as JSON") end) | if all(type == "object") then . else error("a line of the approvals file is not a JSON object") end) as $apps
+  | ($secs[] | . as $s
       | [$pars[] | select(.section == $s.id)] as $cur
       | ([$apps[] | .sections[]? | select(.section.id == $s.id)] | last) as $e
       | select($e != null and ($e.section != $s or $e.paragraphs != $cur))
@@ -685,14 +716,16 @@ asks, through revise.
 8. Append the record:
 
    ```bash
-   printf '%s\n' "$O" | cmp - "$STAGE/shown-dir.txt" && cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
-     ($in | split("\n")) as $l
+   printf '%s\n' "$O" | cmp - "$STAGE/shown-dir.txt" && cmp "$SEC" "$STAGE/shown-sections.jsonl" && cmp "$PAR" "$STAGE/shown-paragraphs.jsonl" && jq -n -c --arg at "$(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/(..)$/:\1/')" --rawfile in "$STAGE/approval-input.txt" --rawfile cur "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" --slurpfile shown "$STAGE/shown-ids.json" --slurpfile secs "$STAGE/shown-sections.jsonl" --slurpfile pars "$STAGE/shown-paragraphs.jsonl" '
+     ($cur | split("\n") | map(select(length > 0)) | all((try (fromjson | type) catch "invalid") == "object" and (gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"") | [splits("[\\s{}\\[\\]:,\"]+")] | map(select(length > 0)) | all(test("^(true|false|null|-?(0|[1-9][0-9]*)([.][0-9]+)?([eE][+-]?[0-9]+)?)$"))))) as $curok
+     | ($in | split("\n")) as $l
      | ($shown[0] | unique) as $seen
      | (try ($l[0] | fromjson) catch null) as $first
      | (if $first == "all-shown" then $seen elif ($first | type) == "array" then ($first | unique) else [] end) as $ids
      | [$secs[] | select(.id as $i | any($ids[]; . == $i))] as $got
      | ($l[1:] | join("\n") | sub("\\n+$"; "")) as $words
-     | if ([$pars[] | select(.section as $x | any($secs[]; .id == $x) | not)] | length) > 0 then error("a paragraph record of the copy shown names no section")
+     | if ($curok | not) then error("the approvals file holds a line that is not a JSON object written as JSON; it was changed by hand")
+       elif ([$pars[] | select(.section as $x | any($secs[]; .id == $x) | not)] | length) > 0 then error("a paragraph record of the copy shown names no section")
        elif ($ids | length) == 0 or ($got | length) != ($ids | length) or (($ids - $seen) | length) != 0 then error("the ids listed are not ids of sections that were shown")
        elif ($words | test("\\S") | not) then error("the statement is empty")
        else {approved_at: $at, statement: $words, sections: [$got[] | . as $s | {section: $s, paragraphs: [$pars[] | select(.section == $s.id)]}]}
@@ -703,7 +736,8 @@ asks, through revise.
 
    The command goes on only while each part holds: the guard of the opening lines (it runs in
    this call too); the real path of the outline directory is the one recorded when the copies
-   were taken; the section file and the paragraph file are still what was shown; no paragraph record of the copy names
+   were taken; the section file and the paragraph file are still what was shown; every line of the
+   approvals file that is not empty is a JSON object written as JSON; no paragraph record of the copy names
    no section; every id listed is the id of a section that was shown, and there is at least one;
    the statement is not empty. It builds the record from the copies that were shown, with `whole`
    true when it covers every section, ends the last line of the approvals file when that line
@@ -716,6 +750,9 @@ asks, through revise.
    missing file, the outline or the real path of its directory changed after it was shown, or
    the copies are gone: say so and return to step 1. When `jq` reported that a paragraph record
    names no section, say so; the author corrects it through revise, and you return to step 1.
+   When `jq` reported that the approvals file holds a line that is not a JSON object, say that
+   the file was changed by hand and leave what to do with it to the author; this skill does not
+   change it.
    When `jq` reported another error, write the file of step 7 again, corrected, and run the
    command again. Only ever append. Do not edit or remove an earlier
    line of the approvals file.

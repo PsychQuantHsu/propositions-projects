@@ -157,13 +157,13 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
 - pytest 7+ for test suite
-- `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`，其他 skill 不需要；它也需要 `git`，`/propositions:manuscript-audit` 與 Operation D 原本就用 git（實跑過 jq 1.7.1 與 1.8.2；outline 開頭會先確認三個工具都在）
+- `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`，其他 skill 不需要；它也需要 `git`，`/propositions:manuscript-audit` 與 Operation D 原本就用 git（實跑過 jq 1.7.1 與 1.8.2；outline 開頭會先確認三個工具都在，而且 jq 分得出兩個不同的長整數，1.7 之前的版本分不出來）
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)
 - Schema versions: v1.0 – v1.7 — validator handles all with backward-compat skip for v1.2+-only rules (R7 / R11 / R12)；v1.4 = `retired`、v1.5 = `retired.superseded_mechanism`、v1.6 = multi-file（file-qualified location + `source.parts`）、v1.7 = `_meta.json` `profile`（`default` / `empirical`，決定 R11／R12 詞彙）。完整版本史見 `docs/SCHEMA.md` §Versioning
 
 ## Hard rules for contributors
 
-- **不修 user 的 jsonl 不問**:任何會寫帳冊目錄裡 jsonl 的 skill(帳冊 `main.jsonl`、`_stage2/` 與 `_pilot/` 的 jsonl、`discourse.jsonl`、`verification.jsonl` 都算;e.g., refresh-locations)必須先 dry-run + AskUserQuestion 確認再寫。綱要的三個檔(`outline-*.jsonl`)除外:什麼時候寫、寫之前問什麼,照 `/propositions:outline` 的 skill
+- **不修 user 的 main.jsonl 不問**:任何會 write jsonl 的 skill (e.g., refresh-locations) 必須先 dry-run + AskUserQuestion 確認再寫。綱要的三個檔(`outline-*.jsonl`)除外:什麼時候寫、寫之前問什麼,照 `/propositions:outline` 的 skill
 - **Loud failure over silent fix**:寧可 anchor_failed 不要亂猜 line number
 - **Schema 升級走 spec 流程**:不要 ad-hoc 加 enum 值;先改 `docs/SCHEMA.md` 確定新 canonical set,再更 validator + tests
 - **Test 覆蓋每條 rule**:R1-R13 各自有獨立 fixture;改 normalize_for_match 等 shared helper 必跑全 R-rule test suite

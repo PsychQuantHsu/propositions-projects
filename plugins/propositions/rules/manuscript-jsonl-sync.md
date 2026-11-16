@@ -4,7 +4,7 @@
 
 本專案的 `manuscript/main.tex` 與 `manuscript/propositions/main.jsonl` (+ `_stage2/*.jsonl` + `_pilot/*.jsonl`) 是**單一 source of truth 的兩面**，不是兩個獨立 deliverable。
 
-本規則說的 JSONL 是 `manuscript/propositions/` 底下的 jsonl，只有綱要檔（`outline-*.jsonl`，見 `docs/OUTLINE.md`）除外：綱要是動筆前的計畫，不跟著 `main.tex` 同步。
+綱要檔（`outline-*.jsonl`，見 `docs/OUTLINE.md`）不在本規則之內：綱要是動筆前的計畫，不跟著 `main.tex` 同步。
 
 任何 `main.tex` 內容改動（rewording / restructure / 加減 sentence / line shift）都**必須**在同一個 commit / change cluster 內審視並更新對應的 propositions JSONL props。**禁止**「先改 main.tex 等之後再 sync jsonl」— 那等於把 R1 drift 變成 latent debt。
 

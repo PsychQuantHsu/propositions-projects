@@ -106,8 +106,9 @@ locators are resolved, because the words no longer occur in the file.
 
 ## Resolve paths
 
-Establish these from the request, or by asking once (AskUserQuestion, all at once, together with
-the action when it is not clear).
+Establish `MAIN` and `OUTDIR` from the request, or by asking once (AskUserQuestion, all at once,
+together with the action when it is not clear). `ROOT` and `STAGE` come from the first command
+below, never from an answer.
 
 - `MAIN` — the manuscript's main `.tex` file. The draft action can run without one.
 - `ROOT` — the root of the repository. The repository is the git repository that holds the
@@ -141,8 +142,9 @@ R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "${S#"$R"/}" = "$S" ] && ec
 - The `ROOT=` line gives `ROOT`. When there is none, a line that begins with `STOP` names why, or
   git prints an error: the directory is not in a git repository. In each of these cases stop and
   tell the author why. This skill works only on a manuscript inside a git repository, at most two
-  levels of submodules deep: the repository's root is the boundary of everything it reads and
-  writes, and it does not take that boundary from an answer.
+  levels of submodules deep: the repository's root is the boundary of the outline files and of
+  every file it reads as a source, and it does not take that boundary from an answer. Its own
+  temporary files are outside the repository, in the stage directory.
 - The `STAGE=` line gives `STAGE`.
 - No `ok the stage directory is outside the repository`: the temporary directory of this machine
   is inside the repository; stop and say so, because the skill's temporary files would be
@@ -153,11 +155,13 @@ belongs to, and every file whose name begins with `outline-` and ends in `.jsonl
 
 ```bash
 ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
-find "$ROOT" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' > "$STAGE/meta-files.txt" && cat -n "$STAGE/meta-files.txt" && find "$ROOT" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} \; && find "$ROOT" -type f -name 'outline-*.jsonl' -not -ipath '*/.git/*' -not -path $'*\n*' && echo 'ok listed'
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] || echo 'STOP a path does not begin with /'
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && find "$ROOT" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' > "$STAGE/meta-files.txt" && cat -n "$STAGE/meta-files.txt" && find "$ROOT" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' -exec jq -r '"ledger\t\(input_filename)\tfor \(.source.file // "?" | tojson)"' {} \; && find "$ROOT" -type f -name 'outline-*.jsonl' -not -ipath '*/.git/*' -not -path $'*\n*' && echo 'ok listed'
 ```
 
-Only regular files are listed; a symbolic link is not followed, and a path that holds a line
-break is not listed. Each numbered line is a `_meta.json`; the list is kept in the stage
+Only regular files are listed: a symbolic link is not followed, and a path that holds a line
+break, or that is inside a `.git` directory in any letter case, is not listed. A `_meta.json`
+that is not listed is not read and does not count as a ledger. A `STOP` line: stop and say why. Each numbered line is a `_meta.json`; the list is kept in the stage
 directory for the next command. Each `_meta.json` is read by itself, so one that cannot be read
 does not stop the others. A `_meta.json` that was read as one ledger has exactly one `ledger` line
 with the same path. A numbered `_meta.json` with no `ledger` line or with more than one: that `_meta.json` could not be read as one ledger (it is not JSON, it is empty, or it
@@ -173,14 +177,16 @@ command reads it from the list.
 ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
 M='<MAIN, written out in full>'
 N=1
-L=$(sed -n "${N}p" "$STAGE/meta-files.txt") && [ -n "$L" ] && [ "${M#/}" != "$M" ] && T=$(git -C "$(dirname "$L")" rev-parse --show-toplevel) && F=$(jq -r '.source.file | strings' "$L") && [ -n "$F" ] && B=$(realpath "$M") && A1=$(realpath "$T/$F" 2>/dev/null || echo none) && A2=$(realpath "$ROOT/$F" 2>/dev/null || echo none) && { { [ "$A1" = "$B" ] || [ "$A2" = "$B" ]; } && echo 'ok this ledger names MAIN' || echo 'ok this ledger names another manuscript'; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${M#/}" != "$M" ] || echo 'STOP a path does not begin with /'
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${M#/}" != "$M" ] && L=$(sed -n "${N}p" "$STAGE/meta-files.txt") && [ -n "$L" ] && T=$(git -C "$(dirname "$L")" rev-parse --show-toplevel) && F=$(jq -r '.source.file | strings' "$L") && [ -n "$F" ] && B=$(realpath "$M") && A1=$(realpath "$T/$F" 2>/dev/null || echo none) && A2=$(realpath "$ROOT/$F" 2>/dev/null || echo none) && { { [ "$A1" = "$B" ] || [ "$A2" = "$B" ]; } && echo 'ok this ledger names MAIN' || echo 'ok this ledger names another manuscript'; }
 ```
 
 `docs/SCHEMA.md` does not say from which root a ledger's `source.file` is written, and both are
 in use. The command reads it both ways: from the root of the git repository that holds the
 ledger (for a ledger inside a submodule, the submodule's root) and from `ROOT`. The ledger names
-`MAIN` when either resolves to the real path of `MAIN`. No `ok` line: the number is past the
-list, `MAIN` does not begin with `/`, or the ledger names no file; it does not name `MAIN`.
+`MAIN` when either resolves to the real path of `MAIN`. A `STOP` line: stop and say why. No
+`ok` line otherwise: the number is past the list, or the ledger names no file; it does not name
+`MAIN`.
 
 1. When exactly one ledger printed `ok this ledger names MAIN`, that is this manuscript's ledger
    and its directory is `OUTDIR`. A ledger is not needed.
@@ -196,7 +202,7 @@ list, `MAIN` does not begin with `/`, or the ledger names no file; it does not n
 
 ```bash
 ROOT='<the root, as printed>'; OUTDIR='<the directory of the outline files>'; STAGE='<the stage directory, as printed>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && { O=$(realpath "$OUTDIR" 2>/dev/null) || O="$(realpath "$(dirname "$OUTDIR")" 2>/dev/null)/$(basename "$OUTDIR")"; } && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ ! -e "$O" ] || [ -d "$O" ]; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is missing or inside the repository, the outline directory is not a directory inside the repository and outside .git, or an outline file is a symbolic link'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(realpath "$ROOT") && S=$(realpath "$STAGE") && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && { O=$(realpath "$OUTDIR" 2>/dev/null) || O="$(realpath "$(dirname "$OUTDIR")" 2>/dev/null)/$(basename "$OUTDIR")"; } && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "$(dirname "$O")" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is missing or inside the repository, the outline directory is not a directory inside the repository and outside .git, or an outline file is a symbolic link'; exit 1; }
 SEC="$O/outline-sections.jsonl"; PAR="$O/outline-paragraphs.jsonl"; APP="$O/outline-approvals.jsonl"
 ```
 
@@ -210,7 +216,8 @@ written out in full, would be taken from wherever the shell happens to be. It go
 the stage directory exists and is outside the repository. It then takes the real path of the
 outline directory, with every symbolic link in its path resolved, the last part included, and
 goes on only when that path is the repository's root or a directory under it, is not inside a
-`.git` directory in any letter case, is a directory or does not exist yet, and none of the three outline files is
+`.git` directory in any letter case, is a directory or does not exist yet in a directory that
+does, and none of the three outline files is
 itself a symbolic link. `SEC`, `PAR` and `APP` are built from the real path. When
 `OUTDIR` does not exist yet, the directory that is to hold it has to exist inside the
 repository. A symbolic link that leads to a place that does not exist cannot be resolved, and
@@ -221,7 +228,8 @@ is itself a symbolic link. A symbolic link in the path of the directory is resol
 refused: what counts is where it leads.
 
 When the stage directory is gone, or the conversation no longer has its path (a new session, a
-conversation that was summarised), make a new one with the `mktemp` line. Whatever was shown
+conversation that was summarised), run the first command of "Resolve paths" again: it makes a
+new one. Whatever was shown
 from the old one no longer counts as shown: an approval needs the sections shown again.
 
 ## Pick the action
@@ -289,9 +297,10 @@ F="$SEC"
 
 It confirms four things: every line that is not empty is a JSON object written as JSON (jq also
 reads `nan`, `Infinity` and numbers such as `01` or `.5`, none of which is JSON) and holds no
-number too large for jq to keep; no string, the name of
-a key included, holds a control character; every record has an `id`, and in the paragraph file
-every point has one too, and no `id` repeats among the records of the file and, in the paragraph
+number too large for jq to keep (jq reads a byte that is not UTF-8 as a replacement character,
+so such a byte is not reported); no string, the name of
+a key included, holds a control character; every record has an `id` that is a non-empty
+string, and in the paragraph file every point has one too, and no `id` repeats among the records of the file and, in the paragraph
 file, their points; in the paragraph file, `points`, where a record has it, is a list. The
 shape of a key that a section record carries and this skill does not define is not checked, a
 key named `points` included; the control-character test still reads every string and every key
@@ -410,7 +419,7 @@ and draft it is a mistake of this skill: correct the staged record and run the c
    The list holds every regular `.tex` file inside the repository whose path holds no line
    break. Read an included file only when it is in the list. Any other included file is not
    read: one outside the repository, a symbolic link, a file reached through a directory that is
-   a symbolic link, a missing file, a file whose path holds a line break, or a file that is not
+   a symbolic link, a file inside a `.git` directory in any letter case, a missing file, a file whose path holds a line break, or a file that is not
    `.tex` (a figure, a table, a style file). Tell the author which files were not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
    it.
@@ -578,8 +587,13 @@ the order of keys does not count, and `1` and `1.0` are the same number. When th
 approvals file, or when it is empty or holds only blank lines, every section was never
 approved. When the approvals file exists but cannot be read, or holds a line that is not empty
 and is not one JSON object written as JSON on its own (a record spread over several lines, two
-records on one line, a line of spaces, a value such as `nan`), the command fails and prints no `ok status`; the same holds for the command below and for the
-list of ids in use.
+records on one line, a line of spaces, a value such as `nan`), the command fails and prints no
+`ok status`; the same holds for the command below and for the list of ids in use. An approval
+record whose keys do not have the shapes the format gives them can also make the command fail
+part way, after some lines. Whenever there is no `ok status`, the lines printed are not a status:
+tell the author that the approvals file could not be read as approval records, that status
+cannot be reported until the author decides what to do with that file, and that this skill does
+not change it.
 
 A paragraph record whose `section` names no section record belongs to no section: it is in no
 approved copy and is never shown with a section. While the paragraph file holds one, the outline

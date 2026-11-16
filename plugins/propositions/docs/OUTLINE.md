@@ -27,8 +27,11 @@ from the index of the outer repository), the outermost repository it is
 checked out in, up to two levels of submodules. The skill works only on a
 manuscript inside a git repository: with more levels of submodules, or when
 the manuscript is in no git repository, it stops and says why. The
-repository's root is the boundary of everything it reads and writes, and it
-does not take that boundary from an answer of the author. A repository that
+repository's root is the boundary of the outline files and of every file the
+skill reads as a source, and the skill does not take that boundary from an
+answer of the author. Its own temporary files are outside the repository. For
+a draft with no manuscript yet, the directory the author names for it stands
+in for the manuscript. A repository that
 sits inside another without being its submodule is a repository of its own.
 Everything this document says is inside the repository is inside this one, and
 every path a locator gives is relative to its root. An outline kept inside a
@@ -47,7 +50,9 @@ which root `source.file` is written, and two are in use: the root of the git
 repository that holds the ledger (for a ledger inside a submodule, the
 submodule's root), and the root of the repository above. The skill reads it
 from both, and the ledger names the manuscript when either one leads to its
-main file. A `_meta.json` that is a symbolic link is not read.
+main file. A `_meta.json` that is a symbolic link, that is inside a `.git`
+directory in any letter case, or whose path holds a line break is not read and
+does not count as a ledger.
 
 The skill uses a directory without asking only when exactly one ledger in the
 repository names this manuscript; it then uses that ledger's directory. In
@@ -476,7 +481,8 @@ one paragraph record for each of its paragraphs and blocks. It follows the
 `.tex` files that the manuscript includes only when they are regular files
 inside the repository whose path holds no line break. Any other included file
 is named to the author and not read: one outside the repository, a symbolic
-link, a file reached through a directory that is a symbolic link, a missing
+link, a file reached through a directory that is a symbolic link, a file
+inside a `.git` directory in any letter case, a missing
 file, a file whose path holds a line break, or a file that is not `.tex`. Every paragraph record it produces has `from` naming the passage it
 comes from, and every point states only what that passage states. A
 theorem-like statement, a figure or a table is named by its own label; the
@@ -578,9 +584,11 @@ not written into a command.
 After every write to an outline file, the skill confirms that every line of
 that file that is not empty is a JSON object written as JSON. jq also reads
 `nan`, `Infinity` and numbers such as `01` or `.5`, none of which is JSON; the
-check reads the text of the line to report them. After a write to the
+check reads the text of the line to report them. It does not report a byte that
+is not UTF-8: jq reads it as a replacement character. After a write to the
 section file or the paragraph file it also confirms that every record has an
-`id`, that no `id` repeats among the section records or among the paragraph
+`id` that is a non-empty string, that no `id` repeats among the section
+records or among the paragraph
 records and points, that no string holds a control character, and that no
 number is too large for jq to keep (such as `1e400`, which is JSON but which jq
 reads as infinite). In the
@@ -629,7 +637,8 @@ That is all: the checks of a write, the resolving of locators, and what status
 reports. Until issue #78 no tool checks whether a required key is missing
 (a record whose `points` is missing or an empty list, a point without `text`, a
 section record without `says`), whether a record
-that carries `carry` has `from`, what `lines` and `commit` hold, whether a
+that carries `carry` has `from`, what `lines` and `commit` hold, whether an
+approval record has only its four keys and their shapes, whether a
 `parent`
 names a section record on an earlier line, or whether the groups of paragraph
 records are in the order of the section file; only the author's reading stands

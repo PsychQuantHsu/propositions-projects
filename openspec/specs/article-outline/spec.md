@@ -10,9 +10,9 @@ The article outline holds what an article is planned to say before it is written
 
 The outline SHALL consist of three files in the directory that holds, or would hold, the manuscript's ledger: `outline-sections.jsonl`, `outline-paragraphs.jsonl` and `outline-approvals.jsonl`. In each file every line that is not empty SHALL be one JSON object.
 
-The repository is the git repository that holds the manuscript, or, when that repository is checked out as a submodule of another (as git reports it, from the index of the outer repository), the outermost repository it is checked out in, up to two levels of submodules; with more levels the skill SHALL ask the author which directory is the top. A repository that sits inside another without being its submodule is a repository of its own; a ledger of the outer repository is then outside the repository, does not name the manuscript, and cannot have the outline beside it. A directory under the repository's root counts as inside it even when it holds a git repository of its own. Wherever this capability says inside the repository, it means inside this one, and every path a locator gives is relative to its root; an outline kept inside a submodule therefore does not resolve in a checkout of the submodule alone.
+The repository is the git repository that holds the manuscript, or, when that repository is checked out as a submodule of another (as git reports it, from the index of the outer repository), the outermost repository it is checked out in, up to two levels of submodules. When the manuscript is in no git repository, or in a submodule more than two levels deep, the skill SHALL stop and say why, and SHALL NOT take the boundary of the repository from an answer of the author. For a draft with no manuscript yet, the directory the author names for the manuscript stands in for it. A repository that sits inside another without being its submodule is a repository of its own; a ledger of the outer repository is then outside the repository, does not name the manuscript, and cannot have the outline beside it. A directory under the repository's root counts as inside it even when it holds a git repository of its own. Wherever this capability says inside the repository, it means inside this one, and every path a locator gives is relative to its root; an outline kept inside a submodule therefore does not resolve in a checkout of the submodule alone.
 
-The outline SHALL NOT depend on a ledger: the directory can hold the three files without a `main.jsonl`. The skill SHALL use a directory without asking only when exactly one ledger in the repository names this manuscript; it then uses that ledger's directory. A ledger names this manuscript when its `source.file`, a path from the root of the git repository that holds the ledger, is the manuscript's main file once both are resolved to real paths; that root is the submodule's root for a ledger inside a submodule. A `_meta.json` that is a symbolic link is not read. In every other case, when no ledger names the manuscript or more than one does, it SHALL ask the author which directory to use and SHALL NOT choose one without asking. Outline files elsewhere in the repository are then offered, not taken, because they can belong to another manuscript. Adding, changing or removing the outline files SHALL NOT change the ledger, its metadata, the structure sidecars or the verification records. The ledger's schema version does not cover the outline files.
+The outline SHALL NOT depend on a ledger: the directory can hold the three files without a `main.jsonl`. The skill SHALL use a directory without asking only when exactly one ledger in the repository names this manuscript; it then uses that ledger's directory. A ledger names this manuscript when its `source.file`, read as a path from the root of the git repository that holds the ledger (for a ledger inside a submodule, the submodule's root) or as a path from the root of the repository, is the manuscript's main file once both are resolved to real paths. `docs/SCHEMA.md` does not say which root is meant, so both readings are tried. A `_meta.json` that is a symbolic link, that is inside a `.git` directory in any letter case, or whose path holds a line break is not read and does not count as a ledger. In every other case, when no ledger names the manuscript or more than one does, it SHALL ask the author which directory to use and SHALL NOT choose one without asking. Outline files elsewhere in the repository are then offered, not taken, because they can belong to another manuscript. Adding, changing or removing the outline files SHALL NOT change the ledger, its metadata, the structure sidecars or the verification records. The ledger's schema version does not cover the outline files.
 
 A section record, a paragraph record, a point and a locator are allowed to carry keys that this capability does not define. An approval record SHALL carry no key other than the four this capability defines for it.
 
@@ -52,8 +52,18 @@ No executable check: this change adds no test target; the examples and tests of 
 
 #### Scenario: A repository inside another that is not its submodule
 
-- **WHEN** the manuscript is in a git repository that sits inside another repository's directory without being registered as its submodule
+- **WHEN** the manuscript is in a git repository that sits inside another repository's directory without being registered as its submodule, and no ledger of the inner repository names the manuscript
 - **THEN** the repository is the inner one, a file of the outer repository is outside it, and a ledger of the outer repository is not used: the skill asks the author which directory of the inner repository to use
+
+#### Scenario: A manuscript in no git repository
+
+- **WHEN** the directory that holds the manuscript is in no git repository
+- **THEN** the skill stops, says that it works only on a manuscript inside a git repository, and reads and writes no outline file
+
+#### Scenario: A ledger written from the outer root
+
+- **WHEN** the manuscript's repository is checked out as a submodule `paper/manuscript` of the repository, and the only ledger that names the manuscript sits inside the submodule with `source.file` `paper/manuscript/main.tex`, a path from the repository's root
+- **THEN** the ledger names this manuscript, and the skill uses its directory without asking
 
 #### Scenario: A backslash that was written as a JSON escape
 
@@ -62,7 +72,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -179,7 +189,7 @@ A locator SHALL be an object with these keys.
 
 | Key | Required | Value |
 | --- | --- | --- |
-| `file` | yes | The path of a file inside the repository, relative to its root, and not inside a `.git` directory |
+| `file` | yes | The path of a file inside the repository, relative to its root, and not inside a `.git` directory in any letter case |
 | `label` | one of `label` and `starts` | A LaTeX label whose text `\label{…}` occurs exactly once in that file. It names the section or the environment the label is attached to |
 | `starts` | one of `label` and `starts` | The opening words of the passage, copied from the file, enough of them to occur exactly once in it |
 | `lines` | no | A list of two line numbers, the first and the last line of the passage |
@@ -193,7 +203,7 @@ The text of a label, `\label{` followed by the value of `label` and `}`, is coun
 
 A label inside a passage does not name the passage: a paragraph of prose that contains a labelled equation is named by `starts`.
 
-The file a locator names is allowed to be outside the manuscript, such as a note in the same repository, and it is allowed to be a file that git ignores; such a file is read like any other and handed to the agent of the premise check. It SHALL NOT be outside the repository: an object whose `file` leads outside it, by a leading `/`, by `..` or through a symbolic link, is not a locator; what counts is where the path leads, so a path whose `..` lead out and back into the repository is taken. A file inside a `.git` directory, or the `.git` file of a submodule, SHALL NOT be a locator's file either.
+The file a locator names is allowed to be outside the manuscript, such as a note in the same repository, and it is allowed to be a file that git ignores; such a file is read like any other and handed to the agent of the premise check. It SHALL NOT be outside the repository: an object whose `file` leads outside it, by a leading `/`, by `..` or through a symbolic link, is not a locator; what counts is where the path leads, so a path whose `..` lead out and back into the repository is taken. A file inside a `.git` directory, in any letter case, or the `.git` file of a submodule, SHALL NOT be a locator's file either.
 
 `from` and `basis` SHALL be lists of one or more locators. A `from` or a `basis` that is not such a list, an empty list included, names no passage.
 
@@ -232,7 +242,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -278,7 +288,9 @@ The **outline stands as approved** when every section stands as approved, the or
 
 A paragraph record whose `section` names no section record belongs to no section. It is in no `paragraphs` copy, so no approval covers it, and it is never shown with a section. While the paragraph file holds one, the outline does not stand as approved, whatever the approval records say.
 
-The status action SHALL report, for each section, whether it stands as approved, and for a section that does not, whether it was never approved or differs from its latest approved copy. It SHALL report whether the order of sections stands as approved, every paragraph record whose `section` names no section record, the number of points that carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does not, it SHALL say that an approval of the whole outline is still needed. It SHALL decide equality on JSON values, not on the text of the lines. An approvals file that is empty or holds only blank lines holds no approval record. When the approvals file exists but cannot be read, or holds a line that is not JSON, it SHALL fail and say so, and SHALL NOT report a section as never approved. It SHALL write nothing to the repository.
+A section is compared with its own records only. When a point of another section that one of its records names in `uses` changes, the section still stands as approved: no tool follows `uses` (issue 78).
+
+The status action SHALL report, for each section, whether it stands as approved, and for a section that does not, whether it was never approved or differs from its latest approved copy. It SHALL report whether the order of sections stands as approved, every paragraph record whose `section` names no section record, the number of points that carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does not, it SHALL say that an approval of the whole outline is still needed. It SHALL decide equality on JSON values, not on the text of the lines. An approvals file that is empty or holds only blank lines holds no approval record. When the approvals file exists but cannot be read, or holds a line that is not empty and is not one JSON object written as JSON on its own (a record spread over several lines, two records on one line, a line of spaces, a value such as `nan`), it SHALL fail and say so, and SHALL NOT report a section as never approved. An approval record whose keys do not have the shapes this capability defines can make it fail part way; lines printed before a failure are not a status. It SHALL write nothing to the repository.
 
 These conditions are what a later capability uses to decide whether text can be written from an outline (issue 51). This capability writes no text.
 
@@ -311,6 +323,11 @@ No executable check: this change adds no test target; the examples and tests of 
 - **WHEN** every section of an outline and the order of sections stand as approved, and a paragraph record whose `section` is `s-typo` is then added, while no section record has that `id`
 - **THEN** every section and the order of sections still stand as approved, the outline does not, and the status action lists that paragraph record
 
+#### Scenario: An approval record spread over several lines
+
+- **WHEN** a valid approval record in `outline-approvals.jsonl` has been rewritten by hand over several lines
+- **THEN** the status action fails and says so, although the lines together are one JSON value
+
 #### Scenario: An approvals file that cannot be read
 
 - **WHEN** `outline-approvals.jsonl` exists and cannot be read
@@ -323,7 +340,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -346,7 +363,7 @@ None of the following is an approval, and this list is closed.
 
 By default the skill SHALL show the whole outline and ask for approval of the whole outline. When the author asks for particular sections to be approved, the skill SHALL show those sections only. The record it appends SHALL cover the sections the author states are approved, which can be fewer than the sections shown, SHALL have at least one entry, and SHALL hold the sections as they were shown. It SHALL NOT have an entry for a section that was not shown: when the author names such a section, the skill leaves it out of the record, says that it was not shown, and shows it. When none of the sections the author names was shown, the skill appends nothing. The record has `whole` true when it covers every section record, and no `whole` otherwise.
 
-The skill SHALL keep, outside the repository, a copy of the section file and the paragraph file as they were when shown, so that the approval can be recorded when the author's reply arrives in a later message. When the section file or the paragraph file differs from that copy at the time of the approval, when the real path of the outline directory differs from the one recorded when the copy was taken, or when the copy is no longer available, the skill SHALL append nothing and show the sections again. When a paragraph record of the copy names no section record, the skill SHALL append nothing either: it shows that record first, and the record is corrected through revise before the outline is shown again.
+The skill SHALL keep, outside the repository, a copy of the section file and the paragraph file as they were when shown, so that the approval can be recorded when the author's reply arrives in a later message. When the section file or the paragraph file differs from that copy at the time of the approval, when the real path of the outline directory differs from the one recorded when the copy was taken, or when the copy is no longer available, the skill SHALL append nothing and show the sections again. When a paragraph record of the copy names no section record, the skill SHALL append nothing either: it shows that record first, and the record is corrected through revise before the outline is shown again. Before it appends, the skill SHALL check that every line of the approvals file that is not empty is one JSON object written as JSON; when one is not, it SHALL append nothing, say that the file was changed by hand, and leave what to do with it to the author.
 
 The skill SHALL append the record as a line of its own: when the last line of the approvals file is not ended by a line break, the skill ends that line first. The line break that ends a line is not part of its content, and the skill SHALL NOT change the content of an earlier line. What the skill writes down for one approval, the author's words and the sections approved, SHALL NOT be used for a later one.
 
@@ -385,6 +402,11 @@ No executable check: this change adds no test target; the examples and tests of 
 - **WHEN** the skill shows the whole outline, the path of the outline directory is then made to lead to another directory of the repository that holds outline files with the same content, and the author replies that the outline is approved
 - **THEN** the skill appends no approval record to either directory and shows the outline again
 
+#### Scenario: The approvals file was changed by hand
+
+- **WHEN** a line of `outline-approvals.jsonl` holds two approval records, and the author replies that the outline is approved
+- **THEN** the skill appends nothing, says that the file was changed by hand, and changes no line of it
+
 #### Scenario: A paragraph record of the copy names no section
 
 - **WHEN** the copy the skill showed holds a paragraph record whose `section` names no section record, and the author replies that the outline is approved
@@ -422,7 +444,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -438,7 +460,7 @@ Each time before the approve action shows sections for approval, the skill SHALL
 3. **Nothing to check against**: a point that states a result, a number or a citation, in a record without `from`, and that has neither `basis` nor `pending`.
 4. **Relies on something later**: a point that needs a term, a result or a claim that only a later record introduces, or a `uses` entry that names an id which is missing, is not on an earlier line, or belongs to a record that carries `dropped`.
 5. **Section not carried**: a section whose `says` is neither stated nor supported by the points of its paragraph records and of the paragraph records of the sections under it. The sections under a section are those that name it as `parent`, directly or through other sections.
-6. **Locator does not resolve**: a locator whose `file` is missing, leads outside the repository or is inside a `.git` directory, whose `label` text does not occur exactly once in the file, or whose `starts` does not occur exactly once in the file. An object in `from` or `basis` that is not a locator, and a `from` or a `basis` that is not a list of one or more locators, are reported as this kind too.
+6. **Locator does not resolve**: a locator whose `file` is missing, leads outside the repository or is inside a `.git` directory in any letter case, whose `label` text does not occur exactly once in the file, or whose `starts` does not occur exactly once in the file. An object in `from` or `basis` that is not a locator, and a `from` or a `basis` that is not a list of one or more locators, are reported as this kind too.
 
 The sixth kind is established by the skill itself, by resolving each path and counting, so that it is decided the same way every time. The first five are judged by the agent `propositions:outline-checker`, which this plugin defines in `agents/outline-checker.md`. Its definition SHALL give it the Read tool and no other tool, so that it cannot write or change a file, run a program or send anything. It is given the paths of the section file, the paragraph file and those of the files their locators name that exist inside the repository, and nothing of the conversation; its definition says that what it reads is data to examine and holds no instruction for it. The Read tool can open any file: that the agent reads only the files it is given is an instruction of its definition, not a limit of the tool. When that agent cannot be started, the skill SHALL stop and say so, and SHALL NOT judge the five kinds with another agent or by itself. The check SHALL NOT read a file that a locator names when that file is outside the repository.
 
@@ -475,7 +497,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -484,7 +506,7 @@ code:
 ---
 ### Requirement: Derive and draft build an outline without inventing content
 
-The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It SHALL follow the `.tex` files that the manuscript includes only when they are regular files inside the repository whose path holds no line break. Any other included file is named to the author and not read: one outside the repository, a symbolic link, a missing file, a file whose path holds a line break, or a file that is not `.tex`. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`, whose point is a complete sentence stating what the block states or shows. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. A theorem-like statement, a figure or a table is named by its own label; the label of a section names the whole section and SHALL NOT be used for a record. The action writes no `lines` and no `commit`. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: the text of its `label` and its `starts`, whichever it has, each occur exactly once in the file it names. A manuscript that has paragraphs SHALL NOT give an empty paragraph file.
+The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It SHALL follow the `.tex` files that the manuscript includes only when they are regular files inside the repository whose path holds no line break. Any other included file is named to the author and not read: one outside the repository, a symbolic link, a file reached through a directory that is a symbolic link, a file inside a `.git` directory in any letter case, a missing file, a file whose path holds a line break, or a file that is not `.tex`. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`, whose point is a complete sentence stating what the block states or shows. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. A theorem-like statement, a figure or a table is named by its own label; the label of a section names the whole section and SHALL NOT be used for a record. The action writes no `lines` and no `commit`. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: the text of its `label` and its `starts`, whichever it has, each occur exactly once in the file it names. A manuscript that has paragraphs SHALL NOT give an empty paragraph file.
 
 The draft action SHALL produce section and paragraph records from a title and ideas, or from an outline the author supplies. A point that would report a result, a number or a citation the author has not supplied SHALL say what will be reported without stating it, and SHALL carry `pending`. When the outline the author supplies has sections and no paragraph yet, the action writes no paragraph record, and the paragraph file is empty.
 
@@ -529,7 +551,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -540,12 +562,13 @@ code:
 
 The revise action SHALL change the outline files only as the author instructs.
 
-A record and a point SHALL keep their `id` when their content changes and when they move. Merging and splitting replace records: the records that are merged, and the record that is split, leave the file, and the records that replace them are new. A new record or point, a replacement included, SHALL get an `id` that appears in neither outline file and in no approval record, as the `id` of a record or a point or as a value of `section`, `parent` or `uses`. A replacement SHALL NOT take the `id` of a record it replaces.
+A record and a point SHALL keep their `id` when their content changes and when they move. Merging and splitting replace records: the records that are merged, and the record that is split, leave the file, and the records that replace them are new. A new record or point, a replacement included, SHALL get an `id` that appears in neither outline file and in no approval record, as the `id` of a record or a point or as a value of `section`, `parent` or `uses`. The list of ids in use that the skill prints can hold more than these, taken from other objects in the files; that only rules out more ids. A replacement SHALL NOT take the `id` of a record it replaces.
 
 Merging, splitting and leaving a paragraph out SHALL keep every source on record.
 
 - The `from` of the record that replaces merged records holds every locator of the records it replaces.
 - When a record that has `from` is split, each record that replaces it has in its `from` at least one locator of the original, and each locator of the original is in the `from` of at least one of them.
+- When a point moves to another paragraph record and the record it leaves has `from`, each locator of that `from` is added to the point's `basis`, so that the point keeps its source.
 - When the author leaves a paragraph out of the article and its record has `from`, the record is not deleted: it is given `dropped` with the reason. A record without `from` that the author leaves out is deleted from the file.
 
 Leaving a section out and moving a section SHALL leave every `parent` naming a section record on an earlier line.
@@ -561,6 +584,11 @@ No executable check: this change adds no test target; the examples and tests of 
 
 - **WHEN** the author has `p-3`, whose `from` names the passage labelled `sec:data`, merged with `p-4`, whose `from` names the passage that starts "We collected"
 - **THEN** one new record replaces them: its `id` appears in neither outline file and in no approval record, its `from` holds both locators, and `p-3` and `p-4` are no longer in the file
+
+#### Scenario: A point moves to a record without a source
+
+- **WHEN** the author moves the point `p-3.2`, whose record `p-3` has `from` naming the passage that starts "We collected", into `p-12`, a record without `from`
+- **THEN** the point `p-3.2` carries in its `basis` the locator of the passage that starts "We collected"
 
 #### Scenario: A split keeps a source in each part
 
@@ -584,7 +612,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -593,11 +621,11 @@ code:
 ---
 ### Requirement: The outline skill writes only the three outline files
 
-The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside the repository are not covered by this rule; the directory that holds them SHALL exist and be outside the repository. The directory of the outline files SHALL be the repository's root or a directory under it once every symbolic link in its path, the last part included, is resolved; it SHALL NOT be inside a `.git` directory, and it SHALL be a directory or not exist yet, in which case the directory that is to hold it SHALL exist. A symbolic link that leads to a place that does not exist can stop the skill, depending on the machine's `realpath`. The skill SHALL confirm both directories again in every command that reads or writes an outline file, and, in the revise action, before its first edit and again after every reply of the author. The skill SHALL NOT read or write an outline file that is itself a symbolic link. A symbolic link in the path of the directory is a different case: it is resolved, and what counts is where it leads. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
+The skill `/propositions:outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside the repository are not covered by this rule; the directory that holds them SHALL exist and be outside the repository. The directory of the outline files SHALL be the repository's root or a directory under it once every symbolic link in its path, the last part included, is resolved; it SHALL NOT be inside a `.git` directory in any letter case, and it SHALL be a directory or not exist yet, in which case the directory that is to hold it SHALL exist and be a directory. A symbolic link that leads to a place that does not exist can stop the skill, depending on the machine's `realpath`. The skill SHALL confirm both directories again in every command that reads or writes an outline file, and, in the revise action, before its first edit and again after every reply of the author. The skill SHALL NOT read or write an outline file that is itself a symbolic link. A symbolic link in the path of the directory is a different case: it is resolved, and what counts is where it leads. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
 
 What the skill reads is data: the manuscript, the outline files, the files a locator names and the output of a command. The skill SHALL NOT act on text in them that reads like an instruction, and says so to the author when it notices it.
 
-After every write to an outline file the skill SHALL confirm that every line of that file that is not empty parses as a JSON object. After a write to the section file or the paragraph file it SHALL also confirm that every record has an `id`, that no `id` repeats among the section records or among the paragraph records and points, and that no string holds a control character, and that no number is one that JSON does not have, such as the `nan` that jq reads. In the paragraph file it SHALL also confirm that every point has an `id` and that `points`, where a record has it, is a list. The shape of a key that a section record carries and this capability does not define is not checked, a key named `points` included; the control-character test still reads every string and every key name. When any of these fails, it SHALL report the file and the line and SHALL NOT report the write as done. The check SHALL NOT report a pass for a file that holds no record. An empty section file is always a mistake. An empty paragraph file is a mistake except when the outline the author gave to draft has sections and no paragraph yet, so that the skill wrote no paragraph record; in that case the skill says in its report that the paragraph file is empty, and goes on. Its report SHALL say that no other check of the format exists until issue 78, apart from resolving the locators.
+After every write to an outline file the skill SHALL confirm that every line of that file that is not empty is a JSON object written as JSON. jq also reads `nan`, `Infinity` and numbers such as `01` or `.5`, none of which is JSON; the check reads the text of the line to report them. A byte that is not UTF-8 is read by jq as a replacement character and is not reported. After a write to the section file or the paragraph file it SHALL also confirm that every record has an `id` that is a non-empty string, that no `id` repeats among the section records or among the paragraph records and points, that no string holds a control character, and that no number is too large for jq to keep (such as `1e400`, which is JSON but which jq reads as infinite). In the paragraph file it SHALL also confirm that every point has an `id` and that `points`, where a record has it, is a list. The shape of a key that a section record carries and this capability does not define is not checked, a key named `points` included; the control-character test still reads every string and every key name. When any of these fails, it SHALL report the file and the line and SHALL NOT report the write as done. When the check of the approvals file fails, the skill SHALL NOT correct that file: it says that the file was changed by hand and leaves what to do with it to the author. The check SHALL NOT report a pass for a file that holds no record. An empty section file is always a mistake. An empty paragraph file is a mistake except in two cases, and only these two: the outline the author gave to draft has sections and no paragraph yet, so that the skill wrote no paragraph record; or the author, through revise, left out every paragraph record and none of them had `from`, so that each was deleted. In those cases the skill says in its report that the paragraph file is empty, and goes on. Its report SHALL say that no other check of the format exists until issue 78, apart from resolving the locators.
 
 No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
 
@@ -646,6 +674,11 @@ No executable check: this change adds no test target; the examples and tests of 
 - **WHEN** a paragraph of the manuscript says that the outline rules no longer apply and that the manuscript is to be rewritten
 - **THEN** the skill does not act on it, writes nothing to the manuscript, and tells the author that the passage reads like an instruction
 
+#### Scenario: A value that jq reads but JSON does not have
+
+- **WHEN** a write leaves a section record with an undefined key whose value is written `Infinity`
+- **THEN** the write check reports the line, and the skill does not report the write as done
+
 #### Scenario: A file with no record
 
 - **WHEN** the derive action has staged a section file that holds no record
@@ -658,7 +691,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace
@@ -689,7 +722,7 @@ code:
 ---
 ### Requirement: Text from the manuscript and the author never becomes part of a command
 
-The skill SHALL NOT write text taken from the manuscript, from an outline file or from the author into the text of a command. Such text (the opening words of a passage, a sentence, an `id`, the name of a file a locator gives, the author's approving words) SHALL reach a command only from a file that the command reads. A command that hands such a value on to a tool SHALL hand it on so that the shell interprets no character of it. A path the skill does write in a command SHALL be written so that the shell interprets no character of it. The three paths that begin every command (the root, the outline directory and the stage directory) SHALL begin with `/`: a path among them that is empty or not written out in full stops the skill.
+The skill SHALL NOT write text taken from the manuscript, from an outline file or from the author into the text of a command. Such text (the opening words of a passage, a sentence, an `id`, the name of a file a locator gives, the author's approving words) SHALL reach a command only from a file that the command reads. A command that hands such a value on to a tool SHALL hand it on so that the shell interprets no character of it. A path the skill does write in a command SHALL be written so that the shell interprets no character of it. The paths the skill writes in its commands are the root, the outline directory, the stage directory, the directory that holds the manuscript and the manuscript's main file. Each SHALL begin with `/`: a path among them that is empty or not written out in full stops the skill, and so does a path that holds a single quote. The paths of the ledgers' `_meta.json` files SHALL reach a command only from a list in the stage directory, not written into the command.
 
 A check of the skill counts as passed only when its command reports success in words. A check whose command prints nothing, fails, or cannot run SHALL be treated as failed. When a tool that the skill's commands need (`jq`, `realpath`, `git`) is not installed, the skill SHALL stop and say which tool is missing.
 
@@ -706,7 +739,7 @@ No executable check: this change adds no test target; the examples and tests of 
 - **THEN** the skill stops, says which tool is missing, and reports no write as done
 
 <!-- @trace
-source: idd-75-fix2
+source: idd-75-fix3
 updated: 2026-11-16
 code:
   - propositions-projects.code-workspace

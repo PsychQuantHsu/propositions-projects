@@ -75,7 +75,8 @@ link), the last part stays as it was resolved, which differs between the
 When git does not have that name, the whole path ignores letter case, and git
 tracks a path that differs from it only in letter case (a file renamed on the
 disk in letter case alone, which git does not notice on such a file system),
-the file counts as tracked and keeps the name it was given; the `.tex` files
+the file counts as tracked and keeps the name it has by the rule above (its
+last part as the directory gives it), not the name git has; the `.tex` files
 that derive follows are treated the same way. One such file is still refused:
 one whose name the outermost repository ignores, because it is asked about
 that name and answers so. A file in a submodule is not refused that way: the

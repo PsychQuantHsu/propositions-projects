@@ -236,8 +236,8 @@ name the disk has, GNU's keeps the name as typed. Git is asked about the name th
 then has. When git does not have it, the whole path ignores letter case (the path with the
 case of its letters swapped is the same file), and git tracks a path that differs from it only
 in letter case (a file renamed on the disk in letter case alone, which git does not notice on
-such a file system), the file counts as tracked. It keeps the name the command has; what git
-prints is not used. The list of `.tex` files in derive does the same. One such file is still
+such a file system), the file counts as tracked. It keeps the name it has by the rule above (its last part as the
+directory gives it), not the name git has; what git prints is not used. The list of `.tex` files in derive does the same. One such file is still
 refused: one whose name the outermost repository ignores, because it is asked about that name
 and answers so; `git mv` to the name on the disk settles it. A file in a submodule is not
 refused that way, because the outermost repository gives no answer for it. A name that does not survive this, such as a

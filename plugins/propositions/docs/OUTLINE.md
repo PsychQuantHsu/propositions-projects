@@ -750,13 +750,17 @@ point, no `note`); derive names it to the author, and the outline itself does
 not show the gap (whether it should is open, issue #51). An include command
 `\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x`
 itself when no `x.tex` is found. LaTeX looks for it from the directory it is
-run in, which the skill does not know, so the skill looks for it from the
-directory of the main file and then from the repository's root; on a file
-system that ignores letter case the same file in another letter case is the
-same file. A command inside a LaTeX comment includes nothing. When the files
+run in, which the skill does not know, so the skill looks in this order:
+`x.tex` from the directory of the main file, then (for `\input`) `x` from it,
+then the same two from the repository's root. The first that exists is the
+included file, and it is read only when it is a file the skill reads; on a
+file system that ignores letter case the same name in another letter case
+counts. A command inside a LaTeX comment includes nothing. When the files
 derive read hold no paragraph and no block at all (every section's text is in
 included files that were not read), derive stops, says which files were not
-read, and writes nothing. Prose that comes
+read, and writes nothing. When the text of only some sections is in such
+files, derive asks the author for the `says` of each of those sections, since
+it has nothing to state it from, and stops when the author gives none. Prose that comes
 before the first heading and is not the abstract gets one section record,
 whose `heading` is the title of the article: that title is what heads the text
 on the page, as in APA style, where the introduction has no heading of its
@@ -888,10 +892,12 @@ file, or holds a line that is not a record, the skill
 names the file, and the line when the check of a write finds it, and corrects
 nothing: status writes nothing, a file with such a line is corrected through
 revise, and a missing file is the author's to put back.
-When the append itself fails part way (a full disk, for one), part of the
-record can be in the file; the skill then checks the approvals file, and when
-that check fails it says so and stops without trying again, since it never
-changes a line of that file.
+When writing the record into the approvals file fails (a full disk, for
+one), the record may have been appended in whole, in part or not at all, and
+nothing tells which: the skill shows the check of the approvals file, the
+status and the file's last line, says that the approval may or may not be on
+record, and stops without trying again, since it never changes a line of that
+file.
 The approve action checks the file the same way before it appends, and appends
 nothing when the file fails or cannot be read: the file was changed by hand,
 the skill says so,
@@ -936,8 +942,9 @@ or from the author reaches those commands only from a file that the command
 reads; it is never written into the text of a command. The paths the skill
 writes into its commands are the repository's root, the outline directory, the
 stage directory, the directory that holds the manuscript, the manuscript's
-main file, and a file the author points to as a source in draft or revise
-(checked the way the main file is before it is read). Each begins with `/`: an empty path, or one not written out in
+main file, and a file the author points to in draft or revise (a source, or
+an outline of the author's own), checked the way the main file is before it
+is read. Each begins with `/`: an empty path, or one not written out in
 full, stops the skill, and so does a path that holds a single quote. The one
 exception is the main file in the command that compares a ledger with it:
 left empty there, it means that there is no manuscript yet. The paths
@@ -1015,7 +1022,7 @@ line is one of the five kinds the premise check's agent judges.
 
 ## What this version leaves open
 
-Four questions about the design were raised with this format and are not
+Five questions about the design were raised with this format and are not
 answered by it.
 
 - **How an outline paragraph is tied to a paragraph of the structure sidecar.**
@@ -1034,3 +1041,8 @@ answered by it.
   passage by a label or by opening words that occur once. Two passages of one
   file that are the same to their end have neither, and derive stops on them
   (issue #84).
+- **Whether the outline shows an included file that derive did not read.**
+  Derive names such a file to the author and records nothing for it, so the
+  outline itself does not show that part of the original is missing. Two ways
+  of recording it were tried and each stopped derive on some manuscript
+  (issue #51).

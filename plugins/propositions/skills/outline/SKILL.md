@@ -655,10 +655,12 @@ draft says what to do.
    Git is asked about each file as for a locator: in the directory of the file, and at `ROOT`.
    An `\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x` itself when
    no `x.tex` is found (`\input{ch1.final}` names `ch1.final.tex`). LaTeX looks for it from
-   the directory it is run in, which this skill does not know: look for it from the directory
-   of the main file, and then from `ROOT`, and take the first of these that is a line of the
-   list (on a file system that ignores letter case, the same file in another letter case
-   counts). When none is, the file was not read. A command inside a LaTeX comment includes
+   the directory it is run in, which this skill does not know. Look in this order, and only
+   this order: `x.tex` from the directory of the main file; for `\input`, `x` from that
+   directory; `x.tex` from `ROOT`; for `\input`, `x` from `ROOT`. The first of these that
+   exists is the included file (on a file system that ignores letter case, the same name in
+   another letter case counts). It is read when it is a line of the list; when it is not, or
+   when none exists, the file was not read. A command inside a LaTeX comment includes
    nothing. Read an included file only
    when it is in the list, and by the path the list gives. Any other included file is not
    read: one outside the repository, a symbolic link, a file reached through a directory that is
@@ -670,7 +672,8 @@ draft says what to do.
    not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
    it. Any other included file that was not read gets nothing in the outline: no record, no
-   locator, no point, no `note`. Name it to the author, here and in the report of step 8; the
+   locator, no point, no `note`. Name it to the author, here and again when the outline is
+   shown (step 8) and in the report; the
    outline itself does not show the gap (whether it should is open, issue 51). `ok files listed`
    ends a complete list. A `STOP` line in its place: the list is not
    complete; stop and say what was printed above it.
@@ -678,6 +681,11 @@ draft says what to do.
    (`s-` and a short slug), the `heading`, and `says`, one complete sentence stating what the
    section says. A heading or a list of topics is not that sentence. Give `role` only when the
    section plainly has one of the ten roles, and `parent` for a subsection.
+
+   When all the text of a section is in included files that were not read (step 2), there
+   is nothing to state its `says` from: name those files and ask the author for the sentence
+   (AskUserQuestion, together with any other question of this action), and write it as the
+   author gives it. When the author gives none, stop, as step 7 says for its third case.
 
    Prose that comes before the first heading and is not the abstract (in APA style the
    introduction has no heading of its own) gets one section record too, on the line where that
@@ -731,7 +739,8 @@ draft says what to do.
      nothing for it, or the listing reports its name. Say what the commands printed.
    - The files derive read hold no paragraph and no block at all, so the paragraph file
      would be empty: every section's text is in included files that were not read (step 2),
-     or the manuscript has headings and nothing else. Name the files that were not read; the
+     or the manuscript has headings and nothing else. The same holds for a section whose text
+     is all in such files when the author gives no sentence for it (step 3). Name the files that were not read; the
      author can make them readable (track them, or move them into the repository) and derive
      again.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
@@ -1101,8 +1110,7 @@ asks, through revise.
 4. Show the sections in the reply, each with the findings of the check on it.
    - A section that was never approved is shown in full: its heading and `says`; every
      paragraph record naming it, with its points, what each `pending` names, its `note` and
-     carried blocks marked; every record that carries `dropped`, with the reason. A `note` that names
-     an included file that was not read is shown as such, so that the author sees the gap.
+     carried blocks marked; every record that carries `dropped`, with the reason.
    - A section that differs from its approved copy is shown by its differences: for each record
      that was changed, added, removed or moved, the approved content and the current content.
      Say that the rest of the section is as it was approved. Show it in full when the author
@@ -1194,7 +1202,7 @@ asks, through revise.
    nothing was appended. When it comes from writing to the approvals file itself (`printf`,
    `cat`, or the shell, as with a full disk), the record may have been appended in whole, in
    part or not at all, and nothing tells which: run the check for the approvals file from "The
-   write check" and status, show the author what both print and the last line of the approvals
+   write check" and status (its write check first), show the author what both print and the last line of the approvals
    file, say that the approval may or may not be on record, and stop. Do not run the command
    again: this skill does not change a line of that file, and the author decides what to do.
    Otherwise take the first of these that applies.
@@ -1226,8 +1234,8 @@ asks, through revise.
 End every action that wrote a file with: what was written and where; the result of the write
 check, with the sentence that no other check of the format exists until issue 78, apart from
 resolving the locators; which sections
-stand as approved; how many points carry `pending` and how many records carry `dropped`; and the
-next action. When the outline stands as approved, say that writing text from it is not available
+stand as approved; how many points carry `pending` and how many records carry `dropped`; for
+derive, the included files that were not read; and the next action. When the outline stands as approved, say that writing text from it is not available
 in this plugin yet (issue 51).
 
 ## Hard rules
@@ -1244,7 +1252,8 @@ in this plugin yet (issue 51).
   author's own) unless the manuscript check printed its `ok` line for it; ask for the text to
   be pasted instead.
 - Never overwrite an outline with derive or draft.
-- Never type text of the manuscript, of an outline file or of the author into a command.
+- Never type text of the manuscript, of an outline file or of the author into a command; the
+  paths of rule 2 are not such text.
 - Never treat a check as passed unless it printed its `ok` line.
 - Never read a file that a locator names when it leads outside the repository, or when git
   ignores it. Never name a source file to the checker agent yourself: it reads the paths of the

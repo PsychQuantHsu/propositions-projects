@@ -653,15 +653,12 @@ draft says what to do.
    and, below the root, no other character that a locator's `file` may not hold: a file a
    locator cannot name is not read.
    Git is asked about each file as for a locator: in the directory of the file, and at `ROOT`.
-   An `\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x` itself when
-   no `x.tex` is found (`\input{ch1.final}` names `ch1.final.tex`). LaTeX looks for it from
-   the directory it is run in, which this skill does not know. Look in this order, and only
-   this order: `x.tex` from the directory of the main file; for `\input`, `x` from that
-   directory; `x.tex` from `ROOT`; for `\input`, `x` from `ROOT`. The first of these that
-   exists is the included file (on a file system that ignores letter case, the same name in
-   another letter case counts). It is read when it is a line of the list; when it is not, or
-   when none exists, the file was not read. A command inside a LaTeX comment includes
-   nothing. Read an included file only
+   An `\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex`, and `x.tex`
+   otherwise (`\include{ch1.tex}` names `ch1.tex`, `\input{ch1.final}` names `ch1.final.tex`),
+   taken from the directory of the main file; it is in the list when a line of the list is
+   that file (on a file system that ignores letter case, the same file in another letter case
+   counts). When no line of the list is that file, the file was not read: do not look for it
+   anywhere else. A command inside a LaTeX comment includes nothing. Read an included file only
    when it is in the list, and by the path the list gives. Any other included file is not
    read: one outside the repository, a symbolic link, a file reached through a directory that is
    a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores (a
@@ -1104,6 +1101,8 @@ asks, through revise.
    ids, such as `["s-intro", "s-method"]`.
 2. Run status as that section says: its write check first, then both commands. When one of
    them does not print its `ok` line, do what "status" says for that case, show nothing for approval, and stop.
+   `EMPTY` from the write check on the paragraph file is not such a case: an outline that has
+   sections and no paragraph yet goes on to step 3.
 3. Run check on the sections to be shown, with `"$STAGE/shown-sections.jsonl"` as the
    section file and `P="$STAGE/shown-paragraphs.jsonl"`. Run it every time, also when it ran before. When
    check stops at the write check that begins it, show nothing for approval. An empty

@@ -748,14 +748,11 @@ that carries `carry`, named in the file that includes it. Any other included
 file that was not read gets nothing in the outline (no record, no locator, no
 point, no `note`); derive names it to the author, and the outline itself does
 not show the gap (whether it should is open, issue #51). An include command
-`\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x`
-itself when no `x.tex` is found. LaTeX looks for it from the directory it is
-run in, which the skill does not know, so the skill looks in this order:
-`x.tex` from the directory of the main file, then (for `\input`) `x` from it,
-then the same two from the repository's root. The first that exists is the
-included file, and it is read only when it is a file the skill reads; on a
-file system that ignores letter case the same name in another letter case
-counts. A command inside a LaTeX comment includes nothing. When the files
+`\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex`, and
+`x.tex` otherwise, taken from the directory of the main file; it is read only
+when it is a file the skill reads, and the skill does not look for it
+anywhere else. On a file system that ignores letter case the same file in
+another letter case is the same file. A command inside a LaTeX comment includes nothing. When the files
 derive read hold no paragraph and no block at all (every section's text is in
 included files that were not read), derive stops, says which files were not
 read, and writes nothing. When the text of only some sections is in such

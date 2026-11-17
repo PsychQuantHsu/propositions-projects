@@ -152,7 +152,7 @@ DIR='<the directory, in single quotes>'
 command -v jq >/dev/null || echo 'missing jq'; command -v realpath >/dev/null || echo 'missing realpath'; command -v git >/dev/null || echo 'missing git'; command -v jq >/dev/null && command -v realpath >/dev/null && command -v git >/dev/null && { printf '[9007199254740993,9007199254740992]' | jq -e '.[0] != .[1]' >/dev/null 2>&1 || { echo 'missing a jq that tells 9007199254740993 from 9007199254740992'; false; }; } && TOOLS=1 && echo 'ok tools'
 [ -z "${TOOLS:-}" ] || [ "${DIR#/}" != "$DIR" ] || echo 'STOP the directory does not begin with /'
 [ -n "${TOOLS:-}" ] && [ "${DIR#/}" != "$DIR" ] && { T=$(git -C "$DIR" rev-parse --show-toplevel) || { echo 'STOP git finds no repository for the directory: it does not exist or is in no git repository'; false; }; } && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && T=${U:-$T} && U=$(git -C "$T" rev-parse --show-superproject-working-tree) && { [ -z "$U" ] || echo 'STOP the manuscript is in a submodule more than two levels deep'; } && [ -z "$U" ] && ROOT=$T && printf 'ROOT=%s\n' "$ROOT"
-[ -n "${ROOT:-}" ] && R=$(cd "$ROOT" && env pwd -P) && { TD=$(cd "${TMPDIR:-/tmp}" 2>/dev/null && env pwd -P) || { echo 'STOP the temporary directory of this machine cannot be entered'; false; }; } && { { [ "$TD" != "$R" ] && [ "${TD#"$R"/}" = "$TD" ]; } || { echo 'STOP the temporary directory of this machine is inside the repository'; false; }; } && STAGE=$(mktemp -d "$TD/outline-XXXXXX") && printf '%s\n' "$R" > "$STAGE/root.txt" && printf 'STAGE=%s\n' "$STAGE" && echo 'ok the stage directory is outside the repository'
+[ -n "${ROOT:-}" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && env pwd -P) && [ "$R" -ef "$ROOT" ] && { { TD=$(builtin cd -P -- "${TMPDIR:-/tmp}" >/dev/null 2>&1 && env pwd -P) && [ "$TD" -ef "${TMPDIR:-/tmp}" ]; } || { echo 'STOP the temporary directory of this machine cannot be entered'; false; }; } && { { [ "$TD" != "$R" ] && [ "${TD#"$R"/}" = "$TD" ]; } || { echo 'STOP the temporary directory of this machine is inside the repository'; false; }; } && STAGE=$(mktemp -d "$TD/outline-XXXXXX") && printf '%s\n' "$R" > "$STAGE/root.txt" && printf 'STAGE=%s\n' "$STAGE" && echo 'ok the stage directory is outside the repository'
 ```
 
 - No `ok tools`: stop and tell the author what the `missing` lines name. This skill needs `jq`,
@@ -170,11 +170,15 @@ command -v jq >/dev/null || echo 'missing jq'; command -v realpath >/dev/null ||
   the repository, or cannot be entered, no stage directory was made: stop and say so. In the
   first case the skill's temporary files would be written into the repository.
 
-Directories are compared by the name the system itself gives them (`pwd -P` after entering
-them), not by the way a path was typed. A path through a symbolic link, in another letter
-case on a file system that ignores case, or through another name of the same volume
-(`/System/Volumes/Data/…` on macOS) leads to the same name, so it cannot make a directory
-inside the repository look like one outside it.
+Directories are compared by the name the system itself gives them, not by the way a path was
+typed: each command enters the directory with the shell's own `cd -P`, asks `pwd -P` for its
+name, and goes on only when that name and the path as typed are the same directory. A path
+through a symbolic link, in another letter case on a file system that ignores case, or
+through another name of the same volume (`/System/Volumes/Data/…` on macOS) leads to the same
+name, so it cannot make a directory inside the repository look like one outside it. A file is
+named the same way: its real path, with its directory named as above, and only when that name
+and the path it came from are the same file. A name that does not survive this, such as a
+directory whose name ends in a line break, stops the command or leaves the file unread.
 
 The stage directory is made by `mktemp` with mode 700, and it holds a file `root.txt` with
 the root it was made for. Every later command tests the owner, the mode and that file. The
@@ -187,22 +191,21 @@ full.
 ```bash
 ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
 M='<MAIN, written out in full>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${M#/}" != "$M" ] && [ -d "$STAGE" ] && R=$(cd "$ROOT" 2>/dev/null && env pwd -P) && S=$(cd "$STAGE" 2>/dev/null && env pwd -P) && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
-[ -f "$M" ] && [ ! -L "$M" ] && D=$(cd "$(dirname "$M")" && env pwd -P) && B="$D/$(basename "$M")" && ls -1a "$D" | grep -Fxq -- "$(basename "$M")" && [ "${B#"$R"/}" != "$B" ] && X=$(printf '%s/' "${B#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && jq -n -e --arg n "${B#"$R"/}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null && git --literal-pathspecs -C "$D" ls-files --cached --others --exclude-standard --error-unmatch -- "$B" >/dev/null 2>&1 && printf 'MAIN=%s\nNAME=%s\n' "$B" "${B#"$R"/}" && echo 'ok the manuscript is a file of the repository' || echo 'STOP the manuscript is not a regular file of the repository: it is missing, a symbolic link, outside the repository, inside .git, ignored by git, or named with a character or in a letter case its directory does not have'
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${M#/}" != "$M" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
+[ -f "$M" ] && [ ! -L "$M" ] && B0=$(realpath "$M") && D=$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && env pwd -P) && B="$D/${B0##*/}" && [ "$B" -ef "$M" ] && [ ! -L "$B" ] && [ "${B#"$R"/}" != "$B" ] && X=$(printf '%s/' "${B#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && jq -n -e --arg n "${B#"$R"/}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null && git --literal-pathspecs -C "$D" ls-files --cached --others --exclude-standard --error-unmatch -- "$B" >/dev/null 2>&1 && printf 'MAIN=%s\nNAME=%s\n' "$B" "${B#"$R"/}" && echo 'ok the manuscript is a file of the repository' || echo 'STOP the manuscript is not a regular file of the repository: it is missing, a symbolic link, outside the repository, inside .git, ignored by git, or named with a character that no locator can carry'
 ```
 
 - `ok the manuscript is a file of the repository`: from here on `MAIN` is the path on the
-  `MAIN=` line: the directory as the system names it, with every symbolic link in it
-  resolved, and the name of the file as its directory lists it. Read the manuscript by that
+  `MAIN=` line: the real path of the file, with every symbolic link and every `..` in it
+  resolved and its directory as the system names it. Read the manuscript by that
   path and by no other spelling of it. The `NAME=` line is the same file as a path from
   `ROOT`: it is the `file` of every locator that names the manuscript's main file.
 - A `STOP` line: stop and tell the author. This skill does not read a manuscript that is a
   symbolic link, that leads outside the repository or into a `.git` directory in any letter
   case, or that git ignores. A file git ignores cannot be named by a locator (see "Locators:
   do they resolve"), so nothing derived from it could say where it comes from. It stops too
-  when the name of the file is typed in another letter case than its directory lists, or
   when its path from the root holds a character that no locator may hold in `file`: the
-  `NAME=` line has to be a name that every locator can carry and every checkout can open.
+  `NAME=` line has to be a name that every locator can carry.
 - The command also confirms `ROOT` against the stage directory, which was made for one root:
   a root that was copied wrongly stops here.
 
@@ -214,7 +217,7 @@ belongs to, and every file whose name begins with `outline-` and ends in `.jsonl
 
 ```bash
 ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(cd "$ROOT" 2>/dev/null && env pwd -P) && S=$(cd "$STAGE" 2>/dev/null && env pwd -P) && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
 find "$R" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' > "$S/meta-all.txt" && jq -R -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); select(clean)' "$S/meta-all.txt" > "$S/meta-files.txt" && jq -R -r '"\(input_line_number)\t\(tojson)"' "$S/meta-files.txt" && find "$R" -type f -name _meta.json -not -ipath '*/.git/*' -not -path $'*\n*' -exec jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (input_filename | strings | select(clean)) as $p | if length == 1 and (.[0] | type) == "object" then "ledger\t\($p | tojson)\tfor \(((.[0].source | objects | .file | strings) // "?") | tojson)" else "not one ledger\t\($p | tojson)" end' {} \; && find "$R" -type f -name 'outline-*.jsonl' -not -ipath '*/.git/*' -not -path $'*\n*' -exec jq -n -r --arg p {} 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $p | select(clean) | "outline file\t\(tojson)"' \; && echo 'ok listed'
 ```
 
@@ -243,9 +246,9 @@ from the list.
 ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
 M='<MAIN, as the manuscript check printed it>'
 N=1
-[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && { [ -z "$M" ] || [ "${M#/}" != "$M" ]; } && [ -d "$STAGE" ] && R=$(cd "$ROOT" 2>/dev/null && env pwd -P) && S=$(cd "$STAGE" 2>/dev/null && env pwd -P) && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && { [ -z "$M" ] || [ "${M#/}" != "$M" ]; } && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
 [ -n "$M" ] || echo 'ok there is no manuscript yet, so no ledger names it'
-[ -n "$M" ] && L=$(sed -n "${N}p" "$S/meta-files.txt") && [ -n "$L" ] && [ -f "$M" ] && B="$(cd "$(dirname "$M")" && env pwd -P)/$(basename "$M")" && T=$(git -C "$(dirname "$L")" rev-parse --show-toplevel) && TR=$(cd "$T" && env pwd -P) && F=$(jq -s -r 'if length == 1 and (.[0] | type) == "object" then (.[0].source | objects | .file | strings | select(explode | all(. >= 32))) else empty end' "$L") && { [ -n "$F" ] && { { A=$(realpath "$TR/$F" 2>/dev/null) && [ -f "$A" ] && A="$(cd "$(dirname "$A")" && env pwd -P)/$(basename "$A")" && [ "${A#"$TR"/}" != "$A" ]; } || { A=$(realpath "$R/$F" 2>/dev/null) && [ -f "$A" ] && A="$(cd "$(dirname "$A")" && env pwd -P)/$(basename "$A")" && [ "${A#"$TR"/}" != "$A" ]; }; } || A=none; } && { [ "$A" = "$B" ] && echo 'ok this ledger names MAIN' || echo 'ok this ledger names another manuscript, or none'; }
+[ -n "$M" ] && L=$(sed -n "${N}p" "$S/meta-files.txt") && [ -n "$L" ] && [ -f "$M" ] && B0=$(realpath "$M") && B="$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && env pwd -P)/${B0##*/}" && [ "$B" -ef "$M" ] && T=$(git -C "${L%/*}" rev-parse --show-toplevel) && TR=$(builtin cd -P -- "$T" >/dev/null 2>&1 && env pwd -P) && [ "$TR" -ef "$T" ] && F=$(jq -s -r 'if length == 1 and (.[0] | type) == "object" then (.[0].source | objects | .file | strings | select(explode | all(. >= 32))) else empty end' "$L") && { [ -n "$F" ] && { { A0=$(realpath "$TR/$F" 2>/dev/null) && [ -f "$A0" ] && A="$(builtin cd -P -- "${A0%/*}" >/dev/null 2>&1 && env pwd -P)/${A0##*/}" && [ "$A" -ef "$TR/$F" ] && [ "${A#"$TR"/}" != "$A" ]; } || { A0=$(realpath "$R/$F" 2>/dev/null) && [ -f "$A0" ] && A="$(builtin cd -P -- "${A0%/*}" >/dev/null 2>&1 && env pwd -P)/${A0##*/}" && [ "$A" -ef "$R/$F" ] && [ "${A#"$TR"/}" != "$A" ]; }; } || A=none; } && { [ "$A" = "$B" ] && echo 'ok this ledger names MAIN' || echo 'ok this ledger names another manuscript, or none'; }
 ```
 
 A ledger names one file at most. `docs/SCHEMA.md` writes a ledger's `source.file` from the
@@ -298,7 +301,7 @@ The command prints one of three `ok` lines, or none.
 
 ```bash
 ROOT='<the root, as printed>'; OUTDIR='<the directory of the outline files>'; STAGE='<the stage directory, as printed>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(cd "$ROOT" 2>/dev/null && env pwd -P) && S=$(cd "$STAGE" 2>/dev/null && env pwd -P) && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" && { O=$(cd "$OUTDIR" 2>/dev/null && env pwd -P) || O="$(cd "$(dirname "$OUTDIR")" 2>/dev/null && env pwd -P)/$(basename "$OUTDIR")"; } && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "$(dirname "$O")" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is not the one the first command made for this repository, the outline directory is not a directory inside the repository and outside .git, or an outline file is a symbolic link'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" && OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && [ "$O" = "$(printf '%s' "$O" | LC_ALL=C tr -d '\000-\037\177')" ] && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is not the one the first command made for this repository, the outline directory is not a directory inside the repository and outside .git, or an outline file is a symbolic link'; exit 1; }
 STAGE=$S; SEC="$O/outline-sections.jsonl"; PAR="$O/outline-paragraphs.jsonl"; APP="$O/outline-approvals.jsonl"
 ```
 
@@ -315,8 +318,8 @@ the `root.txt` that names this root. A directory that fails one of these is not 
 that was copied wrongly cannot send the temporary files, or the removal of one, somewhere
 else. From there on `STAGE` is its real path. The guard then takes the real path of the
 outline directory, with every symbolic link in its path resolved, the last part included, and
-goes on only when that path is the repository's root or a directory under it, is not inside a
-`.git` directory in any letter case, is a directory or does not exist yet in a directory that
+goes on only when that path holds no control character, is the repository's root or a
+directory under it, is not inside a `.git` directory in any letter case, is a directory or does not exist yet in a directory that
 does, and none of the three outline files is
 itself a symbolic link. `SEC`, `PAR` and `APP` are built from the real path. When
 `OUTDIR` does not exist yet, the directory that is to hold it has to exist inside the
@@ -447,7 +450,7 @@ file.
 
 ```bash
 P="$PAR"
-[ -f "$P" ] && : > "$STAGE/checker-files.jsonl" && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | .file | strings | select(clean)] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && cat -n "$STAGE/locator-files.txt" && echo 'ok locator files listed'
+[ -f "$P" ] && : > "$STAGE/checker-files.jsonl" && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | .file | strings | select(clean)] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/locator-files.txt" && echo 'ok locator files listed'
 [ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (.[] | . as $r | (if has("from") and ((.from | type) != "array" or (.from | length) == 0) then "\($r.id | tojson) has a from that is not a list of one or more locators" else empty end), (.points[]? | objects | select(has("basis") and ((.basis | type) != "array" or (.basis | length) == 0)) | "\($r.id | tojson) has a basis that is not a list of one or more locators")), ([.[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | {id: $r.id, loc: .}] | (.[] | select((.loc | type) != "object" or (.loc.file | type) != "string") | "\(.id | tojson) has a locator without a file"), (.[] | select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean | not)) | "\(.id | tojson) has a locator whose file name holds a control character"), (map(select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean)) | {f: .loc.file, id: .id}) | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))")), "ok names listed"' "$P"
 ```
 
@@ -469,7 +472,7 @@ name of the file: the command reads it from the list.
 P="$PAR"
 N=1
 FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
-[ -f "$P" ] && [ -n "$FILE" ] && [ "${FILE#/}" = "$FILE" ] && T=$(realpath "$R/$FILE") && [ -f "$T" ] && T="$(cd "$(dirname "$T")" && env pwd -P)/$(basename "$T")" && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && git --literal-pathspecs -C "$(dirname "$T")" ls-files --cached --others --exclude-standard --error-unmatch -- "$T" >/dev/null 2>&1 && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -n -c --arg f "$FILE" --arg p "$T" '{file: $f, path: $p}' >> "$STAGE/checker-files.jsonl" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
+[ -f "$P" ] && [ -n "$FILE" ] && [ "${FILE#/}" = "$FILE" ] && T0=$(realpath "$R/$FILE") && [ -f "$T0" ] && T="$(builtin cd -P -- "${T0%/*}" >/dev/null 2>&1 && env pwd -P)/${T0##*/}" && [ "$T" -ef "$R/$FILE" ] && [ ! -L "$T" ] && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && git --literal-pathspecs -C "${T%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$T" >/dev/null 2>&1 && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -n -c --arg f "$FILE" --arg p "$T" '{file: $f, path: $p}' >> "$STAGE/checker-files.jsonl" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
   [ .[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | select(.file == $f)
     | (if (has("starts") or has("label")) | not then "\($r.id | tojson): a locator has neither label nor starts" else empty end),
       (if has("lines") and (has("commit") | not) then "\($r.id | tojson): a locator has lines without commit" else empty end),
@@ -729,6 +732,7 @@ jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/
     (($apps | to_entries) as $en
       | ([$en[] | select(.value.whole == true) | .key] | last // -1) as $w
       | ([$en[] | .key as $k | .value.sections[] | {id: .section.id, k: $k}] | group_by(.id) | map(select((map(.k) | max) >= $w) | .[0].id)) - ($secs | map(.id))
+      | if $w >= 0 and (($en[$w].value.sections | map(.section.id)) == ($secs | map(.id))) then [] else . end
       | "sections removed since their approval\t\(length)\(if length > 0 then "\t" + tojson else "" end)"),
     ([$pars[] | select(.section as $x | any($secs[]; .id == $x) | not) | .id] as $o
       | "paragraph records that name no section\t\($o | length)\(if ($o | length) > 0 then "\t" + ($o | tojson) else "" end)"),
@@ -740,10 +744,13 @@ jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/
 
 It prints one line for each section, one for the order of sections, one for the sections
 removed since their approval, one for the paragraph records that name no section, the two
-counts, and `ok status`. A section counts as removed since its approval when it is not in the
-section file and its latest approved copy is in the last approval of the whole outline or in
-an approval record after that one. Once an approval of the whole outline is recorded without
-the section, its removal is approved and it is no longer counted. A section is compared with the
+counts, and `ok status`. A section counts as removed since its approval when the order of
+sections does not stand as approved, the section is not in the section file, and its latest
+approved copy is in the last approval of the whole outline or in an approval record after that
+one. Once an approval of the whole outline is recorded without the section, its removal is
+approved and it is no longer counted. When the order of sections stands as approved, the
+section file holds exactly the sections of the last approval of the whole outline, and no
+removal is waiting for an approval. A section is compared with the
 copies in the last approval record that has an entry for it. The comparison is of JSON values:
 the order of keys does not count, and `1` and `1.0` are the same number. When there is no
 approvals file, or when it is empty or holds only blank lines, every section was never
@@ -797,6 +804,7 @@ jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/
         else empty end),
     (($apps | to_entries) as $en
       | ([$en[] | select(.value.whole == true) | .key] | last // -1) as $w
+      | select(($w >= 0 and (($en[$w].value.sections | map(.section.id)) == ($secs | map(.id)))) | not)
       | [$en[] | .key as $k | .value.sections[] | {k: $k, e: .}] | group_by(.e.section.id) | map(max_by(.k))[]
       | select(.k >= $w) | .e
       | select(.section.id as $i | any($secs[]; .id == $i) | not)

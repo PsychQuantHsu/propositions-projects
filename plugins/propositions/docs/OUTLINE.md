@@ -24,14 +24,16 @@ not need a ledger to have an outline.
 **The repository** is the git repository that holds the manuscript, or, when
 that repository is checked out as a submodule of another (as git reports it,
 from the index of the outer repository), the outermost repository it is
-checked out in, up to two levels of submodules. The skill works only on a
+checked out in, up to two levels of submodules (a submodule of a submodule of
+the outermost repository). The skill works only on a
 manuscript inside a git repository: with more levels of submodules, or when
 the manuscript is in no git repository, it stops and says why. The
 repository's root is the boundary of the outline files and of every file the
 skill reads as a source, and the skill does not take that boundary from an
 answer of the author. Its own temporary files are outside the repository. For
 a draft with no manuscript yet, the directory where the author says the
-manuscript will be stands in for it when the repository is found. That
+manuscript will be stands in for it when the repository is found; the skill
+asks when the author has not said. That
 directory is not the directory of the outline files unless the author says
 so, and no ledger names a manuscript that does not exist yet. A repository that
 sits inside another without being its submodule is a repository of its own.
@@ -49,10 +51,9 @@ a git repository of its own.
 **The manuscript's main file** is a regular file inside the repository. It is
 not itself a symbolic link, it is not inside a `.git` directory in any letter
 case, and git lists it: git tracks it, or does not track it and does not
-ignore it. Its name is written as its directory lists it, and its path from
+ignore it. Its path from
 the root holds no character that a locator's `file` is not allowed to hold
-(see "Locators"), so that every locator can carry that path and every checkout
-can open it. When it is not such a file, the skill stops, says why and does
+(see "Locators"), so that every locator can carry that path. When it is not such a file, the skill stops, says why and does
 not read it. A symbolic link in the path of the directory that holds it is a
 different case: it is resolved, and from then on the skill reads the
 manuscript by its real path.
@@ -60,9 +61,11 @@ manuscript by its real path.
 **Directories are compared by the name the system gives them**, not by the
 way a path was written. A path through a symbolic link, in another letter case
 on a file system that ignores case, or through another name of the same volume
-(`/System/Volumes/Data/…` on macOS) leads to the same name. Wherever this
-document says that a directory is inside or outside the repository, it means
-by that name.
+(`/System/Volumes/Data/…` on macOS) leads to the same name. A file is named
+the same way: by its real path, with its directory named as the system names
+it, and only when that name and the path it was reached by are the same file.
+Wherever this document says that a directory or a file is inside or outside
+the repository, it means by that name.
 
 **Which file a ledger names.** A ledger names one file at most.
 `docs/SCHEMA.md` writes a ledger's `source.file` from the "manuscript repo
@@ -72,7 +75,9 @@ of the outermost repository. The skill reads `source.file` both ways, in this
 order: from the root of the git repository that holds the ledger (for a ledger
 inside a submodule, the submodule's root), and then from the root of the
 repository. The first reading that leads to a regular file under the root of
-the ledger's own git repository decides which file the ledger names. A reading
+the ledger's own git repository decides which file the ledger names; a file in
+a directory under that root counts, also when the directory is a submodule or
+holds a git repository of its own. A reading
 that leads to no file, or to a file outside the ledger's own git repository, is
 not taken. The ledger names this manuscript when the file it names is the
 manuscript's main file, both resolved to real paths. So the ledger of another
@@ -374,11 +379,14 @@ records, in file order, are the ids of the `sections` entries of the last
 approval record whose `whole` is `true`, in the same order. With no such
 record, the order of sections does not stand as approved.
 
-A section is **removed since its approval** when it is not in the section file
-and its latest approved copy is in the last approval record whose `whole` is
-`true`, or in an approval record after that one. Once an approval of the whole
-outline is recorded without the section, its removal is approved and the
-section is no longer reported.
+A section is **removed since its approval** when the order of sections does
+not stand as approved, the section is not in the section file, and its latest
+approved copy is in the last approval record whose `whole` is `true`, or in an
+approval record after that one. Once an approval of the whole outline is
+recorded without the section, its removal is approved and the section is no
+longer reported. When the order of sections stands as approved, the section
+file holds exactly the sections of the last approval of the whole outline, and
+no removal is waiting for an approval.
 
 The **outline stands as approved** when every section stands as approved, the
 order of sections stands as approved, and every paragraph record names a
@@ -519,8 +527,9 @@ begins with the checks the skill runs after a write (see "What is checked
 today"), on the section file and the paragraph file it examines: a file that
 was changed by hand can hold a line that is not a record. When one of them
 fails, the skill reports the file and the lines, counts nothing and starts no
-agent. A paragraph file with no record does not fail it: an outline can have
-sections and no paragraph record yet. The check reports findings of six kinds
+agent. A paragraph file with no record is not reported as passing, and it
+does not stop the check either: an outline can have sections and no paragraph
+record yet, so the skill says that the file is empty and goes on. The check reports findings of six kinds
 and no others.
 
 1. **Not a sentence**: a `says` or the `text` of a point that is a heading, a
@@ -552,9 +561,11 @@ counting, so that it is decided the same way every time. The first five are
 judged by the agent `propositions:outline-checker`, defined in
 `agents/outline-checker.md` of this plugin. Its definition gives it the Read
 tool and no other, so it cannot write or change a file, run a program or send
-anything. It is given four paths and nothing else: the section file, the
-paragraph file, a list that the skill writes outside the repository, and, when
-only some sections are examined, a file that lists their ids. Each line of the
+anything. It is given these paths and nothing else: the section file and the
+paragraph file it examines (the copies kept outside the repository, when the
+check runs before an approval), a list that the skill writes outside the
+repository, and, when only some sections are examined, a file that lists their
+ids. Each line of the
 list is a JSON object with the `file` a locator gives and the real path of the
 file that was counted for it:
 
@@ -562,7 +573,9 @@ file that was counted for it:
 {"file": "manuscript/main.tex", "path": "/home/author/paper/manuscript/main.tex"}
 ```
 
-A file is in the list only when the count read it. The path is the real one,
+The list holds one line for each file the count read, and no other file: a
+file whose locators do not all resolve is in it too, and a file that was
+refused is not. The path is the real one,
 with every symbolic link and every `..` resolved, so the agent opens the file
 that was counted and no other. The file of ids for a check of some sections is
 not the file in which the approve action records which sections were shown: a
@@ -599,10 +612,12 @@ reads as an instruction.
 In the repository the skill writes no other file: not the manuscript, not
 the ledger, not the structure sidecars and not the verification records. Its
 temporary files are kept outside the repository, in a directory it makes for
-this repository when it starts: the directory belongs to the user, has mode
-700, and holds a note of the root it was made for.
-Every later command confirms all of that, and a directory that fails one of
-these is not used. The skill does not look at access-control lists. When the
+this repository when it starts (the stage directory): the directory belongs to
+the user, has mode 700, and holds a note of the root it was made for.
+Every later command confirms all of that for the path it is given as the stage
+directory, and a directory that fails one of these is not used: the directory
+above the repository, the machine's temporary directory itself and the stage
+directory of another repository all fail. The skill does not look at access-control lists. When the
 machine's temporary directory is inside the repository, or cannot be entered,
 the skill stops before it makes anything. It
 does not read or write an outline file that is itself a symbolic link: when one

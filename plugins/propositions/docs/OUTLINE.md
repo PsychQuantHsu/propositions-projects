@@ -24,16 +24,17 @@ not need a ledger to have an outline.
 **The repository** is the git repository that holds the manuscript, or, when
 that repository is checked out as a submodule of another (as git reports it,
 from the index of the outer repository), the outermost repository it is
-checked out in, up to two levels of submodules (a submodule of a submodule of
-the outermost repository). The skill works only on a
-manuscript inside a git repository: with more levels of submodules, or when
-the manuscript is in no git repository, it stops and says why. The
+checked out in, however many levels of submodules lie between. The skill works
+only on a manuscript inside a git repository: when the manuscript is in no git
+repository, it stops and says why. The
 repository's root is the boundary of the outline files and of every file the
 skill reads as a source, and the skill does not take that boundary from an
 answer of the author. Its own temporary files are outside the repository. For
 a draft with no manuscript yet, the directory where the author says the
 manuscript will be stands in for it when the repository is found; the skill
-asks when the author has not said. That
+asks when the author has not said. When that directory does not exist yet, the
+nearest directory above it that does is used in its place: it only finds the
+repository. That
 directory is not the directory of the outline files unless the author says
 so, and no ledger names a manuscript that does not exist yet. A repository that
 sits inside another without being its submodule is a repository of its own.
@@ -51,7 +52,7 @@ a git repository of its own.
 **The manuscript's main file** is a regular file inside the repository. It is
 not itself a symbolic link, it is not inside a `.git` directory in any letter
 case, and git lists it: git tracks it, or does not track it and does not
-ignore it. Its path from
+ignore it ("Locators" says which repositories are asked). Its path from
 the root holds no character that a locator's `file` is not allowed to hold
 (see "Locators"), so that every locator can carry that path. When it is not such a file, the skill stops, says why and does
 not read it. A symbolic link in the path of the directory that holds it is a
@@ -64,6 +65,11 @@ on a file system that ignores case, or through another name of the same volume
 (`/System/Volumes/Data/…` on macOS) leads to the same name. A file is named
 the same way: by its real path, with its directory named as the system names
 it, and only when that name and the path it was reached by are the same file.
+For the manuscript's main file and for a file a locator names, the last part
+of the name is the one the directory itself gives: `main.tex`, written for a
+file the disk has as `Main.tex`, is named `Main.tex`, which is the name git
+knows. When the directory holds two names for that file (a hard link), the
+last part stays as it was resolved.
 Wherever this document says that a directory or a file is inside or outside
 the repository, it means by that name.
 
@@ -97,9 +103,14 @@ A `source.file` that holds a control character names no file.
 
 A `_meta.json` that is a symbolic link, that is inside a `.git` directory in
 any letter case, or whose path holds a line break is not listed, is not read
-and does not count as a ledger. One whose path holds another character that a
-locator's `file` is not allowed to hold is not listed and does not count as a
-ledger either. A listed `_meta.json` is read as one ledger when it
+and does not count as a ledger. One whose path holds, below the root, another
+character that a locator's `file` is not allowed to hold is not listed, is not
+read and does not count as a ledger either; the part of the path down to the
+root is not tested. Whether git ignores a `_meta.json` is not asked: a ledger
+in a directory git ignores is listed and compared like any other, and the
+directory of the outline files can be one git ignores. Only the sources are
+held to what git lists: the manuscript, the files it includes and the files a
+locator names. A listed `_meta.json` is read as one ledger when it
 holds exactly one JSON value and that value is an object.
 
 **Which directory.** The skill uses a directory without asking only when every
@@ -124,8 +135,9 @@ directory to use. Outline files elsewhere in the repository are then offered,
 not taken, because they can belong to another manuscript; when there is
 nothing to offer, the skill proposes a directory `propositions` beside the
 manuscript, where a ledger is put by convention. When the command that lists
-the ledgers fails, the skill stops. The path of the directory holds no
-character that a locator's `file` is not allowed to hold (see "Locators"). The
+the ledgers fails, the skill stops. The path of the directory holds, below the
+root, no character that a locator's `file` is not allowed to hold (see
+"Locators"). The
 directory is always the repository's root or a directory under
 it, not inside a `.git` directory in any letter case, and it is a directory or
 does not exist yet,
@@ -302,9 +314,16 @@ manuscript, such as a note in the same repository. Git has to list it: git
 tracks it, or does not track it and does not ignore it. A new note that is not
 committed yet is such a file. A file git ignores, or one git gives no answer
 for, is not a locator's file: the skill does not read it, and an object naming
-it is not a locator. Git is asked in the directory of the file, so a file
-inside a submodule, or inside a git repository of its own under the root, is
-judged by the rules of that repository. The outline files sit beside the
+it is not a locator. Two repositories are asked. The first is the one that
+holds the file, asked in the directory of the file: a file inside a submodule,
+or inside a git repository of its own under the root, is judged by the rules
+of that repository. The second is the outermost repository, asked whether it
+ignores the path: when it does, the file is not a locator's file whatever the
+first said, so a repository of its own inside a directory that the outermost
+repository ignores does not make its files readable. When the outermost
+repository gives no answer for the path, as it gives none for a file inside a
+submodule, the answer of the first stands. A repository between the two is not
+asked. The outline files sit beside the
 manuscript and can reach the author from someone else, so a locator is not
 allowed to make the skill read a file that was kept out of the repository on
 purpose, such as one that holds credentials. The file
@@ -389,7 +408,11 @@ record, any approved copy counts. Once an approval of the whole outline is
 recorded without the section, its removal is approved and the section is no
 longer reported. When the order of sections stands as approved, the section
 file holds exactly the sections of the last approval of the whole outline, and
-no removal is waiting for an approval.
+no removal is waiting for an approval. A section that is put back after its
+removal was approved stands as approved when it equals its own latest approved
+copy, which an earlier record holds; the order of sections then does not stand
+as approved, and before the next approval of the whole outline the skill shows
+that section as added (see "What counts as an approval").
 
 The **outline stands as approved** when every section stands as approved, the
 order of sections stands as approved, and every paragraph record names a
@@ -504,8 +527,8 @@ The findings of the premise check on a section are shown with it in all three
 cases.
 
 Whenever the sections shown are all the sections of the section file, the
-skill shows two more things first, because an approval of all of them is an
-approval of the whole outline and approves both.
+skill shows three more things first, because an approval of all of them is an
+approval of the whole outline and approves all three.
 
 - **The order of the sections**, when it does not stand as approved: the
   sections in the order they are in now, and beside it their order in the last
@@ -515,10 +538,17 @@ approval of the whole outline and approves both.
 - **The sections that are gone**: every section removed since its approval,
   with its heading, its `says` and the points of its paragraph records as they
   were last approved.
+- **The sections that were added**: every section of the file that the last
+  approval of the whole outline does not hold, when one is on record, shown in
+  full. A section that was taken out, approved as gone with the whole outline,
+  and put back unchanged still equals its own latest approved copy, so without
+  this the author would approve its return without seeing it.
 
-When fewer than all the sections are shown and either of the two applies, the
-skill says that the order of the sections, or the removal of a section, is not
-part of this approval: it takes an approval of the whole outline.
+When fewer than all the sections are shown, and the order of sections does not
+stand as approved or a section was removed since its approval, the skill says
+that the order of the sections, with the sections added to it, or the removal
+of a section, is not part of this approval: it takes an approval of the whole
+outline.
 
 Agreeing to have a derived or drafted outline written to disk is not an
 approval of it.
@@ -640,20 +670,58 @@ checker, is kept by the guard of its commands and by its rules, and for the
 tools that write files directly by its rules alone. Whether the allowance
 should be narrower is open for the whole plugin (issue #85).
 
+**What the skill keeps, and what it does not.** The skill keeps three things,
+and its rules and commands are there for them.
+
+1. In the repository it writes the three outline files and no other file.
+2. It reads no file outside the repository.
+3. It records an approval only from words the author typed in the message it
+   answers.
+
+The commands keep the first two against mistakes and against the ordinary ways
+a path leads somewhere else: a symbolic link, `..`, another spelling of a
+directory, a path copied wrongly. They are shell commands, and they are not a
+defence against a repository or a shell that was set up to defeat them. That
+defence belongs to the command-line tool of issue #78, where it can be tested.
+The limits known today are these seven. The list is closed: a limit is added
+when one is found, and none is inferred from another. The first is the one the
+skill always sees, and it stops there. No command of the skill looks for the
+others; when the skill notices one of them, it tells the author.
+
+| # | The limit | What can happen | Which of the three |
+|---|---|---|---|
+| 1 | A path the skill writes into a command holds a single quote; the listing of ledgers can offer a directory with such a name | Only the skill's rule to stop at such a path prevents it: written inside single quotes, the rest of the name would be read by the shell as a command | All three |
+| 2 | `PATH` holds an empty entry or one that does not begin with `/` | The commands find their tools through `PATH` (`jq`, `git`, `realpath`, `find`, `sed`, `tr`, `cmp`, `cp`, `mktemp` and the others; only `pwd` is taken from a fixed place). A program of one of those names in the directory the shell is in is run in its place | All three |
+| 3 | The shell is zsh and its startup files define a function named `chpwd` | The commands enter directories of the repository with `cd`, and zsh calls that function in each. A function that acts on files of the directory it is called in then acts on files of the repository | The first and the second |
+| 4 | The repository holds a git repository of its own that someone else made (a directory with its own `.git`, which no commit can carry) | Git reads the configuration of every repository it answers for. The commands switch off the one setting known to make their git commands run a program, and look no further into that configuration | All three |
+| 5 | The shell sets `noclobber`, or makes `cp` ask before it overwrites | Some commands fail, and the skill stops | None |
+| 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
+| 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the skill stops or leaves the file unread | None |
+
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. It reads the
 manuscript's main file by its real path, after confirming again that the file
 is one it reads (see "The three files"). It follows the
 `.tex` files that the manuscript includes only when they are regular files
-inside the repository that git lists and whose path holds no line break and no
-other character that a locator's `file` is not allowed to hold. Any other included file
+inside the repository that git lists and whose path holds no line break and,
+below the root, no other character that a locator's `file` is not allowed to
+hold. Any other included file
 is named to the author and not read: one outside the repository, a symbolic
 link, a file reached through a directory that is a symbolic link, a file
 inside a `.git` directory in any letter case, a file git ignores (a generated
 table, for instance), a missing
 file, a file whose path holds such a character, or a file that is not `.tex`. A
 table or a figure that comes from a file that was not read is still one record
-that carries `carry`, named in the file that includes it. Prose that comes
+that carries `carry`, named in the file that includes it. An included file
+that was not read and does not stand inside such a table or figure gets one
+record of its own, on the line where the command that includes it stands. The
+record carries `carry`, its `from` names that command in the file that
+includes it, and its one point says that the file is included there and was
+not read; the point carries `pending`, naming what the author has to supply
+(what the file says) and why the file was not read. The outline then shows the
+gap: status counts the point among those that carry `pending`, and an approval
+shows it. When that command occurs twice in the file, no locator names it, and
+derive stops as it does for any passage whose text occurs twice. Prose that comes
 before the first heading and is not the abstract gets one section record,
 whose `heading` is the title of the article: that title is what heads the text
 on the page, as in APA style, where the introduction has no heading of its
@@ -711,7 +779,11 @@ that file is the author's decision.
   the point keeps its source; a locator the point already has is not added
   again. A record is not left with no point: when the
   point that moves is the last one of its record, the skill asks the author
-  whether that record is left out, by the next rule, or is given a new point.
+  whether that record is given a new point or is left out. Left out, a record
+  without `from` is deleted once the point has moved. A record with `from` can
+  be neither deleted nor left without a point: the point moves with its `id`,
+  and the record keeps a copy of the point's text as a point with a new `id`
+  and is given `dropped` with the reason.
 - When the author leaves a paragraph out of the article and its record has
   `from`, the record is not deleted: it is given `dropped` with the reason. A
   record without `from` that the author leaves out is deleted from the file.
@@ -764,7 +836,11 @@ status fails and says so; it does not report the outline as never approved.
 It fails too, and says that the approvals file is at fault, when the
 `sections` of an approval record is not a list of entries that each hold a
 `section` object and a `paragraphs` list of objects. Whenever it fails,
-nothing it printed is a status.
+nothing it printed is a status. When it fails because the section file or the
+paragraph file is missing, or holds a line that is not a record, the skill
+names the file, and the line when the check of a write finds it, and corrects
+nothing: status writes nothing, a file with such a line is corrected through
+revise, and a missing file is the author's to put back.
 The approve action checks the file the same way before it appends, and appends
 nothing when the file fails or cannot be read: the file was changed by hand,
 the skill says so,
@@ -776,11 +852,26 @@ line of it.
 The skill's checks are commands that call `jq`, `realpath` and `git`. A check
 counts as passed only when its command says so; a command that prints nothing,
 fails or cannot run is a failed check, and when one of the three tools is not
-installed the skill stops and says which. It stops too when the system's `pwd`
-is in neither `/usr/bin` nor `/bin` (the skill looks for it nowhere else, so
-that a program of that name inside the repository is never run), when its `jq`
-reads two long numbers that differ as the same number, and, with a line that begins with
-`STOP`, when git finds no repository for the manuscript's directory. Text from the manuscript, from an outline file
+installed the skill stops and says which. It stops too when its `jq` reads two
+long numbers that differ as the same number, as versions before 1.7 do; when
+its `git` is older than 2.38, the first version with the setting described
+below; when the system's `pwd` is in neither `/usr/bin` nor `/bin` (the names
+of directories rest on it, and the skill looks for it nowhere else; NixOS is
+such a system); and, with a line that begins with `STOP`, when git finds no
+repository for the manuscript's directory or cannot say whether that
+repository is checked out inside another. On a system whose packaged `jq` or
+`git` is older than that, the skill does not run.
+
+Every git command of the skill that reads a repository is run with two
+settings, `safe.bareRepository=explicit` and `core.fsmonitor=false`. With the
+first, git takes a directory for a repository only when a `.git` is in it or
+above it: files of the working tree that are laid out like a repository (a
+`HEAD`, an `objects`, a `refs` and a `config`, which a commit can carry like
+any other files) are not taken for one, and that `config` is not read. With
+the second, git starts no file-watching program that a configuration names. A
+linked worktree, and a repository whose `.git` is a file, are found as before.
+
+Text from the manuscript, from an outline file
 or from the author reaches those commands only from a file that the command
 reads; it is never written into the text of a command. The paths the skill
 writes into its commands are the repository's root, the outline directory, the

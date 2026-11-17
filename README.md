@@ -182,7 +182,7 @@ schema contract travels with each manuscript's ledger, so the plugin vendors no 
 
 - Python 3.10+
 - pytest 7+
-- `jq` and `realpath`, for `/propositions:outline` only, which also needs `git`, as `/propositions:manuscript-audit` and Operation D already do (its commands were run with jq 1.7.1 and 1.8.2; the skill tests for the three tools before anything else, and stops when its `jq` cannot tell two long numbers apart, as versions before 1.7 cannot)
+- `jq` and `realpath`, for `/propositions:outline` only, which also needs `git`, as `/propositions:manuscript-audit` and Operation D already do (its commands were run with jq 1.7.1 and 1.8.2 and git 2.54 and 2.55; the skill tests for the three tools before anything else, and stops when its `jq` cannot tell two long numbers apart, as versions before 1.7 cannot, or when its `git` is older than 2.38)
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` layout (paths configurable via skill args)
 - Schema versions v1.0 / v1.1 / v1.2 / v1.3
 

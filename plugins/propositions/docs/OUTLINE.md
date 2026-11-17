@@ -69,11 +69,13 @@ For the manuscript's main file and for a file a locator names, the last part
 of the name is the one the directory itself gives: `main.tex`, written for a
 file the disk has as `Main.tex`, is named `Main.tex`. When the directory holds
 two names for that file (a hard link), the last part stays as it was resolved.
-When git tracks the file under a name that differs from that one only in
-letter case (a file renamed on the disk in letter case alone, which git does
-not notice on a file system that ignores case), the file counts as tracked and
-is named as git names it; the `.tex` files that derive follows are named the
-same way.
+When git does not have that name, the file system ignores letter case there,
+and git tracks a path that differs from it only in letter case (a file renamed
+on the disk in letter case alone, which git does not notice on such a file
+system), the file counts as tracked and keeps the name the disk has; the
+`.tex` files that derive follows are treated the same way. One such file is
+still refused: one whose name on the disk an ignore rule matches, because the
+outermost repository is asked about that name and answers that it ignores it.
 Wherever this document says that a directory or a file is inside or outside
 the repository, it means by that name.
 
@@ -227,7 +229,7 @@ A point is an object.
 | `id` | yes | A non-empty string, different from the `id` of every other point and of every paragraph record |
 | `text` | yes | One complete sentence stating one key point of the paragraph |
 | `basis` | no | A list of one or more locators naming what supports the point |
-| `pending` | no | A non-empty string naming what the author still has to supply before the point can be written |
+| `pending` | no | A non-empty string naming what the author still has to supply before the point can be written. On the record of an included file that was not read, it names what that file says, and why the file was not read |
 
 **One point or several.** A record with one point states, in that point, what
 the whole paragraph says. A record with several points states one key point of
@@ -879,9 +881,12 @@ above it: files of the working tree that are laid out like a repository (a
 `HEAD`, an `objects`, a `refs` and a `config`, which a commit can carry like
 any other files) are not taken for one, and that `config` is not read. Git
 does not pass such a directory by, though: asked in it, or in a directory
-under it, git refuses to answer. A file there is not listed and not read, a
-locator that names one does not resolve, and a manuscript there stops the
-skill at its first command. With
+under it, git refuses to answer. A source there is not read: derive does not
+follow a `.tex` file there, a locator that names a file there does not
+resolve, and a manuscript there stops the skill at its first command, where
+git's own error gives the reason. A `_meta.json` there is still listed,
+because the listing does not ask git; its comparison with the manuscript does
+not run to its end, so the skill asks. With
 the second, git starts no file-watching program that a configuration names. A
 linked worktree, and a repository whose `.git` is a file, are found as before.
 

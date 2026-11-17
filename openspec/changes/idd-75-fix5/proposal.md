@@ -12,17 +12,17 @@
 
 ## Proposed Solution
 
-維護者 2026-11-17 的決定見 https://github.com/PsychQuantHsu/propositions-projects/issues/75#issuecomment-6938070366：24 項全部處理；skill 保留三項保證（只寫三個綱要檔、不讀 repo 以外的檔、確認紀錄只記作者親口說的），惡意的 repo 內容與異常環境的防護留給 #78 的命令列工具，寫成已知限制；第 1 項擋下仍然修掉。照 spec delta 修改 article-outline 的 10 條 requirement，skill、說明文件與 checker 的定義跟著改。
+維護者 2026-11-17 的決定見 https://github.com/PsychQuantHsu/propositions-projects/issues/75#issuecomment-6938070366：24 項全部處理；skill 保留三項保證（只寫三個綱要檔、不讀 repo 以外的檔、確認紀錄只記作者親口說的），惡意的 repo 內容與異常環境的防護留給 #78 的命令列工具，寫成已知限制；第 1 項擋下仍然修掉。照 spec delta 修改 article-outline 的 11 條 requirement，skill、說明文件與 checker 的定義跟著改。
 
 - git：每一個讀 repo 的 git 指令都帶 `-c safe.bareRepository=explicit -c core.fsmonitor=false`。前者讓 git 只認有 `.git` 的目錄，偽裝成 repo 的目錄不被當成 repo、它的 `config` 不被讀；後者讓 git 不啟動設定檔指名的監看程式。第一段指令要求 git 2.38 以上（`safe.bareRepository` 從這一版開始有）。linked worktree 與 `.git` 是檔案的 repo 照常找得到。
 - 列 `.tex` 檔：不用 `-execdir`。先列出檔案，再逐一問 git。
 - 信任邊界：三份文字（skill、說明文件、規格）都寫明三項保證，以及八項已知限制的封閉清單，每一項寫明可能破壞哪一項保證：路徑含單引號、`PATH` 有空或相對項目、zsh 的 `chpwd` 函式、repo 裡別人做的獨立 git repo 的設定、`noclobber` 與 `cp -i`、暫存目錄的 ACL、檔案身分不穩定的檔案系統、環境裡指揮 git 的變數（`GIT_DIR` 這一類；這一項是這一輪驗收時才量到的，`997d3d0` 也是這樣）。`pwd` 只在 `/usr/bin` 與 `/bin` 找的代價（兩處都沒有的系統上停下）也寫明。
 - submodule：不設層數上限，一路往上找到最外層的 repo。這是實作提出的第三種做法（維護者沒有追認「超過兩層時停下」，原本的做法是請作者指定根目錄，已被先前的決定排除）；途中 git 失敗時印 `STOP`。
 - 忽略的檔：除了在檔案所在的目錄問 git，也在根目錄問最外層的 repo 是否忽略它；外層忽略就不讀。外層答不出來時（submodule 裡的檔），以內層的回答為準。
-- 檔名最後一段：主稿件與來源指標的檔，最後一段取目錄裡實際的名稱（`find -samefile`），所以打錯大小寫的檔名在兩種 `realpath` 下行為相同；同一個目錄有兩個名稱指到同一個檔時維持原樣。
+- 檔名最後一段：主稿件與來源指標的檔，確認在 repo 裡之後，最後一段取目錄裡實際的名稱（`find -samefile`），所以打錯大小寫的檔名在兩種 `realpath` 下行為相同；同一個目錄有兩個名稱指到同一個檔時維持原樣。git 以只差大小寫的另一個名稱追蹤同一個檔時（在磁碟上只改了大小寫），算已追蹤，並用 git 的名稱。後兩點是這一輪第一位獨立測試者實跑出來之後改的：原本查名稱的動作跑在「在不在 repo 裡」的判斷之前，會去列 repo 外的目錄。
 - 列帳冊：只讀清單裡的檔；字元檢查只看根目錄以下的那一段。`_meta.json` 與綱要目錄不問 git 是否忽略，文字照實寫明（只有來源才問）。
 - 第一段指令：開頭清掉 `TOOLS` 與 `ROOT`。稿件將放的目錄還不存在時，改用存在的最近上層目錄（只改文字，由 skill 給目錄）。
-- 反推：被引入而沒有讀、又不在圖表裡的檔，留一筆 `carry` 的紀錄，`from` 指到引入它的那個指令，要點帶 `pending`，寫明作者要補的是那個檔的內容以及沒有讀的原因。
+- 反推：被引入而沒有讀、又不在圖表裡的檔，留一筆 `carry` 的紀錄，`from` 指到引入它的那個指令，要點只說這裡引入了哪個檔（那個指令本身說的），並帶 `pending`，寫明作者要補的是那個檔的內容以及沒有讀的原因。
 - 修改：搬走最後一個要點時，問作者補新的要點還是不要這筆。不要而且沒有來源：搬完後刪掉。不要而且有來源：要點帶著 id 搬走，原紀錄留一個新 id 的要點（同樣的文字）並標 `dropped`。
 - 確認：展示全部的節時多展示第三樣，最後一次整份確認沒有的節（`added`），即使它與自己最近一次通過的內容相同也完整展示。
 - 錯誤的去路：狀態失敗而 jq 沒有指名檔案時，對節檔與段落檔跑寫入檢查；檔案不見時照實說，狀態不建檔也不改檔；追加確認紀錄時找不到「展示了哪些節」的紀錄，回到第 1 步，不重寫輸入檔。
@@ -48,7 +48,7 @@
 
 ## Impact
 
-- Affected specs: `article-outline`（修改 10 條 requirement）
+- Affected specs: `article-outline`（修改 11 條 requirement）
 - Affected code:
   - Modified: `plugins/propositions/skills/outline/SKILL.md`
   - Modified: `plugins/propositions/docs/OUTLINE.md`

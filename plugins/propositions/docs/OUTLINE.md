@@ -67,9 +67,13 @@ the same way: by its real path, with its directory named as the system names
 it, and only when that name and the path it was reached by are the same file.
 For the manuscript's main file and for a file a locator names, the last part
 of the name is the one the directory itself gives: `main.tex`, written for a
-file the disk has as `Main.tex`, is named `Main.tex`, which is the name git
-knows. When the directory holds two names for that file (a hard link), the
-last part stays as it was resolved.
+file the disk has as `Main.tex`, is named `Main.tex`. When the directory holds
+two names for that file (a hard link), the last part stays as it was resolved.
+When git tracks the file under a name that differs from that one only in
+letter case (a file renamed on the disk in letter case alone, which git does
+not notice on a file system that ignores case), the file counts as tracked and
+is named as git names it; the `.tex` files that derive follows are named the
+same way.
 Wherever this document says that a directory or a file is inside or outside
 the repository, it means by that name.
 
@@ -234,7 +238,10 @@ figure, a table, or a displayed formula or derivation that has a blank line
 before it and a blank line after it is one record that carries `carry`. Its
 points are complete sentences stating what the block states or shows ("Theorem
 1 states that the interval covers the true value at the nominal rate."), and the
-text of the block is not rewritten. "States Theorem 1." is not such a sentence. A record that carries `carry` has `from`: without it nothing
+text of the block is not rewritten. "States Theorem 1." is not such a sentence. The command that includes a file
+which derive did not read is such a block too (see "The six actions of the
+skill"): its point says that the file is included there, and its `pending`
+names what that file says as the thing the author has to supply. A record that carries `carry` has `from`: without it nothing
 says which block is moved. Any other displayed formula or derivation is not a
 block of its own: with no blank line on either side it belongs to the record of
 the paragraph it stands in, and with a blank line on one side only it belongs
@@ -312,8 +319,8 @@ actions of the skill"); whether the format should be able to name them is open
 **The file is inside the repository, and git lists it.** It can be outside the
 manuscript, such as a note in the same repository. Git has to list it: git
 tracks it, or does not track it and does not ignore it. A new note that is not
-committed yet is such a file. A file git ignores, or one git gives no answer
-for, is not a locator's file: the skill does not read it, and an object naming
+committed yet is such a file. A file git ignores, or one that the repository
+holding it gives no answer for, is not a locator's file: the skill does not read it, and an object naming
 it is not a locator. Two repositories are asked. The first is the one that
 holds the file, asked in the directory of the file: a file inside a submodule,
 or inside a git repository of its own under the root, is judged by the rules
@@ -499,7 +506,7 @@ when the author's reply arrives in a later message. The premise check that runs
 before the sections are shown reads this copy, and what is shown comes from it.
 When the section file or the paragraph file differs from that copy at the time
 of the approval, when the real path of the outline directory differs from the
-one recorded when the copy was taken, or when the copy is no longer available, the skill appends nothing and shows the sections again. When a
+one recorded when the copy was taken, or when the copy, or the record of which sections were shown, is no longer available, the skill appends nothing and shows the sections again. When a
 paragraph record of the copy names no section record, the skill appends nothing
 either: it shows that record first, and the record is corrected through revise
 before the outline is shown again.
@@ -710,15 +717,17 @@ hold. Any other included file
 is named to the author and not read: one outside the repository, a symbolic
 link, a file reached through a directory that is a symbolic link, a file
 inside a `.git` directory in any letter case, a file git ignores (a generated
-table, for instance), a missing
+table, for instance), a file git gives no answer for (one in or under a
+directory laid out like a git repository), a missing
 file, a file whose path holds such a character, or a file that is not `.tex`. A
 table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. An included file
 that was not read and does not stand inside such a table or figure gets one
 record of its own, on the line where the command that includes it stands. The
 record carries `carry`, its `from` names that command in the file that
-includes it, and its one point says that the file is included there and was
-not read; the point carries `pending`, naming what the author has to supply
+includes it, and its one point says only what that command states, that the
+file is included there, so that the point is supported by the passage its
+`from` names; the point carries `pending`, naming what the author has to supply
 (what the file says) and why the file was not read. The outline then shows the
 gap: status counts the point among those that carry `pending`, and an approval
 shows it. When that command occurs twice in the file, no locator names it, and
@@ -868,7 +877,11 @@ settings, `safe.bareRepository=explicit` and `core.fsmonitor=false`. With the
 first, git takes a directory for a repository only when a `.git` is in it or
 above it: files of the working tree that are laid out like a repository (a
 `HEAD`, an `objects`, a `refs` and a `config`, which a commit can carry like
-any other files) are not taken for one, and that `config` is not read. With
+any other files) are not taken for one, and that `config` is not read. Git
+does not pass such a directory by, though: asked in it, or in a directory
+under it, git refuses to answer. A file there is not listed and not read, a
+locator that names one does not resolve, and a manuscript there stops the
+skill at its first command. With
 the second, git starts no file-watching program that a configuration names. A
 linked worktree, and a repository whose `.git` is a file, are found as before.
 

@@ -223,17 +223,25 @@ through another name of the same volume (`/System/Volumes/Data/…` on macOS) le
 name, so it cannot make a directory inside the repository look like one outside it. A file is
 named the same way: its real path, with its directory named as above, and only when that name
 and the path it came from are the same file. For the manuscript and for a file a locator
-names, the last part of the name is then taken as the directory itself gives it, so `main.tex`
-typed for a file the disk has as `Main.tex` is named `Main.tex`, the name git knows; when the
-directory holds two names for that file (a hard link), the last part stays as `realpath` gave
-it. A name that does not survive this, such as a
+names, once the file is known to be inside the repository, the last part of the name is taken
+as the directory itself gives it, so `main.tex` typed for a file the disk has as `Main.tex` is
+named `Main.tex`; when the directory holds two names for that file (a hard link), the last
+part stays as `realpath` gave it. Git is asked about that name. When git does not have it and
+tracks the same file under a name that differs only in letter case (a file renamed on the disk
+in letter case alone, which git does not notice on a file system that ignores case), the file
+counts as tracked and is named as git names it; the list of `.tex` files in derive does the
+same. A name that does not survive this, such as a
 directory whose name ends in a line break, stops the command or leaves the file unread.
 
 Every git command that reads a repository is run with two settings on its command line,
 `safe.bareRepository=explicit` and `core.fsmonitor=false`. With the first, git takes a
 directory for a repository only when a `.git` is in it or above it: a directory of the working
 tree that merely holds a `HEAD`, an `objects` and a `refs`, which a commit can carry like any
-other files, is not taken for one, and the `config` beside them is not read. With the second,
+other files, is not taken for one, and the `config` beside them is not read. Git does not
+pass such a directory by, though: asked in it, or in a directory under it, git refuses to
+answer. A file there is therefore not listed and not read, a locator that names one does not
+resolve, and with a manuscript there the first command stops, with git's own error above the
+`STOP` line giving the reason. With the second,
 git starts no file-watching program that a configuration names. A linked worktree, and a
 repository whose `.git` is a file, are found as before. Git knows the first setting from
 version 2.38 on, which is why the first command asks for that version.
@@ -250,13 +258,13 @@ full.
 ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
 M='<MAIN, written out in full>'
 [ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${M#/}" != "$M" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
-[ -f "$M" ] && [ ! -L "$M" ] && B0=$(realpath "$M") && D=$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && B="$D/${B0##*/}" && [ "$B" -ef "$M" ] && [ ! -L "$B" ] && { B1=$(find "$D" -maxdepth 1 -type f -samefile "$B" 2>/dev/null) && [ "$B1" -ef "$B" ] && B=$B1; true; } && [ "${B#"$R"/}" != "$B" ] && X=$(printf '%s/' "${B#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && jq -n -e --arg n "${B#"$R"/}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null && git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "$D" ls-files --cached --others --exclude-standard --error-unmatch -- "$B" >/dev/null 2>&1 && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$B" 2>/dev/null; [ "$?" != 0 ]; } && printf 'MAIN=%s\nNAME=%s\n' "$B" "${B#"$R"/}" && echo 'ok the manuscript is a file of the repository' || echo 'STOP the manuscript is not a regular file of the repository: it is missing, a symbolic link, outside the repository, inside .git, ignored by git, or named with a character that no locator can carry'
+[ -f "$M" ] && [ ! -L "$M" ] && B0=$(realpath "$M") && D=$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && B="$D/${B0##*/}" && [ "$B" -ef "$M" ] && [ ! -L "$B" ] && [ "${B#"$R"/}" != "$B" ] && X=$(printf '%s/' "${B#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { B1=$(find "$D" -maxdepth 1 -type f -samefile "$B" 2>/dev/null) && [ "$B1" -ef "$B" ] && B=$B1; true; } && jq -n -e --arg n "${B#"$R"/}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null && { git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "$D" ls-files --cached --others --exclude-standard --error-unmatch -- "$B" >/dev/null 2>&1 || { K=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -c core.quotePath=false -C "$D" ls-files --cached -- ":(literal,icase)$B" 2>/dev/null) && [ -n "$K" ] && [ "$D/$K" -ef "$B" ] && B="$D/$K"; }; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$B" 2>/dev/null; [ "$?" != 0 ]; } && printf 'MAIN=%s\nNAME=%s\n' "$B" "${B#"$R"/}" && echo 'ok the manuscript is a file of the repository' || echo 'STOP the manuscript is not a regular file of the repository: it is missing, a symbolic link, outside the repository, inside .git, ignored by git, or named with a character that no locator can carry'
 ```
 
 - `ok the manuscript is a file of the repository`: from here on `MAIN` is the path on the
   `MAIN=` line: the real path of the file, with every symbolic link and every `..` in it
   resolved, its directory as the system names it and its last part as the directory gives
-  it. Read the manuscript by that
+  it, or as git has it when git tracks the file under another letter case. Read the manuscript by that
   path and by no other spelling of it. The `NAME=` line is the same file as a path from
   `ROOT`: it is the `file` of every locator that names the manuscript's main file.
 - A `STOP` line: stop and tell the author. This skill does not read a manuscript that is a
@@ -538,7 +546,7 @@ name of the file: the command reads it from the list.
 P="$PAR"
 N=1
 FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
-[ -f "$P" ] && [ -n "$FILE" ] && [ "${FILE#/}" = "$FILE" ] && T0=$(realpath "$R/$FILE") && [ -f "$T0" ] && T="$(builtin cd -P -- "${T0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${T0##*/}" && [ "$T" -ef "$R/$FILE" ] && [ ! -L "$T" ] && { T1=$(find "${T%/*}" -maxdepth 1 -type f -samefile "$T" 2>/dev/null) && [ "$T1" -ef "$T" ] && T=$T1; true; } && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "${T%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$T" >/dev/null 2>&1 && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$T" 2>/dev/null; [ "$?" != 0 ]; } && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -n -c --arg f "$FILE" --arg p "$T" '{file: $f, path: $p}' >> "$STAGE/checker-files.jsonl" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
+[ -f "$P" ] && [ -n "$FILE" ] && [ "${FILE#/}" = "$FILE" ] && T0=$(realpath "$R/$FILE") && [ -f "$T0" ] && T="$(builtin cd -P -- "${T0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${T0##*/}" && [ "$T" -ef "$R/$FILE" ] && [ ! -L "$T" ] && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { T1=$(find "${T%/*}" -maxdepth 1 -type f -samefile "$T" 2>/dev/null) && [ "$T1" -ef "$T" ] && T=$T1; true; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "${T%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$T" >/dev/null 2>&1 || { K=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -c core.quotePath=false -C "${T%/*}" ls-files --cached -- ":(literal,icase)$T" 2>/dev/null) && [ -n "$K" ] && [ "${T%/*}/$K" -ef "$T" ] && T="${T%/*}/$K"; }; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$T" 2>/dev/null; [ "$?" != 0 ]; } && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -n -c --arg f "$FILE" --arg p "$T" '{file: $f, path: $p}' >> "$STAGE/checker-files.jsonl" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
   [ .[] | . as $r | ([.from[]?] + [.points[]? | objects | .basis[]?])[] | objects | select(.file == $f)
     | (if (has("starts") or has("label")) | not then "\($r.id | tojson): a locator has neither label nor starts" else empty end),
       (if has("lines") and (has("commit") | not) then "\($r.id | tojson): a locator has lines without commit" else empty end),
@@ -559,7 +567,7 @@ FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
 
 The command refuses a name that begins with `/`, takes the real path of the file, following
 symbolic links, naming its directory as the system does and its last part as the directory
-gives it, and goes on only when that path is a regular file inside the repository, is
+gives it (or as git has it, when git tracks the file under another letter case), and goes on only when that path is a regular file inside the repository, is
 not inside a `.git` directory in any letter case, and is a file git lists: one it tracks, or
 one it does not track and does not ignore. Two repositories are asked. The first is the one
 that holds the file, asked in the directory of the file: a file inside a submodule, or inside
@@ -605,7 +613,7 @@ draft says what to do.
    only to files of this list:
 
    ```bash
-   find "$R" -type f -name '*.tex' -not -ipath '*/.git/*' -not -path $'*\n*' > "$STAGE/tex-all.txt" && { while IFS= read -r f; do if git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "${f%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$f" >/dev/null 2>&1 && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$f" 2>/dev/null; [ "$?" != 0 ]; }; then printf '%s\n' "$f"; fi; done < "$STAGE/tex-all.txt" > "$STAGE/tex-files.txt"; } && jq -R -r --arg r "$R" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); select(ltrimstr($r) | clean)' "$STAGE/tex-files.txt" && echo 'ok files listed' || echo 'STOP the .tex files could not be listed'
+   find "$R" -type f -name '*.tex' -not -ipath '*/.git/*' -not -path $'*\n*' > "$STAGE/tex-all.txt" && { while IFS= read -r f; do if { git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "${f%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$f" >/dev/null 2>&1 || { K=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -c core.quotePath=false -C "${f%/*}" ls-files --cached -- ":(literal,icase)$f" 2>/dev/null) && [ -n "$K" ] && [ "${f%/*}/$K" -ef "$f" ] && f="${f%/*}/$K"; }; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$f" 2>/dev/null; [ "$?" != 0 ]; }; then printf '%s\n' "$f"; fi; done < "$STAGE/tex-all.txt" > "$STAGE/tex-files.txt"; } && jq -R -r --arg r "$R" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); select(ltrimstr($r) | clean)' "$STAGE/tex-files.txt" && echo 'ok files listed' || echo 'STOP the .tex files could not be listed'
    ```
 
    The list holds every regular `.tex` file inside the repository that git lists (a file it
@@ -617,7 +625,8 @@ draft says what to do.
    when it is in the list, and by the path the list gives. Any other included file is not
    read: one outside the repository, a symbolic link, a file reached through a directory that is
    a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores (a
-   generated table, for instance), a missing file, a file whose path holds a line break or
+   generated table, for instance), a file git gives no answer for (one in or under a
+   directory that is laid out like a git repository), a missing file, a file whose path holds a line break or
    another character a locator's `file` may not hold, or a file that is not `.tex` (a figure,
    a table, a style file). Tell the author which files were
    not read, and go on. A figure or a table that comes
@@ -652,10 +661,12 @@ draft says what to do.
 
    An `\input` or `\include` of a file that was not read (step 2), standing outside a figure
    or a table, gets one record that carries `carry` too, on the line where the command
-   stands. Its one point says that the file is included at this place and that it was not
-   read, and carries `pending` naming what the author has to supply, which is what the file
-   says, together with the reason it was not read ("what `sections/generated.tex` says: the
-   file was not read, because git ignores it"). Without this record the outline would show
+   stands. Its one point says only what the command itself states, that the file is included
+   at this place ("The file `sections/generated.tex` is included here."), so that the point
+   is supported by the passage its `from` names. The point carries `pending`, which names what
+   the author has to supply, namely what the file says, and the reason the file was not read
+   ("what `sections/generated.tex` says: the file was not read, because git ignores it").
+   Nothing about the content of the file is stated. Without this record the outline would show
    no gap where the file stands, and an approval of the whole outline would pass over it.
    When the name of the file holds a character that a string of a record may not hold,
    describe the file in the point without its name.

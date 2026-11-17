@@ -14,7 +14,7 @@
 
 ## 3. 句子與規則
 
-- [x] 3.1 規格、說明文件、skill 與 checker 定義的句子，對應第 6、10、11、12、20、21 列。完成時：相同的段落停下並說明；沒有標題的引言自成一節；搬走最後一個要點時問作者；SCHEMA 的說法改成它寫的是哪個詞、沒定的是什麼；控制字元的規則補上鍵名；`allowed-tools` 做什麼照實寫。
+- [x] 3.1 規格、說明文件、skill 與 checker 定義的句子，對應 Requirement「Revising keeps ids stable and never loses a source」「The explanatory document describes the outline」「Derive and draft build an outline without inventing content」與第 6、10、11、12、20、21 列。完成時：相同的段落停下並說明；沒有標題的引言自成一節；搬走最後一個要點時問作者；SCHEMA 的說法改成它寫的是哪個詞、沒定的是什麼；控制字元的規則補上鍵名；`allowed-tools` 做什麼照實寫。
 - [x] 3.2 [P] Swift 規則、同步規則、`CLAUDE.md`、plugin 的 README，對應第 8、17、18、22 列。完成時：〈不適用〉第 1 類與修正輪 3 之前相同；〈例外〉第 4 類點名指令區塊，標題與退場條件一致；同步規則與硬規則回到原本的字句加一句排除；README 的 Skills 清單有 outline。驗證：`git diff main` 對〈不適用〉第 1 類沒有差異。
 
 ## 4. 驗證

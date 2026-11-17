@@ -123,7 +123,9 @@ directory to use. Outline files elsewhere in the repository are then offered,
 not taken, because they can belong to another manuscript; when there is
 nothing to offer, the skill proposes a directory `propositions` beside the
 manuscript, where a ledger is put by convention. When the command that lists
-the ledgers fails, the skill stops. The directory is always the repository's root or a directory under
+the ledgers fails, the skill stops. The path of the directory holds no
+character that a locator's `file` is not allowed to hold (see "Locators"). The
+directory is always the repository's root or a directory under
 it, not inside a `.git` directory in any letter case, and it is a directory or
 does not exist yet,
 in which case the directory that is to hold it exists. The skill resolves every
@@ -773,8 +775,10 @@ line of it.
 The skill's checks are commands that call `jq`, `realpath` and `git`. A check
 counts as passed only when its command says so; a command that prints nothing,
 fails or cannot run is a failed check, and when one of the three tools is not
-installed the skill stops and says which. It stops too when its `jq` reads two
-long numbers that differ as the same number, and, with a line that begins with
+installed the skill stops and says which. It stops too when the system's `pwd`
+is in neither `/usr/bin` nor `/bin` (the skill looks for it nowhere else, so
+that a program of that name inside the repository is never run), when its `jq`
+reads two long numbers that differ as the same number, and, with a line that begins with
 `STOP`, when git finds no repository for the manuscript's directory. Text from the manuscript, from an outline file
 or from the author reaches those commands only from a file that the command
 reads; it is never written into the text of a command. The paths the skill

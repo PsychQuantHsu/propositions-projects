@@ -76,8 +76,9 @@ somewhere else: a symbolic link, `..`, another spelling of a directory, a path c
 They are shell, and they are not a defence against a repository or a shell that was set up to
 defeat them: that defence belongs to the command-line tool of issue 78, where it can be
 tested. The limits known today are the ten below. The list is closed: a limit is added here
-when one is found, and none is inferred from another. The first is the one this skill always
-sees, and rule 2 stops it there. No command looks for the others: when you notice one of
+when one is found, and none is inferred from another. The first and the tenth are the ones
+this skill always sees: rule 2 stops it at the first, and the `ROOT=/` line at the tenth,
+after the stage directory has been made. No command looks for the others: when you notice one of
 them, tell the author.
 
 | # | The limit | What can happen | Which of the three |
@@ -105,7 +106,10 @@ Five rules hold for every command in this skill.
    contains a single quote, stop and say that this skill cannot work with that path.
 3. **Text is never typed into a command.** Text taken from the manuscript, from an outline file
    or from the author is never typed into a command: not the opening words of a passage, not a
-   sentence, not an `id`, not the name of a file a locator gives, not the author's words. LaTeX
+   sentence, not an `id`, not the name of a file a locator gives, not the author's words. (The
+   paths of rule 2 are not such text: the root, the outline directory, the stage directory,
+   the directory of the manuscript, the manuscript, and a file the author points to in draft
+   or revise.) LaTeX
    is full of `$`, backslashes and quotes, and a shell rewrites or runs them. Such text reaches a
    command only inside a file: an outline file, or a file written into the stage directory with
    the Write tool. The commands below read those files. Where a command hands such a value on
@@ -649,10 +653,13 @@ draft says what to do.
    and, below the root, no other character that a locator's `file` may not hold: a file a
    locator cannot name is not read.
    Git is asked about each file as for a locator: in the directory of the file, and at `ROOT`.
-   An `\input{x}` or `\include{x}` names the file `x`, with `.tex` added when `x` has no
-   extension, taken from the directory of the main file as LaTeX does; it is in the list when a
-   line of the list is that file (on a file system that ignores letter case, the same file in
-   another letter case counts). Read an included file only
+   An `\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x` itself when
+   no `x.tex` is found (`\input{ch1.final}` names `ch1.final.tex`). LaTeX looks for it from
+   the directory it is run in, which this skill does not know: look for it from the directory
+   of the main file, and then from `ROOT`, and take the first of these that is a line of the
+   list (on a file system that ignores letter case, the same file in another letter case
+   counts). When none is, the file was not read. A command inside a LaTeX comment includes
+   nothing. Read an included file only
    when it is in the list, and by the path the list gives. Any other included file is not
    read: one outside the repository, a symbolic link, a file reached through a directory that is
    a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores (a
@@ -662,8 +669,9 @@ draft says what to do.
    a table, a style file). Tell the author which files were
    not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
-   it. Any other included file that was not read is written into the `note` of a record, so
-   that the outline shows the gap (step 5). `ok files listed`
+   it. Any other included file that was not read gets nothing in the outline: no record, no
+   locator, no point, no `note`. Name it to the author, here and in the report of step 8; the
+   outline itself does not show the gap (whether it should is open, issue 51). `ok files listed`
    ends a complete list. A `STOP` line in its place: the list is not
    complete; stop and say what was printed above it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
@@ -689,31 +697,6 @@ draft says what to do.
    carries `carry`, with one point that is a complete sentence stating what the block states or
    shows ("Theorem 1 states that the interval covers the true value at the nominal rate."). A
    point such as "States Theorem 1." is not a sentence.
-
-   An `\input` or `\include` of a file that was not read (step 2), standing outside a figure
-   or a table, gets no record of its own and no locator. It is written into the `note` of a
-   record this step or step 4 already writes, as one sentence that names the file as the
-   command names it and says where it is included and that it was not read ("`stats/N` is
-   included in this paragraph and was not read; what it says is not in this outline.", or
-   "… is included just after this paragraph …" when the record is the one before it). When
-   the name holds a character that a locator's `file` may not hold (see "Locators: do they
-   resolve"), do not copy it: write "a file whose name this outline cannot hold" and tell the
-   author the place. Add the reason only when you know it without
-   running anything for it (the path leads outside the repository, the file is not `.tex`);
-   no command is run to find it. A command inside a LaTeX comment includes nothing and gets
-   no sentence. The record is chosen in
-   this order, and only this order: the record of the paragraph or block the command stands
-   in; else the record of the paragraph or block that comes just before it in the same
-   section; else, when the section has no paragraph or block record at all, the section
-   record itself, whose `says` then states only that the section consists of a file that was
-   not read (the checker's fifth kind will report it; tell the author why); else the first
-   record after it. A record that holds several such commands names
-   each file once. When the manuscript gives no paragraph or block record at all, there is
-   nothing to hold the note: tell the author which files were not read, and write the outline
-   without it. The same file included twice is one sentence in each record concerned, never a
-   stop. Nothing about the content of the file is stated, and no point is written for it. The
-   note is shown with its record whenever the record is shown, and approve shows it (step 4),
-   so an approval of the whole outline does not pass over the gap.
 6. Give every paragraph record `from`.
    - The `file` of a locator is the path of the file from `ROOT`: for the manuscript's main
      file, the `NAME=` line of the manuscript check; for an included file, its line of the
@@ -735,8 +718,9 @@ draft says what to do.
    A manuscript that has paragraphs gives a paragraph file that is not empty: `EMPTY` is never
    accepted here.
 
-   Two cases cannot be corrected, and only these two. In both, stop: tell the author which
-   passage it is and why, show nothing as an outline, and write nothing to the repository.
+   Three cases cannot be corrected, and only these three. In each, stop: tell the author which
+   passage or file it is and why, show nothing as an outline, and write nothing to the
+   repository.
    - A passage that has no label of its own and whose whole text, to its end, occurs a
      second time in the same file: as another passage that reads the same (two proofs that
      both read "The proof is immediate."), or inside a longer one. Its opening words occur
@@ -745,9 +729,15 @@ draft says what to do.
      one of the two places, or give the passage a label when it is a block that can carry one.
    - A file that derive read and that the locator commands do not accept: the count prints
      nothing for it, or the listing reports its name. Say what the commands printed.
+   - The files derive read hold no paragraph and no block at all, so the paragraph file
+     would be empty: every section's text is in included files that were not read (step 2),
+     or the manuscript has headings and nothing else. Name the files that were not read; the
+     author can make them readable (track them, or move them into the repository) and derive
+     again.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
-   points, with carried blocks marked and each `note` shown. Say how many sections, paragraph
-   records and carried blocks there are, and which included files were not read.
+   points, with carried blocks marked. Say how many sections, paragraph records and carried
+   blocks there are, and name every included file that was not read: what it says is not in
+   the outline.
 9. Ask whether to write the files into `OUTDIR` (AskUserQuestion). Only after the author agrees:
 
    ```bash
@@ -768,11 +758,15 @@ draft says what to do.
    to a file (a note, an earlier draft) that a record comes from; a point can name what supports
    it in `basis`. The `file` of such a locator is the path of that file from `ROOT`. Read such
    a file, or an outline file the author supplies, only after the manuscript check of
-   "Resolve paths" prints its `ok` line for it (run it with `M` set to that file; nothing in
-   it is particular to a manuscript), and only by the path on its `MAIN=` line; the `NAME=`
-   line is its `file`. When the check stops, do not read the file: ask the author to paste the
-   text into the conversation instead. The same holds in revise for a file the author points
-   to. When the
+   "Resolve paths" prints its `ok` line for it: run that command with `M` set to the path the
+   author gives, written as rule 2 says, like the manuscript's path (it is one of the paths
+   this skill types; see "Text from the manuscript and the author never becomes part of a
+   command" in the format). Read the file only by the path on its `MAIN=` line; the `NAME=`
+   line is its `file`. That run concerns that file only: it does not change `MAIN`, which
+   stays the manuscript's (or none), and a `STOP` line it prints, which speaks of "the
+   manuscript", is about that file. When the check stops, do not read the file: ask the
+   author to paste the text into the conversation instead. The same holds in revise for a
+   file the author points to. When the
    author's outline has sections and no paragraph yet, write no
    paragraph record: the staged paragraph file is empty, and this is one of the two cases in
    which `EMPTY` is accepted for it (the write check names both).
@@ -786,7 +780,7 @@ draft says what to do.
    why, and ask the author whether to correct it or to leave it out of the record.
 
 A draft needs no manuscript. When there is none, the manuscript check of "Resolve paths" is not
-run, and no ledger names a manuscript that does not exist: the directory of the outline files
+run for a manuscript (it is still run for a file the author points to, as step 2 says), and no ledger names a manuscript that does not exist: the directory of the outline files
 is the author's decision (case 2 of "Resolve paths").
 
 ## revise — the author's edits
@@ -860,8 +854,7 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
 - **`note`.** A record's `note` stays with it when its content changes, when it moves and when
   it gets `dropped`. A record that replaces merged records holds, in its `note`, the notes of
   the records it replaces; when a record is split, each record that replaces it holds the
-  note. A sentence about an included file that was not read is never removed by revise unless
-  the author asks.
+  note.
 - **Keys this skill does not know.** Keep them exactly as they are.
 - **`uses`.** After a move, a merge, a split, or leaving a record out, an id in `uses` can end
   up on a later line, name a record that has left the file, or name a record that carries
@@ -1099,8 +1092,8 @@ asks, through revise.
    No `ok every section will be shown`: the file was not written; stop. For particular
    sections, write the file with the Write tool instead: a JSON list of their
    ids, such as `["s-intro", "s-method"]`.
-2. Run both commands of status. When either does not print its `ok` line, do what "status"
-   says for that case, show nothing for approval, and stop.
+2. Run status as that section says: its write check first, then both commands. When one of
+   them does not print its `ok` line, do what "status" says for that case, show nothing for approval, and stop.
 3. Run check on the sections to be shown, with `"$STAGE/shown-sections.jsonl"` as the
    section file and `P="$STAGE/shown-paragraphs.jsonl"`. Run it every time, also when it ran before. When
    check stops at the write check that begins it, show nothing for approval. An empty
@@ -1199,12 +1192,12 @@ asks, through revise.
 
    No `ok approval appended`: when what was printed comes from `cmp` or `jq`, or is nothing,
    nothing was appended. When it comes from writing to the approvals file itself (`printf`,
-   `cat`, or the shell, as with a full disk), part of the record may have been appended: run
-   the check for the approvals file from "The write check". When it prints anything other
-   than its `ok` line (`EMPTY`, or no line, counts as `ok` only when the file was empty or did
-   not exist before this approval), say so, show what it printed, and stop; this skill does
-   not change a line of that file, and the author decides what to do with it. Do not run the
-   command again. Otherwise take the first of these that applies.
+   `cat`, or the shell, as with a full disk), the record may have been appended in whole, in
+   part or not at all, and nothing tells which: run the check for the approvals file from "The
+   write check" and status, show the author what both print and the last line of the approvals
+   file, say that the approval may or may not be on record, and stop. Do not run the command
+   again: this skill does not change a line of that file, and the author decides what to do.
+   Otherwise take the first of these that applies.
    1. `cmp` reported a difference or a missing file: the outline or the real path of its
       directory changed after it was shown, or the copies are gone. Say so and return to
       step 1.
@@ -1224,7 +1217,8 @@ asks, through revise.
 
    Only ever append. Do not edit or remove an earlier
    line of the approvals file.
-9. Run the check for the approvals file from "The write check", then status, and report which
+9. Run the check for the approvals file from "The write check", then status (its write check
+   first), and report which
    sections now stand as approved and whether the outline does.
 
 ## The report
@@ -1246,6 +1240,9 @@ in this plugin yet (issue 51).
   listed by git, or has a path no locator can carry.
 - Never read a file that the manuscript includes unless it is in the list of derive, step 2:
   not one outside the repository, and not one git ignores.
+- Never read a file the author points to (a note, an earlier draft, an outline of the
+  author's own) unless the manuscript check printed its `ok` line for it; ask for the text to
+  be pasted instead.
 - Never overwrite an outline with derive or draft.
 - Never type text of the manuscript, of an outline file or of the author into a command.
 - Never treat a check as passed unless it printed its `ok` line.

@@ -233,7 +233,7 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `carry` | no | `true`: the record stands for a block that is moved unchanged from the passage its `from` names |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
-| `note` | no | A string for the author. Derive writes into it the included files that it did not read and that stand in or next to the record's passage (see "The six actions of the skill") |
+| `note` | no | A string for the author |
 
 A point is an object.
 
@@ -711,8 +711,9 @@ directory, a path copied wrongly. They are shell commands, and they are not a
 defence against a repository or a shell that was set up to defeat them. That
 defence belongs to the command-line tool of issue #78, where it can be tested.
 The limits known today are these ten. The list is closed: a limit is added
-when one is found, and none is inferred from another. The first is the one the
-skill always sees, and it stops there. No command of the skill looks for the
+when one is found, and none is inferred from another. The first and the tenth
+are the ones the skill always sees: it stops at the first, and at the tenth
+after its stage directory has been made. No command of the skill looks for the
 others; when the skill notices one of them, it tells the author.
 
 | # | The limit | What can happen | Which of the three |
@@ -744,26 +745,18 @@ directory laid out like a git repository), a missing
 file, a file whose path holds such a character, or a file that is not `.tex`. A
 table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
-file that was not read gets no record of its own and no locator: derive writes
-one sentence into the `note` of a record it already writes, naming the file
-as the include command names it (or, when that name holds a character a
-locator's `file` may not hold, as "a file whose name this outline cannot
-hold") and saying that it was not read (and why,
-only when that is known without running anything for it). A command inside a
-LaTeX comment includes nothing. That record is the one of the
-paragraph or block the command stands in; else the one just before it in the
-same section; else, when the section has no record of its own, the section
-record, whose `says` then states only that the section consists of a file
-that was not read; else the first record after it. The same file included twice is
-a sentence in each record concerned, and never makes derive stop. When the
-manuscript gives no record at all to hold the note, derive tells the author
-which files were not read. Nothing about the content of such a file is stated.
-An approval shows a record's `note` with it, so an approval of the whole
-outline does not pass over the gap. An include command `\input{x}` or
-`\include{x}` names the file `x`, with `.tex` added when `x` has no extension,
-from the directory of the main file as LaTeX takes it; on a file system that
-ignores letter case the same file in another letter case is the same file.
-Prose that comes
+file that was not read gets nothing in the outline (no record, no locator, no
+point, no `note`); derive names it to the author, and the outline itself does
+not show the gap (whether it should is open, issue #51). An include command
+`\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x`
+itself when no `x.tex` is found. LaTeX looks for it from the directory it is
+run in, which the skill does not know, so the skill looks for it from the
+directory of the main file and then from the repository's root; on a file
+system that ignores letter case the same file in another letter case is the
+same file. A command inside a LaTeX comment includes nothing. When the files
+derive read hold no paragraph and no block at all (every section's text is in
+included files that were not read), derive stops, says which files were not
+read, and writes nothing. Prose that comes
 before the first heading and is not the abstract gets one section record,
 whose `heading` is the title of the article: that title is what heads the text
 on the page, as in APA style, where the introduction has no heading of its
@@ -833,8 +826,7 @@ that file is the author's decision.
   and is given `dropped` with the reason.
 - A record's `note` stays with it when it changes, moves or is given
   `dropped`; a record that replaces merged records holds their notes, and
-  each record that replaces a split record holds its note. A sentence about an
-  included file that was not read is removed only when the author asks.
+  each record that replaces a split record holds its note.
 - When the author leaves a paragraph out of the article and its record has
   `from`, the record is not deleted: it is given `dropped` with the reason. A
   record without `from` that the author leaves out is deleted from the file.
@@ -943,8 +935,9 @@ Text from the manuscript, from an outline file
 or from the author reaches those commands only from a file that the command
 reads; it is never written into the text of a command. The paths the skill
 writes into its commands are the repository's root, the outline directory, the
-stage directory, the directory that holds the manuscript and the manuscript's
-main file. Each begins with `/`: an empty path, or one not written out in
+stage directory, the directory that holds the manuscript, the manuscript's
+main file, and a file the author points to as a source in draft or revise
+(checked the way the main file is before it is read). Each begins with `/`: an empty path, or one not written out in
 full, stops the skill, and so does a path that holds a single quote. The one
 exception is the main file in the command that compares a ledger with it:
 left empty there, it means that there is no manuscript yet. The paths

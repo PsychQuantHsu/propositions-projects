@@ -96,9 +96,10 @@ A `source.file` that holds a control character names no file.
 | the submodule `manuscript/propositions`, which holds only the ledger | `manuscript/main.tex` | `manuscript/main.tex` in the outer repository | no: that file is outside the ledger's repository; the skill asks |
 
 A `_meta.json` that is a symbolic link, that is inside a `.git` directory in
-any letter case, or whose path holds a line break or another character that a
-locator's `file` is not allowed to hold is not listed, is not read and does
-not count as a ledger. A listed `_meta.json` is read as one ledger when it
+any letter case, or whose path holds a line break is not listed, is not read
+and does not count as a ledger. One whose path holds another character that a
+locator's `file` is not allowed to hold is not listed and does not count as a
+ledger either. A listed `_meta.json` is read as one ledger when it
 holds exactly one JSON value and that value is an object.
 
 **Which directory.** The skill uses a directory without asking only when every
@@ -130,8 +131,7 @@ it, not inside a `.git` directory in any letter case, and it is a directory or
 does not exist yet,
 in which case the directory that is to hold it exists. The skill resolves every
 symbolic link in its path, the last part included, before it decides; a link
-that leads to a place that does not exist can stop it, depending on the
-machine's `realpath`. It
+that leads to a place that does not exist stops it. It
 decides again in every command that reads or writes an outline file, and, when
 it revises, before its first edit and again after every reply of the author.
 
@@ -384,7 +384,8 @@ record, the order of sections does not stand as approved.
 A section is **removed since its approval** when the order of sections does
 not stand as approved, the section is not in the section file, and its latest
 approved copy is in the last approval record whose `whole` is `true`, or in an
-approval record after that one. Once an approval of the whole outline is
+approval record after that one; with no approval of the whole outline on
+record, any approved copy counts. Once an approval of the whole outline is
 recorded without the section, its removal is approved and the section is no
 longer reported. When the order of sections stands as approved, the section
 file holds exactly the sections of the last approval of the whole outline, and
@@ -551,8 +552,8 @@ and no others.
    records of the sections under it. The sections under a section are those
    that name it as `parent`, directly or through other sections.
 6. **Locator does not resolve**: a locator whose `file` is missing, leads
-   outside the repository, is inside a `.git` directory, is not a file git
-   lists, or has a name the locator rules do not allow, whose `label` text
+   outside the repository, is inside a `.git` directory in any letter case, is
+   not a file git lists, or has a name the locator rules do not allow, whose `label` text
    does not occur exactly once in the file, or whose `starts` does not occur
    exactly once in the file. An object in `from` or `basis` that is not a
    locator, and a `from` or a `basis` that is not a list of one or more
@@ -785,7 +786,9 @@ reads; it is never written into the text of a command. The paths the skill
 writes into its commands are the repository's root, the outline directory, the
 stage directory, the directory that holds the manuscript and the manuscript's
 main file. Each begins with `/`: an empty path, or one not written out in
-full, stops the skill, and so does a path that holds a single quote. The paths
+full, stops the skill, and so does a path that holds a single quote. The one
+exception is the main file in the command that compares a ledger with it:
+left empty there, it means that there is no manuscript yet. The paths
 of the ledgers' `_meta.json` files are read from a list in the stage directory,
 not written into a command. The task message for the agent of the premise
 check is held to the same rule.

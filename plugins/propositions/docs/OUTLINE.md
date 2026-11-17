@@ -683,7 +683,7 @@ a path leads somewhere else: a symbolic link, `..`, another spelling of a
 directory, a path copied wrongly. They are shell commands, and they are not a
 defence against a repository or a shell that was set up to defeat them. That
 defence belongs to the command-line tool of issue #78, where it can be tested.
-The limits known today are these seven. The list is closed: a limit is added
+The limits known today are these eight. The list is closed: a limit is added
 when one is found, and none is inferred from another. The first is the one the
 skill always sees, and it stops there. No command of the skill looks for the
 others; when the skill notices one of them, it tells the author.
@@ -697,6 +697,7 @@ others; when the skill notices one of them, it tells the author.
 | 5 | The shell sets `noclobber`, or makes `cp` ask before it overwrites | Some commands fail, and the skill stops | None |
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the skill stops or leaves the file unread | None |
+| 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root the skill takes is not the root of the manuscript's repository | The second |
 
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. It reads the

@@ -71,7 +71,7 @@ The commands keep the first two against mistakes and against the ordinary ways a
 somewhere else: a symbolic link, `..`, another spelling of a directory, a path copied wrongly.
 They are shell, and they are not a defence against a repository or a shell that was set up to
 defeat them: that defence belongs to the command-line tool of issue 78, where it can be
-tested. The limits known today are the seven below. The list is closed: a limit is added here
+tested. The limits known today are the eight below. The list is closed: a limit is added here
 when one is found, and none is inferred from another. The first is the one this skill always
 sees, and rule 2 stops it there. No command looks for the others: when you notice one of
 them, tell the author.
@@ -85,6 +85,7 @@ them, tell the author.
 | 5 | The shell sets `noclobber`, or makes `cp` ask before it overwrites | Some commands fail, print no `ok` line, and the skill stops | None |
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the command stops or leaves the file unread | None |
+| 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root this skill takes is not the root of the manuscript's repository | The second |
 
 ## How commands are run
 

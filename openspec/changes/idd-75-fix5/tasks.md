@@ -12,7 +12,7 @@
 
 ## 3. 句子與規則
 
-- [ ] 3.1 三項保證與七項已知限制，對應 Requirement「The outline skill writes only the three outline files」「The explanatory document describes the outline」與第 2、3、16、24 列。完成時：SKILL.md、OUTLINE.md 與規格都列出三項保證與同一份七項的封閉清單，每一項寫明可能破壞哪一項保證；三份文字裡不再有「repo 裡的同名程式絕不會被執行」這類超出保證的句子；`pwd` 與 git 2.38 的代價寫明。驗證：三份清單逐項相同。
+- [ ] 3.1 三項保證與八項已知限制，對應 Requirement「The outline skill writes only the three outline files」「The explanatory document describes the outline」與第 2、3、16、24 列。完成時：SKILL.md、OUTLINE.md 與規格都列出三項保證與同一份八項的封閉清單，每一項寫明可能破壞哪一項保證；三份文字裡不再有「repo 裡的同名程式絕不會被執行」這類超出保證的句子；`pwd` 與 git 2.38 的代價寫明。驗證：三份清單逐項相同。
 - [ ] 3.2 反推、修改、起草與錯誤的去路，對應 Requirement「Derive and draft build an outline without inventing content」「Revising keeps ids stable and never loses a source」「A section stands as approved while it equals its latest approved copy」「Only the author's explicit statement in the current message approves」「The outline is three files beside the ledger」與第 5、9、12、13、22 列。完成時：沒讀的被引入檔留一筆 `carry` 加 `pending` 的紀錄；搬走最後一個要點有兩種合規的結果（有來源、沒有來源各一）；稿件將放的目錄還不存在時用最近的上層目錄；狀態與確認的三條錯誤去路各有走得通的處置；Scenario「Neither a ledger nor an outline exists yet」補上「請求沒有指定目錄」。驗證：節檔有一行是數字時，狀態沒有 `ok status`、寫入檢查指出那一行；段落檔不見時 jq 指名它、狀態不建檔；「展示了哪些節」的紀錄不見時不追加、jq 指名那個檔。
 - [ ] 3.3 [P] checker 的定義、Swift 規則、README 與 `CLAUDE.md`，對應 Requirement「A premise check runs before an outline is shown for approval」與第 6、10、17 列。完成時：checker 的定義寫明 `label` 決定；Swift 規則〈例外〉第 4 類的工作清單涵蓋 19 段指令；plugin 的 README 把「不讀 git 忽略的檔」限於來源；兩份 README 與 `CLAUDE.md` 寫明 git 2.38。驗證：清單對 19 段指令的名稱逐段對過；`git diff main` 對 Swift 規則〈不適用〉第 1 類沒有差異。
 - [ ] 3.4 fix4 封存的 tasks，對應第 7 列。完成時：`openspec/changes/archive/2026-11-17-idd-75-fix4/tasks.md` 的 4.3、4.4 取消勾選，註明當時實際做到哪裡，並指到這個 change 的 4.2、4.4；完成條件的字句不改。驗證：封存檢查與連結檢查仍然通過。
@@ -20,7 +20,7 @@
 ## 4. 驗證
 
 - [ ] 4.1 SKILL.md 的 19 段指令照寫法逐段實跑，八種組合：zsh 與 bash，各配 Homebrew 的 jq、系統內建的 jq、GNU coreutils 在 `PATH` 最前面、`find` 換成 bfs。完成時：八種組合的項數相同、全部符合預期，記下項數與對的 commit；新加的檢查在 `cb5efd2` 的 SKILL.md 上失敗的項數記在這裡。
-- [ ] 4.2 指令凍結之後，獨立 agent 實跑找會出錯的輸入。任務書帶三項保證、七項已知限制與分類規則：破壞三項保證、或相對 `997d3d0` 的功能退步才算重現；落在已知限制裡的記進清單、不算重現。完成時：最後一輪這兩類的重現是 0，而且那一輪之後指令沒有再改；每一輪對的 commit、實跑次數、重現數記在這裡。做不到時不勾，照實寫停在哪裡。
+- [ ] 4.2 指令凍結之後，獨立 agent 實跑找會出錯的輸入。任務書帶三項保證、八項已知限制與分類規則：破壞三項保證、或相對 `997d3d0` 的功能退步才算重現；落在已知限制裡的記進清單、不算重現。完成時：最後一輪這兩類的重現是 0，而且那一輪之後指令沒有再改；每一輪對的 commit、實跑次數、重現數記在這裡。做不到時不勾，照實寫停在哪裡。
 - [ ] 4.3 文字與規格凍結之後，獨立 agent 逐句對照規格、OUTLINE.md 與 SKILL.md 的指令。完成時：找到的不一致都處理，記下對的 commit；處理後若又改了指令或規格的行為，重做。
 - [ ] 4.4 獨立讀者只拿最後的 OUTLINE.md 作答，題組加上這一輪改過的規則。完成時：記下讀的 commit、題數、與預存答案不同的題；不同的逐題處理。處理時若改了 OUTLINE.md，改到的題由另一位讀者重答；記下最後還有幾題不同。
 - [ ] 4.5 全套 pytest 通過；spectra validate 與 spectra analyze 沒有錯誤；`plugins/propositions/scripts`、`plugins/tschema-check`、`tests` 相對於 main 沒有變動。

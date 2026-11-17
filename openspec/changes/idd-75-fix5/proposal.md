@@ -16,7 +16,7 @@
 
 - git：每一個讀 repo 的 git 指令都帶 `-c safe.bareRepository=explicit -c core.fsmonitor=false`。前者讓 git 只認有 `.git` 的目錄，偽裝成 repo 的目錄不被當成 repo、它的 `config` 不被讀；後者讓 git 不啟動設定檔指名的監看程式。第一段指令要求 git 2.38 以上（`safe.bareRepository` 從這一版開始有）。linked worktree 與 `.git` 是檔案的 repo 照常找得到。
 - 列 `.tex` 檔：不用 `-execdir`。先列出檔案，再逐一問 git。
-- 信任邊界：三份文字（skill、說明文件、規格）都寫明三項保證，以及七項已知限制的封閉清單，每一項寫明可能破壞哪一項保證：路徑含單引號、`PATH` 有空或相對項目、zsh 的 `chpwd` 函式、repo 裡別人做的獨立 git repo 的設定、`noclobber` 與 `cp -i`、暫存目錄的 ACL、檔案身分不穩定的檔案系統。`pwd` 只在 `/usr/bin` 與 `/bin` 找的代價（兩處都沒有的系統上停下）也寫明。
+- 信任邊界：三份文字（skill、說明文件、規格）都寫明三項保證，以及八項已知限制的封閉清單，每一項寫明可能破壞哪一項保證：路徑含單引號、`PATH` 有空或相對項目、zsh 的 `chpwd` 函式、repo 裡別人做的獨立 git repo 的設定、`noclobber` 與 `cp -i`、暫存目錄的 ACL、檔案身分不穩定的檔案系統、環境裡指揮 git 的變數（`GIT_DIR` 這一類；這一項是這一輪驗收時才量到的，`997d3d0` 也是這樣）。`pwd` 只在 `/usr/bin` 與 `/bin` 找的代價（兩處都沒有的系統上停下）也寫明。
 - submodule：不設層數上限，一路往上找到最外層的 repo。這是實作提出的第三種做法（維護者沒有追認「超過兩層時停下」，原本的做法是請作者指定根目錄，已被先前的決定排除）；途中 git 失敗時印 `STOP`。
 - 忽略的檔：除了在檔案所在的目錄問 git，也在根目錄問最外層的 repo 是否忽略它；外層忽略就不讀。外層答不出來時（submodule 裡的檔），以內層的回答為準。
 - 檔名最後一段：主稿件與來源指標的檔，最後一段取目錄裡實際的名稱（`find -samefile`），所以打錯大小寫的檔名在兩種 `realpath` 下行為相同；同一個目錄有兩個名稱指到同一個檔時維持原樣。
@@ -42,7 +42,7 @@
 - SKILL.md 的 19 段指令照寫法逐段實跑，八種組合全部符合預期：zsh 與 bash，各配 Homebrew 的 jq、系統內建的 jq、GNU coreutils 在 `PATH` 最前面，以及把 `find` 換成 Claude Code 的 Bash 實際用的 bfs。新加的檢查在修正前的檔案（`cb5efd2`）上會失敗。
 - 第五輪報告第 1 列的重現例子（提交偽裝成 repo 的目錄、`config` 指名一段指令）：第一段指令、主稿件檢查、帳冊比對、列 `.tex` 檔、逐檔計數都不執行那段指令，那些目錄裡的檔不被讀。
 - linked worktree、bare repo 的 worktree 兩種放法，加了選項之後照常運作。
-- 指令凍結之後由獨立測試者實跑；重複到一輪裡沒有「破壞三項保證」或「相對 `997d3d0` 的功能退步」的重現為止，任何指令修正之後重來一輪。落在七項已知限制裡的不算重現，記進清單。
+- 指令凍結之後由獨立測試者實跑；重複到一輪裡沒有「破壞三項保證」或「相對 `997d3d0` 的功能退步」的重現為止，任何指令修正之後重來一輪。落在八項已知限制裡的不算重現，記進清單。
 - 文字與規格凍結之後，獨立 agent 逐句對照規格與指令，只拿到最後的 OUTLINE.md 的讀者作答；之後文件再改時，重做改到的部分。tasks 記下各自對的 commit。
 - 全套 pytest 通過；spectra validate 與 spectra analyze 對這個 change 沒有錯誤；`plugins/propositions/scripts`、`plugins/tschema-check`、`tests` 相對於 main 沒有變動。
 

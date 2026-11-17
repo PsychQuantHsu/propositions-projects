@@ -64,7 +64,8 @@ does it yet (issue 51). Do not write the text.
 This skill keeps three things, and its rules and commands are there for them.
 
 1. In the repository it writes the three outline files and no other file.
-2. It reads no file outside the repository.
+2. It reads no file outside the repository, other than its own: the temporary files it made
+   in the stage directory, and the files of this plugin.
 3. It records an approval only from words the author typed in the message it answers.
 
 The commands keep the first two against mistakes and against the ordinary ways a path leads

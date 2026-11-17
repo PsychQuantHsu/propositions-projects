@@ -12,7 +12,7 @@
 
 ## Proposed Solution
 
-維護者 2026-11-17 的決定見 https://github.com/PsychQuantHsu/propositions-projects/issues/75#issuecomment-6938070366：24 項全部處理；skill 保留三項保證（只寫三個綱要檔、不讀 repo 以外的檔、確認紀錄只記作者親口說的），惡意的 repo 內容與異常環境的防護留給 #78 的命令列工具，寫成已知限制；第 1 項擋下仍然修掉。照 spec delta 修改 article-outline 的 11 條 requirement，skill、說明文件與 checker 的定義跟著改。
+維護者 2026-11-17 的決定見 https://github.com/PsychQuantHsu/propositions-projects/issues/75#issuecomment-6938070366：24 項全部處理；skill 保留三項保證（只寫三個綱要檔、不讀 repo 以外的檔、確認紀錄只記作者親口說的；第二項在文字裡寫明不含 skill 自己放在暫存目錄的檔與 plugin 自己的檔，這是盲讀的讀者指出原句有兩種讀法之後補的），惡意的 repo 內容與異常環境的防護留給 #78 的命令列工具，寫成已知限制；第 1 項擋下仍然修掉。照 spec delta 修改 article-outline 的 11 條 requirement，skill、說明文件與 checker 的定義跟著改。
 
 - git：每一個讀 repo 的 git 指令都帶 `-c safe.bareRepository=explicit -c core.fsmonitor=false`。前者讓 git 只認有 `.git` 的目錄，偽裝成 repo 的目錄不被當成 repo、它的 `config` 不被讀；後者讓 git 不啟動設定檔指名的監看程式。第一段指令要求 git 2.38 以上（`safe.bareRepository` 從這一版開始有）。linked worktree 與 `.git` 是檔案的 repo 照常找得到。
 - 列 `.tex` 檔：不用 `-execdir`。先列出檔案，再逐一問 git。

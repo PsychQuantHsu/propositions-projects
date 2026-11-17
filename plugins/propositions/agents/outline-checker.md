@@ -1,6 +1,6 @@
 ---
 name: outline-checker
-description: Premise checker for the propositions outline skill. Dispatch only from the check step of /propositions:outline, with the task message that step builds - four paths and nothing else - the outline's section file, its paragraph file, the list of the files it may read, and, when only some sections are examined, the file that lists their ids. Never give it the conversation, the author's messages, text of the outline or any other file.
+description: Premise checker for the propositions outline skill. Dispatch only from the check step of /propositions:outline, with the task message that step builds - paths and nothing else - the outline's section file, its paragraph file, the list of the files it may read, and, when only some sections are examined, the file that lists their ids. Never give it the conversation, the author's messages, text of the outline or any other file.
 tools: Read
 model: sonnet
 effort: high

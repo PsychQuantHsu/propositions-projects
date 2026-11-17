@@ -862,7 +862,7 @@ write it. Start the agent `propositions:outline-checker` of this plugin with the
 (`subagent_type: "propositions:outline-checker"`). Its definition, `agents/outline-checker.md`
 of this plugin, gives it only the Read tool, so it cannot run a program, write a file or send
 anything, and it holds the five kinds and how to report them. Give it only this task message,
-and nothing of the conversation. The message holds four paths and nothing taken from the
+and nothing of the conversation. The message holds these paths and nothing taken from the
 outline or the manuscript: `SF` and `P` written out in full, the list `checker-files.jsonl`
 in the stage directory, and, when only some sections are examined, a file that lists their
 ids.

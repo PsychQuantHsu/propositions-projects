@@ -7,7 +7,7 @@
 
 - [ ] 2.1 第一段指令，對應 Requirement「The outline is three files beside the ledger」「Text from the manuscript and the author never becomes part of a command」與第 11 列，以及沒有被追認的「超過兩層 submodule 時停下」。完成時：開頭清掉 `TOOLS` 與 `ROOT`；submodule 不設層數上限；往上找的途中 git 失敗時印 `STOP`。驗證：環境裡有 `TOOLS=1` 而沒有 jq 時不印 `ROOT=`；環境裡有 `ROOT` 而目錄不在 git repo 時不建暫存目錄；三層 submodule 得到最外層的根目錄。
 - [ ] 2.2 列帳冊，對應 Requirement「The outline is three files beside the ledger」與第 8、15、17 列。完成時：只讀清單裡的 `_meta.json`；字元檢查只看根目錄以下的那一段（列帳冊、列綱要檔、守門、列 `.tex` 檔四處）。驗證：路徑含排除字元的 `_meta.json` 沒有被開啟；repo 放在名稱含 U+202E 的目錄底下時帳冊、綱要目錄與 `.tex` 檔照常列出；被 git 忽略的目錄裡的帳冊照常列出並比對。
-- [ ] 2.3 忽略的檔與檔名，對應 Requirement「A locator names a passage by a label or by its opening words」與第 4、14 列。完成時：主稿件、來源指標的檔、被引入的 `.tex` 都另外在根目錄問最外層的 repo 是否忽略；主稿件與來源指標的檔，最後一段取目錄裡實際的名稱；帳冊與稿件以「是不是同一個檔」比較。驗證：外層忽略的目錄裡的獨立 repo，檔案不讀、不進 checker 的清單，沒被忽略的目錄裡的照常；在不分大小寫的檔案系統上，打成另一種大小寫的稿件與來源指標的檔被接受，印出與交給 checker 的是磁碟上的名稱，GNU 與內建的 `realpath` 結果相同。
+- [ ] 2.3 忽略的檔與檔名，對應 Requirement「A locator names a passage by a label or by its opening words」與第 4、14 列。完成時：主稿件、來源指標的檔、被引入的 `.tex` 都另外在根目錄問最外層的 repo 是否忽略；主稿件與來源指標的檔，最後一段取目錄裡實際的名稱；帳冊與稿件以「是不是同一個檔」比較。驗證：外層忽略的目錄裡的獨立 repo，檔案不讀、不進 checker 的清單，沒被忽略的目錄裡的照常；在不分大小寫的檔案系統上，打成另一種大小寫的稿件與來源指標的檔被接受，目錄裡只有一個名稱指到它時，印出與交給 checker 的是磁碟上的名稱，GNU 與內建的 `realpath` 結果相同；已追蹤、在磁碟上只改了大小寫的檔算已追蹤，名稱用磁碟上的；新名稱被最外層的 repo 忽略的那一種停下；在區分大小寫的磁碟上，只差大小寫的已追蹤檔不替被忽略的檔作保。
 - [ ] 2.4 差異指令的 `added` 行，對應 Requirement「Only the author's explicit statement in the current message approves」與第 21 列。完成時：最後一次整份確認沒有的節各印一行 `added`；確認第 4 步在展示全部的節時完整展示這些節。驗證：整份確認記下刪節之後把那一節原樣加回來，狀態報它照通過時的內容，差異指令印 `added`；沒有整份確認時不印。
 
 ## 3. 句子與規則

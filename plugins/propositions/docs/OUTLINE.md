@@ -67,15 +67,19 @@ the same way: by its real path, with its directory named as the system names
 it, and only when that name and the path it was reached by are the same file.
 For the manuscript's main file and for a file a locator names, the last part
 of the name is the one the directory itself gives: `main.tex`, written for a
-file the disk has as `Main.tex`, is named `Main.tex`. When the directory holds
-two names for that file (a hard link), the last part stays as it was resolved.
-When git does not have that name, the file system ignores letter case there,
-and git tracks a path that differs from it only in letter case (a file renamed
-on the disk in letter case alone, which git does not notice on such a file
-system), the file counts as tracked and keeps the name the disk has; the
-`.tex` files that derive follows are treated the same way. One such file is
-still refused: one whose name on the disk an ignore rule matches, because the
-outermost repository is asked about that name and answers that it ignores it.
+file the disk has as `Main.tex`, is named `Main.tex`. The directory is looked
+into for that name only once the file is known to be inside the repository and
+outside `.git`. When the directory holds two names for that file (a hard
+link), the last part stays as it was resolved, which differs between the
+`realpath` macOS ships (the name the disk has) and GNU's (the name as typed).
+When git does not have that name, the whole path ignores letter case, and git
+tracks a path that differs from it only in letter case (a file renamed on the
+disk in letter case alone, which git does not notice on such a file system),
+the file counts as tracked and keeps the name it was given; the `.tex` files
+that derive follows are treated the same way. One such file is still refused:
+one whose name the outermost repository ignores, because it is asked about
+that name and answers so. A file in a submodule is not refused that way: the
+outermost repository gives no answer for it.
 Wherever this document says that a directory or a file is inside or outside
 the repository, it means by that name.
 
@@ -683,8 +687,11 @@ should be narrower is open for the whole plugin (issue #85).
 and its rules and commands are there for them.
 
 1. In the repository it writes the three outline files and no other file.
-2. It reads no file outside the repository, other than its own: the temporary
-   files it made in the stage directory, and the files of this plugin.
+2. It reads no file outside the repository, other than its own (the temporary
+   files it made in the stage directory, and the files of this plugin) and the
+   files git itself reads when it is asked (its configuration, its global
+   ignore file, and, for a linked worktree, the repository the worktree
+   belongs to).
 3. It records an approval only from words the author typed in the message it
    answers.
 
@@ -741,7 +748,8 @@ on the page, as in APA style, where the introduction has no heading of its
 own. The skill tells the author that this section has no heading of its own in
 the manuscript, and asks what to put in `heading` when the manuscript gives no
 title. Every paragraph record it produces has `from` naming the passage it
-comes from, with the real path of the file, relative to the root, as `file`,
+comes from, with the name of the file from the root, as "The three files"
+defines it, as `file`,
 and every point states only what that passage states. A
 theorem-like statement, a figure or a table is named by its own label; the
 label of a section names the whole section and is not used for a record. It

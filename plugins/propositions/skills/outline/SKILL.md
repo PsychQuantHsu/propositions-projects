@@ -64,8 +64,10 @@ does it yet (issue 51). Do not write the text.
 This skill keeps three things, and its rules and commands are there for them.
 
 1. In the repository it writes the three outline files and no other file.
-2. It reads no file outside the repository, other than its own: the temporary files it made
-   in the stage directory, and the files of this plugin.
+2. It reads no file outside the repository, other than its own (the temporary files it made
+   in the stage directory, and the files of this plugin) and the files git itself reads when
+   it is asked (its configuration, its global ignore file, and, for a linked worktree, the
+   repository the worktree belongs to).
 3. It records an approval only from words the author typed in the message it answers.
 
 The commands keep the first two against mistakes and against the ordinary ways a path leads
@@ -228,15 +230,17 @@ named the same way: its real path, with its directory named as above, and only w
 and the path it came from are the same file. For the manuscript and for a file a locator
 names, once the file is known to be inside the repository, the last part of the name is taken
 as the directory itself gives it, so `main.tex` typed for a file the disk has as `Main.tex` is
-named `Main.tex`; when the directory holds two names for that file (a hard link), the last
-part stays as `realpath` gave it. Git is asked about that name. When git does not have it,
-the file system ignores letter case there, and git tracks a path that differs from it only in
-letter case (a file renamed on the disk in letter case alone, which git does not notice on
-such a file system), the file counts as tracked. It keeps the name the disk has; what git
+named `Main.tex`. When the directory holds two names for that file (a hard link), the last
+part stays as `realpath` gave it, and `realpath` differs here: the one macOS ships gives the
+name the disk has, GNU's keeps the name as typed. Git is asked about the name the command
+then has. When git does not have it, the whole path ignores letter case (the path with the
+case of its letters swapped is the same file), and git tracks a path that differs from it only
+in letter case (a file renamed on the disk in letter case alone, which git does not notice on
+such a file system), the file counts as tracked. It keeps the name the command has; what git
 prints is not used. The list of `.tex` files in derive does the same. One such file is still
-refused: one whose name on the disk an ignore rule matches, because the outermost repository
-is asked about that name and answers that it ignores it; `git mv` to the name on the disk
-settles it. A name that does not survive this, such as a
+refused: one whose name the outermost repository ignores, because it is asked about that name
+and answers so; `git mv` to the name on the disk settles it. A file in a submodule is not
+refused that way, because the outermost repository gives no answer for it. A name that does not survive this, such as a
 directory whose name ends in a line break, stops the command or leaves the file unread.
 
 Every git command that reads a repository is run with two settings on its command line,

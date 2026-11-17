@@ -30,9 +30,10 @@ the manuscript is in no git repository, it stops and says why. The
 repository's root is the boundary of the outline files and of every file the
 skill reads as a source, and the skill does not take that boundary from an
 answer of the author. Its own temporary files are outside the repository. For
-a draft with no manuscript yet, the directory the author names for it stands
-in for the manuscript when the repository is found; no ledger names a
-manuscript that does not exist yet. A repository that
+a draft with no manuscript yet, the directory where the author says the
+manuscript will be stands in for it when the repository is found. That
+directory is not the directory of the outline files unless the author says
+so, and no ledger names a manuscript that does not exist yet. A repository that
 sits inside another without being its submodule is a repository of its own.
 Everything this document says is inside the repository is inside this one, and
 every path a locator gives is relative to its root. An outline kept inside a
@@ -40,18 +41,28 @@ submodule therefore does not resolve in a checkout of the submodule alone. When
 the manuscript's repository sits inside another without being its submodule, a
 ledger of the outer repository is outside the repository: it does not name the
 manuscript for the skill, and the outline cannot go beside it. When no ledger
-of the inner repository names the manuscript either, the skill asks the author
-which directory of the inner repository to use. The other way round,
+of the inner repository names the manuscript either, the directory is the
+author's decision (see "Which directory" below). The other way round,
 a directory under the repository's root counts as inside it even when it holds
 a git repository of its own.
 
 **The manuscript's main file** is a regular file inside the repository. It is
 not itself a symbolic link, it is not inside a `.git` directory in any letter
 case, and git lists it: git tracks it, or does not track it and does not
-ignore it. When it is not such a file, the skill stops, says why and does not
-read it. A symbolic link in the path of the directory that holds it is a
+ignore it. Its name is written as its directory lists it, and its path from
+the root holds no character that a locator's `file` is not allowed to hold
+(see "Locators"), so that every locator can carry that path and every checkout
+can open it. When it is not such a file, the skill stops, says why and does
+not read it. A symbolic link in the path of the directory that holds it is a
 different case: it is resolved, and from then on the skill reads the
 manuscript by its real path.
+
+**Directories are compared by the name the system gives them**, not by the
+way a path was written. A path through a symbolic link, in another letter case
+on a file system that ignores case, or through another name of the same volume
+(`/System/Volumes/Data/…` on macOS) leads to the same name. Wherever this
+document says that a directory is inside or outside the repository, it means
+by that name.
 
 **Which file a ledger names.** A ledger names one file at most.
 `docs/SCHEMA.md` writes a ledger's `source.file` from the "manuscript repo
@@ -66,39 +77,48 @@ that leads to no file, or to a file outside the ledger's own git repository, is
 not taken. The ledger names this manuscript when the file it names is the
 manuscript's main file, both resolved to real paths. So the ledger of another
 paper, kept in a submodule or in a git repository of its own under the root,
-does not name a manuscript of the outer repository.
+does not name a manuscript of the outer repository. For the same reason a
+ledger that is kept in a git repository of its own, apart from its manuscript
+(a submodule that holds only the ledger), names no file, and the skill asks.
+A `source.file` that holds a control character names no file.
 
 | The ledger is in | Its `source.file` | The manuscript is | Names it |
 |---|---|---|---|
 | the submodule `paper` | `main.tex` | `paper/main.tex` | yes, by the first reading |
 | the submodule `paper/manuscript` | `paper/manuscript/main.tex` | `paper/manuscript/main.tex` | yes, by the second reading |
 | the outer repository | `paper/main.tex` | `paper/main.tex` | yes |
-| the submodule `paper` | `main.tex` | `main.tex` at the root of the outer repository | no: that file is outside the ledger's repository |
+| the submodule `paper` | `main.tex` | `main.tex` at the root of the outer repository | no: the ledger names `paper/main.tex` when that file exists, and no file when it does not, because the outer `main.tex` is outside the ledger's repository |
+| the submodule `manuscript/propositions`, which holds only the ledger | `manuscript/main.tex` | `manuscript/main.tex` in the outer repository | no: that file is outside the ledger's repository; the skill asks |
 
 A `_meta.json` that is a symbolic link, that is inside a `.git` directory in
-any letter case, or whose path holds a line break is not listed, is not read
-and does not count as a ledger. A listed `_meta.json` is read as one ledger
-when it holds exactly one JSON value and that value is an object.
+any letter case, or whose path holds a line break or another character that a
+locator's `file` is not allowed to hold is not listed, is not read and does
+not count as a ledger. A listed `_meta.json` is read as one ledger when it
+holds exactly one JSON value and that value is an object.
 
 **Which directory.** The skill uses a directory without asking only when every
-`_meta.json` it lists was read as one ledger, exactly one of those ledgers
-names this manuscript, and the author's request names no other directory; it
-then uses that ledger's directory. In every other case the skill does not
+`_meta.json` it lists was read as one ledger and compared with the manuscript,
+exactly one of those ledgers names this manuscript, and the author's request
+names no other directory; it then uses that ledger's directory. In every other case the skill does not
 choose a directory itself. These are the cases, and the list is closed:
 
 1. no ledger names the manuscript;
 2. more than one does;
 3. there is no manuscript yet;
-4. a listed `_meta.json` could not be read as one ledger (the skill also says
-   which one: it might be the manuscript's ledger);
+4. a listed `_meta.json` could not be read as one ledger, or its comparison
+   with the manuscript did not run to its end (the skill also says which one:
+   it might be the manuscript's ledger);
 5. one ledger names the manuscript and the request names another directory.
 
-When the request names the directory, every listed `_meta.json` was read as
-one ledger, and no ledger names the manuscript or there is no manuscript yet,
-the request is the author's answer and the skill uses that directory.
-Otherwise it asks the author which directory to use. Outline files elsewhere
-in the repository are then offered, not taken, because they can belong to
-another manuscript. The directory is always the repository's root or a directory under
+When the request names the directory of the outline files, every listed
+`_meta.json` was read as one ledger and compared, and no ledger names the
+manuscript or there is no manuscript yet, the request is the author's answer
+and the skill uses that directory. Otherwise it asks the author which
+directory to use. Outline files elsewhere in the repository are then offered,
+not taken, because they can belong to another manuscript; when there is
+nothing to offer, the skill proposes a directory `propositions` beside the
+manuscript, where a ledger is put by convention. When the command that lists
+the ledgers fails, the skill stops. The directory is always the repository's root or a directory under
 it, not inside a `.git` directory in any letter case, and it is a directory or
 does not exist yet,
 in which case the directory that is to hold it exists. The skill resolves every
@@ -237,7 +257,8 @@ decides. When both are present, each is counted and each has to occur exactly
 once.
 
 **How `starts` is counted.** Occurrences are counted in the text of the file,
-not in its lines: words that occur twice on one line occur twice. In the
+not in its lines: words that occur twice on one line occur twice, and two
+occurrences that overlap count as two. In the
 comparison every run of spaces, tabs and line breaks, in the file and in
 `starts`, counts as one space, so the opening words can go on past the end of a
 line. White space at either end of `starts` is ignored.
@@ -260,10 +281,12 @@ between `\label` and its brace is not found.
 name the passage: a paragraph of prose that contains a labelled equation is
 named by `starts`.
 
-**Two passages that read the same.** Two passages of one file that read the
-same to their end, neither with a label of its own, cannot be told apart: the
-opening words of each occur twice however many of them are taken. This format
-has no locator for either. Derive stops when it meets such a pair (see "The six
+**A passage whose text occurs twice.** A passage that has no label of its own
+and whose whole text, to its end, occurs a second time in the file cannot be
+named: its opening words occur twice however many of them are taken. The
+second occurrence can be another passage that reads the same, or part of a
+longer one. This format has no locator for such a passage. Derive stops when
+it meets one (see "The six
 actions of the skill"); whether the format should be able to name them is open
 (issue #84).
 
@@ -350,6 +373,12 @@ The **order of sections stands as approved** when the ids of the section
 records, in file order, are the ids of the `sections` entries of the last
 approval record whose `whole` is `true`, in the same order. With no such
 record, the order of sections does not stand as approved.
+
+A section is **removed since its approval** when it is not in the section file
+and its latest approved copy is in the last approval record whose `whole` is
+`true`, or in an approval record after that one. Once an approval of the whole
+outline is recorded without the section, its removal is approved and the
+section is no longer reported.
 
 The **outline stands as approved** when every section stands as approved, the
 order of sections stands as approved, and every paragraph record names a
@@ -463,21 +492,22 @@ What the skill shows for a section depends on its approved copy.
 The findings of the premise check on a section are shown with it in all three
 cases.
 
-Before an approval of the whole outline the skill shows two more things,
-because that approval approves both.
+Whenever the sections shown are all the sections of the section file, the
+skill shows two more things first, because an approval of all of them is an
+approval of the whole outline and approves both.
 
 - **The order of the sections**, when it does not stand as approved: the
   sections in the order they are in now, and beside it their order in the last
   approval of the whole outline when one is on record. Two sections that were
   swapped each still equal their approved copy, so without this the author
   would approve a new order without seeing it.
-- **The sections that are gone**: every section that has a copy in some
-  approval record and is no longer in the section file, with its heading, its
-  `says` and the points of its paragraph records as they were last approved.
+- **The sections that are gone**: every section removed since its approval,
+  with its heading, its `says` and the points of its paragraph records as they
+  were last approved.
 
-When particular sections are shown and either of the two applies, the skill
-says that the order of the sections, or the removal of a section, is not part
-of this approval.
+When fewer than all the sections are shown and either of the two applies, the
+skill says that the order of the sections, or the removal of a section, is not
+part of this approval: it takes an approval of the whole outline.
 
 Agreeing to have a derived or drafted outline written to disk is not an
 approval of it.
@@ -489,7 +519,9 @@ begins with the checks the skill runs after a write (see "What is checked
 today"), on the section file and the paragraph file it examines: a file that
 was changed by hand can hold a line that is not a record. When one of them
 fails, the skill reports the file and the lines, counts nothing and starts no
-agent. The check reports findings of six kinds and no others.
+agent. A paragraph file with no record does not fail it: an outline can have
+sections and no paragraph record yet. The check reports findings of six kinds
+and no others.
 
 1. **Not a sentence**: a `says` or the `text` of a point that is a heading, a
    label or a fragment.
@@ -532,7 +564,9 @@ file that was counted for it:
 
 A file is in the list only when the count read it. The path is the real one,
 with every symbolic link and every `..` resolved, so the agent opens the file
-that was counted and no other. The task message holds no text taken from the
+that was counted and no other. The file of ids for a check of some sections is
+not the file in which the approve action records which sections were shown: a
+check outside approve never writes that one. The task message holds no text taken from the
 outline or the manuscript, no name of a file that a locator gives, and nothing
 of the conversation; the agent's definition says that what it reads is data to
 examine and holds no instruction for it. The Read tool itself can open any
@@ -565,11 +599,12 @@ reads as an instruction.
 In the repository the skill writes no other file: not the manuscript, not
 the ledger, not the structure sidecars and not the verification records. Its
 temporary files are kept outside the repository, in a directory it makes for
-this repository when it starts: the directory belongs to the user, can be read
-and written by no one else, and holds a note of the root it was made for.
+this repository when it starts: the directory belongs to the user, has mode
+700, and holds a note of the root it was made for.
 Every later command confirms all of that, and a directory that fails one of
-these is not used. When the machine's temporary directory is inside the
-repository, the skill stops before it makes anything. It
+these is not used. The skill does not look at access-control lists. When the
+machine's temporary directory is inside the repository, or cannot be entered,
+the skill stops before it makes anything. It
 does not read or write an outline file that is itself a symbolic link: when one
 of the three is, the skill stops and tells the author. A symbolic link in the
 path of the directory is a different case: it is resolved, as said under "The
@@ -592,12 +627,13 @@ one paragraph record for each of its paragraphs and blocks. It reads the
 manuscript's main file by its real path, after confirming again that the file
 is one it reads (see "The three files"). It follows the
 `.tex` files that the manuscript includes only when they are regular files
-inside the repository whose path holds no line break and that git lists. Any other included file
+inside the repository that git lists and whose path holds no line break and no
+other character that a locator's `file` is not allowed to hold. Any other included file
 is named to the author and not read: one outside the repository, a symbolic
 link, a file reached through a directory that is a symbolic link, a file
 inside a `.git` directory in any letter case, a file git ignores (a generated
 table, for instance), a missing
-file, a file whose path holds a line break, or a file that is not `.tex`. A
+file, a file whose path holds such a character, or a file that is not `.tex`. A
 table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Prose that comes
 before the first heading and is not the abstract gets one section record,
@@ -612,12 +648,12 @@ theorem-like statement, a figure or a table is named by its own label; the
 label of a section names the whole section and is not used for a record. It
 writes no `lines` and no `commit`. Before it shows the outline, it confirms
 that every locator it wrote resolves. When a passage that has no label of its
-own reads the same, to its end, as another passage of the same file, no
+own has a text that, to its end, occurs a second time in the same file, no
 locator names it. Derive then stops: it tells the author which passages they
 are, shows no outline and writes nothing to the repository. It does not take
 opening words from the passage that follows. The author can change one of the
-two passages, or give one a label when it is a block that can carry one. It
-stops the same way when a file it read cannot be named by a locator. A
+two places, or give the passage a label when it is a block that can carry one.
+It stops the same way when a file it read is not accepted as a locator's file. A
 manuscript that has paragraphs never gives an empty paragraph file.
 
 **draft** does not invent content. A point that would report a result, a number
@@ -625,7 +661,10 @@ or a citation the author has not supplied says what will be reported without
 stating it, and carries `pending`. When the outline the author supplies has
 sections and no paragraph yet, draft writes no paragraph record, and the
 paragraph file is empty. Draft needs no manuscript: with none, no ledger names
-it, and the directory of the outline files is the author's decision.
+it, and the directory of the outline files is the author's decision. When a
+locator the author asked for does not resolve, draft does not rewrite it: it
+says which and why, and asks the author whether to correct it or to leave it
+out of the record.
 
 Both show the outline to the author before any file is written in the
 repository, and write the files there only after the author agrees. Neither
@@ -651,7 +690,8 @@ that file is the author's decision.
   original is in the `from` of at least one of them.
 - When a point moves to another paragraph record and the record it leaves has
   `from`, each locator of that `from` is added to the point's `basis`, so that
-  the point keeps its source. A record is not left with no point: when the
+  the point keeps its source; a locator the point already has is not added
+  again. A record is not left with no point: when the
   point that moves is the last one of its record, the skill asks the author
   whether that record is left out, by the next rule, or is given a new point.
 - When the author leaves a paragraph out of the article and its record has
@@ -683,15 +723,17 @@ edited a locator can stop resolving; the `from` lists then still say which
 records each passage went to, but the passage may no longer be found by its
 locator.
 
+When a revision leaves a `uses` entry that names a later line, a record that
+is no longer in the file or a record that carries `dropped`, the skill tells
+the author and does not delete the entry itself.
+
 After a revision the skill says which sections no longer stand as approved,
-and which sections that have an approved copy are no longer in the section
-file.
+and which sections were removed since their approval.
 
 **status** reports, for each section, whether it stands as approved, and for a
 section that does not, whether it was never approved or differs from its latest
 approved copy. It reports whether the order of sections stands as approved,
-the sections that have a copy in some approval record and are no longer in the
-section file,
+the sections removed since their approval,
 the paragraph records that name no section record, the number of points that
 carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does
 not, it says that an approval of the whole outline is still needed. It decides
@@ -703,10 +745,11 @@ lines, two records on one line, a line of spaces, a value such as `nan`),
 status fails and says so; it does not report the outline as never approved.
 It fails too, and says that the approvals file is at fault, when the
 `sections` of an approval record is not a list of entries that each hold a
-`section` object and a `paragraphs` list. Whenever it fails, nothing it
-printed is a status.
+`section` object and a `paragraphs` list of objects. Whenever it fails,
+nothing it printed is a status.
 The approve action checks the file the same way before it appends, and appends
-nothing when the file fails: the file was changed by hand, the skill says so,
+nothing when the file fails or cannot be read: the file was changed by hand,
+the skill says so,
 and what to do with it is the author's decision. The skill never changes a
 line of it.
 

@@ -3,7 +3,7 @@
 - [ ] 1.1 主稿件的檢查，對應 Requirement「The outline is three files beside the ledger」「Derive and draft build an outline without inventing content」與第四輪報告第 1 列。完成時：`Resolve paths` 有一段指令檢查主稿件，通過時印出實際路徑與從根目錄算起的名稱；反推讀稿之前再跑一次。驗證：已追蹤的檔、未追蹤且未忽略的檔、經由 repo 裡的目錄連結到達的檔通過；指到 repo 外或 repo 裡的 symbolic link、不存在的檔、目錄、repo 外的檔、git 忽略的檔、`.git` 裡的檔都印 `STOP`。
 - [ ] 1.2 一份帳冊最多指到一個檔，對應 Requirement「The outline is three files beside the ledger」與第 2 列。完成時：先從帳冊自己的 repo 根目錄讀，再從最外層的根目錄讀，只接受落在帳冊自己的 repo 裡的一般檔。驗證：規格的三個例子仍然認得出來；submodule 與內層 repo 裡別篇稿件的帳冊、用 `..` 爬出去的帳冊、主檔不見的帳冊都不指到外層的稿件。
 - [ ] 1.3 交給 checker 的是計數的那個檔，對應 Requirement「A premise check runs before an outline is shown for approval」「Text from the manuscript and the author never becomes part of a command」與第 3 列。完成時：逐檔指令把檔名與實際路徑寫進清單；任務訊息只有四個路徑；checker 的定義改成讀清單。驗證：`lnin/../../outside.tex` 的清單路徑是 repo 裡的那個檔；被拒絕的檔不在清單裡。
-- [ ] 1.4 整份確認前展示節的順序與不在檔裡的節，對應 Requirement「Only the author's explicit statement in the current message approves」「A section stands as approved while it equals its latest approved copy」與第 4 列。完成時：狀態回報有通過紀錄、不在檔裡的節；差異指令印出兩種順序與每一個不在檔裡的節通過時的內容；確認第 4 步先展示這兩樣。驗證：對調兩節、刪掉一節、只有逐節確認三種情況。
+- [ ] 1.4 整份確認前展示節的順序與不在檔裡的節，對應 Requirement「Only the author's explicit statement in the current message approves」「A section stands as approved while it equals its latest approved copy」與第 4 列。完成時：狀態回報通過之後被拿掉的節；差異指令印出兩種順序與每一個這樣的節通過時的內容；展示全部的節時，確認第 4 步先展示這兩樣。驗證：對調兩節、刪掉一節、只有逐節確認、整份確認記下刪除之後不再列出，四種情況。
 
 ## 2. 其餘的指令
 
@@ -19,7 +19,7 @@
 
 ## 4. 驗證
 
-- [ ] 4.1 SKILL.md 的 19 段指令照寫法逐段實跑，四種組合，另加 GNU 的 `realpath`。完成時：各 283 項全部符合預期；17 項重現例子在修正前的檔案上全部失敗。
+- [ ] 4.1 SKILL.md 的 19 段指令照寫法逐段實跑，四種組合，另加 GNU 的 `realpath`。完成時：各 308 項全部符合預期；17 項重現例子在修正前的檔案上全部失敗。
 - [ ] 4.2 一位獨立 agent 對照第四輪報告要處理的列，逐列回報已處理與在哪一句。完成時：沒有未處理的；有的話先修再重跑。
 - [ ] 4.3 一位獨立 agent 只看這一輪的 diff，為每一項改動的行為找會出錯的輸入並實跑。完成時：找到的都修掉或寫明不處理的理由。
 - [ ] 4.4 獨立讀者重讀最後的 OUTLINE.md，題組加上這一輪改過的規則。完成時：答案與預存的答案全部相同。

@@ -75,7 +75,7 @@ The commands keep the first two against mistakes and against the ordinary ways a
 somewhere else: a symbolic link, `..`, another spelling of a directory, a path copied wrongly.
 They are shell, and they are not a defence against a repository or a shell that was set up to
 defeat them: that defence belongs to the command-line tool of issue 78, where it can be
-tested. The limits known today are the nine below. The list is closed: a limit is added here
+tested. The limits known today are the ten below. The list is closed: a limit is added here
 when one is found, and none is inferred from another. The first is the one this skill always
 sees, and rule 2 stops it there. No command looks for the others: when you notice one of
 them, tell the author.
@@ -90,7 +90,8 @@ them, tell the author.
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the command stops or leaves the file unread | None |
 | 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root this skill takes is not the root of the manuscript's repository | The second |
-| 9 | Text in the manuscript or in a file a locator names asks the reader to read another file | The Read tool of the checker agent, and of this skill, can open any path; only the rules (the checker's definition, rule 5 below) keep them to the files they are given | The second |
+| 9 | Text that the skill or the checker reads (the manuscript, a file a locator names, a file the author points to, the outline files) asks the reader to read another file | The Read tool of the checker agent, and of this skill, can open any path; only the rules (the checker's definition, rule 5 below) keep them to the files they are given | The second |
+| 10 | The repository's root is the root of the file system | The machine's temporary directory is then inside the repository, and the first command does not see that in this one case: it makes its stage directory there before it stops | The first |
 
 ## How commands are run
 
@@ -692,14 +693,21 @@ draft says what to do.
    An `\input` or `\include` of a file that was not read (step 2), standing outside a figure
    or a table, gets no record of its own and no locator. It is written into the `note` of a
    record this step or step 4 already writes, as one sentence that names the file as the
-   command names it and says that it was not read ("`stats/N` is included here and was not
-   read; what it says is not in this outline."). Add the reason only when you know it without
+   command names it and says where it is included and that it was not read ("`stats/N` is
+   included in this paragraph and was not read; what it says is not in this outline.", or
+   "… is included just after this paragraph …" when the record is the one before it). When
+   the name holds a character that a locator's `file` may not hold (see "Locators: do they
+   resolve"), do not copy it: write "a file whose name this outline cannot hold" and tell the
+   author the place. Add the reason only when you know it without
    running anything for it (the path leads outside the repository, the file is not `.tex`);
    no command is run to find it. A command inside a LaTeX comment includes nothing and gets
    no sentence. The record is chosen in
    this order, and only this order: the record of the paragraph or block the command stands
    in; else the record of the paragraph or block that comes just before it in the same
-   section; else the first record after it. A record that holds several such commands names
+   section; else, when the section has no paragraph or block record at all, the section
+   record itself, whose `says` then states only that the section consists of a file that was
+   not read (the checker's fifth kind will report it; tell the author why); else the first
+   record after it. A record that holds several such commands names
    each file once. When the manuscript gives no paragraph or block record at all, there is
    nothing to hold the note: tell the author which files were not read, and write the outline
    without it. The same file included twice is one sentence in each record concerned, never a
@@ -738,8 +746,8 @@ draft says what to do.
    - A file that derive read and that the locator commands do not accept: the count prints
      nothing for it, or the listing reports its name. Say what the commands printed.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
-   points, with carried blocks marked. Say how many sections, paragraph records and carried
-   blocks there are.
+   points, with carried blocks marked and each `note` shown. Say how many sections, paragraph
+   records and carried blocks there are, and which included files were not read.
 9. Ask whether to write the files into `OUTDIR` (AskUserQuestion). Only after the author agrees:
 
    ```bash
@@ -791,7 +799,9 @@ spelling of it:
 printf 'ok outline directory: %s\n' "$O"
 ```
 
-Read both outline files first, and edit the lines concerned with the Edit tool. Run the call
+Read both outline files first, and edit the lines concerned with the Edit tool. A file the
+author points to during a revision (a note a point now rests on) is read under the rule of
+draft, step 2: only after the manuscript check accepts it. Run the call
 again after every reply of the author, before the next edit: the reply arrives in a later
 call, and the guard has to hold then too. No `ok outline directory`: do not read or edit.
 
@@ -866,8 +876,11 @@ no longer stand as approved, and which sections were removed since their approva
 Status writes nothing to the repository.
 
 Before the two commands below, run the write check on the section file and on the paragraph
-file. When the section file does not print its `ok` line, or the paragraph file prints anything
-other than its `ok` line or `EMPTY`, report the file and what was printed and report no status:
+file. When the check prints nothing at all for a file, the file is missing or is not a
+regular file: say which (look at the path), and that status cannot be reported until it is a
+readable file again; status does not make or change it. When the section file does not print
+its `ok` line, or the paragraph file prints anything other than its `ok` line or `EMPTY`,
+report the file and what was printed and report no status:
 jq reads some values that are not written as JSON (`01`, a record spread over several lines)
 as if they were, and status would then compare them as if nothing were wrong. The file is
 corrected through revise.
@@ -1094,8 +1107,8 @@ asks, through revise.
    paragraph file does not stop it there.
 4. Show the sections in the reply, each with the findings of the check on it.
    - A section that was never approved is shown in full: its heading and `says`; every
-     paragraph record naming it, with its points, `pending` notes, its `note` and carried
-     blocks marked; every record that carries `dropped`, with the reason. A `note` that names
+     paragraph record naming it, with its points, what each `pending` names, its `note` and
+     carried blocks marked; every record that carries `dropped`, with the reason. A `note` that names
      an included file that was not read is shown as such, so that the author sees the gap.
    - A section that differs from its approved copy is shown by its differences: for each record
      that was changed, added, removed or moved, the approved content and the current content.
@@ -1184,13 +1197,14 @@ asks, through revise.
    input file whether or not it appended, so that it cannot be used for another approval. After a
    `STOP` the file stays until step 1 runs again, and step 1 runs before any other approval.
 
-   No `ok approval appended`: the record was not appended, or, when the failure came while it
-   was being written (a full disk, for one), it may have been appended in part. First run the
-   check for the approvals file from "The write check". When it prints anything other than its
-   `ok` line, a part of the record may be in the file: say so, show what it printed, and stop;
-   this skill does not change a line of that file, and the author decides what to do with it.
-   Do not run the command again. When it prints its `ok` line, nothing of the record is there;
-   take the first of these that applies.
+   No `ok approval appended`: when what was printed comes from `cmp` or `jq`, or is nothing,
+   nothing was appended. When it comes from writing to the approvals file itself (`printf`,
+   `cat`, or the shell, as with a full disk), part of the record may have been appended: run
+   the check for the approvals file from "The write check". When it prints anything other
+   than its `ok` line (`EMPTY`, or no line, counts as `ok` only when the file was empty or did
+   not exist before this approval), say so, show what it printed, and stop; this skill does
+   not change a line of that file, and the author decides what to do with it. Do not run the
+   command again. Otherwise take the first of these that applies.
    1. `cmp` reported a difference or a missing file: the outline or the real path of its
       directory changed after it was shown, or the copies are gone. Say so and return to
       step 1.

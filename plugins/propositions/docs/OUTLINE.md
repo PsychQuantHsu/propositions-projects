@@ -233,7 +233,7 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `carry` | no | `true`: the record stands for a block that is moved unchanged from the passage its `from` names |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
-| `note` | no | A string for the author. Derive writes into it the files that the record's passage includes and that it did not read (see "The six actions of the skill") |
+| `note` | no | A string for the author. Derive writes into it the included files that it did not read and that stand in or next to the record's passage (see "The six actions of the skill") |
 
 A point is an object.
 
@@ -339,12 +339,13 @@ or inside a git repository of its own under the root, is judged by the rules
 of that repository. The second is the outermost repository, asked whether it
 ignores the path: when it does, the file is not a locator's file whatever the
 first said, so a repository of its own inside a directory that the outermost
-repository ignores does not make its files readable. When the outermost
+repository ignores does not make its files readable. (Outlines written before
+this rule can have locators into such a directory that resolved then and do
+not now.) When the outermost
 repository gives no answer for the path, as it gives none for a file inside a
 submodule, the answer of the first stands; any error of that second question
 counts as no answer. A repository between the two is not
-asked. An outline written before this rule can have locators into such an
-ignored directory that resolved then and do not now. The outline files sit beside the
+asked. The outline files sit beside the
 manuscript and can reach the author from someone else, so a locator is not
 allowed to make the skill read a file that was kept out of the repository on
 purpose, such as one that holds credentials. The file
@@ -672,7 +673,8 @@ Every later command confirms all of that for the path it is given as the stage
 directory, and a directory that fails one of these is not used: the directory
 above the repository, the machine's temporary directory itself and the stage
 directory of another repository all fail. The skill does not look at access-control lists. When the
-machine's temporary directory is inside the repository, or cannot be entered,
+machine's temporary directory is inside the repository (except in the one case
+of known limit 10), or cannot be entered,
 the skill stops before it makes anything. It
 does not read or write an outline file that is itself a symbolic link: when one
 of the three is, the skill stops and tells the author. A symbolic link in the
@@ -708,7 +710,7 @@ a path leads somewhere else: a symbolic link, `..`, another spelling of a
 directory, a path copied wrongly. They are shell commands, and they are not a
 defence against a repository or a shell that was set up to defeat them. That
 defence belongs to the command-line tool of issue #78, where it can be tested.
-The limits known today are these nine. The list is closed: a limit is added
+The limits known today are these ten. The list is closed: a limit is added
 when one is found, and none is inferred from another. The first is the one the
 skill always sees, and it stops there. No command of the skill looks for the
 others; when the skill notices one of them, it tells the author.
@@ -723,7 +725,8 @@ others; when the skill notices one of them, it tells the author.
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the skill stops or leaves the file unread | None |
 | 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root the skill takes is not the root of the manuscript's repository | The second |
-| 9 | Text in the manuscript or in a file a locator names asks the reader to read another file | The Read tool of the checker agent, and of the skill, can open any path; only their rules keep them to the files they are given | The second |
+| 9 | Text that the skill or the checker reads (the manuscript, a file a locator names, a file the author points to, the outline files) asks the reader to read another file | The Read tool of the checker agent, and of the skill, can open any path; only their rules keep them to the files they are given | The second |
+| 10 | The repository's root is the root of the file system | The machine's temporary directory is then inside the repository, and the first command makes the stage directory there before the skill stops | The first |
 
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. It reads the
@@ -743,11 +746,15 @@ table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
 file that was not read gets no record of its own and no locator: derive writes
 one sentence into the `note` of a record it already writes, naming the file
-as the include command names it and saying that it was not read (and why,
+as the include command names it (or, when that name holds a character a
+locator's `file` may not hold, as "a file whose name this outline cannot
+hold") and saying that it was not read (and why,
 only when that is known without running anything for it). A command inside a
 LaTeX comment includes nothing. That record is the one of the
 paragraph or block the command stands in; else the one just before it in the
-same section; else the first record after it. The same file included twice is
+same section; else, when the section has no record of its own, the section
+record, whose `says` then states only that the section consists of a file
+that was not read; else the first record after it. The same file included twice is
 a sentence in each record concerned, and never makes derive stop. When the
 manuscript gives no record at all to hold the note, derive tells the author
 which files were not read. Nothing about the content of such a file is stated.

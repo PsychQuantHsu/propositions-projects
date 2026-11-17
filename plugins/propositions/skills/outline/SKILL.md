@@ -66,15 +66,16 @@ This skill keeps three things, and its rules and commands are there for them.
 1. In the repository it writes the three outline files and no other file.
 2. It reads no file outside the repository, other than its own (the temporary files it made
    in the stage directory, and the files of this plugin) and the files git itself reads when
-   it is asked (its configuration, its global ignore file, and, for a linked worktree, the
-   repository the worktree belongs to).
+   it is asked (its configuration, its global ignore file, and the git directory of the
+   repository wherever it is, which for a linked worktree is in the repository the worktree
+   belongs to).
 3. It records an approval only from words the author typed in the message it answers.
 
 The commands keep the first two against mistakes and against the ordinary ways a path leads
 somewhere else: a symbolic link, `..`, another spelling of a directory, a path copied wrongly.
 They are shell, and they are not a defence against a repository or a shell that was set up to
 defeat them: that defence belongs to the command-line tool of issue 78, where it can be
-tested. The limits known today are the eight below. The list is closed: a limit is added here
+tested. The limits known today are the nine below. The list is closed: a limit is added here
 when one is found, and none is inferred from another. The first is the one this skill always
 sees, and rule 2 stops it there. No command looks for the others: when you notice one of
 them, tell the author.
@@ -89,6 +90,7 @@ them, tell the author.
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the command stops or leaves the file unread | None |
 | 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root this skill takes is not the root of the manuscript's repository | The second |
+| 9 | Text in the manuscript or in a file a locator names asks the reader to read another file | The Read tool of the checker agent, and of this skill, can open any path; only the rules (the checker's definition, rule 5 below) keep them to the files they are given | The second |
 
 ## How commands are run
 
@@ -170,7 +172,8 @@ cases those commands leave open.
 - `ROOT` — the root of the repository. The repository is the git repository that holds the
   manuscript, or, when that repository is checked out as a submodule of another (as git reports
   it, from the index of the outer repository), the outermost
-  repository it is checked out in, however many levels of submodules lie between. When the
+  repository it is checked out in, however many levels of submodules lie between (no cap yet:
+  the maintainer has not decided whether to stop past some number of levels). When the
   manuscript is in no git repository, the skill stops. A repository that sits inside
   another without being its submodule is a repository of its own. Every `file` of a locator is a
   path relative to `ROOT`; an outline kept inside a submodule therefore does not resolve in a
@@ -212,6 +215,15 @@ TOOLS=; ROOT=; command -v jq >/dev/null || echo 'missing jq'; command -v realpat
   repository: the repository's root is the boundary of the outline files and of
   every file it reads as a source, and it does not take that boundary from an answer. Its own
   temporary files are outside the repository, in the stage directory.
+- When the `ROOT=` line is `ROOT=/`, stop and tell the author that a repository whose root is
+  the root of the file system is not supported. The machine's temporary directory is then
+  inside it, and the first command does not see that in this one case: it has already made
+  its stage directory there, which is the one thing it wrote.
+- When `DIR` was the nearest directory above a manuscript directory that does not exist yet,
+  tell the author which repository `ROOT` is, and ask whether the manuscript will be in that
+  repository, before any other command runs. The directory above can belong to a larger
+  repository (a repository of the home directory, a repository of many projects) that the
+  manuscript will not be in. When the author says it will not be, stop.
 - The `STAGE=` line gives `STAGE`, and `ok the stage directory is outside the repository`
   follows it. When a `STOP` line says that the temporary directory of this machine is inside
   the repository, or cannot be entered, no stage directory was made: stop and say so. In the
@@ -253,7 +265,9 @@ answer. A source there is therefore not read: a `.tex` file there is not in the 
 derive, a locator that names a file there does not resolve, and with a manuscript there the
 first command stops; its `STOP` line gives the two usual reasons, and git's own error above
 it gives the real one. A `_meta.json` there is still listed, because the listing does not
-ask git; its comparison prints no `ok` line, so the skill asks. With the second,
+ask git; when there is a manuscript, its comparison prints no `ok` line, so the skill asks.
+When there is no manuscript yet, the comparison runs no git and prints its `ok` line, so such a
+`_meta.json` counts as compared. With the second,
 git starts no file-watching program that a configuration names. A linked worktree, and a
 repository whose `.git` is a file, are found as before. Git knows the first setting from
 version 2.38 on, which is why the first command asks for that version.
@@ -588,7 +602,8 @@ the outermost repository, asked at `ROOT` whether it ignores the path: when it d
 is not read, whatever the first said, so a repository of its own inside a directory that the
 outermost repository ignores does not make its files readable. When the outermost repository
 gives no answer for the path, as it gives none for a file inside a submodule, the answer of
-the first stands. A repository between the two is not asked. A file git ignores is not read,
+the first stands; the command takes any error of that second question as no answer, whatever
+its cause. A repository between the two is not asked. A file git ignores is not read,
 and neither is one the first repository cannot answer for. A name whose `..` lead out and back into the repository is taken by where it
 leads. The command then counts, in the text of the file with every run of spaces, tabs and line
 breaks turned into one space, how often each `starts` occurs and how often the text
@@ -633,7 +648,10 @@ draft says what to do.
    and, below the root, no other character that a locator's `file` may not hold: a file a
    locator cannot name is not read.
    Git is asked about each file as for a locator: in the directory of the file, and at `ROOT`.
-   Read an included file only
+   An `\input{x}` or `\include{x}` names the file `x`, with `.tex` added when `x` has no
+   extension, taken from the directory of the main file as LaTeX does; it is in the list when a
+   line of the list is that file (on a file system that ignores letter case, the same file in
+   another letter case counts). Read an included file only
    when it is in the list, and by the path the list gives. Any other included file is not
    read: one outside the repository, a symbolic link, a file reached through a directory that is
    a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores (a
@@ -643,8 +661,8 @@ draft says what to do.
    a table, a style file). Tell the author which files were
    not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
-   it. An included file that was not read and does not stand inside such a figure or table
-   gets a record of its own, so that the outline shows the gap (step 5). `ok files listed`
+   it. Any other included file that was not read is written into the `note` of a record, so
+   that the outline shows the gap (step 5). `ok files listed`
    ends a complete list. A `STOP` line in its place: the list is not
    complete; stop and say what was printed above it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
@@ -672,14 +690,19 @@ draft says what to do.
    point such as "States Theorem 1." is not a sentence.
 
    An `\input` or `\include` of a file that was not read (step 2), standing outside a figure
-   or a table, gets one record that carries `carry` too, on the line where the command
-   stands. Its one point says only what the command itself states, that the file is included
-   at this place ("The file `sections/generated.tex` is included here."), so that the point
-   is supported by the passage its `from` names. The point carries `pending`, which names what
-   the author has to supply, namely what the file says, and the reason the file was not read
-   ("what `sections/generated.tex` says: the file was not read, because git ignores it").
-   Nothing about the content of the file is stated. Without this record the outline would show
-   no gap where the file stands, and an approval of the whole outline would pass over it.
+   or a table, gets no record of its own and no locator. It is written into the `note` of a
+   record this step or step 4 already writes, as one sentence that names the file and says
+   that it was not read and why ("`sections/generated.tex` is included here and was not read,
+   because git ignores it; what it says is not in this outline."). The record is chosen in
+   this order, and only this order: the record of the paragraph or block the command stands
+   in; else the record of the paragraph or block that comes just before it in the same
+   section; else the first record after it. A record that holds several such commands names
+   each file once. When the manuscript gives no paragraph or block record at all, there is
+   nothing to hold the note: tell the author which files were not read, and write the outline
+   without it. The same file included twice is one sentence in each record concerned, never a
+   stop. Nothing about the content of the file is stated, and no point is written for it. The
+   note is shown with its record whenever the record is shown, and approve shows it (step 4),
+   so an approval of the whole outline does not pass over the gap.
 6. Give every paragraph record `from`.
    - The `file` of a locator is the path of the file from `ROOT`: for the manuscript's main
      file, the `NAME=` line of the manuscript check; for an included file, its line of the
@@ -689,10 +712,6 @@ draft says what to do.
    - A paragraph of prose gets `starts`: its opening words as they are in the file, enough of
      them to occur once in the file. A label of an equation inside the paragraph names the
      equation, not the paragraph, so it is not used.
-   - The record of an included file that was not read gets `starts`: the command that
-     includes it, as it is in the file that includes it. When the same command occurs a
-     second time in that file, no words name it: that is the first of the two cases of
-     step 7.
    - Runs of white space count as one space. When a passage opens like another one (every proof
      opens with the same command on a line of its own), go on into its next line, with one
      space where the file has the line break, until the words occur once.
@@ -736,7 +755,13 @@ draft says what to do.
 2. From the title and ideas, or from the outline the author supplies, write section records and
    paragraph records as in derive, steps 3 and 4. Records have no `from` unless the author points
    to a file (a note, an earlier draft) that a record comes from; a point can name what supports
-   it in `basis`. The `file` of such a locator is the path of that file from `ROOT`. When the
+   it in `basis`. The `file` of such a locator is the path of that file from `ROOT`. Read such
+   a file, or an outline file the author supplies, only after the manuscript check of
+   "Resolve paths" prints its `ok` line for it (run it with `M` set to that file; nothing in
+   it is particular to a manuscript), and only by the path on its `MAIN=` line; the `NAME=`
+   line is its `file`. When the check stops, do not read the file: ask the author to paste the
+   text into the conversation instead. The same holds in revise for a file the author points
+   to. When the
    author's outline has sections and no paragraph yet, write no
    paragraph record: the staged paragraph file is empty, and this is one of the two cases in
    which `EMPTY` is accepted for it (the write check names both).
@@ -819,6 +844,11 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
     record with `from` can be neither deleted nor left without a point: the point moves with
     its `id`, and the record keeps a copy of the point's text as a point with a new `id` and
     gets `dropped` with the author's reason. Its `from` stays as it is.
+- **`note`.** A record's `note` stays with it when its content changes, when it moves and when
+  it gets `dropped`. A record that replaces merged records holds, in its `note`, the notes of
+  the records it replaces; when a record is split, each record that replaces it holds the
+  note. A sentence about an included file that was not read is never removed by revise unless
+  the author asks.
 - **Keys this skill does not know.** Keep them exactly as they are.
 - **`uses`.** After a move, a merge, a split, or leaving a record out, an id in `uses` can end
   up on a later line, name a record that has left the file, or name a record that carries
@@ -831,6 +861,13 @@ no longer stand as approved, and which sections were removed since their approva
 ## status — what stands as approved
 
 Status writes nothing to the repository.
+
+Before the two commands below, run the write check on the section file and on the paragraph
+file. When the section file does not print its `ok` line, or the paragraph file prints anything
+other than its `ok` line or `EMPTY`, report the file and what was printed and report no status:
+jq reads some values that are not written as JSON (`01`, a record spread over several lines)
+as if they were, and status would then compare them as if nothing were wrong. The file is
+corrected through revise.
 
 ```bash
 jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/null)" --slurpfile secs "$SEC" --slurpfile pars "$PAR" '
@@ -887,10 +924,11 @@ error, and take the first of these three that applies.
    records, that status cannot be reported until the author decides what to do with it, and
    that this skill does not change it.
 2. It names the section file or the paragraph file (`--slurpfile secs` or `--slurpfile pars`,
-   with the path). When it says that the file could not be opened, the file is missing: tell
-   the author that it is not there and that status cannot be reported until it is again
+   with the path). When it says that the file could not be opened, the file is missing or is
+   not a regular file that can be read (a directory, for one): tell the author which, quoting
+   the reason jq gives, and that status cannot be reported until it is a readable file again
    (restored, or, for an outline that has no paragraph yet, an empty paragraph file). Status
-   does not make it. Otherwise a line of that file is not JSON: run the write check on that
+   does not make or change it. Otherwise a line of that file is not JSON: run the write check on that
    file and report what it prints.
 3. Anything else: run the write check on the section file and on the paragraph file. A line
    that is JSON and is not a record (a number, a string) makes jq fail without naming a
@@ -1053,8 +1091,9 @@ asks, through revise.
    paragraph file does not stop it there.
 4. Show the sections in the reply, each with the findings of the check on it.
    - A section that was never approved is shown in full: its heading and `says`; every
-     paragraph record naming it, with its points, `pending` notes and carried blocks marked;
-     every record that carries `dropped`, with the reason.
+     paragraph record naming it, with its points, `pending` notes, its `note` and carried
+     blocks marked; every record that carries `dropped`, with the reason. A `note` that names
+     an included file that was not read is shown as such, so that the author sees the gap.
    - A section that differs from its approved copy is shown by its differences: for each record
      that was changed, added, removed or moved, the approved content and the current content.
      Say that the rest of the section is as it was approved. Show it in full when the author
@@ -1142,7 +1181,13 @@ asks, through revise.
    input file whether or not it appended, so that it cannot be used for another approval. After a
    `STOP` the file stays until step 1 runs again, and step 1 runs before any other approval.
 
-   No `ok approval appended`: nothing was appended. Take the first of these that applies.
+   No `ok approval appended`: the record was not appended, or, when the failure came while it
+   was being written (a full disk, for one), it may have been appended in part. First run the
+   check for the approvals file from "The write check". When it prints anything other than its
+   `ok` line, a part of the record may be in the file: say so, show what it printed, and stop;
+   this skill does not change a line of that file, and the author decides what to do with it.
+   Do not run the command again. When it prints its `ok` line, nothing of the record is there;
+   take the first of these that applies.
    1. `cmp` reported a difference or a missing file: the outline or the real path of its
       directory changed after it was shown, or the copies are gone. Say so and return to
       step 1.

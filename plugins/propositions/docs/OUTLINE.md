@@ -24,7 +24,9 @@ not need a ledger to have an outline.
 **The repository** is the git repository that holds the manuscript, or, when
 that repository is checked out as a submodule of another (as git reports it,
 from the index of the outer repository), the outermost repository it is
-checked out in, however many levels of submodules lie between. The skill works
+checked out in, however many levels of submodules lie between (this has no
+cap yet because the maintainer has not decided whether to stop past some
+number of levels; it is an implementer's proposal, issue #75). The skill works
 only on a manuscript inside a git repository: when the manuscript is in no git
 repository, it stops and says why. The
 repository's root is the boundary of the outline files and of every file the
@@ -34,7 +36,13 @@ a draft with no manuscript yet, the directory where the author says the
 manuscript will be stands in for it when the repository is found; the skill
 asks when the author has not said. When that directory does not exist yet, the
 nearest directory above it that does is used in its place: it only finds the
-repository. That
+repository. Because that directory can belong to a larger repository the
+manuscript will not be in, the skill then tells the author which repository it
+found and asks whether the manuscript will be there, and stops when it will
+not. A repository whose root is the root of the file system is not supported:
+the skill stops, after its first command has already made its temporary
+directory inside it (the machine's temporary directory is then inside the
+repository, which that command does not see in this one case). That
 directory is not the directory of the outline files unless the author says
 so, and no ledger names a manuscript that does not exist yet. A repository that
 sits inside another without being its submodule is a repository of its own.
@@ -225,7 +233,7 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `carry` | no | `true`: the record stands for a block that is moved unchanged from the passage its `from` names |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
-| `note` | no | A string for the author |
+| `note` | no | A string for the author. Derive writes into it the files that the record's passage includes and that it did not read (see "The six actions of the skill") |
 
 A point is an object.
 
@@ -234,7 +242,7 @@ A point is an object.
 | `id` | yes | A non-empty string, different from the `id` of every other point and of every paragraph record |
 | `text` | yes | One complete sentence stating one key point of the paragraph |
 | `basis` | no | A list of one or more locators naming what supports the point |
-| `pending` | no | A non-empty string naming what the author still has to supply before the point can be written. On the record of an included file that was not read, it names what that file says, and why the file was not read |
+| `pending` | no | A non-empty string naming what the author still has to supply before the point can be written |
 
 **One point or several.** A record with one point states, in that point, what
 the whole paragraph says. A record with several points states one key point of
@@ -245,10 +253,7 @@ figure, a table, or a displayed formula or derivation that has a blank line
 before it and a blank line after it is one record that carries `carry`. Its
 points are complete sentences stating what the block states or shows ("Theorem
 1 states that the interval covers the true value at the nominal rate."), and the
-text of the block is not rewritten. "States Theorem 1." is not such a sentence. The command that includes a file
-which derive did not read is such a block too (see "The six actions of the
-skill"): its point says that the file is included there, and its `pending`
-names what that file says as the thing the author has to supply. A record that carries `carry` has `from`: without it nothing
+text of the block is not rewritten. "States Theorem 1." is not such a sentence. A record that carries `carry` has `from`: without it nothing
 says which block is moved. Any other displayed formula or derivation is not a
 block of its own: with no blank line on either side it belongs to the record of
 the paragraph it stands in, and with a blank line on one side only it belongs
@@ -336,8 +341,10 @@ ignores the path: when it does, the file is not a locator's file whatever the
 first said, so a repository of its own inside a directory that the outermost
 repository ignores does not make its files readable. When the outermost
 repository gives no answer for the path, as it gives none for a file inside a
-submodule, the answer of the first stands. A repository between the two is not
-asked. The outline files sit beside the
+submodule, the answer of the first stands; any error of that second question
+counts as no answer. A repository between the two is not
+asked. An outline written before this rule can have locators into such an
+ignored directory that resolved then and do not now. The outline files sit beside the
 manuscript and can reach the author from someone else, so a locator is not
 allowed to make the skill read a file that was kept out of the repository on
 purpose, such as one that holds credentials. The file
@@ -528,8 +535,8 @@ one.
 What the skill shows for a section depends on its approved copy.
 
 - A section that has no approved copy is shown in full: its `heading` and
-  `says`, every paragraph record naming it with its points, and every record
-  that carries `dropped` together with the reason.
+  `says`, every paragraph record naming it with its points and its `note`, and
+  every record that carries `dropped` together with the reason.
 - A section that differs from its approved copy is shown by its differences:
   for each record that was changed, added, removed or moved, the approved
   content and the current content. The skill says that the rest of the section
@@ -691,8 +698,8 @@ and its rules and commands are there for them.
 2. It reads no file outside the repository, other than its own (the temporary
    files it made in the stage directory, and the files of this plugin) and the
    files git itself reads when it is asked (its configuration, its global
-   ignore file, and, for a linked worktree, the repository the worktree
-   belongs to).
+   ignore file, and the git directory of the repository wherever it is, which
+   for a linked worktree is in the repository the worktree belongs to).
 3. It records an approval only from words the author typed in the message it
    answers.
 
@@ -701,7 +708,7 @@ a path leads somewhere else: a symbolic link, `..`, another spelling of a
 directory, a path copied wrongly. They are shell commands, and they are not a
 defence against a repository or a shell that was set up to defeat them. That
 defence belongs to the command-line tool of issue #78, where it can be tested.
-The limits known today are these eight. The list is closed: a limit is added
+The limits known today are these nine. The list is closed: a limit is added
 when one is found, and none is inferred from another. The first is the one the
 skill always sees, and it stops there. No command of the skill looks for the
 others; when the skill notices one of them, it tells the author.
@@ -716,6 +723,7 @@ others; when the skill notices one of them, it tells the author.
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the skill stops or leaves the file unread | None |
 | 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root the skill takes is not the root of the manuscript's repository | The second |
+| 9 | Text in the manuscript or in a file a locator names asks the reader to read another file | The Read tool of the checker agent, and of the skill, can open any path; only their rules keep them to the files they are given | The second |
 
 **derive** produces one section record for each section of the manuscript and
 one paragraph record for each of its paragraphs and blocks. It reads the
@@ -732,17 +740,21 @@ table, for instance), a file git gives no answer for (one in or under a
 directory laid out like a git repository), a missing
 file, a file whose path holds such a character, or a file that is not `.tex`. A
 table or a figure that comes from a file that was not read is still one record
-that carries `carry`, named in the file that includes it. An included file
-that was not read and does not stand inside such a table or figure gets one
-record of its own, on the line where the command that includes it stands. The
-record carries `carry`, its `from` names that command in the file that
-includes it, and its one point says only what that command states, that the
-file is included there, so that the point is supported by the passage its
-`from` names; the point carries `pending`, naming what the author has to supply
-(what the file says) and why the file was not read. The outline then shows the
-gap: status counts the point among those that carry `pending`, and an approval
-shows it. When that command occurs twice in the file, no locator names it, and
-derive stops as it does for any passage whose text occurs twice. Prose that comes
+that carries `carry`, named in the file that includes it. Any other included
+file that was not read gets no record of its own and no locator: derive writes
+one sentence into the `note` of a record it already writes, naming the file
+and saying that it was not read and why. That record is the one of the
+paragraph or block the command stands in; else the one just before it in the
+same section; else the first record after it. The same file included twice is
+a sentence in each record concerned, and never makes derive stop. When the
+manuscript gives no record at all to hold the note, derive tells the author
+which files were not read. Nothing about the content of such a file is stated.
+An approval shows a record's `note` with it, so an approval of the whole
+outline does not pass over the gap. An include command `\input{x}` or
+`\include{x}` names the file `x`, with `.tex` added when `x` has no extension,
+from the directory of the main file as LaTeX takes it; on a file system that
+ignores letter case the same file in another letter case is the same file.
+Prose that comes
 before the first heading and is not the abstract gets one section record,
 whose `heading` is the title of the article: that title is what heads the text
 on the page, as in APA style, where the introduction has no heading of its
@@ -772,7 +784,11 @@ paragraph file is empty. Draft needs no manuscript: with none, no ledger names
 it, and the directory of the outline files is the author's decision. When a
 locator the author asked for does not resolve, draft does not rewrite it: it
 says which and why, and asks the author whether to correct it or to leave it
-out of the record.
+out of the record. A file the author points to (a note, an earlier draft, an
+outline of the author's own) is read only after the check the skill runs on
+the manuscript's main file accepts it, and by the path that check gives; when
+the check refuses it, the skill asks the author to paste the text instead.
+The same holds in revise.
 
 Both show the outline to the author before any file is written in the
 repository, and write the files there only after the author agrees. Neither
@@ -806,6 +822,10 @@ that file is the author's decision.
   be neither deleted nor left without a point: the point moves with its `id`,
   and the record keeps a copy of the point's text as a point with a new `id`
   and is given `dropped` with the reason.
+- A record's `note` stays with it when it changes, moves or is given
+  `dropped`; a record that replaces merged records holds their notes, and
+  each record that replaces a split record holds its note. A sentence about an
+  included file that was not read is removed only when the author asks.
 - When the author leaves a paragraph out of the article and its record has
   `from`, the record is not deleted: it is given `dropped` with the reason. A
   record without `from` that the author leaves out is deleted from the file.
@@ -858,11 +878,19 @@ status fails and says so; it does not report the outline as never approved.
 It fails too, and says that the approvals file is at fault, when the
 `sections` of an approval record is not a list of entries that each hold a
 `section` object and a `paragraphs` list of objects. Whenever it fails,
-nothing it printed is a status. When it fails because the section file or the
-paragraph file is missing, or holds a line that is not a record, the skill
+nothing it printed is a status. Before it compares, status runs the check of a
+write on the section file and the paragraph file, and reports no status when
+either fails (an empty paragraph file excepted): jq reads some values that are
+not written as JSON, such as `01`, as if they were. When it fails because the
+section file or the paragraph file is missing or is not a readable regular
+file, or holds a line that is not a record, the skill
 names the file, and the line when the check of a write finds it, and corrects
 nothing: status writes nothing, a file with such a line is corrected through
 revise, and a missing file is the author's to put back.
+When the append itself fails part way (a full disk, for one), part of the
+record can be in the file; the skill then checks the approvals file, and when
+that check fails it says so and stops without trying again, since it never
+changes a line of that file.
 The approve action checks the file the same way before it appends, and appends
 nothing when the file fails or cannot be read: the file was changed by hand,
 the skill says so,
@@ -895,8 +923,10 @@ under it, git refuses to answer. A source there is not read: derive does not
 follow a `.tex` file there, a locator that names a file there does not
 resolve, and a manuscript there stops the skill at its first command, where
 git's own error gives the reason. A `_meta.json` there is still listed,
-because the listing does not ask git; its comparison with the manuscript does
-not run to its end, so the skill asks. With
+because the listing does not ask git; when there is a manuscript, its
+comparison with the manuscript does not run to its end, so the skill asks;
+when there is no manuscript yet, the comparison runs no git, and the file
+counts as compared. With
 the second, git starts no file-watching program that a configuration names. A
 linked worktree, and a repository whose `.git` is a file, are found as before.
 

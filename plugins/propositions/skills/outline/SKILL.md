@@ -678,7 +678,7 @@ draft says what to do.
    ends a complete list. A `STOP` line in its place: the list is not
    complete; stop and say what was printed above it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
-   (`s-` and a short slug), the `heading`, and `says`, one complete sentence stating what the
+   (`s-` and a short slug), the `heading` (for an abstract without one, "Abstract"), and `says`, one complete sentence stating what the
    section says. A heading or a list of topics is not that sentence. Give `role` only when the
    section plainly has one of the ten roles, and `parent` for a subsection.
 
@@ -740,7 +740,8 @@ draft says what to do.
    - The files derive read hold no paragraph and no block at all, so the paragraph file
      would be empty: every section's text is in included files that were not read (step 2),
      or the manuscript has headings and nothing else. The same holds for a section whose text
-     is all in such files when the author gives no sentence for it (step 3). Name the files that were not read; the
+     is all in such files when the author gives no sentence for it (step 3). Both can be seen
+     before anything is staged: stop as soon as they are, without writing the staged files. Name the files that were not read; the
      author can make them readable (track them, or move them into the repository) and derive
      again.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's

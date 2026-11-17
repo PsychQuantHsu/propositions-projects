@@ -215,7 +215,7 @@ Each line of `outline-paragraphs.jsonl` SHALL be a paragraph record with these k
 | `carry` | no | `true`: the record stands for a block that is moved unchanged from the passage its `from` names |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
-| `note` | no | A string for the author. The derive action writes into it the included files that it did not read and that stand in or next to the record's passage |
+| `note` | no | A string for the author |
 
 A point SHALL be an object with these keys.
 
@@ -256,7 +256,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix6
+source: idd-75-fix7
 updated: 2026-11-18
 code:
   - propositions-projects.code-workspace
@@ -502,7 +502,7 @@ By default the skill SHALL show the whole outline and ask for approval of the wh
 
 The skill SHALL keep, outside the repository, a copy of the section file and the paragraph file as they were when shown, so that the approval can be recorded when the author's reply arrives in a later message. When the section file or the paragraph file differs from that copy at the time of the approval, when the real path of the outline directory differs from the one recorded when the copy was taken, or when the copy, or the record of which sections were shown, is no longer available, the skill SHALL append nothing and show the sections again. When a paragraph record of the copy names no section record, the skill SHALL append nothing either: it shows that record first, and the record is corrected through revise before the outline is shown again. Before it appends, the skill SHALL check that every line of the approvals file that is not empty is one JSON object written as JSON whose `sections` has the shape the status action requires; when one is not, or the file cannot be read, it SHALL append nothing, say that the file was changed by hand or cannot be read, and leave what to do with it to the author.
 
-When the append fails part way, part of the record can be in the file: the skill SHALL then check the approvals file and, when that check fails, say so and stop without appending again. The skill SHALL append the record as a line of its own: when the last line of the approvals file is not ended by a line break, the skill ends that line first. The line break that ends a line is not part of its content, and the skill SHALL NOT change the content of an earlier line. What the skill writes down for one approval, the author's words and the sections approved, SHALL NOT be used for a later one.
+When writing the record into the approvals file fails, the record may have been appended in whole, in part or not at all: the skill SHALL show the author the check of the approvals file, the status and the last line of the approvals file, say that the approval may or may not be on record, and SHALL NOT append again. The skill SHALL append the record as a line of its own: when the last line of the approvals file is not ended by a line break, the skill ends that line first. The line break that ends a line is not part of its content, and the skill SHALL NOT change the content of an earlier line. What the skill writes down for one approval, the author's words and the sections approved, SHALL NOT be used for a later one.
 
 What the skill shows for a section depends on its approved copy.
 
@@ -608,7 +608,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix6
+source: idd-75-fix7
 updated: 2026-11-18
 code:
   - propositions-projects.code-workspace
@@ -685,9 +685,9 @@ code:
 ---
 ### Requirement: Derive and draft build an outline without inventing content
 
-The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It reads the manuscript's main file by its real path, after confirming again that the file meets the conditions this capability sets for it. It SHALL follow the `.tex` files that the manuscript includes only when they are regular files inside the repository that git lists (tracked, or not tracked and not ignored) and whose path holds no line break and, below the root, no other character that a locator's `file` is not allowed to hold. Any other included file is named to the author and not read: one outside the repository, a symbolic link, a file reached through a directory that is a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores, a file git gives no answer for (one in or under a directory laid out like a git repository), a missing file, a file whose path holds such a character, or a file that is not `.tex`. Any other included file that was not read SHALL get no record of its own and no locator: the action writes one sentence into the `note` of a record it already writes, naming the file as the include command names it (or, when that name holds a character a locator's `file` may not hold, as a file whose name the outline cannot hold) and saying that it was not read; a command inside a LaTeX comment includes nothing. That record is the one of the paragraph or block the command stands in; else the one just before it in the same section; else, when the section has no record of its own, the section record, whose `says` then states only that the section consists of a file that was not read; else the first record after it. The same file included twice is a sentence in each record concerned, and SHALL NOT make the action stop. When the manuscript gives no record to hold the note, the action tells the author which files were not read. An include command `\input{x}` or `\include{x}` names the file `x`, with `.tex` added when `x` has no extension, from the directory of the main file; on a file system that ignores letter case the same file in another letter case is the same file. Prose that comes before the first heading and is not the abstract gets one section record, whose `heading` is the title of the article; the skill tells the author that this section has no heading of its own in the manuscript, and asks what to put in `heading` when the manuscript gives no title. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`, whose point is a complete sentence stating what the block states or shows. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. A theorem-like statement, a figure or a table is named by its own label; the label of a section names the whole section and SHALL NOT be used for a record. The action writes no `lines` and no `commit`, and the `file` of every locator it writes is the name of the file from the root, as the first requirement defines it. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: the text of its `label` and its `starts`, whichever it has, each occur exactly once in the file it names. When a passage that has no label of its own has a text that, to its end, occurs a second time in the same file, as another passage that reads the same or inside a longer one, no locator names it: the action SHALL stop, tell the author which passages they are, show no outline and write nothing to the repository, and SHALL NOT take opening words from the passage that follows. It stops the same way when a file it read is not accepted as a locator's file. A manuscript that has paragraphs SHALL NOT give an empty paragraph file.
+The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It reads the manuscript's main file by its real path, after confirming again that the file meets the conditions this capability sets for it. It SHALL follow the `.tex` files that the manuscript includes only when they are regular files inside the repository that git lists (tracked, or not tracked and not ignored) and whose path holds no line break and, below the root, no other character that a locator's `file` is not allowed to hold. Any other included file is named to the author and not read: one outside the repository, a symbolic link, a file reached through a directory that is a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores, a file git gives no answer for (one in or under a directory laid out like a git repository), a missing file, a file whose path holds such a character, or a file that is not `.tex`. A figure or a table that comes from an included file that was not read is still the one record that carries `carry` for the figure or the table, named in the file that includes it. Any other included file that was not read SHALL get nothing in the outline: no record, no locator, no point and no `note`; the action names it to the author, and the outline does not show the gap (whether it should is open, issue 51). An include command `\input{x}` or `\include{x}` names the file `x.tex`, or, for `\input`, `x` itself when no `x.tex` is found. Since LaTeX looks for it from the directory it is run in, which the skill does not know, the skill looks in this order: `x.tex` from the directory of the main file, then (for `\input`) `x` from it, then the same two from the root; the first that exists is the included file, read only when it is a file the skill reads, and on a file system that ignores letter case the same name in another letter case counts. A command inside a LaTeX comment includes nothing. When all the text of a section is in included files that were not read, the action SHALL ask the author for the section's `says` and SHALL stop when the author gives none. When the files the action read hold no paragraph and no block at all, so that the paragraph file would be empty, the action SHALL stop, say which included files were not read, show no outline and write nothing to the repository. Prose that comes before the first heading and is not the abstract gets one section record, whose `heading` is the title of the article; the skill tells the author that this section has no heading of its own in the manuscript, and asks what to put in `heading` when the manuscript gives no title. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`, whose point is a complete sentence stating what the block states or shows. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. A theorem-like statement, a figure or a table is named by its own label; the label of a section names the whole section and SHALL NOT be used for a record. The action writes no `lines` and no `commit`, and the `file` of every locator it writes is the name of the file from the root, as the first requirement defines it. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: the text of its `label` and its `starts`, whichever it has, each occur exactly once in the file it names. When a passage that has no label of its own has a text that, to its end, occurs a second time in the same file, as another passage that reads the same or inside a longer one, no locator names it: the action SHALL stop, tell the author which passages they are, show no outline and write nothing to the repository, and SHALL NOT take opening words from the passage that follows. It stops the same way when a file it read is not accepted as a locator's file. A manuscript that has paragraphs SHALL NOT give an empty paragraph file.
 
-The draft action SHALL produce section and paragraph records from a title and ideas, or from an outline the author supplies. It needs no manuscript. A file the author points to, or an outline the author supplies as a file, SHALL be read only after the check the skill runs on the manuscript's main file accepts it, and by the path that check gives; when the check refuses it, the skill asks the author to paste the text. When a locator the author asked for does not resolve, the action SHALL NOT rewrite it: it says which and why, and asks the author whether to correct it or to leave it out of the record. A point that would report a result, a number or a citation the author has not supplied SHALL say what will be reported without stating it, and SHALL carry `pending`. When the outline the author supplies has sections and no paragraph yet, the action writes no paragraph record, and the paragraph file is empty.
+The draft action SHALL produce section and paragraph records from a title and ideas, or from an outline the author supplies. It needs no manuscript. A file the author points to, or an outline the author supplies as a file, SHALL be read only after the check the skill runs on the manuscript's main file accepts it, and by the path that check gives; that run concerns that file only and does not change which file is the manuscript's main file; when the check refuses it, the skill asks the author to paste the text. When a locator the author asked for does not resolve, the action SHALL NOT rewrite it: it says which and why, and asks the author whether to correct it or to leave it out of the record. A point that would report a result, a number or a citation the author has not supplied SHALL say what will be reported without stating it, and SHALL carry `pending`. When the outline the author supplies has sections and no paragraph yet, the action writes no paragraph record, and the paragraph file is empty.
 
 Both actions SHALL show the outline to the author before any file is written in the repository, and SHALL write the files there only after the author agrees. Agreeing to have the files written is not an approval of the outline, and neither action appends an approval record. Neither action SHALL overwrite or add to existing outline files: when `outline-sections.jsonl` or `outline-paragraphs.jsonl` exists, the action stops and says that revise is the action to use. When only `outline-approvals.jsonl` exists, the action SHALL stop too: a new outline is not started beside the approvals of an earlier one, and what to do with that file is the author's decision.
 
@@ -721,7 +721,7 @@ No executable check: this change adds no test target; the examples and tests of 
 #### Scenario: A file included from outside the repository
 
 - **WHEN** the manuscript includes a file by a path that leads outside the repository
-- **THEN** the derive action does not read that file, tells the author which file it is, names it in the `note` of a record it writes, and goes on with the rest of the manuscript
+- **THEN** the derive action does not read that file, tells the author which file it is, writes nothing for it in the outline, and goes on with the rest of the manuscript
 
 #### Scenario: Two proofs that read the same
 
@@ -741,12 +741,22 @@ No executable check: this change adds no test target; the examples and tests of 
 #### Scenario: An included section that git ignores
 
 - **WHEN** the manuscript includes `sections/generated.tex`, a file inside the repository that git ignores, by a command that stands between two paragraphs of prose and occurs once
-- **THEN** the outline has no record for the command; the `note` of the record of the paragraph before it names the file and says that it was not read, and an approval shows that note
+- **THEN** the outline holds nothing for the command or the file, and the derive action names `sections/generated.tex` to the author as a file that was not read
 
 #### Scenario: The same unread file included twice
 
 - **WHEN** the manuscript writes `We surveyed \input{stats/N} adults.` in one paragraph and `Participants were \input{stats/N} adults.` in another, and `stats/` is ignored by git
-- **THEN** the derive action does not stop: the `note` of each of the two paragraph records names `stats/N` as not read, and no locator names the command
+- **THEN** the derive action does not stop: it writes the two paragraph records, nothing for `stats/N`, and names `stats/N` to the author as a file that was not read
+
+#### Scenario: Every section's text is in files that were not read
+
+- **WHEN** the main file holds `\section{Introduction}` followed by `\input{sections/intro}` and `\section{Method}` followed by `\input{sections/method}`, and `sections/` is ignored by git
+- **THEN** the derive action stops, names the two files as not read, shows no outline and writes nothing to the repository
+
+#### Scenario: A file name with a dot
+
+- **WHEN** the manuscript writes `\input{ch1.final}` and `ch1.final.tex` is a file git tracks in the directory of the main file
+- **THEN** the derive action reads `ch1.final.tex`
 
 #### Scenario: A displayed formula inside a paragraph
 
@@ -755,7 +765,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix6
+source: idd-75-fix7
 updated: 2026-11-18
 code:
   - propositions-projects.code-workspace
@@ -780,7 +790,7 @@ Leaving a section out and moving a section SHALL leave every `parent` naming a s
 - When the author leaves a section out, three things happen in this order. First, the sections under it are settled: each is left out with it, or is given another `parent` or none, as the author says; the skill asks when the author has not said. Second, each paragraph record naming the section is left out by the rule above. Third, the skill looks at what still names the section: when no paragraph record and no section record names it any more, the section record is deleted from the file; otherwise it stays and is given `dropped` with the reason.
 - A section that is moved takes the sections under it along, so that they stay on later lines than it. A section is not moved to a line before its own `parent`: it is given another `parent`, or none, first, as the author says. The skill asks when the author has not said.
 
-A record's `note` stays with it when it changes, moves or is given `dropped`; a record that replaces merged records holds their notes, and each record that replaces a split record holds its note. A sentence about an included file that was not read is removed only when the author asks. A file the author points to during a revision is read under the same rule as in draft.
+A record's `note` stays with it when it changes, moves or is given `dropped`; a record that replaces merged records holds their notes, and each record that replaces a split record holds its note. A file the author points to during a revision is read under the same rule as in draft.
 
 When a revision leaves a `uses` entry that names a later line, a record that is no longer in the file or a record that carries `dropped`, the skill tells the author and SHALL NOT delete the entry itself.
 
@@ -835,7 +845,7 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix6
+source: idd-75-fix7
 updated: 2026-11-18
 code:
   - propositions-projects.code-workspace
@@ -973,7 +983,7 @@ code:
 ---
 ### Requirement: Text from the manuscript and the author never becomes part of a command
 
-The skill SHALL NOT write text taken from the manuscript, from an outline file or from the author into the text of a command. Such text (the opening words of a passage, a sentence, an `id`, the name of a file a locator gives, the author's approving words) SHALL reach a command only from a file that the command reads. A command that hands such a value on to a tool SHALL hand it on so that the shell interprets no character of it. A path the skill does write in a command SHALL be written so that the shell interprets no character of it. The paths the skill writes in its commands are the root, the outline directory, the stage directory, the directory that holds the manuscript and the manuscript's main file. Each SHALL begin with `/`: a path among them that is empty or not written out in full stops the skill, and so does a path that holds a single quote. The one exception is the manuscript's main file in the command that compares a ledger with it: left empty there, it means that there is no manuscript yet. The paths of the ledgers' `_meta.json` files SHALL reach a command only from a list in the stage directory, not written into the command. The task message the skill gives to the agent of the premise check is held to the same rule: it holds paths the skill made, and none of that text.
+The skill SHALL NOT write text taken from the manuscript, from an outline file or from the author into the text of a command. Such text (the opening words of a passage, a sentence, an `id`, the name of a file a locator gives, the author's approving words) SHALL reach a command only from a file that the command reads. A command that hands such a value on to a tool SHALL hand it on so that the shell interprets no character of it. A path the skill does write in a command SHALL be written so that the shell interprets no character of it. The paths the skill writes in its commands are the root, the outline directory, the stage directory, the directory that holds the manuscript, the manuscript's main file, and a file the author points to in draft or revise (a source, or an outline of the author's own), which the skill checks the way it checks the main file before it reads it. Each SHALL begin with `/`: a path among them that is empty or not written out in full stops the skill, and so does a path that holds a single quote. The one exception is the manuscript's main file in the command that compares a ledger with it: left empty there, it means that there is no manuscript yet. The paths of the ledgers' `_meta.json` files SHALL reach a command only from a list in the stage directory, not written into the command. The task message the skill gives to the agent of the premise check is held to the same rule: it holds paths the skill made, and none of that text.
 
 A check of the skill counts as passed only when its command reports success in words. A check whose command prints nothing, fails, or cannot run SHALL be treated as failed. When a tool that the skill's commands need (`jq`, `realpath`, `git`) is not installed, the skill SHALL stop and say which tool is missing. It SHALL stop too when its `jq` reads two long numbers that differ as the same number, as versions before 1.7 do; when its `git` is older than 2.38, the first version that knows the setting `safe.bareRepository`; and when the system's `pwd` is in neither `/usr/bin` nor `/bin`: the names of directories rest on it, and the skill looks for it nowhere else. The other tools are found through `PATH`. A variable named `TOOLS` or `ROOT` in the author's environment SHALL NOT change what the first command does. When the first command finds no git repository for the directory, or git cannot say whether that repository is checked out inside another, it says so in a line of its own that begins with `STOP`.
 
@@ -1017,7 +1027,7 @@ No executable check: this change adds no test target; the examples and tests of 
 - **THEN** the skill stops, says which tool is missing, and reports no write as done
 
 <!-- @trace
-source: idd-75-fix6
+source: idd-75-fix7
 updated: 2026-11-18
 code:
   - propositions-projects.code-workspace

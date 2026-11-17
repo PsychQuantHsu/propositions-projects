@@ -31,6 +31,7 @@
   - 第三次，對 `beb4242`（`aa8a63d` 改過指令之後）：6 處（硬連結與 GNU `realpath` 時名稱不同、被拒絕的那一種只有最外層會拒、git 自己讀的設定、「整條路徑」不分大小寫、`file` 的用詞、tasks 2.3 的驗證條件），改在 `c6480af`，只改文字。
 - [x] 4.4 獨立讀者只拿最後的 OUTLINE.md 作答，題組加上這一輪改過的規則。完成時：記下讀的 commit、題數、與預存答案不同的題；不同的逐題處理。處理時若改了 OUTLINE.md，改到的題由另一位讀者重答；記下最後還有幾題不同。
   - 第十九位讀者讀 `aa8a63d` 的 OUTLINE.md，213 題（加了 30 題這一輪的規則）：209 題與預存答案相同，4 題少答了一部分（G19、G45、H24、I18），沒有不同的；它標出第二項保證「不讀 repo 以外的檔」照字面也涵蓋 skill 自己的暫存檔（G55），句子在 `beb4242` 改了。第二十位讀者讀 `beb4242`，重答 7 題，全部相同。第三次對照之後 OUTLINE.md 又改了，第二十一位讀者讀 `c6480af`，重答受影響的 7 題，全部相同；它標出「keeps the name it was given」沒說是誰給的名稱（J28），句子在封存前的 commit 改明確。最後與預存答案不同的題是 0。
+  - 2026-11-18 更正（第六輪驗證第 16 列）：上一句只對 `c6480af` 成立。`2bd462a` 依第二十一位讀者的意見改了 J28 那一句，之後沒有讀者重答 J28；補讀由 `idd-75-fix6` 的 3.3 做。
 - [x] 4.5 全套 pytest 通過；spectra validate 與 spectra analyze 沒有錯誤；`plugins/propositions/scripts`、`plugins/tschema-check`、`tests` 相對於 main 沒有變動。
   - `pytest tests/`：872 passed、3 skipped。`spectra validate` 通過；`spectra analyze` 沒有 warning。三個目錄相對於 main 沒有變動。
 - [x] 4.6 issue 上的紀錄，對應第 10、20 列。完成時：#78 的正文與第一輪 Follow-up 留言裡「其餘」的清單與 Swift 規則的 14 項一致；逐段實跑的案例表（每一項的指令段、情境與預期）貼在 #78，不含本機路徑。

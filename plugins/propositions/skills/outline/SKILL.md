@@ -691,9 +691,12 @@ draft says what to do.
 
    An `\input` or `\include` of a file that was not read (step 2), standing outside a figure
    or a table, gets no record of its own and no locator. It is written into the `note` of a
-   record this step or step 4 already writes, as one sentence that names the file and says
-   that it was not read and why ("`sections/generated.tex` is included here and was not read,
-   because git ignores it; what it says is not in this outline."). The record is chosen in
+   record this step or step 4 already writes, as one sentence that names the file as the
+   command names it and says that it was not read ("`stats/N` is included here and was not
+   read; what it says is not in this outline."). Add the reason only when you know it without
+   running anything for it (the path leads outside the repository, the file is not `.tex`);
+   no command is run to find it. A command inside a LaTeX comment includes nothing and gets
+   no sentence. The record is chosen in
    this order, and only this order: the record of the paragraph or block the command stands
    in; else the record of the paragraph or block that comes just before it in the same
    section; else the first record after it. A record that holds several such commands names

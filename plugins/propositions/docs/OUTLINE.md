@@ -743,7 +743,9 @@ table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
 file that was not read gets no record of its own and no locator: derive writes
 one sentence into the `note` of a record it already writes, naming the file
-and saying that it was not read and why. That record is the one of the
+as the include command names it and saying that it was not read (and why,
+only when that is known without running anything for it). A command inside a
+LaTeX comment includes nothing. That record is the one of the
 paragraph or block the command stands in; else the one just before it in the
 same section; else the first record after it. The same file included twice is
 a sentence in each record concerned, and never makes derive stop. When the

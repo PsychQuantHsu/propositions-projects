@@ -32,9 +32,15 @@ func lines(_ count: Int, _ special: [Int: String] = [:]) -> String {
 func prop(_ id: String, _ location: String, cites: [String] = [], type: String = "claim",
           retired: Bool = false) -> String {
     var object: [String: Any] = ["id": id, "location": location, "cites": cites, "claim_type": type]
-    if retired { object["retired"] = ["mechanism": "removed", "reason": "test"] }
+    if retired {
+        object["retired"] = ["since": "2026-11-01", "mechanism": "removed", "match": "exact", "reason": "test"]
+    }
     let data = try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     return String(decoding: data, as: UTF8.self)
 }
 
 func ledger(_ lines: String...) -> Ledger { Ledger(jsonl: lines.joined(separator: "\n") + "\n") }
+
+/// The root of this repository, found from the path of this file.
+let repositoryRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

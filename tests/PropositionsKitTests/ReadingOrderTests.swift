@@ -14,7 +14,8 @@ struct LocationTests {
         #expect(Location.parse(raw) == Location(file: file, start: start, end: end))
     }
 
-    @Test(arguments: ["main.tex:12", "L0", "L9-L3", "12", "L", "Lx", "a b.tex:L1", "a.tex:b.tex:L1", "L1-", "L1-L2-L3", ""])
+    @Test(arguments: ["main.tex:12", "L0", "L9-L3", "12", "L", "Lx", "a b.tex:L1", "a.tex:b.tex:L1", "L1-", "L1-L2-L3", "",
+                     "/parts/a.tex:L1", "/main.tex:L1"])
     func `A location the schema does not allow is refused`(raw: String) {
         #expect(Location.parse(raw) == nil)
     }
@@ -165,14 +166,14 @@ struct ReadingOrderTests {
         #expect(try manuscript.order().files == ["main.tex", "a.tex"])
     }
 
-    // spec-example: citation-order / lines are counted as the ledger tools count them
-    @Test func `Lines are counted as the ledger tools count them`() throws {
-        // A form feed and a lone carriage return each end a line, as Python's splitlines has it.
+    // spec-example: citation-order / lines are counted as the tool that writes locations counts them
+    @Test func `Lines are counted as the tool that writes locations counts them`() throws {
+        // A line feed, a carriage return and the two together end a line; a form feed does not.
         let manuscript = try Manuscript([
             "main.tex": "one\u{0C}x\u{0C}two\nthree\r\\input{a}\r\nsix\n",
             "a.tex": lines(2),
         ])
-        #expect(try manuscript.order().position(file: "a.tex", line: 1) == [5, 1, 1])
+        #expect(try manuscript.order().position(file: "a.tex", line: 1) == [3, 1, 1])
     }
 
     // spec-example: citation-order / the main file under another name
@@ -182,14 +183,10 @@ struct ReadingOrderTests {
             "main.tex": lines(5),
         ])
         let order = try ReadingOrder(mainFile: manuscript.root.appendingPathComponent("thesis.tex"))
-        #expect(order.position(file: "thesis.tex", line: 3) == [3])   // the main file's own name
         #expect(order.position(file: nil, line: 3) == [3])
-        #expect(order.position(file: "main.tex", line: 3) == [10, 1, 3])  // a sub-file called main.tex
-    }
-
-    @Test func `The legacy prefix main.tex names the main file when no sub-file has that name`() throws {
-        let manuscript = try Manuscript(["thesis.tex": lines(5)])
-        let order = try ReadingOrder(mainFile: manuscript.root.appendingPathComponent("thesis.tex"))
+        #expect(order.position(file: "thesis.tex", line: 3) == [3])  // the main file's own name
+        // `main.tex` always means the main file, as the tool that writes locations has it; the
+        // included file of that name cannot be named by a location.
         #expect(order.position(file: "main.tex", line: 3) == [3])
     }
 
@@ -208,5 +205,48 @@ struct ReadingOrderTests {
         #expect(throws: InputTreeError.missing(target: ".tex", in: "main.tex", line: 1)) {
             try manuscript.order()
         }
+    }
+
+    // spec-example: citation-order / an environment ends only at its own end
+    @Test func `An environment ends only at its own end`() throws {
+        let manuscript = try Manuscript([
+            "main.tex": "\\begin{verbatim}\n\\end{comment}\n\\input{gone}\n\\end{verbatim}\n\\input{a}\n",
+            "a.tex": lines(2),
+        ])
+        #expect(try manuscript.order().files == ["main.tex", "a.tex"])
+    }
+
+    @Test(arguments: [
+        "\\begin{comment}ignored\\end{comment}\\input{a}\n",
+        "\\begin{verbatim}50% \\input{gone}\\end{verbatim}\n\\input{a}\n",
+        "\\input{a}\\begin{verbatim}\n\\input{gone}\n\\end{verbatim}\n",
+    ])
+    func `An include beside an environment on one line is followed`(main: String) throws {
+        let manuscript = try Manuscript(["main.tex": main, "a.tex": lines(2)])
+        #expect(try manuscript.order().files == ["main.tex", "a.tex"])
+    }
+
+    // spec-example: citation-order / an import macro that is not followed
+    @Test func `An import macro that is not followed`() throws {
+        let manuscript = try Manuscript([
+            "main.tex": "\\subfile{x}\\input{a}\n\\import{dir/}{y}\n",
+            "a.tex": lines(2),
+        ])
+        let order = try manuscript.order()
+        #expect(order.files == ["main.tex", "a.tex"])
+        #expect(order.skippedImports == ["main.tex:1", "main.tex:2"])
+    }
+
+    // spec-example: citation-order / a file reached through a symbolic link
+    @Test func `A file reached through a symbolic link`() throws {
+        let manuscript = try Manuscript([
+            "main.tex": "\\input{a}\n\\input{b}\n",
+            "a.tex": lines(2),
+        ])
+        try FileManager.default.createSymbolicLink(
+            at: manuscript.root.appendingPathComponent("b.tex"),
+            withDestinationURL: manuscript.root.appendingPathComponent("a.tex"))
+        // b.tex is a.tex: one file, counted where it is first included.
+        #expect(try manuscript.order().files == ["main.tex", "a.tex"])
     }
 }

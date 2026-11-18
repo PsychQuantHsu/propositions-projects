@@ -25,10 +25,10 @@ The two listings must agree per plugin. **A mismatch blocks the release** — fi
 
 ```bash
 git tag v<X.Y.Z>
-git push origin main --tags
+git push origin main v<X.Y.Z>
 ```
 
-One tag per release commit; the tag is what pinned consumers (CI workflows) check out.
+One plugin tag per release commit; the tag is what pinned consumers (CI workflows) check out. Push the tag by name, not with `--tags`: the binary has its own tags (see "Releasing the command-line binary"), and `--tags` would publish any of them that is still local.
 
 ## 5. Release notes — pinned entry-point contract statement (required field)
 

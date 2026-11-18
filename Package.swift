@@ -15,11 +15,11 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
-        .target(name: "PropositionsKit"),
-        .executableTarget(name: "propositions", dependencies: [
-            "PropositionsKit",
+        // The command line is parsed in the library, so that arguments and exit codes are tested.
+        .target(name: "PropositionsKit", dependencies: [
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
         ]),
+        .executableTarget(name: "propositions", dependencies: ["PropositionsKit"]),
         .executableTarget(name: "tschema-check", dependencies: ["PropositionsKit"]),
         // The path is spelled out: the repository already has a lower-case `tests/` (pytest), and
         // SwiftPM's default `Tests/` is another directory on a case-sensitive file system.

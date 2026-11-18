@@ -45,7 +45,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 這是封閉列舉，只有四類，不得依性質相似類推出第五類。
 
 1. **Swift binary 還不存在、或使用端沒有 binary 時才需要的殼層。** 這一類只有三種：
-   - plugin 下載 binary 的 wrapper，照 Akashic-Library 的 `plugin/bin/akashic-mcp-wrapper.sh` 寫；
+   - plugin 取得 binary 的 wrapper。放在哪裡、下載後怎麼驗證還沒有定（見本條末段），**不要照抄
+     Akashic-Library 把它放進 plugin 的 `bin/`**；
    - 編排 `codesign`、`notarytool` 的 release 腳本，照 Akashic-Library 的 `scripts/release-signed.sh` 寫；
    - 根目錄 `scripts/` 的轉接層，但只限於使用者依〈移植〉第 6 步決定保留它們之後，改寫成只取得並呼叫
      binary 的版本。
@@ -132,9 +133,10 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
      和 Python 版相同；做不到的列為刻意差異，並在同一個變更裡改掉所有判讀那個結束碼的呼叫端。
    - 參考稿件在作者的私有 repo，位置不寫進這個公開 repo；需要時問使用者。
    - 刻意的差異逐條列在該次的 issue。
-3. **先發布，再換呼叫端。** 還沒有 wrapper 與 release 時，先依〈例外〉第 1 類建立。發布簽過章的
+3. **先發布，再換呼叫端。** 還沒有 release 時，先依〈例外〉第 1 類建立發布腳本；plugin 怎麼取得 binary
+   由維護者在第一次發布時決定（〈例外〉第 1 類末段）。發布簽過章的
    release 會讓檔案離開這台電腦，依全域 `CLAUDE.md`〈不可逆的事 Claude 不自己做〉，先列 operation
-   格式等使用者確認。發布後用 wrapper 下載的 binary 實際跑一次要切換的 skill。
+   格式等使用者確認。發布後用 plugin 實際取得的那份 binary 跑一次要切換的 skill。
 4. **同一個變更改掉所有指向舊 `.py` 的地方**：skill（含 SKILL.md 裡的程式區塊）、`plugins/*/rules/`
    這些隨 plugin 出貨的規則、`docs/`、`openspec/specs/`、`CLAUDE.md`、README。
 5. **沒有人再載入它，才刪 Python 版。** 只要還有任何剩下的 Python 程式（腳本、`_lib`、SKILL.md 裡的
@@ -152,7 +154,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
   apple-xcode-skills 裡對應的 skill。測試用 Swift Testing，從 XCTest 的寫法轉換時看
   `apple-xcode-skills:test-modernizer`。
 - 外部套件比照 AkashicKit：YAML 用 Yams，命令列用 swift-argument-parser。
-- binary 隨 GitHub release 發布，簽章並 notarize，由 plugin 的 wrapper 下載，做法照 Akashic-Library。
+- binary 隨 GitHub release 發布，簽章並 notarize（`scripts/release-signed.sh`，流程見 `docs/RELEASE-FLOW.md`）。
+  plugin 怎麼取得它還沒有定，不照 Akashic-Library 放 `bin/`（〈例外〉第 1 類末段）。
   `plugin.json` 的版本和 binary 的 release tag 分開記，原因見 Akashic-Library #275：只改 plugin 外殼時
   也會升版本，但那個版本並沒有對應的 release。
 
@@ -213,7 +216,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 | 2026-11-16 | #75 第三輪驗證指出：第 2 類把文件裡的 jq 也算進來，`docs/RELEASE-FLOW.md` 既有的兩行因此不屬於任何類別；第 4 類的退場條件只涵蓋六段 jq 裡的三段；守門這類用 `&&` 串起幾個工具的檢查列不屬於任何一類 | 第 2 類的 jq 只算 SKILL.md 裡的；退場條件改成子命令涵蓋每一段之後；〈不適用〉第 1 類當時加了一份指令列可以用的接法清單，2026-11-17 退回（見下一列） |
 | 2026-11-17 | #75 第四輪驗證指出：2026-11-16 加在〈不適用〉第 1 類的接法清單對整個 repo 都適用，超出 2026-11-15「記一條指名的例外」的決定，也沒有另外的決定；清單用寫法劃界（`[ x ] && a \|\| b` 就是 `if`／`else`），照它自己的標準也沒有涵蓋 outline 用到的參數展開；第 4 類的標題仍說到 #78 為止 | 維護者選「退回，併入例外第 4 類」：〈不適用〉第 1 類退回原本的字句；第 4 類改成點名那份 SKILL.md 的指令區塊（jq 程式與同一區塊的 shell 指令），標題改成與退場條件一致。**不要用接法或寫法的清單去界定什麼是指令列**：2026-11-16 那一次就是這樣超出範圍的。其他 skill 裡既有的 `for`、`if` 與子 shell 不屬於任何一類，另記在 #86 |
 | 2026-11-17 | #75 第五輪驗證指出：第 4 類說整個指令區塊都算，接著列的 12 項工作卻漏了三段（確認還沒有綱要檔、顯示綱要目錄、記下展示了哪些節），退場條件依這份清單，於是那三段沒有退場條件 | 清單補成 14 項，對那份 SKILL.md 的 19 段指令逐段對過。**清單要跟著指令區塊走**：在那份 SKILL.md 加一段指令時，同一個變更裡把它做的事加進清單 |
-| 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。`\input` 樹與 `location` 的解析因此有 Python 與 Swift 兩份 | 現況、語言組成與〈例外〉第 1 類的檔數更新。**兩份解析要一起改**：改 `_lib/latex_env_parser.py` 的 `resolve_input_tree` 或 `parse_location_v16` 時，`Sources/PropositionsKit/ReadingOrder.swift` 與 `Location.swift` 要跟著改，測試用同樣的案例；驗證器移植之後只留 Swift 那一份 |
+| 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：讀帳冊的一行、讀 `location`、讀 `\input` 樹與行號。#46 的兩輪驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **Swift 版要對齊的是寫 `location` 的工具 `refresh-prop-locations.py`**（行在 LF、CR、CRLF 結束；`main.tex:` 一律指主檔），讀帳冊的部分對齊驗證器的 `retired_problem`。改那支工具數行或寫檔名的方式、`parse_location_v16`、`retired_problem` 時，同一個變更要改 `Sources/PropositionsKit/` 的 `ReadingOrder.swift`、`Location.swift`、`LedgerReader.swift`，測試用同樣的案例。規格 `umbrella-marketplace-layout` 寫了同一件事。Python 的 `resolve_input_tree` 讀 `\input` 樹比 Swift 版粗（#94），那是刻意留著的差異 |
 
 ## 語言組成（2026-11-19 量，只計受追蹤的檔）
 

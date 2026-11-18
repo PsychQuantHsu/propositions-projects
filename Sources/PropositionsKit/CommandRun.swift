@@ -23,21 +23,28 @@ public enum CiteOrderRun {
     public static let defaultLedger = "manuscript/propositions/main.jsonl"
     public static let defaultMainFile = "manuscript/main.tex"
 
-    public static func run(jsonl: String, tex: String, json: Bool) -> CommandResult {
-        guard let text = try? String(contentsOf: URL(fileURLWithPath: jsonl), encoding: .utf8) else {
+    /// Paths that are not absolute are taken from `workingDirectory`. Messages show a path as
+    /// it was given, and text that comes from a file with its control characters escaped.
+    public static func run(jsonl: String, tex: String, json: Bool, workingDirectory: URL) -> CommandResult {
+        func resolve(_ path: String) -> URL {
+            path.hasPrefix("/") ? URL(fileURLWithPath: path) : workingDirectory.appendingPathComponent(path)
+        }
+        let ledgerURL = resolve(jsonl)
+        let mainURL = resolve(tex)
+        guard let text = try? String(contentsOf: ledgerURL, encoding: .utf8) else {
             return CommandResult(stderr: ["cite-order: cannot read the ledger \(jsonl)"], exitCode: 2)
         }
-        guard FileManager.default.fileExists(atPath: tex) else {
+        guard FileManager.default.fileExists(atPath: mainURL.path) else {
             return CommandResult(stderr: ["cite-order: cannot read the main file \(tex)"], exitCode: 2)
         }
         let order: ReadingOrder
         do {
-            order = try ReadingOrder(mainFile: URL(fileURLWithPath: tex))
+            order = try ReadingOrder(mainFile: mainURL)
         } catch {
-            return CommandResult(stderr: ["cite-order: \(error)"], exitCode: 2)
+            return CommandResult(stderr: ["cite-order: \(CiteOrder.visible("\(error)"))"], exitCode: 2)
         }
         let notes = order.skippedImports.map {
-            "[warn] non-standard import macro skipped at \($0) (\\subimport/\\subfile unsupported)"
+            "[warn] non-standard import macro skipped at \(CiteOrder.visible($0)) (\\subimport/\\subfile/\\import unsupported)"
         }
         let report = CiteOrder.check(ledger: Ledger(jsonl: text), order: order)
         let lines: [String]

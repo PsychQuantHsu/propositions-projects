@@ -32,10 +32,13 @@ public enum InputTreeError: Error, Equatable, CustomStringConvertible {
 /// line that includes it, before the next line of the including file, and before the file
 /// that a later include on the same line names.
 ///
-/// The input tree is read as `resolve_input_tree` of the Python tools reads it
-/// (plugins/propositions/scripts/_lib/latex_env_parser.py), with one difference: a verbatim-like
-/// environment that begins inside a `%` comment, or begins and ends on one line, does not hide
-/// the lines after it (the Python function still has that fault, issue 94). Change the two together.
+/// What this has to agree with is the tool that writes `location`,
+/// plugins/propositions/scripts/refresh-prop-locations.py: a line number in a ledger is the
+/// number that tool counted, and a file name is the name it wrote. So lines end where that tool
+/// ends them (line feed, carriage return, or the two together), and the prefix `main.tex`
+/// always means the main file. The tree itself is read more carefully than the Python
+/// `resolve_input_tree` reads it (issue 94): a file that function leaves out can hold no
+/// location the tool wrote, so reading it changes no answer.
 public struct ReadingOrder: Sendable {
     public static let maxDepth = 3
 
@@ -64,24 +67,12 @@ public struct ReadingOrder: Sendable {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else {
                 throw InputTreeError.unreadable(file: name)
             }
-            var inVerbatim = false
+            var environment: String?  // the verbatim-like environment the scan is inside, if any
             for (index, raw) in LatexLine.splitLines(text).enumerated() {
                 let lineNumber = index + 1
-                if inVerbatim {
-                    if LatexLine.endsVerbatim(raw) { inVerbatim = false }
-                    continue
-                }
-                let line = LatexLine.stripComment(raw)
-                if LatexLine.beginsVerbatim(line) {
-                    // An environment that also ends on this line hides nothing after it.
-                    inVerbatim = !LatexLine.endsVerbatim(line)
-                    continue
-                }
-                if LatexLine.hasUnsupportedImport(line) {
-                    skipped.append("\(name):\(lineNumber)")
-                    continue
-                }
-                for (offset, target) in LatexLine.inputTargets(line).enumerated() {
+                let found = LatexLine.scan(raw, environment: &environment)
+                if found.unsupportedImport { skipped.append("\(name):\(lineNumber)") }
+                for (offset, target) in found.targets.enumerated() {
                     if target.hasPrefix("/") || target.hasPrefix("\\\\") {
                         throw InputTreeError.absolute(target: target, in: name, line: lineNumber)
                     }
@@ -117,15 +108,16 @@ public struct ReadingOrder: Sendable {
 
     /// The position of a line, or `nil` when the file is not in the input tree.
     ///
-    /// A location names the main file when it writes no file or writes the main file's own
-    /// name. The name `main.tex` in a manuscript whose main file has another name means a
-    /// sub-file of that name when the tree holds one, and the main file otherwise (ledgers
-    /// written before schema v1.6 prefix every location with `main.tex`).
+    /// A location names the main file when it writes no file, writes `main.tex`, or writes the
+    /// main file's own name. `main.tex` means the main file whatever the main file is called:
+    /// the tool that writes locations writes that prefix for every proposition of the main
+    /// file. An included file that is itself called `main.tex`, beside a main file of another
+    /// name, can therefore not be named by a location.
     public func position(file: String?, line: Int) -> [Int]? {
         guard let file else { return [line] }
         let key = ReadingOrder.normalise(file)
+        if key == "main.tex" || key == mainName { return [line] }
         if let prefix = prefixes[key] { return prefix + [line] }
-        if key == mainName || key == "main.tex" { return [line] }
         return nil
     }
 
@@ -159,14 +151,9 @@ public struct ReadingOrder: Sendable {
 enum LatexLine {
     static let verbatimEnvironments = ["verbatim", "Verbatim", "lstlisting", "comment", "filecontents"]
 
-    /// The characters that end a line for Python's `str.splitlines`, which the tools that write
-    /// `location` use: line numbers have to be counted the same way here.
-    private static let lineEnds: Set<Unicode.Scalar> = [
-        "\n", "\r", "\u{0B}", "\u{0C}", "\u{1C}", "\u{1D}", "\u{1E}", "\u{85}", "\u{2028}", "\u{2029}",
-    ]
-
-    /// The lines of a text, split where `str.splitlines` splits (`\r\n` is one line end, and a
-    /// text that ends with a line end has no empty last line).
+    /// The lines of a text, split where the tool that writes `location` splits them: at a line
+    /// feed, at a carriage return, and at the two together as one line end. A form feed and the
+    /// other characters Python's `str.splitlines` splits at do not end a line here.
     static func splitLines(_ text: String) -> [String] {
         var lines: [String] = []
         var current = String.UnicodeScalarView()
@@ -177,7 +164,7 @@ enum LatexLine {
                 continue
             }
             previousWasCR = scalar == "\r"
-            if lineEnds.contains(scalar) {
+            if scalar == "\n" || scalar == "\r" {
                 lines.append(String(current))
                 current = String.UnicodeScalarView()
             } else {
@@ -188,24 +175,62 @@ enum LatexLine {
         return lines
     }
 
-    /// Drops everything from an unescaped `%` on. `\%` is a percent sign; `\\%` is a line
-    /// break followed by a comment.
-    static func stripComment(_ line: String) -> String {
-        var run = 0
-        var out = ""
-        for ch in line {
-            if ch == "%" && run % 2 == 0 { return out }
-            run = ch == "\\" ? run + 1 : 0
-            out.append(ch)
-        }
-        return out
+    /// What one line holds outside comments and verbatim-like environments.
+    struct Found {
+        var targets: [String] = []
+        var unsupportedImport = false
     }
 
-    static func beginsVerbatim(_ line: String) -> Bool { marks(line, "\\begin{") }
-    static func endsVerbatim(_ line: String) -> Bool { marks(line, "\\end{") }
+    /// Reads one line. `environment` is the verbatim-like environment the line starts inside, and
+    /// is left as the one it ends inside. An environment ends only at its own `\end`; a `%`
+    /// starts a comment only outside one; text before and after an environment on the same line
+    /// is read like any other.
+    static func scan(_ raw: String, environment: inout String?) -> Found {
+        var found = Found()
+        var rest = raw[...]
+        while true {
+            if let inside = environment {
+                let ends = ["\\end{\(inside)}", "\\end{\(inside)*}"].compactMap { rest.range(of: $0) }
+                guard let end = ends.min(by: { $0.lowerBound < $1.lowerBound }) else { return found }
+                environment = nil
+                rest = rest[end.upperBound...]
+                continue
+            }
+            let comment = commentStart(rest)
+            var begin: (range: Range<Substring.Index>, name: String)?
+            for name in verbatimEnvironments {
+                for marker in ["\\begin{\(name)}", "\\begin{\(name)*}"] {
+                    if let range = rest.range(of: marker), begin == nil || range.lowerBound < begin!.range.lowerBound {
+                        begin = (range, name)
+                    }
+                }
+            }
+            if let begin, comment == nil || begin.range.lowerBound < comment! {
+                read(String(rest[..<begin.range.lowerBound]), into: &found)
+                environment = begin.name
+                rest = rest[begin.range.upperBound...]
+                continue
+            }
+            read(String(comment.map { rest[..<$0] } ?? rest), into: &found)
+            return found
+        }
+    }
 
-    private static func marks(_ line: String, _ opener: String) -> Bool {
-        verbatimEnvironments.contains { line.contains("\(opener)\($0)}") || line.contains("\(opener)\($0)*}") }
+    private static func read(_ text: String, into found: inout Found) {
+        if hasUnsupportedImport(text) { found.unsupportedImport = true }
+        found.targets += inputTargets(text)
+    }
+
+    /// Where a `%` comment starts, if it does. `\%` is a percent sign; `\\%` is a line break
+    /// followed by a comment.
+    private static func commentStart(_ text: Substring) -> Substring.Index? {
+        var run = 0
+        for index in text.indices {
+            let ch = text[index]
+            if ch == "%" && run % 2 == 0 { return index }
+            run = ch == "\\" ? run + 1 : 0
+        }
+        return nil
     }
 
     static func hasUnsupportedImport(_ line: String) -> Bool {

@@ -23,7 +23,8 @@ public struct Location: Equatable, Sendable {
         var rest = Substring(text)
         if let colon = text.range(of: ".tex:") {
             let name = String(text[text.startIndex..<colon.lowerBound]) + ".tex"
-            guard !name.isEmpty, name != ".tex",
+            // A path from the root of the file system is not a path from the main file's directory.
+            guard !name.isEmpty, name != ".tex", !name.hasPrefix("/"),
                   !name.contains(where: { $0 == ":" || $0 == "{" || $0 == "}" || $0.isWhitespace })
             else { return nil }
             file = name

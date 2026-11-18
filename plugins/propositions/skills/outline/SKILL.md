@@ -334,7 +334,8 @@ writes it. A `STOP` line: stop and say why. Each numbered line is a `_meta.json`
 list is kept in the stage directory for the next command. Each `_meta.json` is read by itself,
 so one that cannot be read does not stop the others.
 
-A `_meta.json` that holds exactly one JSON value, an object, has one `ledger` line with the
+A `_meta.json` that holds exactly one JSON value, an object, and that is written as JSON by
+the test of "The write check", has one `ledger` line with the
 same path; the line ends with the `source.file` it gives, or `"?"` when it gives none. Every
 other numbered `_meta.json` was not read as one ledger: it has a `not one ledger` line (it is
 empty, cannot be opened, holds more than one value, holds a value that is not an object, or holds a
@@ -342,7 +343,9 @@ value that is not written as JSON by the test of "The write check": jq also read
 `Infinity` and numbers such as `01` or `.5`, and a file that begins with a byte-order mark),
 or no line at all and an error from jq (a file that passes that test and that jq still cannot
 read, one with a comma too many, for instance). A byte that is not UTF-8 is not reported, as in the write check. For these, go to case 2 below, and
-tell the author which `_meta.json` could not be read: it might be the manuscript's ledger. No
+tell the author which `_meta.json` could not be read: it might be the manuscript's ledger. A
+`not one ledger` line does not say which of these the file is, and the command shows no message
+from jq for it: say only that the file is not one JSON object written as JSON. No
 `ok listed`: `find` itself failed, and the list is not complete. Stop and say what it printed.
 
 Then run this once for each numbered `_meta.json` that has a `ledger` line, with `N` set to its
@@ -669,9 +672,9 @@ draft says what to do.
    a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores (a
    generated table, for instance), a file git gives no answer for (one in or under a
    directory that is laid out like a git repository), a file whose path holds a line break or
-   another character a locator's `file` may not hold, or a missing file. An include of a file
-   that is not `.tex` (a figure, a table, a style file) comes to a missing file: `\input{fig.tikz}`
-   names `fig.tikz.tex`. Tell the author which files were
+   another character a locator's `file` may not hold, or a missing file. An include whose name does not end
+   in `.tex` names the file with `.tex` added (`\input{fig.tikz}` names `fig.tikz.tex`):
+   that file is read when it exists and is a file the skill reads, and is a missing file when it does not exist, the usual case for a figure, a table or a style file kept under its own name. Tell the author which files were
    not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
    it. Any other included file that was not read gets nothing in the outline: no record, no
@@ -746,12 +749,15 @@ draft says what to do.
    - A file that derive read and that the locator commands do not accept: the count prints
      nothing for it, or the listing reports its name. Say what the commands printed.
    - The files derive read hold no paragraph and no block at all, so the paragraph file
-     would be empty. That is so when every section's text is in included files that were not
-     read (step 2), when the manuscript has headings and nothing else, and when some sections
-     are the one and some the other. A figure or a table whose content is in a file that was
-     not read is still a block (step 2), so a manuscript that has one is not this case. The same holds for a section whose text
-     is all in such files when the author gives no sentence for it (step 3). Both can be seen
-     before anything is staged: stop as soon as they are, without writing the staged files. Name the files that were not read; the
+     would be empty. That is so when the files read hold headings and nothing else: every
+     section's text is in included files that were not read (step 2), the manuscript has
+     headings and nothing under them, or some sections are the one and some the other. It is
+     not so when a file derive read holds an abstract or prose before the first heading, which
+     is a paragraph, or a figure or a table whose content is in a file that was not read, which
+     is still a block (step 2). Derive also stops, in the same way, for a section whose text
+     is all in such files when the author gives no sentence for it (step 3). The case itself
+     can be seen before anything is staged, and the missing sentence as soon as the author
+     answers: stop then, without writing the staged files. Name the files that were not read; the
      author can make them readable (track them, or move them into the repository) and derive
      again. A manuscript that has headings and nothing else has no such file: say that draft
      builds an outline from its headings.

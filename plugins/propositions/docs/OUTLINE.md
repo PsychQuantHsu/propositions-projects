@@ -748,8 +748,8 @@ link, a file reached through a directory that is a symbolic link, a file
 inside a `.git` directory in any letter case, a file git ignores (a generated
 table, for instance), a file git gives no answer for (one in or under a
 directory laid out like a git repository), a file whose path holds such a
-character, or a missing file. An include of a file that is not `.tex` names a
-file that is missing (`\input{fig.tikz}` names `fig.tikz.tex`). A
+character, or a missing file. An include whose name does not end in `.tex` names the
+file with `.tex` added (`\input{fig.tikz}` names `fig.tikz.tex`): that file is read when it exists and is a file the skill reads, and is a missing file when it does not exist, the usual case for a figure, a table or a style file kept under its own name. A
 table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
 file that was not read gets nothing in the outline (no record, no locator, no
@@ -760,14 +760,16 @@ not show the gap (whether it should is open, issue #51). An include command
 when it is a file the skill reads, and the skill does not look for it
 anywhere else. On a file system that ignores letter case the same file in
 another letter case is the same file. A command inside a LaTeX comment includes nothing. When the files
-derive read hold no paragraph and no block at all (every section's text is in
-included files that were not read, the manuscript has headings and nothing
-else, or some sections are the one and some the other; a figure or a table
-whose content is in a file that was not read is still a block, so a
-manuscript that has one is not this case), derive stops, says which files were not read, and writes nothing; it
+derive read hold no paragraph and no block at all (they hold headings and
+nothing else: every section's text is in included files that were not read,
+the manuscript has headings and nothing under them, or some sections are the
+one and some the other; an abstract or prose before the first heading in a
+file derive read is a paragraph, and a figure or a table in such a file whose
+content is in a file that was not read is still a block, so a manuscript that
+has either is not this case), derive stops, says which files were not read, and writes nothing; it
 stops before it asks for any section's `says`, and for a manuscript of
-headings only it says that draft builds an outline from headings. When the
-text of only some sections is in such
+headings only it says that draft builds an outline from headings. Otherwise,
+when all the text of a section is in such
 files, derive asks the author for the `says` of each of those sections, since
 it has nothing to state it from, and stops when the author gives none. When such a
 section ends with no paragraph record, of its own or of a section under it,

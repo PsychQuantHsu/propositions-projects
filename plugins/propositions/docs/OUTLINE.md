@@ -130,7 +130,11 @@ in a directory git ignores is listed and compared like any other, and the
 directory of the outline files can be one git ignores. Only the sources are
 held to what git lists: the manuscript, the files it includes and the files a
 locator names. A listed `_meta.json` is read as one ledger when it
-holds exactly one JSON value and that value is an object.
+holds exactly one JSON value, that value is an object, and the file is written
+as JSON by the test the write check applies to an outline file: jq also reads
+`nan`, `Infinity`, numbers such as `01` or `.5`, and a file that begins with a
+byte-order mark, none of which is JSON, and such a file is not read as one
+ledger. A byte that is not UTF-8 is not reported, as in the write check.
 
 **Which directory.** The skill uses a directory without asking only when every
 `_meta.json` it lists was read as one ledger and compared with the manuscript,
@@ -712,7 +716,8 @@ defence against a repository or a shell that was set up to defeat them. That
 defence belongs to the command-line tool of issue #78, where it can be tested.
 The limits known today are these ten. The list is closed: a limit is added
 when one is found, and none is inferred from another. The first and the tenth
-are the ones the skill always sees: it stops at the first, and at the tenth
+are the ones the skill always sees: it stops at the first (for a file the
+author points to in draft or revise, for that file only), and at the tenth
 after its stage directory has been made. No command of the skill looks for the
 others; when the skill notices one of them, it tells the author.
 
@@ -733,7 +738,8 @@ others; when the skill notices one of them, it tells the author.
 one paragraph record for each of its paragraphs and blocks. It reads the
 manuscript's main file by its real path, after confirming again that the file
 is one it reads (see "The three files"). It follows the
-`.tex` files that the manuscript includes only when they are regular files
+files that the manuscript includes, whose names end in `.tex` in any letter
+case, only when they are regular files
 inside the repository that git lists and whose path holds no line break and,
 below the root, no other character that a locator's `file` is not allowed to
 hold. Any other included file
@@ -741,23 +747,33 @@ is named to the author and not read: one outside the repository, a symbolic
 link, a file reached through a directory that is a symbolic link, a file
 inside a `.git` directory in any letter case, a file git ignores (a generated
 table, for instance), a file git gives no answer for (one in or under a
-directory laid out like a git repository), a missing
-file, a file whose path holds such a character, or a file that is not `.tex`. A
+directory laid out like a git repository), a file whose path holds such a
+character, or a missing file. An include whose name does not end in `.tex` in any letter case names the
+file with `.tex` added (`\input{fig.tikz}` names `fig.tikz.tex`): that file is read when it exists and is a file the skill reads, and is a missing file when it does not exist, the usual case for a figure, a table or a style file kept under its own name. A
 table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
 file that was not read gets nothing in the outline (no record, no locator, no
 point, no `note`); derive names it to the author, and the outline itself does
 not show the gap (whether it should is open, issue #51). An include command
-`\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex`, and
+`\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex` in any letter case, and
 `x.tex` otherwise, taken from the directory of the main file; it is read only
 when it is a file the skill reads, and the skill does not look for it
 anywhere else. On a file system that ignores letter case the same file in
 another letter case is the same file. A command inside a LaTeX comment includes nothing. When the files
-derive read hold no paragraph and no block at all (every section's text is in
-included files that were not read), derive stops, says which files were not
-read, and writes nothing. When the text of only some sections is in such
-files, derive asks the author for the `says` of each of those sections, since
-it has nothing to state it from, and stops when the author gives none. Prose that comes
+derive read hold no paragraph and no block at all (a paragraph counts when
+derive read any of its text; a block, which is a theorem-like statement, a
+proof, a figure, a table or a displayed formula, counts when derive read the
+environment or the delimiters that hold it, even when its content is in a file
+that was not read), derive stops, says which files were not read, and writes nothing; it
+stops before it asks for any section's `says`, and for a manuscript of
+headings only it says that draft builds an outline from headings. When derive
+does not stop for this reason and all the text of a section is in included
+files that were not read, derive asks the author for the `says` of each of those sections, since
+it has nothing to state it from, and stops when the author gives none. When such a
+section ends with no paragraph record, of its own or of a section under it,
+the premise check reports it under its fifth kind each time, and derive tells
+the author why. An abstract that has
+no heading of its own gets the `heading` "Abstract". Prose that comes
 before the first heading and is not the abstract gets one section record,
 whose `heading` is the title of the article: that title is what heads the text
 on the page, as in APA style, where the introduction has no heading of its
@@ -890,10 +906,10 @@ names the file, and the line when the check of a write finds it, and corrects
 nothing: status writes nothing, a file with such a line is corrected through
 revise, and a missing file is the author's to put back.
 When writing the record into the approvals file fails (a full disk, for
-one), the record may have been appended in whole, in part or not at all, and
-nothing tells which: the skill shows the check of the approvals file, the
-status and the file's last line, says that the approval may or may not be on
-record, and stops without trying again, since it never changes a line of that
+one), the record may have been appended in whole, in part or not at all:
+the skill shows the check of the approvals file and the
+status, says that the approval may or may not be on record, and
+stops without trying again, since it never changes a line of that
 file.
 The approve action checks the file the same way before it appends, and appends
 nothing when the file fails or cannot be read: the file was changed by hand,
@@ -942,7 +958,9 @@ stage directory, the directory that holds the manuscript, the manuscript's
 main file, and a file the author points to in draft or revise (a source, or
 an outline of the author's own), checked the way the main file is before it
 is read. Each begins with `/`: an empty path, or one not written out in
-full, stops the skill, and so does a path that holds a single quote. The one
+full, stops the skill, and so does a path that holds a single quote; for a
+file the author points to, such a path stops the skill for that file only:
+it does not read the file and asks the author to paste the text. The one
 exception is the main file in the command that compares a ledger with it:
 left empty there, it means that there is no manuscript yet. The paths
 of the ledgers' `_meta.json` files are read from a list in the stage directory,

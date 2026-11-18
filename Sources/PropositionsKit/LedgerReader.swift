@@ -41,7 +41,16 @@ public struct Ledger: Sendable {
                 continue
             }
             let raw = object["location"] as? String
-            let cites = (object["cites"] as? [Any])?.compactMap { $0 as? String } ?? []
+            // A `cites` that is not a list of strings is reported: dropping the entries that are
+            // not strings would let the check pass with nothing checked.
+            var cites: [String] = []
+            if let value = object["cites"], !(value is NSNull) {
+                guard let list = value as? [Any], let strings = list as? [String] else {
+                    unreadable.append("line \(number): the cites of \(id) is not a list of strings")
+                    continue
+                }
+                cites = strings
+            }
             // `retired` is an object from schema v1.4 on; any value but null and false retires.
             let retiredValue = object["retired"]
             let retired = !(retiredValue == nil || retiredValue is NSNull || (retiredValue as? Bool) == false)

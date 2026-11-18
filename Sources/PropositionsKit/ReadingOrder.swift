@@ -26,23 +26,31 @@ public enum InputTreeError: Error, Equatable, CustomStringConvertible {
 
 /// Where each file of a manuscript sits in reading order.
 ///
-/// A position is a list of line numbers: line L of the main file is `[L]`; line k of a file
-/// that line L of the main file includes is `[L, k]`, and so on. Positions compare
-/// lexicographically, so the text of an included file comes after the line that includes it
-/// and before the next line of the including file.
+/// A position is a list of numbers. Line L of the main file is `[L]`. Line c of the file that
+/// the k-th include on line L of the main file names is `[L, k, c]`, and so on for deeper
+/// files. Positions compare lexicographically, so the text of an included file comes after the
+/// line that includes it, before the next line of the including file, and before the file
+/// that a later include on the same line names.
+///
+/// The input tree is read as `resolve_input_tree` of the Python tools reads it
+/// (plugins/propositions/scripts/_lib/latex_env_parser.py), with one difference: a verbatim-like
+/// environment that begins inside a `%` comment, or begins and ends on one line, does not hide
+/// the lines after it (the Python function still has that fault, issue 94). Change the two together.
 public struct ReadingOrder: Sendable {
     public static let maxDepth = 3
 
-    /// The prefix of every position in a file, keyed by its path relative to the directory of
-    /// the main file (`nil` key is not used: the main file is the empty prefix).
+    /// The prefix of every position in an included file, keyed by its path relative to the
+    /// directory of the main file (`../shared/defs.tex` for a file outside it).
     private let prefixes: [String: [Int]]
+    /// The name of the main file, without its directory.
+    public let mainName: String
     /// Files in the order they are first included, the main file first.
     public let files: [String]
     /// Lines that hold an import macro this tool does not follow (`\subimport`, `\subfile`, `\import`).
     public let skippedImports: [String]
 
     public init(mainFile: URL) throws {
-        let main = mainFile.standardizedFileURL
+        let main = mainFile.resolvingSymlinksInPath().standardizedFileURL
         let root = main.deletingLastPathComponent()
         var prefixes: [String: [Int]] = [:]
         var files: [String] = [main.lastPathComponent]
@@ -57,29 +65,28 @@ public struct ReadingOrder: Sendable {
                 throw InputTreeError.unreadable(file: name)
             }
             var inVerbatim = false
-            // `components(separatedBy:)` keeps empty lines, so indices are the file's line numbers.
-            let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
-            for (index, raw) in lines.enumerated() {
+            for (index, raw) in LatexLine.splitLines(text).enumerated() {
                 let lineNumber = index + 1
                 if inVerbatim {
                     if LatexLine.endsVerbatim(raw) { inVerbatim = false }
                     continue
                 }
-                if LatexLine.beginsVerbatim(raw) {
-                    inVerbatim = true
+                let line = LatexLine.stripComment(raw)
+                if LatexLine.beginsVerbatim(line) {
+                    // An environment that also ends on this line hides nothing after it.
+                    inVerbatim = !LatexLine.endsVerbatim(line)
                     continue
                 }
-                let line = LatexLine.stripComment(raw)
                 if LatexLine.hasUnsupportedImport(line) {
                     skipped.append("\(name):\(lineNumber)")
                     continue
                 }
-                for target in LatexLine.inputTargets(line) {
+                for (offset, target) in LatexLine.inputTargets(line).enumerated() {
                     if target.hasPrefix("/") || target.hasPrefix("\\\\") {
                         throw InputTreeError.absolute(target: target, in: name, line: lineNumber)
                     }
                     let relative = target.hasSuffix(".tex") ? target : target + ".tex"
-                    let child = root.appendingPathComponent(relative).standardizedFileURL
+                    let child = root.appendingPathComponent(relative).resolvingSymlinksInPath().standardizedFileURL
                     var isDirectory: ObjCBool = false
                     guard FileManager.default.fileExists(atPath: child.path, isDirectory: &isDirectory),
                           !isDirectory.boolValue
@@ -92,26 +99,34 @@ public struct ReadingOrder: Sendable {
                     }
                     if seen.contains(child.path) { continue }  // counted where it is first included
                     seen.insert(child.path)
-                    let key = ReadingOrder.relativePath(of: child, under: root)
-                    prefixes[key] = prefix + [lineNumber]
+                    let key = ReadingOrder.relativePath(of: child, from: root)
+                    let childPrefix = prefix + [lineNumber, offset + 1]
+                    prefixes[key] = childPrefix
                     files.append(key)
-                    try visit(child, name: key, prefix: prefix + [lineNumber], stack: chain)
+                    try visit(child, name: key, prefix: childPrefix, stack: chain)
                 }
             }
         }
 
         try visit(main, name: main.lastPathComponent, prefix: [], stack: [])
         self.prefixes = prefixes
+        self.mainName = main.lastPathComponent
         self.files = files
         self.skippedImports = skipped
     }
 
     /// The position of a line, or `nil` when the file is not in the input tree.
+    ///
+    /// A location names the main file when it writes no file or writes the main file's own
+    /// name. The name `main.tex` in a manuscript whose main file has another name means a
+    /// sub-file of that name when the tree holds one, and the main file otherwise (ledgers
+    /// written before schema v1.6 prefix every location with `main.tex`).
     public func position(file: String?, line: Int) -> [Int]? {
         guard let file else { return [line] }
         let key = ReadingOrder.normalise(file)
-        guard let prefix = prefixes[key] else { return nil }
-        return prefix + [line]
+        if let prefix = prefixes[key] { return prefix + [line] }
+        if key == mainName || key == "main.tex" { return [line] }
+        return nil
     }
 
     /// Whether position `a` comes strictly before position `b`.
@@ -120,13 +135,22 @@ public struct ReadingOrder: Sendable {
         return a.count < b.count
     }
 
-    static func relativePath(of url: URL, under root: URL) -> String {
-        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        return url.path.hasPrefix(rootPath) ? String(url.path.dropFirst(rootPath.count)) : url.path
+    /// The path of `url` relative to the directory `root`, with `..` where it leaves it.
+    static func relativePath(of url: URL, from root: URL) -> String {
+        let target = url.pathComponents
+        let base = root.pathComponents
+        var common = 0
+        while common < target.count, common < base.count, target[common] == base[common] { common += 1 }
+        let up = Array(repeating: "..", count: base.count - common)
+        return (up + target[common...]).joined(separator: "/")
     }
 
+    /// A relative path with `.` parts dropped and `x/..` folded, as Python's `posixpath.normpath` does.
     static func normalise(_ file: String) -> String {
-        let parts = file.split(separator: "/").filter { $0 != "." }
+        var parts: [Substring] = []
+        for part in file.split(separator: "/") where part != "." {
+            if part == "..", let last = parts.last, last != ".." { parts.removeLast() } else { parts.append(part) }
+        }
         return parts.joined(separator: "/")
     }
 }
@@ -134,6 +158,35 @@ public struct ReadingOrder: Sendable {
 /// The few facts about one line of LaTeX that reading the input tree needs.
 enum LatexLine {
     static let verbatimEnvironments = ["verbatim", "Verbatim", "lstlisting", "comment", "filecontents"]
+
+    /// The characters that end a line for Python's `str.splitlines`, which the tools that write
+    /// `location` use: line numbers have to be counted the same way here.
+    private static let lineEnds: Set<Unicode.Scalar> = [
+        "\n", "\r", "\u{0B}", "\u{0C}", "\u{1C}", "\u{1D}", "\u{1E}", "\u{85}", "\u{2028}", "\u{2029}",
+    ]
+
+    /// The lines of a text, split where `str.splitlines` splits (`\r\n` is one line end, and a
+    /// text that ends with a line end has no empty last line).
+    static func splitLines(_ text: String) -> [String] {
+        var lines: [String] = []
+        var current = String.UnicodeScalarView()
+        var previousWasCR = false
+        for scalar in text.unicodeScalars {
+            if scalar == "\n" && previousWasCR {
+                previousWasCR = false
+                continue
+            }
+            previousWasCR = scalar == "\r"
+            if lineEnds.contains(scalar) {
+                lines.append(String(current))
+                current = String.UnicodeScalarView()
+            } else {
+                current.append(scalar)
+            }
+        }
+        if !current.isEmpty { lines.append(String(current)) }
+        return lines
+    }
 
     /// Drops everything from an unescaped `%` on. `\%` is a percent sign; `\\%` is a line
     /// break followed by a comment.
@@ -181,7 +234,7 @@ enum LatexLine {
                 guard rest.first == "{", let close = rest.firstIndex(of: "}") else { continue }
                 let target = rest[rest.index(after: rest.startIndex)..<close]
                     .trimmingCharacters(in: .whitespaces)
-                if !target.isEmpty { found.append((range.lowerBound, target)) }
+                found.append((range.lowerBound, target))  // an empty name is a missing file, not no include
             }
         }
         return found.sorted { $0.0 < $1.0 }.map(\.1)

@@ -3,7 +3,8 @@ import Foundation
 /// A proposition's `location`, as `docs/SCHEMA.md` writes it from schema v1.6 on:
 /// `[<relpath>.tex:]L<a>[-L<b>]`. The path is relative to the directory of the main file.
 public struct Location: Equatable, Sendable {
-    /// `nil` for the main file (no prefix, or the prefix `main.tex`).
+    /// The file as the location writes it, or `nil` when it writes none (the main file).
+    /// Which file a written name means is decided by `ReadingOrder`, which knows the manuscript.
     public let file: String?
     public let start: Int
     public let end: Int
@@ -36,7 +37,7 @@ public struct Location: Equatable, Sendable {
             end = last
         }
         guard start >= 1, end >= start else { return nil }
-        return Location(file: file == "main.tex" ? nil : file, start: start, end: end)
+        return Location(file: file, start: start, end: end)
     }
 
     private static func lineNumber(_ part: Substring) -> Int? {

@@ -27,7 +27,9 @@ public enum CiteOrder {
         var unreadable = ledger.unreadable
         var positions: [String: [Int]] = [:]
         var shown: [String: String] = [:]
-        var active: [LedgerProposition] = []
+        // Each proposition is judged from where it stands itself. An id used a second time is
+        // R8's concern: citations of that id are judged against the first proposition that has it.
+        var active: [(proposition: LedgerProposition, position: [Int])] = []
 
         for proposition in ledger.propositions where !proposition.retired {
             guard let location = proposition.location else {
@@ -38,28 +40,26 @@ public enum CiteOrder {
             }
             guard let position = order.position(file: location.file, line: location.start) else {
                 unreadable.append(
-                    "line \(proposition.ledgerLine): the location of \(proposition.id) names \(location.file ?? "main.tex"), which the input tree does not hold")
+                    "line \(proposition.ledgerLine): the location of \(proposition.id) names \(location.file ?? order.mainName), which the input tree does not hold")
                 continue
             }
-            // A second proposition with the same id is R8's concern; the first one keeps the id.
             if positions[proposition.id] == nil {
                 positions[proposition.id] = position
                 shown[proposition.id] = proposition.rawLocation ?? ""
             }
-            active.append(proposition)
+            active.append((proposition, position))
         }
 
         var checked = 0
         var forward: [ForwardCitation] = []
-        for proposition in active {
-            guard let here = positions[proposition.id] else { continue }
+        for (proposition, here) in active {
             for cited in proposition.cites {
                 // An id the ledger does not hold, a retired one, or one whose position is unknown.
                 guard let there = positions[cited] else { continue }
                 checked += 1
                 if ReadingOrder.precedes(here, there) {
                     forward.append(ForwardCitation(
-                        from: proposition.id, fromLocation: shown[proposition.id] ?? "",
+                        from: proposition.id, fromLocation: proposition.rawLocation ?? "",
                         to: cited, toLocation: shown[cited] ?? ""))
                 }
             }
@@ -69,15 +69,33 @@ public enum CiteOrder {
 
     /// The lines the command prints: one per unreadable item, one per warning, then the count.
     public static func render(_ report: CiteOrderReport) -> [String] {
-        var lines = report.unreadable.map { "UNREADABLE cite-order: \($0)" }
+        var lines = report.unreadable.map { "UNREADABLE cite-order: \(visible($0))" }
         lines += report.forward.map {
-            "WARN cite-order: \($0.from) (\($0.fromLocation)) cites \($0.to) (\($0.toLocation)), which comes later"
+            "WARN cite-order: \(visible($0.from)) (\(visible($0.fromLocation))) cites \(visible($0.to)) (\(visible($0.toLocation))), which comes later"
         }
         lines.append("cite-order: \(report.forward.count) forward citation(s) among \(report.checked) citation(s) checked")
         if !report.isComplete {
             lines.append("cite-order: incomplete, \(report.unreadable.count) item(s) could not be read")
         }
         return lines
+    }
+
+    /// Text from a ledger with its control characters written as escapes, so that an id or a
+    /// location cannot start a line of its own in the output.
+    static func visible(_ text: String) -> String {
+        var out = ""
+        for scalar in text.unicodeScalars {
+            let hidden = scalar.properties.generalCategory == .control
+                || scalar.properties.generalCategory == .format
+                || scalar.properties.generalCategory == .lineSeparator
+                || scalar.properties.generalCategory == .paragraphSeparator
+            if hidden {
+                out += "\\u{" + String(scalar.value, radix: 16, uppercase: true) + "}"
+            } else {
+                out.unicodeScalars.append(scalar)
+            }
+        }
+        return out
     }
 
     /// The object the command prints with `--json`.

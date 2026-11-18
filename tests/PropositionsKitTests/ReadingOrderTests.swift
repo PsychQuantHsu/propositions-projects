@@ -5,8 +5,8 @@ import Testing
 struct LocationTests {
     @Test(arguments: [
         ("L12", nil as String?, 12, 12),
-        ("main.tex:L214", nil, 214, 214),
-        ("main.tex:L501-L507", nil, 501, 507),
+        ("main.tex:L214", "main.tex", 214, 214),
+        ("main.tex:L501-L507", "main.tex", 501, 507),
         ("parts/part2-theory.tex:L4-L9", "parts/part2-theory.tex", 4, 9),
         ("  L3 ", nil, 3, 3),
     ])
@@ -74,7 +74,7 @@ struct ReadingOrderTests {
             "shared.tex": lines(3),
         ])
         let order = try manuscript.order()
-        #expect(order.position(file: "shared.tex", line: 1) == [2, 1])
+        #expect(order.position(file: "shared.tex", line: 1) == [2, 1, 1])
         #expect(order.files == ["main.tex", "shared.tex"])
     }
 
@@ -138,5 +138,75 @@ struct ReadingOrderTests {
     @Test func `A file outside the input tree has no position`() throws {
         let manuscript = try Manuscript(["main.tex": lines(3), "parts/b.tex": lines(3)])
         #expect(try manuscript.order().position(file: "parts/b.tex", line: 2) == nil)
+    }
+
+    // spec-example: citation-order / two includes on one line keep their order
+    @Test func `Two includes on one line keep their order`() throws {
+        let manuscript = try Manuscript([
+            "main.tex": "\\input{a}\\input{b}\nnext\n",
+            "a.tex": lines(60), "b.tex": lines(3),
+        ])
+        let order = try manuscript.order()
+        let inA = try #require(order.position(file: "a.tex", line: 50))
+        let inB = try #require(order.position(file: "b.tex", line: 1))
+        let next = try #require(order.position(file: nil, line: 2))
+        #expect(ReadingOrder.precedes(inA, inB))
+        #expect(ReadingOrder.precedes(inB, next))
+    }
+
+    // spec-example: citation-order / an environment marker inside a comment changes nothing
+    @Test(arguments: [
+        "x\n%\\begin{comment}\n\\input{a}\n%\\end{comment}\ny\n",
+        "% \\begin{verbatim}\n\\input{a}\n",
+        "\\begin{verbatim}x\\end{verbatim}\n\\input{a}\n",
+    ])
+    func `An environment marker inside a comment changes nothing`(main: String) throws {
+        let manuscript = try Manuscript(["main.tex": main, "a.tex": lines(3)])
+        #expect(try manuscript.order().files == ["main.tex", "a.tex"])
+    }
+
+    // spec-example: citation-order / lines are counted as the ledger tools count them
+    @Test func `Lines are counted as the ledger tools count them`() throws {
+        // A form feed and a lone carriage return each end a line, as Python's splitlines has it.
+        let manuscript = try Manuscript([
+            "main.tex": "one\u{0C}x\u{0C}two\nthree\r\\input{a}\r\nsix\n",
+            "a.tex": lines(2),
+        ])
+        #expect(try manuscript.order().position(file: "a.tex", line: 1) == [5, 1, 1])
+    }
+
+    // spec-example: citation-order / the main file under another name
+    @Test func `The main file under another name`() throws {
+        let manuscript = try Manuscript([
+            "thesis.tex": lines(20, [10: "\\input{main}"]),
+            "main.tex": lines(5),
+        ])
+        let order = try ReadingOrder(mainFile: manuscript.root.appendingPathComponent("thesis.tex"))
+        #expect(order.position(file: "thesis.tex", line: 3) == [3])   // the main file's own name
+        #expect(order.position(file: nil, line: 3) == [3])
+        #expect(order.position(file: "main.tex", line: 3) == [10, 1, 3])  // a sub-file called main.tex
+    }
+
+    @Test func `The legacy prefix main.tex names the main file when no sub-file has that name`() throws {
+        let manuscript = try Manuscript(["thesis.tex": lines(5)])
+        let order = try ReadingOrder(mainFile: manuscript.root.appendingPathComponent("thesis.tex"))
+        #expect(order.position(file: "main.tex", line: 3) == [3])
+    }
+
+    @Test func `A file outside the main file's directory is keyed by its relative path`() throws {
+        let manuscript = try Manuscript([
+            "m/main.tex": "\\input{../shared/defs}\n",
+            "shared/defs.tex": lines(3),
+        ])
+        let order = try ReadingOrder(mainFile: manuscript.root.appendingPathComponent("m/main.tex"))
+        #expect(order.files == ["main.tex", "../shared/defs.tex"])
+        #expect(order.position(file: "../shared/defs.tex", line: 2) == [1, 1, 2])
+    }
+
+    @Test func `An include with an empty name stops the check`() throws {
+        let manuscript = try Manuscript(["main.tex": "\\input{ }\n"])
+        #expect(throws: InputTreeError.missing(target: ".tex", in: "main.tex", line: 1)) {
+            try manuscript.order()
+        }
     }
 }

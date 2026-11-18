@@ -1,8 +1,9 @@
 #!/bin/bash
-# Builds, signs, notarizes and publishes the `propositions` binary.
-# A shell of the first kind the Swift rule allows: it runs swift, codesign, notarytool, git
-# and gh in order. It is run by the maintainer only: it publishes a file under their
-# signing identity. Needs DEVELOPER_ID (certificate SHA-1) and NOTARY_PROFILE (keychain profile).
+# Builds, signs, notarizes and publishes the `propositions` binary (docs/RELEASE-FLOW.md,
+# "Releasing the command-line binary"). A shell of the first kind the Swift rule allows: it
+# runs swift, codesign, notarytool, git and gh in order. It is run by the maintainer only: it
+# publishes a file under their signing identity. Needs DEVELOPER_ID (certificate SHA-1) and
+# NOTARY_PROFILE (keychain profile).
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required (for example 0.1.0)}"
@@ -27,7 +28,8 @@ if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
     echo "tag ${TAG} exists and names another commit; choose a new version"; exit 1; }
 fi
 
-echo "[1/5] universal release build"
+echo "[1/5] tests, then the universal release build"
+swift test
 BUILD_ARGS=(-c release --arch arm64 --arch x86_64)
 BUILT="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)/${BINARY}"
 rm -f "${BUILT}"   # still there after the build means this build made it
@@ -45,16 +47,27 @@ codesign --verify --strict "${OUT}/${BINARY}"
 
 echo "[3/5] notarize"
 ditto -c -k "${OUT}/${BINARY}" "${OUT}/${BINARY}-notarize.zip"
-xcrun notarytool submit "${OUT}/${BINARY}-notarize.zip" --keychain-profile "${NOTARY_PROFILE}" --wait
+# `--wait` returning says the submission finished, not that it was accepted: read the status.
+NOTARY_JSON=$(xcrun notarytool submit "${OUT}/${BINARY}-notarize.zip" \
+  --keychain-profile "${NOTARY_PROFILE}" --wait --output-format json)
+NOTARY_STATUS=$(printf '%s' "${NOTARY_JSON}" | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ "${NOTARY_STATUS}" = "Accepted" ] || {
+  echo "notarization was not accepted (status: ${NOTARY_STATUS:-unknown}); nothing was tagged or published"
+  printf '%s\n' "${NOTARY_JSON}"; exit 1; }
 
 echo "[4/5] checksum and tag"
 shasum -a 256 "${OUT}/${BINARY}" | awk '{print $1}' > "${OUT}/${BINARY}.sha256"
-git tag "${TAG}" "${BUILD_COMMIT}" 2>/dev/null || echo "  (the tag exists and names the build commit)"
+if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+  echo "  (the tag exists and names the build commit: checked above)"
+else
+  git tag "${TAG}" "${BUILD_COMMIT}"
+fi
 git push origin "${TAG}"
 
 echo "[5/5] GitHub release"
 gh release create "${TAG}" --title "propositions CLI v${VERSION}" \
-  --notes "propositions CLI v${VERSION}: signed and notarized universal binary (arm64 and x86_64)" \
+  --notes "propositions CLI v${VERSION}: signed and notarized universal binary (arm64 and x86_64). Pinned entry-point contract unchanged: this release adds a binary and changes no root scripts/ path, report format or exit code." \
   "${OUT}/${BINARY}" "${OUT}/${BINARY}.sha256"
 
-echo "released ${TAG}. Next: set \"binary_version\": \"${VERSION}\" in plugins/propositions/.claude-plugin/plugin.json."
+echo "released ${TAG}; sha256 $(cat "${OUT}/${BINARY}.sha256")"
+echo "No plugin downloads this binary yet: how a plugin fetches and verifies it is a later change."

@@ -4,8 +4,8 @@
 當時 #33 剛合併，又多了三支 Python 工具和第一個外部依賴 PyYAML。
 
 **現況（2026-11-19 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
-與測試 target，共 11 個 Swift 檔，裡面只有一條檢查（引用方向，`propositions cite-order`），binary 還沒有發布，
-沒有 skill 呼叫它。其餘受追蹤的可執行程式碼是 72 個 Python 檔、5 個 shell 檔，
+與測試 target，共 12 個 Swift 檔，裡面只有一條檢查（引用方向，`propositions cite-order`），binary 還沒有發布，
+沒有 skill 呼叫它。其餘受追蹤的可執行程式碼是 72 個 Python 檔、4 個 shell 檔，
 另外有 3 段寫在 SKILL.md 裡的 Python 程式（見〈既有檔〉）。skill 用 `python3 "$VALIDATOR"` 這類寫法呼叫
 plugin 內的腳本，所以使用者端要有 Python 3.10 以上；帳冊附檔用到 `move`／`type` 時還要裝 PyYAML。
 
@@ -51,8 +51,9 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
      binary 的版本。
 
    **它們只做串接**：檢查 binary 在不在、下載、依序呼叫外部 CLI。裡面一旦出現領域判斷，就把它移進
-   Swift。目前這一類有 2 個檔：`plugins/propositions/bin/propositions-wrapper.sh`（下載 binary）與
-   `scripts/release-signed.sh`（簽章發布，只由維護者執行）。
+   Swift。目前這一類有 1 個檔：`scripts/release-signed.sh`（簽章發布，只由維護者執行）。下載 binary 的
+   wrapper 還沒有：plugin 的目錄一旦有 `bin/`，claude.ai 與 Cowork 就不安裝這個 plugin，而且裡面的檔會出現在
+   Bash 工具的 PATH 上；怎麼發給 plugin、下載後怎麼驗證，等第一次發布時由維護者決定（#46）。
 2. **本規則成文前就已存在的程式碼（grandfathered）**，逐項列在下方〈既有檔〉。
    - 可以修 bug，也可以做不改變行為的小改，例如改訊息字句、補註解、重新命名區域變數。
    - 不得在它們旁邊新增同類檔案，也不得加入下列任何一種新功能。這是封閉列舉，只有四種：
@@ -61,7 +62,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
    - 修 bug 時要補的回歸測試，加進已經涵蓋那支腳本的 pytest 檔。沒有任何 pytest 檔涵蓋它時（目前
      `reorder-ledger.py`、`structure-batch.py` 的案例在 `test_structure_tools.py`），加進最接近的那一個；
      不要為了它新建 `test_*.py`。
-3. **指名的守衛測試，在 Swift package 建好之前。** 這是封閉清單，目前只有一組：
+3. **指名的守衛測試，在它讀的詞彙在 Swift 裡有來源之前。** 這是封閉清單，目前只有一組：
    - `tests/test_plugin_payload_tracked.py` 裡名稱以 `test_obligations_` 開頭的案例（義務表的守衛，#47）。
      它檢查的是 `plugins/propositions/catalog/obligations.yaml` 與
      `plugins/propositions/docs/OBLIGATIONS.md` 的內容，以及 `plugins/propositions/docs/VERIFICATION.md`
@@ -71,7 +72,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
    要把別的守衛加進這份清單，先在這裡加一列、寫明它檢查哪些檔，並由維護者決定。不得因為「它也是檢查
    資料檔的守衛」就比照辦理。
 
-   **退場條件**：#46 建好 Swift package、而且守衛讀的詞彙在 Swift 裡有了來源之後，把這一組連同
+   **退場條件**：守衛讀的詞彙在 Swift 裡有了來源之後（package 已由 #46 建好，詞彙還沒有），把這一組連同
    `spec-example:` 標記搬到 `tests/PropositionsKitTests/` 的 Swift Testing target，然後刪掉這一條例外。現在不寫成 Swift 的原因
    是守衛直接從 Python 的驗證器讀詞彙（`PROFILE_VOCABULARIES`、`KINDS`、`ROLES`、`METHODS`）；驗證器移植之前，
    Swift 版只能另抄一份，抄的那一份不會跟著驗證器更新。
@@ -91,8 +92,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
    **退場條件**：`propositions` CLI 的子命令涵蓋上面列的每一項工作之後，把這份 SKILL.md 的指令區塊換成
    呼叫子命令，然後刪掉這一條例外。#78 做的是寫入檢查、來源指標與狀態三項；其餘幾項還沒有子命令時，
-   那幾項照這一條留著，這一條也留著。現在不寫成 Swift 的原因是 repo 還沒有 Swift
-   package（#46），綱要的子命令要等它；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
+   那幾項照這一條留著，這一條也留著。現在不寫成 Swift 的原因是綱要的
+   子命令還沒有寫（package 已由 #46 建好，binary 也還沒有發布）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
 
 ## 不適用
 
@@ -216,5 +217,5 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 ## 語言組成（2026-11-19 量，只計受追蹤的檔）
 
-Swift 11、Python 72、shell 5（其中 2 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 12、Python 72、shell 4（其中 1 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

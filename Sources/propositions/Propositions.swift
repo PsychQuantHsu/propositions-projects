@@ -16,9 +16,6 @@ struct Propositions: ParsableCommand {
         do {
             var command = try parseAsRoot()
             try command.run()
-        } catch let stop as Stop {
-            FileHandle.standardError.write(Data((stop.message + "\n").utf8))
-            Foundation.exit(stop.code)
         } catch {
             if exitCode(for: error) == .validationFailure {
                 FileHandle.standardError.write(Data((fullMessage(for: error) + "\n").utf8))
@@ -41,45 +38,19 @@ struct CiteOrderCommand: ParsableCommand {
             argument is wrong.
             """)
 
-    @Option(help: "The ledger (default: manuscript/propositions/main.jsonl).")
-    var jsonl = "manuscript/propositions/main.jsonl"
+    @Option(help: "The ledger.")
+    var jsonl = CiteOrderRun.defaultLedger
 
-    @Option(help: "The manuscript's main file (default: manuscript/main.tex).")
-    var tex = "manuscript/main.tex"
+    @Option(help: "The manuscript's main file.")
+    var tex = CiteOrderRun.defaultMainFile
 
     @Flag(help: "Print one JSON object instead of lines.")
     var json = false
 
     func run() throws {
-        guard let text = try? String(contentsOf: URL(fileURLWithPath: jsonl), encoding: .utf8) else {
-            throw Stop(code: 2, message: "cite-order: cannot read the ledger \(jsonl)")
-        }
-        guard FileManager.default.fileExists(atPath: tex) else {
-            throw Stop(code: 2, message: "cite-order: cannot read the main file \(tex)")
-        }
-        let order: ReadingOrder
-        do {
-            order = try ReadingOrder(mainFile: URL(fileURLWithPath: tex))
-        } catch {
-            throw Stop(code: 2, message: "cite-order: \(error)")
-        }
-        for skipped in order.skippedImports {
-            FileHandle.standardError.write(Data(
-                "[warn] non-standard import macro skipped at \(skipped) (\\subimport/\\subfile unsupported)\n".utf8))
-        }
-        let report = CiteOrder.check(ledger: Ledger(jsonl: text), order: order)
-        if json {
-            print(try CiteOrder.renderJSON(report))
-        } else {
-            CiteOrder.render(report).forEach { print($0) }
-        }
-        if !report.isComplete { throw ExitCode(1) }
+        let result = CiteOrderRun.run(jsonl: jsonl, tex: tex, json: json)
+        result.stdout.forEach { print($0) }
+        result.stderr.forEach { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }
+        if result.exitCode != 0 { throw ExitCode(result.exitCode) }
     }
-}
-
-/// An error that carries the message to print and the exit code to use.
-struct Stop: Error, CustomStringConvertible {
-    let code: Int32
-    let message: String
-    var description: String { message }
 }

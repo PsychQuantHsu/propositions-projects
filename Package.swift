@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 // The one Swift package of this repository (.claude/rules/swift-is-the-implementation-language.md).

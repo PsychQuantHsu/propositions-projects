@@ -17,6 +17,6 @@
 - [x] 3.1 八種組合（zsh、bash × homebrew、system、GNU、bfs）全過。
   - 八種組合各 394 項全過（bfs 的兩種 393 項），0 項失敗。
 - [x] 3.2 用正式的 `propositions:outline-checker` 跑一次確認一份只有節的綱要，走到記下確認與 status。
-  - 一份兩節、段落檔是空的綱要：寫入檢查印 `ok write check: 2 records` 與 `EMPTY`，來源指標清單是空的；以 skill 規定的訊息啟動 `propositions:outline-checker`（安裝的 plugin 是 0.12.0），它只用 Read 讀了三個檔，對兩節各回報一項第 5 類，其餘四類沒有發現。展示、記下確認與 status 三步這次沒有接著手動跑，由驗收的 `shown`、`append`、`status` 各項涵蓋。
+  - 一份兩節、段落檔是空的綱要：寫入檢查印 `ok write check: 2 records` 與 `EMPTY`，來源指標清單是空的；以 skill 規定的訊息啟動 `propositions:outline-checker`（安裝的 plugin 是 0.12.0），它只用 Read 讀了三個檔，對兩節各回報一項第 5 類，其餘四類沒有發現。接著在同一份綱要上跑完其餘各步的指令：保留展示的副本（`ok shown copies kept`、`ok every section will be shown`），對副本的寫入檢查（`ok` 與 `EMPTY`），追加確認（`ok approval appended`，紀錄是 `whole: true`、兩節的 `paragraphs` 都是 `[]`），確認紀錄檔的檢查（`ok every line is a JSON object`），status 回報兩節與順序都 stands as approved。作者的確認那一句是測試寫入的，不是真的作者。
 - [x] 3.3 `pytest tests/` 通過；`plugins/propositions/scripts`、`plugins/tschema-check`、`tests` 相對於 main 沒有變動。
   - `pytest tests/`：872 passed、3 skipped；三個目錄相對於 main 沒有變動；指令區塊仍是 19 段。

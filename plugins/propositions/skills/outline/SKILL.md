@@ -77,7 +77,8 @@ They are shell, and they are not a defence against a repository or a shell that 
 defeat them: that defence belongs to the command-line tool of issue 78, where it can be
 tested. The limits known today are the ten below. The list is closed: a limit is added here
 when one is found, and none is inferred from another. The first and the tenth are the ones
-this skill always sees: rule 2 stops it at the first, and the `ROOT=/` line at the tenth,
+this skill always sees: rule 2 stops it at the first (for a file the author points to in
+draft or revise, it stops for that file only), and the `ROOT=/` line at the tenth,
 after the stage directory has been made. No command looks for the others: when you notice one of
 them, tell the author.
 
@@ -337,8 +338,10 @@ A `_meta.json` that holds exactly one JSON value, an object, has one `ledger` li
 same path; the line ends with the `source.file` it gives, or `"?"` when it gives none. Every
 other numbered `_meta.json` was not read as one ledger: it has a `not one ledger` line (it is
 empty, cannot be opened, holds more than one value, holds a value that is not an object, or holds a
-value that is not written as JSON: jq also reads `nan`, `Infinity` and numbers such as `01`),
-or no line at all and an error from jq (it is not JSON). For these, go to case 2 below, and
+value that is not written as JSON by the test of "The write check": jq also reads `nan`,
+`Infinity` and numbers such as `01` or `.5`, and a file that begins with a byte-order mark),
+or no line at all and an error from jq (a file that passes that test and that jq still cannot
+read, one with a comma too many, for instance). A byte that is not UTF-8 is not reported, as in the write check. For these, go to case 2 below, and
 tell the author which `_meta.json` could not be read: it might be the manuscript's ledger. No
 `ok listed`: `find` itself failed, and the list is not complete. Stop and say what it printed.
 
@@ -686,9 +689,11 @@ draft says what to do.
    is nothing to state its `says` from: name those files and ask the author for the sentence
    (AskUserQuestion, together with any other question of this action), and write it as the
    author gives it. When the author gives none, stop, as step 7 says for its third case.
-   When this holds for every section, do not ask: stop at once, as step 7 says for that case.
-   A section whose sentence the author gave has no paragraph record, so the premise check
-   reports it under its fifth kind each time it runs: tell the author why.
+   Before asking for any section, see whether step 7's third case holds (the files read hold
+   no paragraph and no block at all): when it does, do not ask, and stop at once as step 7 says.
+   When a section whose sentence the author gave ends with no paragraph record, of its own or
+   of a section under it, the premise check reports it under its fifth kind each time it runs:
+   tell the author why.
 
    Prose that comes before the first heading and is not the abstract (in APA style the
    introduction has no heading of its own) gets one section record too, on the line where that
@@ -741,8 +746,10 @@ draft says what to do.
    - A file that derive read and that the locator commands do not accept: the count prints
      nothing for it, or the listing reports its name. Say what the commands printed.
    - The files derive read hold no paragraph and no block at all, so the paragraph file
-     would be empty: every section's text is in included files that were not read (step 2),
-     or the manuscript has headings and nothing else. The same holds for a section whose text
+     would be empty. That is so when every section's text is in included files that were not
+     read (step 2), when the manuscript has headings and nothing else, and when some sections
+     are the one and some the other. A figure or a table whose content is in a file that was
+     not read is still a block (step 2), so a manuscript that has one is not this case. The same holds for a section whose text
      is all in such files when the author gives no sentence for it (step 3). Both can be seen
      before anything is staged: stop as soon as they are, without writing the staged files. Name the files that were not read; the
      author can make them readable (track them, or move them into the repository) and derive
@@ -1208,9 +1215,8 @@ asks, through revise.
    No `ok approval appended`: when what was printed comes from `cmp` or `jq`, or is nothing,
    nothing was appended. When it comes from writing to the approvals file itself (`printf`,
    `cat`, or the shell, as with a full disk), the record may have been appended in whole, in
-   part or not at all, and nothing tells which: run the check for the approvals file from "The
-   write check" and status (its write check first), show the author what both print, say that the approval may or may not be on record and that
-   the last line of the approvals file shows which (this skill does not read that file here), and stop. Do not run the command
+   part or not at all: run the check for the approvals file from "The
+   write check" and status (its write check first), show the author what both print, say that the approval may or may not be on record, and stop. Do not run the command
    again: this skill does not change a line of that file, and the author decides what to do.
    Otherwise take the first of these that applies.
    1. `cmp` reported a difference or a missing file: the outline or the real path of its

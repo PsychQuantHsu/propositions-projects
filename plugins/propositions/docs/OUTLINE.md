@@ -131,9 +131,10 @@ directory of the outline files can be one git ignores. Only the sources are
 held to what git lists: the manuscript, the files it includes and the files a
 locator names. A listed `_meta.json` is read as one ledger when it
 holds exactly one JSON value, that value is an object, and the file is written
-as JSON: jq also reads `nan`, `Infinity` and numbers such as `01` or `.5`, none
-of which is JSON, and a file that holds one outside a string is not read as
-one ledger.
+as JSON by the test the write check applies to an outline file: jq also reads
+`nan`, `Infinity`, numbers such as `01` or `.5`, and a file that begins with a
+byte-order mark, none of which is JSON, and such a file is not read as one
+ledger. A byte that is not UTF-8 is not reported, as in the write check.
 
 **Which directory.** The skill uses a directory without asking only when every
 `_meta.json` it lists was read as one ledger and compared with the manuscript,
@@ -715,7 +716,8 @@ defence against a repository or a shell that was set up to defeat them. That
 defence belongs to the command-line tool of issue #78, where it can be tested.
 The limits known today are these ten. The list is closed: a limit is added
 when one is found, and none is inferred from another. The first and the tenth
-are the ones the skill always sees: it stops at the first, and at the tenth
+are the ones the skill always sees: it stops at the first (for a file the
+author points to in draft or revise, for that file only), and at the tenth
 after its stage directory has been made. No command of the skill looks for the
 others; when the skill notices one of them, it tells the author.
 
@@ -759,15 +761,18 @@ when it is a file the skill reads, and the skill does not look for it
 anywhere else. On a file system that ignores letter case the same file in
 another letter case is the same file. A command inside a LaTeX comment includes nothing. When the files
 derive read hold no paragraph and no block at all (every section's text is in
-included files that were not read, or the manuscript has headings and nothing
-else), derive stops, says which files were not read, and writes nothing; it
+included files that were not read, the manuscript has headings and nothing
+else, or some sections are the one and some the other; a figure or a table
+whose content is in a file that was not read is still a block, so a
+manuscript that has one is not this case), derive stops, says which files were not read, and writes nothing; it
 stops before it asks for any section's `says`, and for a manuscript of
 headings only it says that draft builds an outline from headings. When the
 text of only some sections is in such
 files, derive asks the author for the `says` of each of those sections, since
-it has nothing to state it from, and stops when the author gives none. Such a
-section has no paragraph record, so the premise check reports it under its
-fifth kind each time, and derive tells the author why. An abstract that has
+it has nothing to state it from, and stops when the author gives none. When such a
+section ends with no paragraph record, of its own or of a section under it,
+the premise check reports it under its fifth kind each time, and derive tells
+the author why. An abstract that has
 no heading of its own gets the `heading` "Abstract". Prose that comes
 before the first heading and is not the abstract gets one section record,
 whose `heading` is the title of the article: that title is what heads the text
@@ -901,10 +906,9 @@ names the file, and the line when the check of a write finds it, and corrects
 nothing: status writes nothing, a file with such a line is corrected through
 revise, and a missing file is the author's to put back.
 When writing the record into the approvals file fails (a full disk, for
-one), the record may have been appended in whole, in part or not at all, and
-nothing tells which: the skill shows the check of the approvals file and the
-status, says that the approval may or may not be on record and that the
-file's last line shows which (the skill does not read that line itself), and
+one), the record may have been appended in whole, in part or not at all:
+the skill shows the check of the approvals file and the
+status, says that the approval may or may not be on record, and
 stops without trying again, since it never changes a line of that
 file.
 The approve action checks the file the same way before it appends, and appends

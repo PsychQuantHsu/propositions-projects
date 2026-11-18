@@ -749,9 +749,10 @@ draft says what to do.
    - A file that derive read and that the locator commands do not accept: the count prints
      nothing for it, or the listing reports its name. Say what the commands printed.
    - The files derive read hold no paragraph and no block at all, so the paragraph file
-     would be empty. A paragraph counts only when derive read its text; a figure or a table
-     whose environment derive read is a block even when its content is in a file that was not
-     read (step 2). Derive also stops, in the same way, for a section whose text is all in
+     would be empty. A paragraph counts when derive read any of its text; a block (a theorem-like
+     statement, a proof, a figure, a table or a displayed formula) counts when derive read the
+     environment or the delimiters that hold it, even when its content is in a file that was
+     not read (step 2). Derive also stops, in the same way, for a section whose text is all in
      included files that were not read when the author gives no sentence for it (step 3). The case itself
      can be seen before anything is staged, and the missing sentence as soon as the author
      answers: stop then, without writing the staged files. Name the files that were not read; the

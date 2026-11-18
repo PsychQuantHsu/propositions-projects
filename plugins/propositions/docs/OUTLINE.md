@@ -760,13 +760,15 @@ not show the gap (whether it should is open, issue #51). An include command
 when it is a file the skill reads, and the skill does not look for it
 anywhere else. On a file system that ignores letter case the same file in
 another letter case is the same file. A command inside a LaTeX comment includes nothing. When the files
-derive read hold no paragraph and no block at all (a paragraph counts only
-when derive read its text; a figure or a table whose environment derive read
-is a block even when its content is in a file that was not read), derive stops, says which files were not read, and writes nothing; it
+derive read hold no paragraph and no block at all (a paragraph counts when
+derive read any of its text; a block, which is a theorem-like statement, a
+proof, a figure, a table or a displayed formula, counts when derive read the
+environment or the delimiters that hold it, even when its content is in a file
+that was not read), derive stops, says which files were not read, and writes nothing; it
 stops before it asks for any section's `says`, and for a manuscript of
-headings only it says that draft builds an outline from headings. Otherwise,
-when all the text of a section is in included files that were not read,
-derive asks the author for the `says` of each of those sections, since
+headings only it says that draft builds an outline from headings. When derive
+does not stop for this reason and all the text of a section is in included
+files that were not read, derive asks the author for the `says` of each of those sections, since
 it has nothing to state it from, and stops when the author gives none. When such a
 section ends with no paragraph record, of its own or of a section under it,
 the premise check reports it under its fifth kind each time, and derive tells

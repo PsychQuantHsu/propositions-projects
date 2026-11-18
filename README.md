@@ -72,6 +72,10 @@ The repository and marketplace were renamed from `propositions` to `propositions
 /propositions:proofread          # per-prop L1-L5 semantic walk (is each claim true & faithful?)
 /propositions:manuscript-audit   # cross-artifact drift across tex / jsonl / code / bib
 /propositions:clarity-audit      # prose readability — can a human reader follow it?
+/propositions:outline            # plan before writing: one sentence per section
+                                 # (outline-sections.jsonl), at least one per paragraph
+                                 # (outline-paragraphs.jsonl), approved by the author
+                                 # (outline-approvals.jsonl). Needs no ledger.
 ```
 
 ## Architecture
@@ -124,7 +128,10 @@ propositions-projects/
 │   │   │   ├── manuscript-audit/SKILL.md  # cross-artifact drift
 │   │   │   ├── construct/SKILL.md         # article structure, explain, next
 │   │   │   ├── construct-batch/SKILL.md   # long-manuscript structure batches
+│   │   │   ├── outline/SKILL.md           # the outline: what the article will say, before it is written
 │   │   │   └── clarity-audit/SKILL.md     # prose readability
+│   │   ├── agents/          # subagents that skills start
+│   │   │   └── outline-checker.md         # judges five of the six kinds of the outline's premise check; its only tool is Read
 │   │   ├── scripts/         # validator, audit, extraction and structure tooling
 │   │   │   ├── validate-propositions.py
 │   │   │   ├── refresh-prop-locations.py
@@ -147,7 +154,7 @@ propositions-projects/
 │   │   ├── templates/ledger/  # Operation D scaffold
 │   │   └── docs/
 │   │       ├── EXTRACTION-PROMPT.md
-│   │       ├── STRUCTURE.md, VERIFICATION.md, OBLIGATIONS.md
+│   │       ├── STRUCTURE.md, VERIFICATION.md, OBLIGATIONS.md, OUTLINE.md
 │   │       └── PLAYBOOK.md
 │   └── tschema-check/       # source-fidelity review (migrated from truth-conditions, #4)
 │       ├── .claude-plugin/plugin.json
@@ -175,6 +182,7 @@ schema contract travels with each manuscript's ledger, so the plugin vendors no 
 
 - Python 3.10+
 - pytest 7+
+- `jq` and `realpath`, for `/propositions:outline` only, which also needs `git`, as `/propositions:manuscript-audit` and Operation D already do (its commands were run with jq 1.7.1 and 1.8.2 and git 2.54 and 2.55; the skill tests for the three tools before anything else, and stops when its `jq` cannot tell two long numbers apart, as versions before 1.7 cannot, when its `git` is older than 2.38, or when the system's `pwd` is in neither `/usr/bin` nor `/bin`)
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` layout (paths configurable via skill args)
 - Schema versions v1.0 / v1.1 / v1.2 / v1.3
 

@@ -43,6 +43,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | `/propositions:construct` | 建構軸,整篇文章的層次:標註承諾(研究問題、目的、假設、章節計畫、近距離承諾)、章節角色與三層依存樹(句在段內的頭、段在節內的頭、節的 parent),存成帳冊旁的 `structure.json`／`discourse.jsonl`(格式 2.0,S1–S9 檢查);寫到一半的稿件則依右邊緣與未兌現的承諾提出下一句的候選,每個候選寫出預期的 `move`,並參考連結清單的走法(提示不是規則,不改候選順序,#36);也能解釋一段裡句子之間的關係(`structure-explain.py`,#33)(#26、#30) |
 | `/propositions:construct-batch` | 長稿的建構軸標註:先把帳冊排成閱讀順序(`reorder-ledger.py`,dry-run gated),再依段落切批、分給 subagent、合併回暫存附檔(`structure-batch.py`;依存樹已有時用 `--moves-only` 只標 `move`、`type`);審查與寫入仍回 `/propositions:construct` |
 | `/propositions:clarity-audit` | 可讀性軸,散文層級的 stumble 掃描與改寫(不需要 JSONL) |
+| `/propositions:outline` | 綱要軸,動筆之前的計畫:文章層每節一句、段落層每段至少一句要點,存成帳冊旁的 `outline-sections.jsonl`、`outline-paragraphs.jsonl`,作者的確認存成 `outline-approvals.jsonl`。六個動作:從寫完的稿反推、從題目起草、依作者指示修改(合併與刪除都不丟來源)、前提檢查(五類由只有 Read 工具的 agent `propositions:outline-checker` 判斷,定義在 `plugins/propositions/agents/outline-checker.md`)、記錄作者當次明說的確認、回報哪些節仍照通過時的內容。只寫這三個檔,不寫稿件與帳冊;不需要先有帳冊(#75) |
 
 | Rule (shipped) | When applies |
 |----------------|--------------|
@@ -57,6 +58,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 | `plugins/propositions/catalog/vocabulary.yaml`、`plugins/propositions/scripts/structure-explain.py`、`build-link-catalog.py`、`structure-links.py` | 每一句「在做什麼」的封閉詞彙（手寫，帶 `move`／`type` 的附檔由 S9 檢查，需要 PyYAML）；讀法工具把一段讀成「第幾句、在做什麼、掛在第幾句、什麼關係」；`catalog/links.csv` 由工具從附檔產生：六種連結（下一句、頭、`also`、引用、承諾兌現、段落頭）一種一列，只含次數，是觀察到的走法不是規則，可以有環；`structure-links.py` 列出一句的所有連結，以及某個步驟看過與沒看過的走法（沒看過的由詞彙算出，不儲存）；`structure-batch.py --moves-only` 只標步驟不動依存樹，`structure-metrics.py --compare-moves` 報告兩份標註的 Cohen's κ（#33）|
 | `plugins/propositions/scripts/validate-verification.py`、`proofread-to-verification.py` + `docs/VERIFICATION.md` | 驗證紀錄 sidecar（`verification.jsonl`）：帳冊只當索引，proofread／Lean／CAS 等方法的判定記在旁邊；轉換只認完整 proposition id（#12） |
 | `plugins/propositions/catalog/obligations.yaml` + `docs/OBLIGATIONS.md` | 義務表：一列一條，寫明帳冊與附檔要對什麼（前提）、文章欠讀者什麼（義務，依原則分七組），以及驗證它的檢查；還沒有檢查的標成缺口並指到 issue。說明文件定義每一列對一個單位（一筆命題或整篇文章）的四種結果，以及「完全合理」＝每一列都是通過或不適用。現在沒有工具讀這張表，由 `tests/test_plugin_payload_tracked.py` 的 `test_obligations_` 案例守住格式與完整性（#47） |
+| `plugins/propositions/docs/OUTLINE.md` | 綱要的三個檔：每一個鍵、來源指標（label 或開頭文字）、確認紀錄，以及「一節仍照通過時的內容」的判定。現在沒有驗證器（#78，等 #46），只有 skill 寫入後自己跑的幾項檢查；照綱要把文字寫進稿件是 #51（#75） |
 
 同一個 marketplace 另有第二個 plugin `plugins/tschema-check/`（#4）：文件對外部來源的忠實度查核，validator 自帶、不 import 本 plugin（安裝後 plugin 彼此隔離）。
 
@@ -155,12 +157,13 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
 - pytest 7+ for test suite
+- `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`，其他 skill 不需要；它也需要 `git`，`/propositions:manuscript-audit` 與 Operation D 原本就用 git（實跑過 jq 1.7.1 與 1.8.2、git 2.54 與 2.55；outline 開頭會先確認三個工具都在，jq 分得出兩個不同的長整數，1.7 之前的版本分不出來，git 是 2.38 以上，而且系統的 `pwd` 在 `/usr/bin` 或 `/bin`；少一樣就停下）
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)
 - Schema versions: v1.0 – v1.7 — validator handles all with backward-compat skip for v1.2+-only rules (R7 / R11 / R12)；v1.4 = `retired`、v1.5 = `retired.superseded_mechanism`、v1.6 = multi-file（file-qualified location + `source.parts`）、v1.7 = `_meta.json` `profile`（`default` / `empirical`，決定 R11／R12 詞彙）。完整版本史見 `docs/SCHEMA.md` §Versioning
 
 ## Hard rules for contributors
 
-- **不修 user 的 main.jsonl 不問**:任何會 write jsonl 的 skill (e.g., refresh-locations) 必須先 dry-run + AskUserQuestion 確認再寫
+- **不修 user 的 main.jsonl 不問**:任何會 write jsonl 的 skill (e.g., refresh-locations) 必須先 dry-run + AskUserQuestion 確認再寫。綱要的三個檔(`outline-*.jsonl`)除外:什麼時候寫、寫之前問什麼,照 `/propositions:outline` 的 skill
 - **Loud failure over silent fix**:寧可 anchor_failed 不要亂猜 line number
 - **Schema 升級走 spec 流程**:不要 ad-hoc 加 enum 值;先改 `docs/SCHEMA.md` 確定新 canonical set,再更 validator + tests
 - **Test 覆蓋每條 rule**:R1-R13 各自有獨立 fixture;改 normalize_for_match 等 shared helper 必跑全 R-rule test suite

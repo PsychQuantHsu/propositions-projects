@@ -169,6 +169,9 @@ manuscript/propositions/
 ├── main.jsonl             # 1 prop per line, in main.tex reading order
 ├── structure.json         # optional sidecar — thesis, section and paragraph plans (see §Structure sidecars)
 ├── discourse.jsonl        # optional sidecar — 1 record per prop: head, relation, commitments (see §Structure sidecars)
+├── outline-sections.jsonl   # optional — the outline, article layer: 1 section per line (plugin docs/OUTLINE.md)
+├── outline-paragraphs.jsonl # optional — the outline, paragraph layer: 1 paragraph per line
+├── outline-approvals.jsonl  # optional — 1 approval of the outline per line
 ├── _smoke_tests/
 │   ├── rollback_60.tex
 │   ├── rollback_60_meta.json
@@ -193,6 +196,14 @@ Article structure is stored in two sidecar files in the ledger's directory, next
 - **Full format**: `plugins/propositions/docs/STRUCTURE.md`.
 
 This follows the precedent of `verification.jsonl` (`plugins/propositions/docs/VERIFICATION.md`): the ledger stays an index of claims, and annotations that can be redone without touching it live beside it.
+
+## Article outline (beside the ledger, outside its schema)
+
+The three outline files (`outline-sections.jsonl`, `outline-paragraphs.jsonl`, `outline-approvals.jsonl`) hold what an article is planned to say before it is written, and the author's approvals of that plan. All three are optional, and a manuscript can have them without having a ledger.
+
+- **The ledger schema does not change.** The outline files add no field to `main.jsonl` or `_meta.json`, and adding, changing or removing them does not change either. `schema_version` does not cover them, so adding them needs no version bump or migration. They carry no version of their own yet.
+- **`validate-propositions.py` does not read them**, and no other validator does until issue #78.
+- **Full format**: `plugins/propositions/docs/OUTLINE.md`.
 
 ## `_meta.json` schema (root metadata)
 

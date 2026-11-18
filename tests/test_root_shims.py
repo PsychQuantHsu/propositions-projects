@@ -45,8 +45,8 @@ def test_core_implementation_exists():
     )
 
 
+# spec-example: umbrella-marketplace-layout / the validator shim forwards its exit code and output
 def test_validate_propositions_shim_transparent():
-    # spec-example: umbrella-marketplace-layout / the validator shim forwards its exit code and output
     """Root shim and core script agree on exit code and stdout."""
     fixture_args = [
         "--jsonl", str(FIXTURES / "duplicate_id.jsonl"),

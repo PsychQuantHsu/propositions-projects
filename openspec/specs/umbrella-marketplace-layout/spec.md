@@ -8,7 +8,7 @@ TBD - created by archiving change 'umbrella-marketplace-migration'. Update Purpo
 
 ### Requirement: Plugins monorepo layout with a single tool implementation
 
-The repository SHALL host all plugin content under `plugins/<name>/` directories, with `plugins/propositions/` as the core plugin (validator scripts, audit chain, and the domain-general manuscript-QA skills). Each tool script SHALL have exactly one implementation, located under `plugins/propositions/scripts/`. The repository SHALL NOT ship a plugin directory that contains no skills and no scripts.
+The repository SHALL host all plugin content under `plugins/<name>/` directories, with `plugins/propositions/` as the core plugin (validator scripts, audit chain, and the domain-general manuscript-QA skills). Each tool script SHALL have exactly one implementation, located under `plugins/propositions/scripts/`. Tools written in Swift are the exception to that location: they live in the one Swift package at the repository root (`Package.swift`, `Sources/`, `tests/PropositionsKitTests/`), outside every plugin directory. While the Python validators are not ported, the rules for reading a `location` and the `\input` tree exist once in Python and once in Swift; the two SHALL be changed together, and no other logic is written twice. The repository SHALL NOT ship a plugin directory that contains no skills and no scripts.
 
 #### Scenario: Core plugin owns the toolchain
 
@@ -22,10 +22,18 @@ The repository SHALL host all plugin content under `plugins/<name>/` directories
 - **THEN** it is placed in `plugins/propositions/` unless it depends on a domain-specific toolchain (e.g. sympy substitution checking, Lean bridging)
 - **AND** a separate `plugins/<domain>/` directory is created only at the moment such domain-specific content actually lands, never as an empty placeholder
 
+
+<!-- @trace
+source: idd-46-fix1
+updated: 2026-11-19
+code:
+  - propositions-projects.code-workspace
+-->
+
 ---
 ### Requirement: Root-level CI entry shims preserve the pinned path contract
 
-The repository SHALL keep root-level `scripts/` entries (at minimum `run-audit.sh` and `validate-propositions.py`) as forwarding shims that delegate to the implementations under `plugins/propositions/scripts/`, forwarding argv, stdout/stderr, and exit codes byte-for-byte. The root-level `tests/` invocation (`pytest tests/`) SHALL remain green.
+The repository SHALL keep root-level `scripts/` entries (at minimum `run-audit.sh` and `validate-propositions.py`) as forwarding shims that delegate to the implementations under `plugins/propositions/scripts/`, forwarding argv, stdout/stderr, and exit codes byte-for-byte. The root-level `scripts/` directory MAY also hold `release-signed.sh`, the maintainer's script for releasing the Swift binary; it is not an entry point for downstream CI and forwards to nothing. The root-level `tests/` invocation (`pytest tests/`) SHALL remain green.
 
 #### Scenario: Pinned CI checkout keeps working across tags
 
@@ -37,6 +45,14 @@ The repository SHALL keep root-level `scripts/` entries (at minimum `run-audit.s
 
 - **WHEN** the test suite runs
 - **THEN** a shim smoke test asserts that root-level invocation and core-plugin invocation produce identical exit codes and equivalent output for a fixture input
+
+
+<!-- @trace
+source: idd-46-fix1
+updated: 2026-11-19
+code:
+  - propositions-projects.code-workspace
+-->
 
 ---
 ### Requirement: Umbrella marketplace manifest

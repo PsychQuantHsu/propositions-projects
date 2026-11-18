@@ -10,6 +10,8 @@ TBD - created by archiving change 'umbrella-marketplace-migration'. Update Purpo
 
 The repository SHALL host all plugin content under `plugins/<name>/` directories, with `plugins/propositions/` as the core plugin (validator scripts, audit chain, and the domain-general manuscript-QA skills). Each tool script SHALL have exactly one implementation, located under `plugins/propositions/scripts/`. Tools written in Swift are the exception to that location: they live in the one Swift package at the repository root (`Package.swift`, `Sources/`, `tests/PropositionsKitTests/`), outside every plugin directory. While the Python validators are not ported, the rules for reading a `location` and the `\input` tree exist once in Python and once in Swift; the two SHALL be changed together, and no other logic is written twice. The repository SHALL NOT ship a plugin directory that contains no skills and no scripts.
 
+No executable check: where a tool lives and whether a second copy exists is a property of the whole tree that a reviewer reads; the one part a test can observe, the root shims, is checked under the next requirement.
+
 #### Scenario: Core plugin owns the toolchain
 
 - **WHEN** a maintainer edits a validator or audit script
@@ -24,7 +26,7 @@ The repository SHALL host all plugin content under `plugins/<name>/` directories
 
 
 <!-- @trace
-source: idd-46-fix1
+source: idd-46-fix1-links
 updated: 2026-11-19
 code:
   - propositions-projects.code-workspace
@@ -46,9 +48,15 @@ The repository SHALL keep root-level `scripts/` entries (at minimum `run-audit.s
 - **WHEN** the test suite runs
 - **THEN** a shim smoke test asserts that root-level invocation and core-plugin invocation produce identical exit codes and equivalent output for a fixture input
 
+##### Example: the validator shim forwards its exit code and output
+
+- **GIVEN** the fixture ledger of the shim smoke test
+- **WHEN** `scripts/validate-propositions.py` at the root and the implementation under `plugins/propositions/scripts/` are each run on it
+- **THEN** both exit with the same code and print the same output
+
 
 <!-- @trace
-source: idd-46-fix1
+source: idd-46-fix1-links
 updated: 2026-11-19
 code:
   - propositions-projects.code-workspace

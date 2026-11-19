@@ -36,8 +36,12 @@ its own, or as a submodule of any other. The skill works
 only on a manuscript inside a git repository: when the manuscript is in no git
 repository, it stops and says why. The
 repository's root is the boundary of the outline files and of every file the
-skill reads as a source, and the skill does not take that boundary from an
-answer of the author. Its own temporary files are outside the repository. For
+skill reads as a source. The skill does not take that boundary from an answer
+of the author: the author's choice of the outline directory can only narrow it
+to a repository inside the outermost one, and the skill stops when that
+repository does not hold the manuscript (for a draft, the directory where the
+manuscript will be). The root only moves down; to choose an outline directory
+outside it, the skill starts again. Its own temporary files are outside the repository. For
 a draft with no manuscript yet, the directory where the author says the
 manuscript will be stands in for it when the repository is found; the skill
 asks when the author has not said. When that directory does not exist yet, the
@@ -57,11 +61,15 @@ every path a locator gives is relative to its root. When the directory of the
 outline files is in a repository that does not hold the manuscript (a
 submodule that holds only the ledger, or a repository of its own beside the
 manuscript's), the skill stops and asks for a directory of a repository that
-does. An outline written before this rule (plugin 0.12.0 and earlier) gives
-every `file` from the outermost repository; when that is not the outline
-directory's repository, its locators do not resolve, check reports each of
-them, and the leading part of each `file` that leads from the outermost
-repository down to this one is removed by hand. When
+does. An outline written before this rule (issue #91) gives every `file` from
+the outermost repository. When the root moves down and the outline files
+already exist, the skill names the leading part that a `file` written that way
+begins with and asks the author whether the outline was written so; it does
+not decide it from whether the locators resolve, because a `file` written from
+the outermost root can by chance name another file under the new root that
+holds the same label or opening words. When the author says it was, that part
+is removed from each `file` with revise, and every section whose records change
+no longer stands as approved, so the author approves those sections again. When
 the manuscript's repository sits inside another without being its submodule, a
 ledger of the outer repository is outside the repository: it does not name the
 manuscript for the skill, and the outline cannot go beside it. When no ledger
@@ -685,7 +693,12 @@ In the repository the skill writes no other file: not the manuscript, not
 the ledger, not the structure sidecars and not the verification records. Its
 temporary files are kept outside the repository, in a directory it makes for
 this repository when it starts (the stage directory): the directory belongs to
-the user, has mode 700, and holds a note of the root it was made for.
+the user, has mode 700, and holds a note of the root it was made for. The
+first command writes the outermost root there; the command that sets the root
+to the outline directory's repository rewrites it and marks the root as set,
+and every command after that goes on only when the mark is there, so a stage
+directory whose root was never set, as after a new session, stops them until
+that command runs again.
 Every later command confirms all of that for the path it is given as the stage
 directory, and a directory that fails one of these is not used: the directory
 above the repository, the machine's temporary directory itself and the stage
@@ -715,7 +728,10 @@ and its rules and commands are there for them.
 
 1. In the repository it writes the three outline files and no other file.
 2. It reads no file outside the repository, other than its own (the temporary
-   files it made in the stage directory, and the files of this plugin) and the
+   files it made in the stage directory, and the files of this plugin), the
+   ledgers' `_meta.json` files of the outermost repository the manuscript is
+   checked out in, which it reads to find the ledger before the root is set,
+   and the
    files git itself reads when it is asked (its configuration, its global
    ignore file, and the git directory of the repository wherever it is, which
    for a linked worktree is in the repository the worktree belongs to).
@@ -975,7 +991,9 @@ full, stops the skill, and so does a path that holds a single quote; for a
 file the author points to, such a path stops the skill for that file only:
 it does not read the file and asks the author to paste the text. The one
 exception is the main file in the command that compares a ledger with it:
-left empty there, it means that there is no manuscript yet. The paths
+left empty there, it means that there is no manuscript yet. The command that
+sets the root takes the directory where the manuscript will be in its place,
+so its path is never empty. The paths
 of the ledgers' `_meta.json` files are read from a list in the stage directory,
 not written into a command. The task message for the agent of the premise
 check is held to the same rule.

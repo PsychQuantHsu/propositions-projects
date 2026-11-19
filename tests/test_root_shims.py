@@ -45,6 +45,7 @@ def test_core_implementation_exists():
     )
 
 
+# spec-example: umbrella-marketplace-layout / the validator shim forwards its exit code and output
 def test_validate_propositions_shim_transparent():
     """Root shim and core script agree on exit code and stdout."""
     fixture_args = [

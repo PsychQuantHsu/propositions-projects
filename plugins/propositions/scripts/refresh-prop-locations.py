@@ -175,6 +175,18 @@ def find_prop_span(
     return occurrences[0]
 
 
+def read_tex_lines(path: Path) -> tuple[str, list[str]]:
+    """(text, lines) of one manuscript file, as every `location` this tool writes counts them.
+
+    `read_text()` reads with universal newlines, so a line ends at LF, CR or CRLF and at
+    no other character. The Swift package counts lines the same way
+    (Sources/PropositionsKit/ReadingOrder.swift, `LatexLine.splitLines`), and its ParityTests
+    call this function: change the two together.
+    """
+    text = path.read_text()
+    return text, text.split("\n")
+
+
 def parse_claimed_loc(loc_str: str) -> tuple[str | None, int | None, int | None]:
     """v1.6-aware parse: returns (relpath_or_None, start, end).
 
@@ -215,8 +227,7 @@ def refresh_jsonl(
     def locator_state(key: str | None) -> tuple[list[str], str, list[str]]:
         """(tex_lines, normalized_tex, window_norms) for one corpus file."""
         if key not in _locator_cache:
-            text = file_paths[key].read_text()
-            lines = text.split("\n")
+            text, lines = read_tex_lines(file_paths[key])
             _locator_cache[key] = (
                 lines,
                 normalize(text),

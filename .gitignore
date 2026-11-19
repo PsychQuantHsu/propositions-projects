@@ -45,3 +45,6 @@ tests/fixtures/hsu-regression/
 
 # IDD tree-lock (idd-tree-lock.sh #183) — per-machine session state, not tracked
 .claude/.idd/tree-lock
+
+# Swift build products
+/.build/

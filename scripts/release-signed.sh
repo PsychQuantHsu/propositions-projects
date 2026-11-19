@@ -29,8 +29,9 @@ if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
 fi
 
 echo "[1/5] tests, then the universal release build"
-swift test
-BUILD_ARGS=(-c release --arch arm64 --arch x86_64)
+# Dependencies are the versions Package.resolved names, and the build starts from nothing.
+swift test --only-use-versions-from-resolved-file
+BUILD_ARGS=(-c release --arch arm64 --arch x86_64 --only-use-versions-from-resolved-file)
 BUILT="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)/${BINARY}"
 rm -f "${BUILT}"   # still there after the build means this build made it
 swift build "${BUILD_ARGS[@]}"

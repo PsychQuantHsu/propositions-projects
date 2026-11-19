@@ -9,13 +9,14 @@ struct LocationTests {
         ("main.tex:L501-L507", "main.tex", 501, 507),
         ("parts/part2-theory.tex:L4-L9", "parts/part2-theory.tex", 4, 9),
         ("  L3 ", nil, 3, 3),
+        ("/parts/a.tex:L1", "/parts/a.tex", 1, 1),  // read here; no tree holds a file of that name
+        ("L٣", nil, 3, 3),                          // any decimal digit, as Python's \\d reads it
     ])
     func `A location the schema allows is parsed`(raw: String, file: String?, start: Int, end: Int) {
         #expect(Location.parse(raw) == Location(file: file, start: start, end: end))
     }
 
-    @Test(arguments: ["main.tex:12", "L0", "L9-L3", "12", "L", "Lx", "a b.tex:L1", "a.tex:b.tex:L1", "L1-", "L1-L2-L3", "",
-                     "/parts/a.tex:L1", "/main.tex:L1"])
+    @Test(arguments: ["main.tex:12", "L0", "L9-L3", "12", "L", "Lx", "a b.tex:L1", "a.tex:b.tex:L1", "L1-", "L1-L2-L3", "", "L½"])
     func `A location the schema does not allow is refused`(raw: String) {
         #expect(Location.parse(raw) == nil)
     }
@@ -184,10 +185,12 @@ struct ReadingOrderTests {
         ])
         let order = try ReadingOrder(mainFile: manuscript.root.appendingPathComponent("thesis.tex"))
         #expect(order.position(file: nil, line: 3) == [3])
-        #expect(order.position(file: "thesis.tex", line: 3) == [3])  // the main file's own name
         // `main.tex` always means the main file, as the tool that writes locations has it; the
         // included file of that name cannot be named by a location.
         #expect(order.position(file: "main.tex", line: 3) == [3])
+        // The main file's own name is not a prefix that tool writes or reads.
+        #expect(order.position(file: "thesis.tex", line: 3) == nil)
+        #expect(order.position(file: "/main.tex", line: 3) == nil)
     }
 
     @Test func `A file outside the main file's directory is keyed by its relative path`() throws {

@@ -296,6 +296,16 @@ struct CommandTests {
         #expect(result.stdout.joined(separator: "\n").contains("cite-order"))
     }
 
+    // spec-example: citation-order / help for the subcommand
+    @Test(arguments: [["cite-order", "--help"], ["cite-order", "-h"], ["help", "cite-order"]])
+    func `Help for the subcommand`(arguments: [String]) {
+        let result = PropositionsCLI.run(arguments, workingDirectory: manuscript.root)
+        #expect(result.exitCode == 0)
+        let text = result.stdout.joined(separator: "\n")
+        #expect(text.contains("--jsonl"))
+        #expect(text.contains("Exit codes"))
+    }
+
     // spec-example: citation-order / a wrong argument
     @Test func `A wrong argument`() {
         let result = run("cite-order", "--bogus")

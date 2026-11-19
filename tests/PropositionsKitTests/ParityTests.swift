@@ -6,10 +6,19 @@ import Testing
 /// These tests put the same inputs to both and compare, so that a change to one side that the
 /// other does not follow fails here. They run the Python tools of this repository.
 struct ParityTests {
-    /// The first `python3` on PATH (the Python tools need 3.10 or later, which the system's may not be).
+    /// The first `python3` on PATH that is 3.10 or later, which the Python tools need. When there
+    /// is none these tests are skipped, and the test run says so.
     static let interpreter: String? = ((ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map { "\($0)/python3" }
         + ["/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python3"])
-        .first { FileManager.default.isExecutableFile(atPath: $0) }
+        .first { path in
+            guard FileManager.default.isExecutableFile(atPath: path) else { return false }
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            return (try? process.run()) != nil && { process.waitUntilExit(); return process.terminationStatus == 0 }()
+        }
 
     /// Runs a Python program with the scripts directory on its path; `input` is handed over as JSON on stdin.
     func python(_ program: String, input: Any) throws -> Any {
@@ -33,7 +42,9 @@ struct ParityTests {
     @Test(.enabled(if: ParityTests.interpreter != nil))
     func `A location is read alike in both languages`() throws {
         let cases = ["L12", "main.tex:L214", "main.tex:L501-L507", "parts/a.tex:L4-L9", "main.tex:12", "L0", "L9-L3",
-                     "12", "L", "a b.tex:L1", "a.tex:b.tex:L1", "L1-", "L1-L2-L3", "", "../shared/defs.tex:L2"]
+                     "12", "L", "a b.tex:L1", "a.tex:b.tex:L1", "L1-", "L1-L2-L3", "", "../shared/defs.tex:L2",
+                     "/parts/a.tex:L1", "/main.tex:L1", "L٣", "parts/a.tex:L٤-L٥", "L½", " L3\t", "\u{200B}L3",
+                     "\u{FEFF}L3", "L3\u{1C}", "L3\u{A0}", "Lx", "L-1", "L 3", "l3", ".tex:L1", "a.tex:"]
         let answer = try python("""
             from _lib.latex_env_parser import parse_location_v16
             out = []
@@ -46,14 +57,14 @@ struct ParityTests {
         for (raw, row) in zip(cases, rows) {
             let swift = Location.parse(raw)
             guard let triple = row as? [Any] else {
-                #expect(swift == nil, "Python refuses '\\(raw)', Swift reads it")
+                #expect(swift == nil, "Python refuses \(raw.debugDescription), Swift reads it")
                 continue
             }
             // Python maps the prefix `main.tex` to "no file"; Swift keeps it and ReadingOrder maps it.
             let file = triple[0] as? String
-            #expect(swift?.start == triple[1] as? Int, "start of '\\(raw)'")
-            #expect(swift?.end == triple[2] as? Int, "end of '\\(raw)'")
-            #expect((swift?.file == "main.tex" ? nil : swift?.file) == file, "file of '\\(raw)'")
+            #expect(swift?.start == triple[1] as? Int, "start of \(raw.debugDescription)")
+            #expect(swift?.end == triple[2] as? Int, "end of \(raw.debugDescription)")
+            #expect((swift?.file == "main.tex" ? nil : swift?.file) == file, "file of \(raw.debugDescription)")
         }
     }
 
@@ -62,13 +73,15 @@ struct ParityTests {
     func `Lines are counted alike in both languages`() throws {
         let texts = ["a\nb\nc", "a\r\nb\r\nc\r\n", "a\rb\rc", "one\u{0C}x\u{0B}two\nthree", "a\u{2028}b\nc\u{85}d\n", "", "\n\n", "x\r\n\ry"]
         let manuscript = try Manuscript(Dictionary(uniqueKeysWithValues: texts.enumerated().map { ("t\($0.offset).tex", $0.element) }))
-        // The line of the last piece of text, as the tool that writes locations counts it:
-        // read_text() and split at line feeds.
+        // The Python side is the function of refresh-prop-locations.py that every location it
+        // writes is counted with, loaded from the script itself.
         let answer = try python("""
-            import pathlib
+            import importlib.util, pathlib
+            spec = importlib.util.spec_from_file_location('r', 'plugins/propositions/scripts/refresh-prop-locations.py')
+            r = importlib.util.module_from_spec(spec); spec.loader.exec_module(r)
             out = []
             for path in json.load(sys.stdin):
-                lines = pathlib.Path(path).read_text().split("\\n")
+                lines = r.read_tex_lines(pathlib.Path(path))[1]
                 while lines and lines[-1] == "":
                     lines.pop()
                 out.append(lines)
@@ -78,7 +91,7 @@ struct ParityTests {
         for (text, row) in zip(texts, rows) {
             var swift = LatexLine.splitLines(text)
             while swift.last == "" { swift.removeLast() }
-            #expect(swift == row, "lines of \\(text.debugDescription)")
+            #expect(swift == row, "lines of \(text.debugDescription)")
         }
     }
 
@@ -105,7 +118,7 @@ struct ParityTests {
             """, input: blocks)
         let rows = try #require(answer as? [Bool])
         for (block, expected) in zip(blocks, rows) {
-            #expect(Ledger.isRetired(block) == expected, "retired block \\(block)")
+            #expect(Ledger.isRetired(block) == expected, "retired block \(block)")
         }
     }
 }

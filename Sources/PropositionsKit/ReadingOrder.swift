@@ -36,9 +36,9 @@ public enum InputTreeError: Error, Equatable, CustomStringConvertible {
 /// plugins/propositions/scripts/refresh-prop-locations.py: a line number in a ledger is the
 /// number that tool counted, and a file name is the name it wrote. So lines end where that tool
 /// ends them (line feed, carriage return, or the two together), and the prefix `main.tex`
-/// always means the main file. The tree itself is read more carefully than the Python
-/// `resolve_input_tree` reads it (issue 94): a file that function leaves out can hold no
-/// location the tool wrote, so reading it changes no answer.
+/// always means the main file. The tree itself is read by this type's own rules, not by the
+/// Python `resolve_input_tree` (issue 94 lists where the two differ); for a manuscript on
+/// which they differ, the order here is the order of this tree.
 public struct ReadingOrder: Sendable {
     public static let maxDepth = 3
 
@@ -108,15 +108,16 @@ public struct ReadingOrder: Sendable {
 
     /// The position of a line, or `nil` when the file is not in the input tree.
     ///
-    /// A location names the main file when it writes no file, writes `main.tex`, or writes the
-    /// main file's own name. `main.tex` means the main file whatever the main file is called:
-    /// the tool that writes locations writes that prefix for every proposition of the main
-    /// file. An included file that is itself called `main.tex`, beside a main file of another
-    /// name, can therefore not be named by a location.
+    /// A location names the main file when it writes no file or writes `main.tex`, whatever the
+    /// main file is called: the tool that writes locations writes that prefix for every
+    /// proposition of the main file, and reads no other name for it. An included file that is
+    /// itself called `main.tex`, beside a main file of another name, can therefore not be named
+    /// by a location. A file written from the root of the file system is in no tree.
     public func position(file: String?, line: Int) -> [Int]? {
         guard let file else { return [line] }
+        if file.hasPrefix("/") { return nil }
         let key = ReadingOrder.normalise(file)
-        if key == "main.tex" || key == mainName { return [line] }
+        if key == "main.tex" { return [line] }
         if let prefix = prefixes[key] { return prefix + [line] }
         return nil
     }

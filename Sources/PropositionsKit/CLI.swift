@@ -15,14 +15,19 @@ public enum PropositionsCLI {
                     jsonl: citeOrder.jsonl, tex: citeOrder.tex, json: citeOrder.json,
                     workingDirectory: workingDirectory)
             }
-            // The root command with no subcommand: print its help.
-            return CommandResult(stdout: lines(Root.helpMessage()), exitCode: 0)
+            // No subcommand, or help was asked for (the parser hands back its help command for
+            // `--help`, `-h` and `help`): print the help of the command that was named.
+            return CommandResult(stdout: lines(help(for: arguments)), exitCode: 0)
         } catch {
             let message = lines(Root.fullMessage(for: error))
             let code = Root.exitCode(for: error)
             if code == .success { return CommandResult(stdout: message, exitCode: 0) }  // --help, --version
             return CommandResult(stderr: message, exitCode: code == .validationFailure ? 2 : code.rawValue)
         }
+    }
+
+    private static func help(for arguments: [String]) -> String {
+        arguments.contains("cite-order") ? Root.helpMessage(for: CiteOrderOptions.self) : Root.helpMessage()
     }
 
     private static func lines(_ text: String) -> [String] {

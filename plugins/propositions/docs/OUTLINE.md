@@ -21,12 +21,18 @@ The outline is three files in the directory that holds, or would hold, the
 ledger. The directory can hold them without a `main.jsonl`: a manuscript does
 not need a ledger to have an outline.
 
-**The repository** is the git repository that holds the manuscript, or, when
-that repository is checked out as a submodule of another (as git reports it,
-from the index of the outer repository), the outermost repository it is
-checked out in, however many levels of submodules lie between (this has no
-cap yet because the maintainer has not decided whether to stop past some
-number of levels; it is an implementer's proposal, issue #75). The skill works
+**The repository** is the git repository that holds the directory of the
+outline files (issue #91). The skill finds it in two steps. First it finds the
+outermost repository the manuscript is checked out in: the git repository that
+holds the manuscript, or, when that repository is checked out as a submodule
+of another (as git reports it, from the index of the outer repository), the
+outermost repository above it, however many levels of submodules lie between.
+That is where it looks for ledgers and outline files, and where the directory
+of the outline files has to be. Once that directory is known, the repository
+that holds it is the repository from then on: it has to hold the manuscript
+too, and its submodules are inside it. Every `file` of a locator is written
+from its root, so an outline resolves in every checkout of that repository: on
+its own, or as a submodule of any other. The skill works
 only on a manuscript inside a git repository: when the manuscript is in no git
 repository, it stops and says why. The
 repository's root is the boundary of the outline files and of every file the
@@ -47,8 +53,15 @@ directory is not the directory of the outline files unless the author says
 so, and no ledger names a manuscript that does not exist yet. A repository that
 sits inside another without being its submodule is a repository of its own.
 Everything this document says is inside the repository is inside this one, and
-every path a locator gives is relative to its root. An outline kept inside a
-submodule therefore does not resolve in a checkout of the submodule alone. When
+every path a locator gives is relative to its root. When the directory of the
+outline files is in a repository that does not hold the manuscript (a
+submodule that holds only the ledger, or a repository of its own beside the
+manuscript's), the skill stops and asks for a directory of a repository that
+does. An outline written before this rule (plugin 0.12.0 and earlier) gives
+every `file` from the outermost repository; when that is not the outline
+directory's repository, its locators do not resolve, check reports each of
+them, and the leading part of each `file` that leads from the outermost
+repository down to this one is removed by hand. When
 the manuscript's repository sits inside another without being its submodule, a
 ledger of the outer repository is outside the repository: it does not name the
 manuscript for the skill, and the outline cannot go beside it. When no ledger
@@ -86,9 +99,9 @@ disk in letter case alone, which git does not notice on such a file system),
 the file counts as tracked and keeps the name it has by the rule above (its
 last part as the directory gives it), not the name git has; the `.tex` files
 that derive follows are treated the same way. One such file is still refused:
-one whose name the outermost repository ignores, because it is asked about
+one whose name the repository ignores at its root, because it is asked about
 that name and answers so. A file in a submodule is not refused that way: the
-outermost repository gives no answer for it.
+repository gives no answer for it.
 Wherever this document says that a directory or a file is inside or outside
 the repository, it means by that name.
 
@@ -99,7 +112,7 @@ another, some ledgers read that as the submodule's root and others as the root
 of the outermost repository. The skill reads `source.file` both ways, in this
 order: from the root of the git repository that holds the ledger (for a ledger
 inside a submodule, the submodule's root), and then from the root of the
-repository. The first reading that leads to a regular file under the root of
+outermost repository. The first reading that leads to a regular file under the root of
 the ledger's own git repository decides which file the ledger names; a file in
 a directory under that root counts, also when the directory is a submodule or
 holds a git repository of its own. A reading
@@ -340,12 +353,12 @@ holding it gives no answer for, is not a locator's file: the skill does not read
 it is not a locator. Two repositories are asked. The first is the one that
 holds the file, asked in the directory of the file: a file inside a submodule,
 or inside a git repository of its own under the root, is judged by the rules
-of that repository. The second is the outermost repository, asked whether it
+of that repository. The second is the repository, asked at its root whether it
 ignores the path: when it does, the file is not a locator's file whatever the
-first said, so a repository of its own inside a directory that the outermost
+first said, so a repository of its own inside a directory that the
 repository ignores does not make its files readable. (Outlines written before
 this rule can have locators into such a directory that resolved then and do
-not now.) When the outermost
+not now.) When the
 repository gives no answer for the path, as it gives none for a file inside a
 submodule, the answer of the first stands; any error of that second question
 counts as no answer. A repository between the two is not

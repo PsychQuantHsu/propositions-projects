@@ -176,18 +176,20 @@ cases those commands leave open.
   says which repositories are asked), and whose path from the root holds no
   character that a locator's `file` may not hold. The second command below checks this and prints
   the path to use for it from then on.
-- `ROOT` — the root of the repository. The repository is the git repository that holds the
+- `ROOT` — the root of the repository, set in two steps. The first command gives the
+  outermost repository the manuscript is checked out in: the git repository that holds the
   manuscript, or, when that repository is checked out as a submodule of another (as git reports
-  it, from the index of the outer repository), the outermost
-  repository it is checked out in, however many levels of submodules lie between (no cap yet:
-  the maintainer has not decided whether to stop past some number of levels). When the
-  manuscript is in no git repository, the skill stops. A repository that sits inside
-  another without being its submodule is a repository of its own. Every `file` of a locator is a
-  path relative to `ROOT`; an outline kept inside a submodule therefore does not resolve in a
-  checkout of the submodule alone. When the manuscript's repository sits inside another without
-  being its submodule, a ledger of the outer repository is outside `ROOT`: it is not listed below,
-  and the outline cannot go beside it. The other way round, a directory under `ROOT` counts as
-  inside it even when it holds a git repository of its own.
+  it, from the index of the outer repository), the outermost repository above it, however many
+  levels of submodules lie between. That is the area in which ledgers and outline files are
+  looked for. Once `OUTDIR` is known, "The root is the repository of the outline directory"
+  below sets `ROOT` to the git repository that holds `OUTDIR` (issue 91), and every command from
+  then on uses that root. Every `file` of a locator is a path relative to it, so an outline kept
+  in a submodule resolves in a checkout of that submodule alone, and in any checkout that holds
+  it. When the manuscript is in no git repository, the skill stops. A repository that sits inside
+  another without being its submodule is a repository of its own. When the manuscript's
+  repository sits inside another without being its submodule, a ledger of the outer repository is
+  outside `ROOT`: it is not listed below, and the outline cannot go beside it. The other way round,
+  a directory under `ROOT` counts as inside it even when it holds a git repository of its own.
 - `OUTDIR` — the directory of the outline files.
 - `STAGE` — a directory outside the repository that the first command makes for this session's
   temporary files.
@@ -257,9 +259,9 @@ case of its letters swapped is the same file), and git tracks a path that differ
 in letter case (a file renamed on the disk in letter case alone, which git does not notice on
 such a file system), the file counts as tracked. It keeps the name it has by the rule above (its last part as the
 directory gives it), not the name git has; what git prints is not used. The list of `.tex` files in derive does the same. One such file is still
-refused: one whose name the outermost repository ignores, because it is asked about that name
+refused: one whose name the repository at `ROOT` ignores, because it is asked about that name
 and answers so; `git mv` to the name on the disk settles it. A file in a submodule is not
-refused that way, because the outermost repository gives no answer for it. A name that does not survive this, such as a
+refused that way, because the repository at `ROOT` gives no answer for it. A name that does not survive this, such as a
 directory whose name ends in a line break, stops the command or leaves the file unread.
 
 Every git command that reads a repository is run with two settings on its command line,
@@ -366,7 +368,8 @@ A ledger names one file at most. `docs/SCHEMA.md` writes a ledger's `source.file
 "manuscript repo root"; when the ledger's repository is a submodule of another, that is read
 as the submodule's root by some ledgers and as the outermost root by others. The command reads
 it both ways, in this order: from the root of the git repository that holds the ledger (for a
-ledger inside a submodule, the submodule's root), and then from `ROOT`. The first reading that
+ledger inside a submodule, the submodule's root), and then from `ROOT` as the first command
+printed it. The first reading that
 leads to a regular file under the root of the ledger's own git repository decides, and the
 ledger names `MAIN` when that file is `MAIN`. A reading that leads to a file outside the
 ledger's own repository is not taken, so the ledger of another paper, kept in a submodule or
@@ -407,6 +410,46 @@ The command prints one of three `ok` lines, or none.
    The directory the author names for a manuscript that does not exist yet (`DIR` of the
    first command) only finds the repository. It is not the directory of the outline files
    unless the author says so.
+
+### The root is the repository of the outline directory
+
+Run this once `OUTDIR` is known, before any other command. `ROOT` and `STAGE` are as the first
+command printed them, `OUTDIR` is the directory of the outline files, and `M` is `MAIN` as the
+manuscript check printed it; when there is no manuscript yet, leave nothing between its quotes.
+
+```bash
+ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
+OUTDIR='<the directory of the outline files>'
+M='<MAIN, as the manuscript check printed it>'
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && { [ -z "$M" ] || [ "${M#/}" != "$M" ]; } && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
+OD=${OUTDIR%"${OUTDIR##*[!/]}"}; if [ -d "$OD" ]; then D=$OD; else D=${OD%/*}; fi; O=$(builtin cd -P -- "$D" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$D" ] && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } || { echo 'STOP the outline directory, or the directory that is to hold it, is not a directory inside the repository'; exit 1; }
+T=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$O" rev-parse --show-toplevel) && TR=$(builtin cd -P -- "$T" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$TR" -ef "$T" ] || { echo 'STOP git finds no repository for the outline directory'; exit 1; }
+{ [ "$TR" = "$R" ] || [ "${TR#"$R"/}" != "$TR" ]; } && [ "$TR" != / ] || { echo 'STOP the repository of the outline directory is not inside the repository'; exit 1; }
+[ -z "$M" ] || { [ -f "$M" ] && B0=$(realpath "$M") && B="$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${B0##*/}" && [ "$B" -ef "$M" ] && [ "${B#"$TR"/}" != "$B" ]; } || { echo 'STOP the manuscript is not in the repository of the outline directory'; exit 1; }
+printf '%s\n' "$TR" > "$S/root.txt" && printf 'ROOT=%s\n' "$TR" && echo 'ok the root is the repository of the outline directory'
+```
+
+The root is the git repository that holds the directory of the outline files (for a directory
+that does not exist yet, the directory that is to hold it), not the outermost repository the
+first command found. Every `file` of a locator is written from this root, so the outline
+resolves in every checkout of this repository: on its own, or as a submodule of any other.
+
+- `ok the root is the repository of the outline directory`: from here on `ROOT` is the path on
+  the `ROOT=` line, and the stage directory names this root, so a command that is given the
+  root the first command printed stops. When there is a manuscript, run the manuscript check
+  again with this `ROOT`: its `NAME=` line, the path of the main file from this root, is the
+  `file` of every locator that names it. When this root is the one the first command printed,
+  nothing changes but the stage directory's record of it.
+- A `STOP` line: stop and tell the author why. When it says that the manuscript is not in the
+  repository of the outline directory, the outline directory is in a repository that does not
+  hold the manuscript (a submodule that holds only the ledger, or a repository of its own beside
+  the manuscript's): say that the outline goes in a directory of a repository that holds the
+  manuscript, and ask for one.
+
+An outline written before this rule (plugin 0.12.0 and earlier) gives every `file` from the
+outermost repository. When that repository is not the outline directory's, its locators do not
+resolve under this root: check reports each of them, and the author removes the leading part of
+each `file` that names the way from the outermost repository down to this one.
 
 ### The lines that begin every call
 
@@ -611,9 +654,9 @@ not inside a `.git` directory in any letter case, and is a file git lists: one i
 one it does not track and does not ignore. Two repositories are asked. The first is the one
 that holds the file, asked in the directory of the file: a file inside a submodule, or inside
 a repository of its own under `ROOT`, is judged by the rules of that repository. The second is
-the outermost repository, asked at `ROOT` whether it ignores the path: when it does, the file
+the repository at `ROOT`, asked whether it ignores the path: when it does, the file
 is not read, whatever the first said, so a repository of its own inside a directory that the
-outermost repository ignores does not make its files readable. When the outermost repository
+repository at `ROOT` ignores does not make its files readable. When the repository at `ROOT`
 gives no answer for the path, as it gives none for a file inside a submodule, the answer of
 the first stands; the command takes any error of that second question as no answer, whatever
 its cause. A repository between the two is not asked. A file git ignores is not read,

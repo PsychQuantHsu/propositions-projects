@@ -249,4 +249,29 @@ struct ReadingOrderTests {
         // b.tex is a.tex: one file, counted where it is first included.
         #expect(try manuscript.order().files == ["main.tex", "a.tex"])
     }
+
+    // spec-example: citation-order / a starred environment ends at its starred end
+    @Test(arguments: [
+        "\\begin{verbatim*}\n\\end{verbatim}\n\\input{gone}\n\\end{verbatim*}\n\\input{a}\n",
+        "\\begin{verbatim}\n\\end{verbatim*}\n\\input{gone}\n\\end{verbatim}\n\\input{a}\n",
+    ])
+    func `A starred environment ends at its starred end`(main: String) throws {
+        let manuscript = try Manuscript(["main.tex": main, "a.tex": lines(2)])
+        #expect(try manuscript.order().files == ["main.tex", "a.tex"])
+    }
+
+    // spec-example: citation-order / a line break before the word input
+    @Test func `A line break before the word input`() throws {
+        // `\\\\input{gone}` is a line break and the word "input"; `\\\\\\input{a}` is a line break and an include.
+        let manuscript = try Manuscript([
+            "main.tex": "text\\\\input{gone}\nmore\\\\\\input{a}\n\\\\begin{verbatim}\n\\input{b}\n",
+            "a.tex": lines(2), "b.tex": lines(2),
+        ])
+        #expect(try manuscript.order().files == ["main.tex", "a.tex", "b.tex"])
+    }
+
+    @Test func `A starred import macro is named and not followed`() throws {
+        let manuscript = try Manuscript(["main.tex": "\\subimport*{dir/}{x}\n\\import*{dir/}{y}\n"])
+        #expect(try manuscript.order().skippedImports == ["main.tex:1", "main.tex:2"])
+    }
 }

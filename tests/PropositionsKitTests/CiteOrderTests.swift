@@ -279,6 +279,23 @@ struct CommandTests {
         #expect(empty.stderr == ["cite-order: cannot read the ledger manuscript/propositions/main.jsonl"])
     }
 
+    // spec-example: citation-order / the line for an import macro that is not followed
+    @Test func `The line for an import macro that is not followed`() throws {
+        let other = try Manuscript(["main.tex": "\\subfile{x}\n" + lines(5)])
+        let jsonl = try write("one.jsonl", prop("A", "L2"))
+        let result = run("cite-order", "--jsonl", jsonl, "--tex", other.main.path)
+        #expect(result.exitCode == 0)
+        #expect(result.stderr == ["[warn] non-standard import macro skipped at main.tex:1 (\\subimport/\\subfile/\\import unsupported)"])
+    }
+
+    // spec-example: citation-order / no subcommand
+    @Test func `No subcommand`() {
+        let result = run()
+        #expect(result.exitCode == 0)
+        #expect(result.stderr.isEmpty)
+        #expect(result.stdout.joined(separator: "\n").contains("cite-order"))
+    }
+
     // spec-example: citation-order / a wrong argument
     @Test func `A wrong argument`() {
         let result = run("cite-order", "--bogus")

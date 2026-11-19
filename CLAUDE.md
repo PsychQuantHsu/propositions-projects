@@ -101,6 +101,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 ```
 
 Layer 1 lives in the **user's manuscript repo** (data, paper-specific).
+Layer 2 另有一部分不在 plugin 裡：repo 根目錄的 Swift package（`Sources/PropositionsKit`，目前只有引用方向檢查），不隨 plugin 出貨，見下方 Compatibility。
 Layers 2 + 3 are this plugin (reusable across any prop-iso manuscript).
 
 ## Quick start (in a user's manuscript repo)

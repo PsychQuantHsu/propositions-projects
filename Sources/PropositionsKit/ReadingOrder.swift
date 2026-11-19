@@ -190,19 +190,18 @@ enum LatexLine {
         var rest = raw[...]
         while true {
             if let inside = environment {
-                let ends = ["\\end{\(inside)}", "\\end{\(inside)*}"].compactMap { rest.range(of: $0) }
-                guard let end = ends.min(by: { $0.lowerBound < $1.lowerBound }) else { return found }
+                // Only its own \end closes it: `verbatim*` does not end at `\end{verbatim}`.
+                guard let end = command("\\end{\(inside)}", in: rest) else { return found }
                 environment = nil
                 rest = rest[end.upperBound...]
                 continue
             }
             let comment = commentStart(rest)
             var begin: (range: Range<Substring.Index>, name: String)?
-            for name in verbatimEnvironments {
-                for marker in ["\\begin{\(name)}", "\\begin{\(name)*}"] {
-                    if let range = rest.range(of: marker), begin == nil || range.lowerBound < begin!.range.lowerBound {
-                        begin = (range, name)
-                    }
+            for name in verbatimEnvironments.flatMap({ [$0, $0 + "*"] }) {
+                if let range = command("\\begin{\(name)}", in: rest),
+                   begin == nil || range.lowerBound < begin!.range.lowerBound {
+                    begin = (range, name)
                 }
             }
             if let begin, comment == nil || begin.range.lowerBound < comment! {
@@ -214,6 +213,26 @@ enum LatexLine {
             read(String(comment.map { rest[..<$0] } ?? rest), into: &found)
             return found
         }
+    }
+
+    /// The first place `token`, which begins with a backslash, stands as a command: its backslash
+    /// is not the second half of a `\\\\` before it. In `x\\\\input{a}` the word "input" follows a
+    /// line break and no command is there; in `x\\\\\\input{a}` one is.
+    static func command(_ token: String, in text: Substring) -> Range<Substring.Index>? {
+        var search = text
+        while let range = search.range(of: token) {
+            var before = 0
+            var index = range.lowerBound
+            while index > text.startIndex {
+                let previous = text.index(before: index)
+                if text[previous] != "\\" { break }
+                before += 1
+                index = previous
+            }
+            if before % 2 == 0 { return range }
+            search = search[search.index(after: range.lowerBound)...]
+        }
+        return nil
     }
 
     private static func read(_ text: String, into found: inout Found) {
@@ -236,8 +255,10 @@ enum LatexLine {
     static func hasUnsupportedImport(_ line: String) -> Bool {
         ["\\subimport", "\\subfile", "\\import"].contains { macro in
             var search = line[...]
-            while let range = search.range(of: macro) {
-                let after = search[range.upperBound...].drop(while: { $0 == " " || $0 == "\t" })
+            while let range = command(macro, in: search) {
+                var after = search[range.upperBound...]
+                if after.first == "*" { after = after.dropFirst() }  // \subimport*, \import*
+                after = after.drop(while: { $0 == " " || $0 == "\t" })
                 if after.first == "{" { return true }
                 search = search[range.upperBound...]
             }
@@ -250,7 +271,7 @@ enum LatexLine {
         var found: [(String.Index, String)] = []
         for macro in ["\\input", "\\include"] {
             var search = line[...]
-            while let range = search.range(of: macro) {
+            while let range = command(macro, in: search) {
                 var rest = search[range.upperBound...]
                 search = rest
                 // `\include` must not match `\includegraphics`, nor `\input` match `\inputencoding`.

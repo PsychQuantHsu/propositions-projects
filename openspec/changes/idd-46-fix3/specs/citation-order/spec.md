@@ -1,0 +1,163 @@
+## MODIFIED Requirements
+
+### Requirement: Reading order comes from each proposition's location and the input tree
+
+The check SHALL take a proposition's position from the first line of its `location`, never from its line in the ledger. For a manuscript of several files, the text of an included file SHALL come after the line that includes it and before the next line of the including file, at every level of nesting; when one line holds several includes, the files they name come in the order the includes are written; a file included more than once counts where it is first included.
+
+What the check agrees with is the tool that writes `location` (`refresh-prop-locations.py`): a line number in a ledger is the number that tool counted, and a file name is the name it wrote. A `location` that writes no file is in the main file, and so is one that writes `main.tex`. The check also takes the main file's own name for the main file, which that tool does not write and the ledger validator accepts. `main.tex` means the main file whatever the main file is called, because that tool writes this prefix for every proposition of the main file; an included file that is itself called `main.tex`, beside a main file of another name, can therefore not be named by a location (a known limit). An included file is named by its path from the directory of the main file, with `..` where it leaves that directory. A `location` whose file begins with `/` is not written as the schema writes it.
+
+The input tree is read by these rules: `\input` and `\include` written with braces, paths taken from the directory of the main file, `.tex` added when the name does not end in it, a file reached through a symbolic link counted as the file the link leads to. A line ends at a line feed, at a carriage return, or at the two together, and at no other character: a form feed does not end a line, as it does not for the tool that writes `location`. A command inside a `%` comment is ignored, and so is a command inside one of the environments `verbatim`, `Verbatim`, `lstlisting`, `comment` and `filecontents`, starred or not. Such an environment ends only at its own `\end`, and the starred form is another environment than the unstarred one; a marker of one that is itself inside a comment begins nothing; a `%` inside one starts no comment; and what stands before or after one on the same line is read like any other text. A command is read only where its backslash is not the second half of a `\\` before it: `\\input{x}` is a line break and the word "input", and includes nothing. The macros `\subimport`, `\subfile` and `\import`, starred or not, are not followed: the check goes on, and names each line that holds one on standard error with the line `[warn] non-standard import macro skipped at <file>:<line> (\subimport/\subfile/\import unsupported)`; an `\input` on the same line is still followed. An include of an absolute path, of a file that does not exist (an empty name included), a cyclic include and nesting deeper than three levels SHALL stop the check with an error.
+
+The check reads only what these rules state. An `\input` inside a macro definition, inside a conditional or inside `\verb` is read as an include; when the file it names does not exist the check stops, although LaTeX would compile the manuscript. This is a known limit that the Python tools share (issue 94). Two more limits are known: an include of a file that is not a `.tex` file (`\input{figures/plot.pgf}`) is looked for with `.tex` added and stops the check when that file does not exist; and text that follows an `\input` on the same line is placed at that line, before the included file. The Python tools read the input tree in their own way, and for some manuscripts their tree and this one differ (issue 94 lists the cases known). Where they differ the check does not answer silently: a location in a file this tree lacks is reported as unreadable, and a file this tree cannot find stops the check.
+
+#### Scenario: Ledger order is not reading order
+
+- **WHEN** the ledger lists a proposition at `L30` before a proposition at `L5`
+- **THEN** the proposition at `L5` comes first in reading order
+
+##### Example: an included file sits at the line that includes it
+
+- **GIVEN** a main file whose line 10 is `\input{parts/a}` and a proposition `P1` at `parts/a.tex:L50`, a proposition `P2` at `L12` and a proposition `P3` at `L8`
+- **WHEN** reading order is computed
+- **THEN** the order is `P3`, `P1`, `P2`
+
+##### Example: a commented include is not followed
+
+- **GIVEN** a main file whose line 3 is `% \input{parts/gone}` and no file `parts/gone.tex`
+- **WHEN** the input tree is read
+- **THEN** the check does not stop, and the tree holds the main file only
+
+##### Example: a missing include stops the check
+
+- **GIVEN** a main file whose line 3 is `\input{parts/missing}` and no file `parts/missing.tex`
+- **WHEN** the input tree is read
+- **THEN** the check stops with an error that names `parts/missing.tex` and line 3
+
+##### Example: two includes on one line keep their order
+
+- **GIVEN** a main file whose line 1 is `\input{a}\input{b}`
+- **WHEN** reading order is computed
+- **THEN** line 50 of `a.tex` comes before line 1 of `b.tex`, and both come before line 2 of the main file
+
+##### Example: an environment marker inside a comment changes nothing
+
+- **GIVEN** a main file whose lines are `x`, `%\begin{comment}`, `\input{a}`, `%\end{comment}`, `y`, and a file `a.tex`
+- **WHEN** the input tree is read
+- **THEN** the tree holds the main file and `a.tex`
+
+##### Example: lines are counted as the tool that writes locations counts them
+
+- **GIVEN** a main file whose text is `one`, a form feed, `x`, a form feed, `two`, a line feed, `three`, a carriage return, `\input{a}`
+- **WHEN** the input tree is read
+- **THEN** the include is on line 3: the form feeds end no line, the line feed and the carriage return each end one
+
+##### Example: the main file under another name
+
+- **GIVEN** a main file `thesis.tex` whose line 10 is `\input{main}` and a file `main.tex` beside it
+- **WHEN** positions are computed for `thesis.tex:L3`, for `L3` and for `main.tex:L3`
+- **THEN** all three are line 3 of the main file
+
+##### Example: an environment ends only at its own end
+
+- **GIVEN** a main file whose lines are `\begin{verbatim}`, `\end{comment}`, `\input{gone}`, `\end{verbatim}`, `\input{a}`, a file `a.tex` and no file `gone.tex`
+- **WHEN** the input tree is read
+- **THEN** the check does not stop, and the tree holds the main file and `a.tex`
+
+##### Example: an import macro that is not followed
+
+- **GIVEN** a main file whose line 1 is `\subfile{x}\input{a}` and whose line 2 is `\import{dir/}{y}`, and a file `a.tex`
+- **WHEN** the input tree is read
+- **THEN** the tree holds the main file and `a.tex`, and lines 1 and 2 are named as holding a macro that was not followed
+
+##### Example: a file reached through a symbolic link
+
+- **GIVEN** a main file that includes `a` and then `b`, where `b.tex` is a symbolic link to `a.tex`
+- **WHEN** the input tree is read
+- **THEN** the tree holds the main file and `a.tex` only
+
+##### Example: a starred environment ends at its starred end
+
+- **GIVEN** a main file whose lines are `\begin{verbatim*}`, `\end{verbatim}`, `\input{gone}`, `\end{verbatim*}`, `\input{a}`, a file `a.tex` and no file `gone.tex`
+- **WHEN** the input tree is read
+- **THEN** the check does not stop, and the tree holds the main file and `a.tex`
+
+##### Example: a line break before the word input
+
+- **GIVEN** a main file whose line 1 is `text\\input{gone}` and whose line 2 is `more\\\input{a}`, a file `a.tex` and no file `gone.tex`
+- **WHEN** the input tree is read
+- **THEN** line 1 includes nothing, line 2 includes `a.tex`, and the check does not stop
+
+### Requirement: The binary is published only by the maintainer
+
+The repository SHALL hold a release script, `scripts/release-signed.sh`, that runs the package's tests, builds the `propositions` binary, signs it, submits it for notarization, and tags and publishes it only when the notarization result is `Accepted`. It is not run by a skill or by this change: publishing a signed binary is the maintainer's action. The repository SHALL NOT, in this version, hold a script that downloads the binary for a plugin, and no plugin directory holds a `bin/` directory: how a plugin obtains and verifies the binary is decided with the first release. Until a binary is released and a plugin uses it, no skill calls `propositions`, and the obligation `dependence.cites-backward` stays a gap owned by issue 46, which stays open until then.
+
+The script SHALL refuse, before it runs any other tool, a version that differs from the package's version. Signing, notarization and publishing themselves have no test: they act on the maintainer's signing identity and on a release, which no test can supply. The script's order and its refusals are tested with stand-ins for the tools it runs.
+
+#### Scenario: No plugin ships an executable directory
+
+- **WHEN** the plugin directories of the repository are listed
+- **THEN** none of them holds a `bin/` directory
+
+##### Example: no plugin ships an executable directory
+
+- **GIVEN** the directories under `plugins/` of the repository
+- **WHEN** each is looked into
+- **THEN** none of them holds a `bin/` directory
+
+##### Example: the release script refuses a version that is not the package's
+
+- **GIVEN** the package at version `0.1.0`
+- **WHEN** the release script runs with `VERSION=9.9.9`
+- **THEN** it says that the version differs from `Sources/PropositionsKit/Version.swift`, exits with 1, and has run no other tool
+
+##### Example: a notarization that is not accepted publishes nothing
+
+- **GIVEN** stand-ins for the tools the release script runs, with a notarization that reports `Invalid`
+- **WHEN** the release script runs
+- **THEN** it ran the tests first, says that the notarization was not accepted, exits with 1, and made no tag, pushed nothing and created no release
+
+##### Example: an accepted notarization is tagged and published
+
+- **GIVEN** the same stand-ins, with a notarization that reports `Accepted`
+- **WHEN** the release script runs
+- **THEN** it runs the tests, then the notarization, then tags `propositions-cli-v<version>`, then creates the release, in that order
+
+### Requirement: The command states its interface
+
+`propositions cite-order` SHALL take `--jsonl <path>` for the ledger and `--tex <path>` for the manuscript's main file, with the defaults `manuscript/propositions/main.jsonl` and `manuscript/main.tex`; a path that is not absolute is taken from the directory the command runs in, and a message shows a path as it was given. Without `--json` it prints one line for each item that could not be read (`UNREADABLE cite-order: …`), one line for each warning (`WARN cite-order: <id> (<location>) cites <id> (<location>), which comes later`), and then the count line; an id or a location is printed with its control and format characters written as escapes, so that text from a ledger cannot start a line of its own. With `--json` it SHALL print one JSON object with exactly the keys `checked` (a number), `forward` (a list of objects with the keys `from`, `fromLocation`, `to` and `toLocation`) and `unreadable` (a list of strings), and the exit codes are the same. Text that comes from a manuscript file is escaped the same way where a message on standard error quotes it. An argument the command does not know SHALL exit with 2, with the usage on standard error and nothing on standard output. `propositions` with no subcommand SHALL print its help, which names `cite-order`, on standard output and exit with 0. `propositions --version` SHALL print the version of the package on standard output and exit with 0; the release script compares it with the version it was asked to release.
+
+##### Example: the JSON object
+
+- **GIVEN** a ledger with the proposition `A` at `L12` citing the proposition `B` at `L30`
+- **WHEN** `propositions cite-order --json` runs on it
+- **THEN** it prints `{"checked":1,"forward":[{"from":"A","fromLocation":"L12","to":"B","toLocation":"L30"}],"unreadable":[]}` and exits with 0
+
+##### Example: the defaults of the two paths
+
+- **GIVEN** a directory that holds `manuscript/propositions/main.jsonl` and `manuscript/main.tex`, and a directory that holds neither
+- **WHEN** `propositions cite-order` runs with no option in each
+- **THEN** in the first it checks that ledger against that main file, and in the second it says that it cannot read the ledger `manuscript/propositions/main.jsonl` and exits with 2
+
+##### Example: a wrong argument
+
+- **GIVEN** the argument `--bogus`
+- **WHEN** `propositions cite-order --bogus` runs
+- **THEN** it prints nothing on standard output, names `--bogus` on standard error and exits with 2
+
+##### Example: the version
+
+- **GIVEN** the package at version `0.1.0`
+- **WHEN** `propositions --version` runs
+- **THEN** it prints `0.1.0` on standard output and exits with 0
+
+##### Example: the line for an import macro that is not followed
+
+- **GIVEN** a main file whose line 1 is `\subfile{x}` and a ledger with nothing forward
+- **WHEN** `propositions cite-order` runs on them
+- **THEN** standard error holds the one line `[warn] non-standard import macro skipped at main.tex:1 (\subimport/\subfile/\import unsupported)` and the exit code is 0
+
+##### Example: no subcommand
+
+- **GIVEN** no argument
+- **WHEN** `propositions` runs
+- **THEN** it prints help that names `cite-order` on standard output, nothing on standard error, and exits with 0

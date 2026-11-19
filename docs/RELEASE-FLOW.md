@@ -19,6 +19,7 @@ The two listings must agree per plugin. **A mismatch blocks the release** — fi
 ## 3. Verification gates
 
 - `python3 -m pytest tests/` — full suite green (includes the root-shim smoke tests that guard the pinned CI entry-point contract).
+- `swift test` — green. It holds the checks of the repository itself that pytest does not run: no plugin directory holds a `bin/` directory, the Swift package is at the root only, and this document names the binary's script, version file and tag.
 - If the release touches `plugins/propositions/scripts/`, confirm root `scripts/` shims still forward correctly (covered by `tests/test_root_shims.py`).
 
 ## 4. Tag + push

@@ -4,7 +4,7 @@
 當時 #33 剛合併，又多了三支 Python 工具和第一個外部依賴 PyYAML。
 
 **現況（2026-11-19 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
-與測試 target，共 12 個 Swift 檔，裡面只有一條檢查（引用方向，`propositions cite-order`），binary 還沒有發布，
+與測試 target，共 15 個 Swift 檔，裡面只有一條檢查（引用方向，`propositions cite-order`），binary 還沒有發布，
 沒有 skill 呼叫它。其餘受追蹤的可執行程式碼是 72 個 Python 檔、4 個 shell 檔，
 另外有 3 段寫在 SKILL.md 裡的 Python 程式（見〈既有檔〉）。skill 用 `python3 "$VALIDATOR"` 這類寫法呼叫
 plugin 內的腳本，所以使用者端要有 Python 3.10 以上；帳冊附檔用到 `move`／`type` 時還要裝 PyYAML。
@@ -216,9 +216,9 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 | 2026-11-16 | #75 第三輪驗證指出：第 2 類把文件裡的 jq 也算進來，`docs/RELEASE-FLOW.md` 既有的兩行因此不屬於任何類別；第 4 類的退場條件只涵蓋六段 jq 裡的三段；守門這類用 `&&` 串起幾個工具的檢查列不屬於任何一類 | 第 2 類的 jq 只算 SKILL.md 裡的；退場條件改成子命令涵蓋每一段之後；〈不適用〉第 1 類當時加了一份指令列可以用的接法清單，2026-11-17 退回（見下一列） |
 | 2026-11-17 | #75 第四輪驗證指出：2026-11-16 加在〈不適用〉第 1 類的接法清單對整個 repo 都適用，超出 2026-11-15「記一條指名的例外」的決定，也沒有另外的決定；清單用寫法劃界（`[ x ] && a \|\| b` 就是 `if`／`else`），照它自己的標準也沒有涵蓋 outline 用到的參數展開；第 4 類的標題仍說到 #78 為止 | 維護者選「退回，併入例外第 4 類」：〈不適用〉第 1 類退回原本的字句；第 4 類改成點名那份 SKILL.md 的指令區塊（jq 程式與同一區塊的 shell 指令），標題改成與退場條件一致。**不要用接法或寫法的清單去界定什麼是指令列**：2026-11-16 那一次就是這樣超出範圍的。其他 skill 裡既有的 `for`、`if` 與子 shell 不屬於任何一類，另記在 #86 |
 | 2026-11-17 | #75 第五輪驗證指出：第 4 類說整個指令區塊都算，接著列的 12 項工作卻漏了三段（確認還沒有綱要檔、顯示綱要目錄、記下展示了哪些節），退場條件依這份清單，於是那三段沒有退場條件 | 清單補成 14 項，對那份 SKILL.md 的 19 段指令逐段對過。**清單要跟著指令區塊走**：在那份 SKILL.md 加一段指令時，同一個變更裡把它做的事加進清單 |
-| 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：讀帳冊的一行、讀 `location`、讀 `\input` 樹與行號。#46 的兩輪驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **Swift 版要對齊的是寫 `location` 的工具 `refresh-prop-locations.py`**（行在 LF、CR、CRLF 結束；`main.tex:` 一律指主檔），讀帳冊的部分對齊驗證器的 `retired_problem`。改那支工具數行或寫檔名的方式、`parse_location_v16`、`retired_problem` 時，同一個變更要改 `Sources/PropositionsKit/` 的 `ReadingOrder.swift`、`Location.swift`、`LedgerReader.swift`，測試用同樣的案例。規格 `umbrella-marketplace-layout` 寫了同一件事。Python 的 `resolve_input_tree` 讀 `\input` 樹比 Swift 版粗（#94），那是刻意留著的差異 |
+| 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：判斷 `retired` 區塊是否格式正確、讀 `location`、數稿件檔的行。#46 的驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **三件事各有一個對齊的對象**：`retired` 照驗證器的 `retired_problem`，`location` 照 `parse_location_v16`，數行照寫 `location` 的工具 `refresh-prop-locations.py`（行在 LF、CR、CRLF 結束）。`tests/PropositionsKitTests/ParityTests.swift` 拿同一組輸入餵兩邊比對，改其中一邊而另一邊沒跟上時會失敗；改這三個 Python 函式時同一個變更要改 `Sources/PropositionsKit/`。`\input` 樹 Swift 版用自己的規則讀（寫在規格 `citation-order`），不是 `resolve_input_tree` 的副本（#94） |
 
 ## 語言組成（2026-11-19 量，只計受追蹤的檔）
 
-Swift 12、Python 72、shell 4（其中 1 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 15、Python 72、shell 4（其中 1 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

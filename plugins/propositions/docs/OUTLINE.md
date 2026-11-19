@@ -18,7 +18,8 @@ kept by the skill and by the reader.
 ## The three files
 
 The outline is three files in the directory that holds, or would hold, the
-ledger. The directory can hold them without a `main.jsonl`: a manuscript does
+ledger, when that directory is in a repository that holds the manuscript. The
+directory can hold them without a `main.jsonl`: a manuscript does
 not need a ledger to have an outline.
 
 **The repository** is the git repository that holds the directory of the
@@ -61,15 +62,21 @@ every path a locator gives is relative to its root. When the directory of the
 outline files is in a repository that does not hold the manuscript (a
 submodule that holds only the ledger, or a repository of its own beside the
 manuscript's), the skill stops and asks for a directory of a repository that
-does. An outline written before this rule (issue #91) gives every `file` from
-the outermost repository. When the root moves down and the outline files
-already exist, the skill names the leading part that a `file` written that way
-begins with and asks the author whether the outline was written so; it does
-not decide it from whether the locators resolve, because a `file` written from
-the outermost root can by chance name another file under the new root that
-holds the same label or opening words. When the author says it was, that part
-is removed from each `file` with revise, and every section whose records change
-no longer stands as approved, so the author approves those sections again. When
+does. It stops too when the outline directory is inside a submodule that is
+not checked out (files written there could not be tracked), and when git finds
+no repository for it, which includes a directory in or under one that is laid
+out like a git repository (see "What is checked today"). An outline written
+before this rule (issue #91) gives every `file` from the outermost repository.
+The skill does not convert such an outline and does not try to recognise one:
+when the root is a repository below the outermost one, its locators do not
+resolve and check reports each of them, and the skill then says that such an
+outline names its files from the outermost repository and that the path from
+that repository down to this one can be removed from each `file` with revise.
+Every section whose records change then no longer stands as approved. Two
+cases are not reported and are left to the author: a `file` that by chance
+names another file under the new root that holds the same label or opening
+words, and a `file` outside the new root, which no locator can name any
+more. When
 the manuscript's repository sits inside another without being its submodule, a
 ledger of the outer repository is outside the repository: it does not name the
 manuscript for the skill, and the outline cannot go beside it. When no ledger
@@ -175,10 +182,12 @@ When the request names the directory of the outline files, every listed
 `_meta.json` was read as one ledger and compared, and no ledger names the
 manuscript or there is no manuscript yet, the request is the author's answer
 and the skill uses that directory. Otherwise it asks the author which
-directory to use. Outline files elsewhere in the repository are then offered,
-not taken, because they can belong to another manuscript; when there is
-nothing to offer, the skill proposes a directory `propositions` beside the
-manuscript, where a ledger is put by convention. When the command that lists
+directory to use. Outline files elsewhere in the outermost repository are then
+offered, not taken, because they can belong to another manuscript; when there
+is nothing to offer, the skill proposes a directory `propositions` beside the
+manuscript, where a ledger is put by convention. A directory in a repository
+that does not hold the manuscript, such as a submodule that holds only
+ledgers, cannot hold the outline, and the skill asks for another. When the command that lists
 the ledgers fails, the skill stops. The path of the directory holds, below the
 root, no character that a locator's `file` is not allowed to hold (see
 "Locators"). The
@@ -694,11 +703,12 @@ the ledger, not the structure sidecars and not the verification records. Its
 temporary files are kept outside the repository, in a directory it makes for
 this repository when it starts (the stage directory): the directory belongs to
 the user, has mode 700, and holds a note of the root it was made for. The
-first command writes the outermost root there; the command that sets the root
-to the outline directory's repository rewrites it and marks the root as set,
-and every command after that goes on only when the mark is there, so a stage
-directory whose root was never set, as after a new session, stops them until
-that command runs again.
+first command writes the outermost root there, and the command that sets the
+root to the outline directory's repository rewrites it. Every command after
+that asks git which repository holds the outline directory and goes on only
+when it is the root the stage directory records, so a root that was never set,
+as after a new session, or an outline directory changed to one of another
+repository, stops them until that command runs again.
 Every later command confirms all of that for the path it is given as the stage
 directory, and a directory that fails one of these is not used: the directory
 above the repository, the machine's temporary directory itself and the stage
@@ -733,7 +743,8 @@ and its rules and commands are there for them.
    checked out in, which it reads to find the ledger before the root is set,
    and the
    files git itself reads when it is asked (its configuration, its global
-   ignore file, and the git directory of the repository wherever it is, which
+   ignore file, and the git directory of the repository, and of the outermost
+   repository and the repositories between them, wherever it is, which
    for a linked worktree is in the repository the worktree belongs to).
 3. It records an approval only from words the author typed in the message it
    answers.
@@ -759,7 +770,7 @@ others; when the skill notices one of them, it tells the author.
 | 5 | The shell sets `noclobber`, or makes `cp` ask before it overwrites | Some commands fail, and the skill stops | None |
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the skill stops or leaves the file unread | None |
-| 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root the skill takes is not the root of the manuscript's repository | The second |
+| 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root the skill takes is not the root of the outline directory's repository | The second |
 | 9 | Text that the skill or the checker reads (the manuscript, a file a locator names, a file the author points to, the outline files) asks the reader to read another file | The Read tool of the checker agent, and of the skill, can open any path; only their rules keep them to the files they are given | The second |
 | 10 | The repository's root is the root of the file system | The machine's temporary directory is then inside the repository, and the first command makes the stage directory there before the skill stops | The first |
 

@@ -36,11 +36,11 @@ code:
 
 The check SHALL take a proposition's position from the first line of its `location`, never from its line in the ledger. For a manuscript of several files, the text of an included file SHALL come after the line that includes it and before the next line of the including file, at every level of nesting; when one line holds several includes, the files they name come in the order the includes are written; a file included more than once counts where it is first included.
 
-What the check agrees with is the tool that writes `location` (`refresh-prop-locations.py`): a line number in a ledger is the number that tool counted, and a file name is the name it wrote. A `location` that writes no file is in the main file, and so is one that writes `main.tex`. The check also takes the main file's own name for the main file, which that tool does not write and the ledger validator accepts. `main.tex` means the main file whatever the main file is called, because that tool writes this prefix for every proposition of the main file; an included file that is itself called `main.tex`, beside a main file of another name, can therefore not be named by a location (a known limit). An included file is named by its path from the directory of the main file, with `..` where it leaves that directory. A `location` whose file begins with `/` is not written as the schema writes it.
+What the check agrees with is the tool that writes `location` (`refresh-prop-locations.py`): a line number in a ledger is the number that tool counted, and a file name is the name it wrote. A `location` that writes no file is in the main file, and so is one that writes `main.tex`. No other name means the main file: the main file's own name, when it is not `main.tex`, is a name that tool neither writes nor reads, and the check reports a location that writes it as naming a file the tree does not hold. `main.tex` means the main file whatever the main file is called, because that tool writes this prefix for every proposition of the main file; an included file that is itself called `main.tex`, beside a main file of another name, can therefore not be named by a location (a known limit). An included file is named by its path from the directory of the main file, with `..` where it leaves that directory. A `location` whose file begins with `/` names a file no tree holds.
 
 The input tree is read by these rules: `\input` and `\include` written with braces, paths taken from the directory of the main file, `.tex` added when the name does not end in it, a file reached through a symbolic link counted as the file the link leads to. A line ends at a line feed, at a carriage return, or at the two together, and at no other character: a form feed does not end a line, as it does not for the tool that writes `location`. A command inside a `%` comment is ignored, and so is a command inside one of the environments `verbatim`, `Verbatim`, `lstlisting`, `comment` and `filecontents`, starred or not. Such an environment ends only at its own `\end`, and the starred form is another environment than the unstarred one; a marker of one that is itself inside a comment begins nothing; a `%` inside one starts no comment; and what stands before or after one on the same line is read like any other text. A command is read only where its backslash is not the second half of a `\\` before it: `\\input{x}` is a line break and the word "input", and includes nothing. The macros `\subimport`, `\subfile` and `\import`, starred or not, are not followed: the check goes on, and names each line that holds one on standard error with the line `[warn] non-standard import macro skipped at <file>:<line> (\subimport/\subfile/\import unsupported)`; an `\input` on the same line is still followed. An include of an absolute path, of a file that does not exist (an empty name included), a cyclic include and nesting deeper than three levels SHALL stop the check with an error.
 
-The check reads only what these rules state. An `\input` inside a macro definition, inside a conditional or inside `\verb` is read as an include; when the file it names does not exist the check stops, although LaTeX would compile the manuscript. This is a known limit that the Python tools share (issue 94). Two more limits are known: an include of a file that is not a `.tex` file (`\input{figures/plot.pgf}`) is looked for with `.tex` added and stops the check when that file does not exist; and text that follows an `\input` on the same line is placed at that line, before the included file. The Python tools read the input tree in their own way, and for some manuscripts their tree and this one differ (issue 94 lists the cases known). Where they differ the check does not answer silently: a location in a file this tree lacks is reported as unreadable, and a file this tree cannot find stops the check.
+The check reads only what these rules state. An `\input` inside a macro definition, inside a conditional or inside `\verb` is read as an include; when the file it names does not exist the check stops, although LaTeX would compile the manuscript. This is a known limit that the Python tools share (issue 94). More limits are known, and the list is closed: an include of a file that is not a `.tex` file (`\input{figures/plot.pgf}`) is looked for with `.tex` added and stops the check when that file does not exist; text that follows an `\input` on the same line is placed at that line, before the included file; an include whose braced name stands on the line after the command is not followed; and a marker of an environment written with white space before its brace (`\begin {comment}`) is not recognised. The Python tools read the input tree in their own way, and for some manuscripts their tree and this one differ (issue 94 lists the cases known). For such a manuscript the order this check uses is the order of its own tree. A location in a file this tree lacks is reported as unreadable and a file this tree cannot find stops the check; but where both trees hold a file at different places, the check answers by its own tree and prints nothing about the difference.
 
 #### Scenario: Ledger order is not reading order
 
@@ -86,8 +86,8 @@ The check reads only what these rules state. An `\input` inside a macro definiti
 ##### Example: the main file under another name
 
 - **GIVEN** a main file `thesis.tex` whose line 10 is `\input{main}` and a file `main.tex` beside it
-- **WHEN** positions are computed for `thesis.tex:L3`, for `L3` and for `main.tex:L3`
-- **THEN** all three are line 3 of the main file
+- **WHEN** positions are computed for `L3`, for `main.tex:L3` and for `thesis.tex:L3`
+- **THEN** the first two are line 3 of the main file, and the third names a file the tree does not hold
 
 ##### Example: an environment ends only at its own end
 
@@ -121,7 +121,7 @@ The check reads only what these rules state. An `\input` inside a macro definiti
 
 
 <!-- @trace
-source: idd-46-fix3
+source: idd-46-fix4
 updated: 2026-11-19
 code:
   - propositions-projects.code-workspace
@@ -180,7 +180,7 @@ code:
 ---
 ### Requirement: The check says what it could not read
 
-An empty ledger line and a line that begins with `//` are skipped, as `docs/SCHEMA.md` has it. A ledger line that is not a JSON object, a proposition without a string `id`, a `cites` that is present and is not a list of strings (`null` included), and, for a proposition that is not retired, a `location` that is missing, is not written as the schema writes it (`[<file>.tex:]L<a>[-L<b>]`, with ASCII digits) or names a file the input tree does not hold, SHALL each be reported with the ledger line number, and SHALL NOT be guessed at. A retired proposition's `location` is not read. A proposition whose `cites` could not be read is still a proposition: it has no citation of its own that can be checked, and citations of it are checked. When anything was reported this way the check is incomplete: the command prints, after the count, a line that says so, and SHALL exit with 1. A ledger or a main file that does not exist and an input tree that cannot be read SHALL exit with 2, with the reason on standard error and nothing on standard output; a wrong argument SHALL exit with 2 as well.
+An empty ledger line and a line that begins with `//` are skipped, as `docs/SCHEMA.md` has it. A ledger line that is not a JSON object, a proposition without a string `id`, a `cites` that is present and is not a list of strings (`null` included), and, for a proposition that is not retired, a `location` that is missing, is not written as the schema writes it (`[<file>.tex:]L<a>[-L<b>]`, read as `parse_location_v16` of the Python tools reads it) or names a file the input tree does not hold, SHALL each be reported with the ledger line number, and SHALL NOT be guessed at. A retired proposition's `location` is not read. A proposition whose `cites` could not be read is still a proposition: it has no citation of its own that can be checked, and citations of it are checked. When anything was reported this way the check is incomplete: the command prints, after the count, a line that says so, and SHALL exit with 1. A ledger or a main file that does not exist and an input tree that cannot be read SHALL exit with 2, with the reason on standard error and nothing on standard output; a wrong argument SHALL exit with 2 as well.
 
 #### Scenario: A ledger that does not exist
 
@@ -219,7 +219,7 @@ An empty ledger line and a line that begins with `//` are skipped, as `docs/SCHE
 
 
 <!-- @trace
-source: idd-46-fix2
+source: idd-46-fix4
 updated: 2026-11-19
 code:
   - propositions-projects.code-workspace
@@ -230,7 +230,7 @@ code:
 
 The repository SHALL hold a release script, `scripts/release-signed.sh`, that runs the package's tests, builds the `propositions` binary, signs it, submits it for notarization, and tags and publishes it only when the notarization result is `Accepted`. It is not run by a skill or by this change: publishing a signed binary is the maintainer's action. The repository SHALL NOT, in this version, hold a script that downloads the binary for a plugin, and no plugin directory holds a `bin/` directory: how a plugin obtains and verifies the binary is decided with the first release. Until a binary is released and a plugin uses it, no skill calls `propositions`, and the obligation `dependence.cites-backward` stays a gap owned by issue 46, which stays open until then.
 
-The script SHALL refuse, before it runs any other tool, a version that differs from the package's version. Signing, notarization and publishing themselves have no test: they act on the maintainer's signing identity and on a release, which no test can supply. The script's order and its refusals are tested with stand-ins for the tools it runs.
+The script SHALL refuse, before it runs any other tool, a version that differs from the package's version. Signing, notarization and publishing themselves have no test: they act on the maintainer's signing identity and on a release, which no test can supply. These are tested, with stand-ins for the tools the script runs, and no other path of the script is: the refusal of a version that is not the package's, of a missing version, of a missing signing identity, of a working tree that is not clean, of a tag that names another commit, and of a notarization that is not accepted; and the order of the steps when all of these pass. The script builds with the dependency versions that `Package.resolved` names.
 
 #### Scenario: No plugin ships an executable directory
 
@@ -253,7 +253,7 @@ The script SHALL refuse, before it runs any other tool, a version that differs f
 
 - **GIVEN** stand-ins for the tools the release script runs, with a notarization that reports `Invalid`
 - **WHEN** the release script runs
-- **THEN** it ran the tests first, says that the notarization was not accepted, exits with 1, and made no tag, pushed nothing and created no release
+- **THEN** it ran the tests before the build and the build before the notarization, says that the notarization was not accepted, exits with 1, and made no tag, pushed nothing and created no release
 
 ##### Example: an accepted notarization is tagged and published
 
@@ -261,9 +261,15 @@ The script SHALL refuse, before it runs any other tool, a version that differs f
 - **WHEN** the release script runs
 - **THEN** it runs the tests, then the notarization, then tags `propositions-cli-v<version>`, then creates the release, in that order
 
+##### Example: the release script refuses a tree or a tag that is not the commit it builds
+
+- **GIVEN** stand-ins for the tools the release script runs, with a working tree that has a change, or with the release tag already at another commit
+- **WHEN** the release script runs
+- **THEN** it says so, exits with 1, and has tested, built and published nothing
+
 
 <!-- @trace
-source: idd-46-fix3
+source: idd-46-fix4
 updated: 2026-11-19
 code:
   - propositions-projects.code-workspace
@@ -272,7 +278,7 @@ code:
 ---
 ### Requirement: The command states its interface
 
-`propositions cite-order` SHALL take `--jsonl <path>` for the ledger and `--tex <path>` for the manuscript's main file, with the defaults `manuscript/propositions/main.jsonl` and `manuscript/main.tex`; a path that is not absolute is taken from the directory the command runs in, and a message shows a path as it was given. Without `--json` it prints one line for each item that could not be read (`UNREADABLE cite-order: …`), one line for each warning (`WARN cite-order: <id> (<location>) cites <id> (<location>), which comes later`), and then the count line; an id or a location is printed with its control and format characters written as escapes, so that text from a ledger cannot start a line of its own. With `--json` it SHALL print one JSON object with exactly the keys `checked` (a number), `forward` (a list of objects with the keys `from`, `fromLocation`, `to` and `toLocation`) and `unreadable` (a list of strings), and the exit codes are the same. Text that comes from a manuscript file is escaped the same way where a message on standard error quotes it. An argument the command does not know SHALL exit with 2, with the usage on standard error and nothing on standard output. `propositions` with no subcommand SHALL print its help, which names `cite-order`, on standard output and exit with 0. `propositions --version` SHALL print the version of the package on standard output and exit with 0; the release script compares it with the version it was asked to release.
+`propositions cite-order` SHALL take `--jsonl <path>` for the ledger and `--tex <path>` for the manuscript's main file, with the defaults `manuscript/propositions/main.jsonl` and `manuscript/main.tex`; a path that is not absolute is taken from the directory the command runs in, and a message shows a path as it was given. Without `--json` it prints one line for each item that could not be read (`UNREADABLE cite-order: …`), one line for each warning (`WARN cite-order: <id> (<location>) cites <id> (<location>), which comes later`), and then the count line; an id or a location is printed with its control and format characters written as escapes, so that text from a ledger cannot start a line of its own. With `--json` it SHALL print one JSON object with exactly the keys `checked` (a number), `forward` (a list of objects with the keys `from`, `fromLocation`, `to` and `toLocation`) and `unreadable` (a list of strings), and the exit codes are the same. Text that comes from a manuscript file is escaped the same way where a message on standard error quotes it. An argument the command does not know SHALL exit with 2, with the usage on standard error and nothing on standard output. `propositions` with no subcommand SHALL print its help, which names `cite-order`, on standard output and exit with 0. `propositions cite-order --help`, `propositions cite-order -h` and `propositions help cite-order` SHALL print the help of `cite-order`, which names its options and its exit codes, and exit with 0. `propositions --version` SHALL print the version of the package on standard output and exit with 0; the release script compares it with the version it was asked to release.
 
 ##### Example: the JSON object
 
@@ -310,8 +316,14 @@ code:
 - **WHEN** `propositions` runs
 - **THEN** it prints help that names `cite-order` on standard output, nothing on standard error, and exits with 0
 
+##### Example: help for the subcommand
+
+- **GIVEN** the arguments `cite-order --help`
+- **WHEN** `propositions` runs with them
+- **THEN** it prints help that names `--jsonl` and the exit codes on standard output, and exits with 0
+
 <!-- @trace
-source: idd-46-fix3
+source: idd-46-fix4
 updated: 2026-11-19
 code:
   - propositions-projects.code-workspace

@@ -101,7 +101,7 @@ Changes can be parked（暫存）— temporarily moved out of `openspec/changes/
 ```
 
 Layer 1 lives in the **user's manuscript repo** (data, paper-specific).
-Layer 2 另有一部分不在 plugin 裡：repo 根目錄的 Swift package（`Sources/PropositionsKit`，目前只有引用方向檢查），不隨 plugin 出貨，見下方 Compatibility。
+Layer 2 另有一部分不在 plugin 裡：repo 根目錄的 Swift package（`Sources/PropositionsKit`：引用方向檢查，以及綱要三個檔的格式、狀態與來源指標檢查），不隨 plugin 出貨，見下方 Compatibility。
 Layers 2 + 3 are this plugin (reusable across any prop-iso manuscript).
 
 ## Quick start (in a user's manuscript repo)
@@ -157,7 +157,7 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 ## Compatibility
 
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
-- Swift 6.2 以上的 toolchain，只在開發這個 repo 時需要。根目錄有一個 Swift package（`Package.swift`、`Sources/`、`tests/PropositionsKitTests/`），不在 plugin 的目錄裡、不隨 plugin 出貨：`PropositionsKit`、`propositions`、`tschema-check`。目前只有引用方向檢查 `propositions cite-order`（#46，規格 `citation-order`）；binary 尚未發布，skill 還不呼叫它。`swift test` 跑它的測試
+- Swift 6.2 以上的 toolchain，只在開發這個 repo 時需要。根目錄有一個 Swift package（`Package.swift`、`Sources/`、`tests/PropositionsKitTests/`），不在 plugin 的目錄裡、不隨 plugin 出貨：`PropositionsKit`、`propositions`、`tschema-check`。它有引用方向檢查 `propositions cite-order`（#46，規格 `citation-order`）與綱要的三個子命令 `propositions outline check`、`status`、`locators`（#78，規格 `article-outline`）；發布過的 binary 只有前者，plugin 還沒有辦法取得 binary，skill 還不呼叫它們。`swift test` 跑它的測試
 - pytest 7+ for test suite
 - `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`，其他 skill 不需要；它也需要 `git`，`/propositions:manuscript-audit` 與 Operation D 原本就用 git（實跑過 jq 1.7.1 與 1.8.2、git 2.54 與 2.55；outline 開頭會先確認三個工具都在，jq 分得出兩個不同的長整數，1.7 之前的版本分不出來，git 是 2.38 以上，而且系統的 `pwd` 在 `/usr/bin` 或 `/bin`；少一樣就停下）
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)

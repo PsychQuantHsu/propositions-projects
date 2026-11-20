@@ -3,9 +3,10 @@
 使用者 2026-11-04（+08:00）定調：「我的這些工具想要完全用swift做，跟akashic lib一樣， 可以家入.claude/rules」。
 當時 #33 剛合併，又多了三支 Python 工具和第一個外部依賴 PyYAML。
 
-**現況（2026-11-19 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
-與測試 target，共 15 個 Swift 檔，裡面只有一條檢查（引用方向，`propositions cite-order`），binary 還沒有發布，
-沒有 skill 呼叫它。其餘受追蹤的可執行程式碼是 72 個 Python 檔、4 個 shell 檔，
+**現況（2026-11-20 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
+與測試 target，共 21 個 Swift 檔。裡面有兩組檢查：引用方向（`propositions cite-order`，#46）與綱要三個檔的格式、狀態、
+來源指標（`propositions outline check`、`status`、`locators`，#78）。發布過的 binary（`propositions-cli-v0.1.0`）只有前者；
+plugin 還沒有辦法取得 binary，所以沒有 skill 呼叫它。其餘受追蹤的可執行程式碼是 72 個 Python 檔、4 個 shell 檔，
 另外有 3 段寫在 SKILL.md 裡的 Python 程式（見〈既有檔〉）。skill 用 `python3 "$VALIDATOR"` 這類寫法呼叫
 plugin 內的腳本，所以使用者端要有 Python 3.10 以上；帳冊附檔用到 `move`／`type` 時還要裝 PyYAML。
 
@@ -219,7 +220,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 | 2026-11-19 | 本檔原本要 plugin 的 wrapper 照 Akashic-Library 的 `plugin/bin/akashic-mcp-wrapper.sh` 寫。#46 照做之後，驗證查到 Claude Code 的 plugin 文件：plugin 目錄有 `bin/` 時 claude.ai 與 Cowork 不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的 PATH 上 | 〈例外〉第 1 類、〈移植〉第 3 步、〈寫 Swift 之前〉三處改成「還沒有定、不放進 `bin/`」。這是實作時取的做法，維護者尚未確認，第一次發布時決定。Akashic-Library 的 wrapper 由 `.mcp.json` 呼叫、後面有已發布的 binary，情形不同 |
 | 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：判斷 `retired` 區塊是否格式正確、讀 `location`、數稿件檔的行。#46 的驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **三件事各有一個對齊的對象**：`retired` 照驗證器的 `retired_problem`，`location` 照 `parse_location_v16`，數行照寫 `location` 的工具 `refresh-prop-locations.py` 的 `read_tex_lines`（行在 LF、CR、CRLF 結束）。`tests/PropositionsKitTests/ParityTests.swift` 直接載入這三個 Python 函式、拿同一組輸入餵兩邊比對，改其中一邊而另一邊沒跟上時會失敗；改這三個 Python 函式時同一個變更要改 `Sources/PropositionsKit/`。`\input` 樹 Swift 版用自己的規則讀（寫在規格 `citation-order`），不是 `resolve_input_tree` 的副本（#94） |
 
-## 語言組成（2026-11-19 量，只計受追蹤的檔）
+## 語言組成（2026-11-20 量，只計受追蹤的檔）
 
-Swift 15、Python 72、shell 4（其中 1 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 21、Python 72、shell 4（其中 1 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

@@ -64,6 +64,29 @@ Report by exit code:
 | `[FAIL]` line (exit 1) | report FAIL; surface the failing rule + offending prop IDs, then triage below |
 | crash / exit 2 | tool error — show stderr |
 
+### Citation direction (`order:cites`)
+
+After the validator, run the citation-direction check. It is a command of the `propositions`
+command-line tool, which the plugin's session-start hook fetches on macOS (a signed release,
+checked against the SHA-256 and the signing team pinned in `hooks/cli.lock`). Where the tool is
+not there (another system, no network at session start, a plugin loaded without its hooks) the
+check does not run: say so in the report, and do not report the citation direction as checked.
+
+```bash
+CLI="${CLAUDE_PLUGIN_DATA}/bin/propositions"
+[ -x "$CLI" ] || CLI="$HOME/.claude/plugins/data/propositions-propositions-projects/bin/propositions"
+[ -x "$CLI" ] || echo "cite-order: NOT RUN (the propositions command-line tool is not installed)"
+[ ! -x "$CLI" ] || "$CLI" cite-order --jsonl "$JSONL" --tex "$TEX"
+```
+
+| `cite-order` result | Action |
+|---------------------|--------|
+| exit 0, no warning | report that no proposition cites a later one |
+| exit 0, warnings | list them. A warning does not fail Operation A: a roadmap or a promissory note may point forward, and the author judges each one |
+| exit 1 | the check is incomplete: show what it could not read, and report the citation direction as not checked |
+| exit 2 | tool error — show stderr |
+| `NOT RUN` | report that the citation direction was not checked, and why |
+
 ### R1-R13 coverage (the validator's contract)
 
 | Rule | Invariant |

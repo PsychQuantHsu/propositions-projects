@@ -157,7 +157,7 @@ The umbrella narrative doc (philosophy + lifecycle + concrete state of the sourc
 ## Compatibility
 
 - Python 3.10+ (uses 3.10+ type hints + `match` statements in some scripts)
-- Swift 6.2 以上的 toolchain，只在開發這個 repo 時需要。根目錄有一個 Swift package（`Package.swift`、`Sources/`、`tests/PropositionsKitTests/`），不在 plugin 的目錄裡、不隨 plugin 出貨：`PropositionsKit`、`propositions`、`tschema-check`。它有引用方向檢查 `propositions cite-order`（#46，規格 `citation-order`）與綱要的三個子命令 `propositions outline check`、`status`、`locators`（#78，規格 `article-outline`）；發布過的 binary 只有前者，plugin 還沒有辦法取得 binary，skill 還不呼叫它們。`swift test` 跑它的測試
+- Swift 6.2 以上的 toolchain，只在開發這個 repo 時需要。根目錄有一個 Swift package（`Package.swift`、`Sources/`、`tests/PropositionsKitTests/`），不在 plugin 的目錄裡、不隨 plugin 出貨：`PropositionsKit`、`propositions`、`tschema-check`。它有引用方向檢查 `propositions cite-order`（#46，規格 `citation-order`）與綱要的三個子命令 `propositions outline check`、`status`、`locators`（#78，規格 `article-outline`）；發布過的 binary（0.1.0）只有前者。propositions plugin 在 session 開始時用 hook（`plugins/propositions/hooks/fetch-cli.sh`）把 `hooks/cli.lock` 鎖定的那一版下載到 plugin 的資料目錄，雜湊與簽章都符合才安裝，只有 macOS；`/propositions:propositions` 的 Operation A 在驗證器之後呼叫 `cite-order`，沒有 binary 時回報這一項沒有檢查。綱要的三個子命令還沒有 skill 呼叫（#102）。`swift test` 跑它的測試
 - pytest 7+ for test suite
 - `/propositions:outline` 的指令另外需要 `jq` 與 `realpath`，其他 skill 不需要；它也需要 `git`，`/propositions:manuscript-audit` 與 Operation D 原本就用 git（實跑過 jq 1.7.1 與 1.8.2、git 2.54 與 2.55；outline 開頭會先確認三個工具都在，jq 分得出兩個不同的長整數，1.7 之前的版本分不出來，git 是 2.38 以上，而且系統的 `pwd` 在 `/usr/bin` 或 `/bin`；少一樣就停下）
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` convention(可自訂 path via skill args)

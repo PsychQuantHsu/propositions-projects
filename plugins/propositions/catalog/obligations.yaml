@@ -363,8 +363,7 @@ entries:
     applies:
       cites: [present]
     criterion: "Every proposition this one cites comes earlier in reading order, or the forward reference is a roadmap or a promissory note."
-    check: gap
-    owner: 46
+    check: order:cites
     verified_by: [mechanical]
     on_warning: judge
 

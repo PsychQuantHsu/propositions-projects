@@ -40,16 +40,17 @@ quotes two entries as examples and no more.
   applies:
     cites: [present]
   criterion: "Every proposition this one cites comes earlier in reading order, or the forward reference is a roadmap or a promissory note."
-  check: gap
-  owner: 46
+  check: order:cites
   verified_by: [mechanical]
   on_warning: judge
 ```
 
 This entry is an obligation of the group `dependence`. It is decided for each
-proposition that cites at least one other. No check verifies it yet, and issue
-46 will supply one. When that check exists it will be mechanical, and a warning
-from it will have to be judged before the entry passes.
+proposition that cites at least one other. Its check is `order:cites`, which
+warns about every citation of a proposition that comes later in reading order.
+The check is mechanical, and a warning from it has to be judged before the
+entry passes: a roadmap and a promissory note may point forward, and the check
+does not tell them apart from other forward citations.
 
 ### Units
 
@@ -327,6 +328,7 @@ findings, or leaves records, about units under an id of its own.
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
 | `order:ledger` | The dry run of `reorder-ledger.py` | The construct-batch skill |
+| `order:cites` | `propositions cite-order`, a command of the Swift package at the root of the repository. A plugin session fetches the binary on macOS; where it is not there the check does not run, and the entry is unverified | The spec `citation-order` |
 | `audit:R1`, `R2`, `R3` | `audit-symbols.py`, `audit-citations.py` and `audit-code-manuscript.py`, in that order. `audit:R2` stands for both rules of the citation script, which it labels R2 and R2-bis | `rules/manuscript-consistency-audit.md` |
 | `proofread:L1` to `L5`, `proofread:E1` to `E7` | The per-proposition walk of the proofread skill | The proofread skill |
 

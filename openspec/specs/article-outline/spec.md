@@ -1254,7 +1254,7 @@ The command-line tool SHALL have three subcommands that read the outline files o
 
 The tool reads JSON strictly and keeps what it reads: a key written twice is reported, and two numbers are equal only when they have the same value, however long they are. A line ends at a line feed, so a file with CRLF line ends reads the same; an empty line, with either line end, is passed over; a line that is not valid UTF-8 is not JSON, and neither is one with an escape that names half of a surrogate pair. An exponent is kept exactly up to fifteen digits, and a number with a longer one is refused. Each of the three files SHALL be a regular file: one that is a symbolic link is not read. Names and ids are compared code point by code point: two spellings of one accented letter are two names. The tool only reads: it has no command that writes an outline file, and the skill writes them itself (issue 102).
 
-The skill does not call these commands yet: no plugin fetches the binary (issue 46). Until it does, the skill's own commands stay as they are. For an outline that passes `propositions outline check`, `propositions outline status` SHALL print the lines the skill's status command prints, with one difference: in an id it writes the characters U+007F to U+009F, U+2028 to U+202E and U+2066 to U+2069 as escapes, so that a name cannot break or reorder a line of output; other characters that affect the direction of text are not escaped. A second difference concerns numbers alone: the tool compares them by their exact value, and `jq` cannot tell apart two numbers that differ only beyond what it keeps (an exponent of hundreds of digits' worth, such as `1e-999999999999999` and `2e-999999999999999`); for such numbers the tool's answer is the one this capability means. For files that do not pass the check the two can differ: the skill's command reads a record written across lines, and the tool does not.
+The skill does not call these commands yet: the binary the plugin fetches is the one its lock file names, version 0.1.0, which does not have them (issue 102). Until it does, the skill's own commands stay as they are. For an outline that passes `propositions outline check`, `propositions outline status` SHALL print the lines the skill's status command prints, with one difference: in an id it writes the characters U+007F to U+009F, U+2028 to U+202E and U+2066 to U+2069 as escapes, so that a name cannot break or reorder a line of output; other characters that affect the direction of text are not escaped. A second difference concerns numbers alone: the tool compares them by their exact value, and `jq` cannot tell apart two numbers that differ only beyond what it keeps (an exponent of hundreds of digits' worth, such as `1e-999999999999999` and `2e-999999999999999`); for such numbers the tool's answer is the one this capability means. For files that do not pass the check the two can differ: the skill's command reads a record written across lines, and the tool does not.
 
 ##### Example: a missing file and a wrong argument
 
@@ -1273,4 +1273,25 @@ source: idd-78-fix3
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
+-->
+
+<!-- @trace
+source: idd-46-plugin-binary
+updated: 2026-11-20
+code:
+  - plugins/propositions/.claude-plugin/plugin.json
+  - docs/RELEASE-FLOW.md
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/hooks/hooks.json
+  - .claude-plugin/marketplace.json
+  - scripts/release-signed.sh
+  - CLAUDE.md
+  - plugins/propositions/hooks/fetch-cli.sh
+  - plugins/propositions/hooks/cli.lock
+  - propositions-projects.code-workspace
+  - tests/PropositionsKitTests/FetchHookTests.swift
+  - plugins/propositions/skills/propositions/SKILL.md
+  - plugins/propositions/catalog/obligations.yaml
+tests:
+  - tests/test_plugin_payload_tracked.py
 -->

@@ -127,23 +127,54 @@ public enum LedgerOrder {
             return ([location.start], String(location.start))
         }
         guard let position = order.position(file: location.file, line: location.start) else {
-            throw Failure(message: "location \(shown) of \(name) names a file that is not in the input tree of \(order.mainName)")
+            throw Failure(message: "location \(shown) of \(name) names a file that is not in the input tree of \(CiteOrder.visible(order.mainName))")
         }
         let file = location.file.map(ReadingOrder.normalise) ?? "main.tex"
         return (position, "\(CiteOrder.visible(file)):\(location.start)")
     }
 
+    /// A ledger as it was read: its bytes, and the file they came from.
+    public struct Snapshot: Equatable, Sendable {
+        public let data: Data
+        let device: dev_t
+        let inode: ino_t
+        let mode: mode_t
+    }
+
+    /// Reads an open file to its end, and says which file it is. `nil` when it is not a regular file.
+    private static func snapshot(of descriptor: Int32) -> Snapshot? {
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1 << 16)
+        while true {
+            let count = Foundation.read(descriptor, &buffer, buffer.count)
+            if count < 0 { return nil }
+            if count == 0 { break }
+            data.append(buffer, count: count)
+        }
+        return Snapshot(data: data, device: info.st_dev, inode: info.st_ino, mode: info.st_mode & 0o7777)
+    }
+
+    /// The ledger at a path, read through one open file, so that the bytes and the identity are
+    /// of the same file. A link is followed here: a dry run of a linked ledger is answered.
+    /// O_NONBLOCK keeps a pipe at that path from holding the command; it is then refused.
+    public static func read(_ url: URL) -> Snapshot? {
+        let descriptor = open(url.path, O_RDONLY | O_NONBLOCK)
+        guard descriptor >= 0 else { return nil }
+        defer { close(descriptor) }
+        return snapshot(of: descriptor)
+    }
+
     /// Replaces the ledger through a temporary file beside it, with the ledger's permission bits.
     ///
-    /// `read` is what the plan was made from: the ledger is replaced only if it is still a regular
-    /// file, not a link, that holds those bytes. A save made in between is so not overwritten;
-    /// the moment between that last look and the rename is the one that remains.
-    public static func write(_ content: Data, to url: URL, replacing read: Data) throws {
-        var info = stat()
-        guard lstat(url.path, &info) == 0 else { throw Failure(message: "the ledger is no longer there; nothing was written") }
-        guard info.st_mode & S_IFMT == S_IFREG else {
-            throw Failure(message: "the ledger is not a regular file (a link, for one); nothing was written. Name the file itself")
-        }
+    /// The ledger is replaced only if, at the last look, the path is not a link and names the same
+    /// file as `read`, with the same permission bits and the same bytes, all three taken from one
+    /// open file. A save or a change of permissions made in between is so not undone; the moment
+    /// between that look and the rename is the one that remains.
+    ///
+    /// Returns whether the directory was synced after the rename.
+    public static func write(_ content: Data, to url: URL, replacing read: Snapshot) throws -> Bool {
         var template = Array((url.path + ".XXXXXX").utf8CString)
         let descriptor = mkstemp(&template)
         guard descriptor >= 0 else { throw Failure(message: "cannot write beside the ledger; nothing was written") }
@@ -162,23 +193,27 @@ public enum LedgerOrder {
             }
             return true
         }
-        guard written, fchmod(descriptor, info.st_mode & 0o7777) == 0, fsync(descriptor) == 0 else {
+        guard written, fchmod(descriptor, read.mode) == 0, fsync(descriptor) == 0 else {
             throw Failure(message: "cannot write the new ledger; nothing was changed")
         }
-        var now = stat()
-        guard lstat(url.path, &now) == 0, now.st_mode & S_IFMT == S_IFREG, now.st_ino == info.st_ino,
-              FileManager.default.contents(atPath: url.path) == read
-        else {
+        let directory = open(url.deletingLastPathComponent().path, O_RDONLY)
+        defer { if directory >= 0 { close(directory) } }
+        // The last look: one open file, not reached through a link, gives identity, mode and bytes.
+        let current = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+        guard current >= 0 else {
+            throw Failure(message: errno == ELOOP
+                ? "the ledger is named through a link; nothing was written. Name the file itself"
+                : "the ledger can no longer be read; nothing was written")
+        }
+        let now = snapshot(of: current)
+        close(current)
+        guard now == read else {
             throw Failure(message: "the ledger changed while it was being ordered; nothing was written. Run the command again")
         }
         guard rename(temporary, url.path) == 0 else { throw Failure(message: "cannot put the new ledger in place; nothing was changed") }
         done = true
-        // So that the rename itself survives a crash. A failure here leaves the new ledger in place.
-        let directory = open(url.deletingLastPathComponent().path, O_RDONLY)
-        if directory >= 0 {
-            fsync(directory)
-            close(directory)
-        }
+        // So that the rename itself survives a crash.
+        return directory >= 0 && fsync(directory) == 0
     }
 }
 
@@ -196,19 +231,16 @@ public enum LedgerOrderRun {
             CommandResult(stderr: ["error: \(message)"], exitCode: 2)
         }
         let ledgerURL = resolve(jsonl)
-        // A regular file, looked at before it is opened: a pipe at that path is not read.
-        var info = stat()
-        guard stat(ledgerURL.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
-            return refuse("ledger not found: \(CiteOrder.visible(jsonl))")
+        guard let snapshot = LedgerOrder.read(ledgerURL) else {
+            return refuse("ledger not found, or not a regular file that can be read: \(CiteOrder.visible(jsonl))")
         }
-        guard let data = FileManager.default.contents(atPath: ledgerURL.path) else {
-            return refuse("cannot read the ledger \(CiteOrder.visible(jsonl))")
-        }
+        let data = snapshot.data
         var order: ReadingOrder?
         var notes: [String] = []
         if let tex {
             let mainURL = resolve(tex)
-            guard FileManager.default.fileExists(atPath: mainURL.path) else {
+            var info = stat()
+            guard stat(mainURL.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
                 return refuse("cannot read the main file \(CiteOrder.visible(tex))")
             }
             do {
@@ -242,12 +274,16 @@ public enum LedgerOrderRun {
         }
         out.append("\(plan.moved) line(s) move")
         guard write else { return CommandResult(stdout: out, stderr: notes, exitCode: 1) }
+        let synced: Bool
         do {
-            try LedgerOrder.write(plan.content, to: ledgerURL, replacing: data)
+            synced = try LedgerOrder.write(plan.content, to: ledgerURL, replacing: snapshot)
         } catch let failure as LedgerOrder.Failure {
             return CommandResult(stdout: out, stderr: notes + ["error: \(failure.message)"], exitCode: 2)
         } catch {
             return CommandResult(stdout: out, stderr: notes + ["error: the ledger could not be written"], exitCode: 2)
+        }
+        if !synced {
+            notes.append("[warn] the ledger was replaced, but its directory could not be synced: after a crash the old ledger may be back")
         }
         return CommandResult(stdout: out + ["written: \(CiteOrder.visible(jsonl))"], stderr: notes, exitCode: 0)
     }

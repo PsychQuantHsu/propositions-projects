@@ -162,8 +162,8 @@ struct LedgerOrderTests {
         (["--jsonl", "p/main.jsonl", "--tex", "main.tex"], [("a", "sections/zz.tex:L1")], "not in the input tree of main.tex"),
         (["--jsonl", "p/main.jsonl", "--tex", "main.tex"], [("a", "/abs/a.tex:L1")], "not in the input tree"),
         (["--jsonl", "p/main.jsonl", "--tex", "none.tex"], [("a", "L1")], "cannot read the main file none.tex"),
-        (["--jsonl", "p/none.jsonl", "--tex", "main.tex"], [("a", "L1")], "ledger not found: p/none.jsonl"),
-        (["--jsonl", "p", "--tex", "main.tex"], [("a", "L1")], "ledger not found: p"),
+        (["--jsonl", "p/none.jsonl", "--tex", "main.tex"], [("a", "L1")], "p/none.jsonl"),
+        (["--jsonl", "p", "--tex", "main.tex"], [("a", "L1")], "ledger not found, or not a regular file that can be read: p"),
     ] as [([String], [(String, String)], String)])
     func `Refuses what it cannot order, and writes nothing`(
         arguments: [String], rows: [(String, String)], message: String
@@ -192,23 +192,78 @@ struct LedgerOrderTests {
         let result = swift(["--jsonl", "main.jsonl", "--write"], in: box)
         #expect(result.exitCode == 2)
         #expect(result.stdout == ["2 line(s) move"])
-        #expect(result.stderr.count == 1 && result.stderr[0].contains("not a regular file"))
+        #expect(result.stderr.count == 1 && result.stderr[0].contains("named through a link"))
         #expect(try Data(contentsOf: real) == Data(text.utf8))
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: box.url.appendingPathComponent("main.jsonl").path) == real.path)
         #expect(try FileManager.default.contentsOfDirectory(atPath: box.url.path).sorted() == ["main.jsonl", "real"])
     }
 
-    @Test func `Does not replace a ledger that changed after it was read`() throws {
+    /// What was done to the ledger between reading it and writing.
+    enum Change: CaseIterable { case moreBytes, sameBytesNewFile, permissions, link }
+
+    @Test(arguments: Change.allCases)
+    func `Does not replace a ledger that changed after it was read`(change: Change) throws {
         let box = try Box()
-        let read = Self.line("b", "L9") + "\n" + Self.line("a", "L2") + "\n"
-        let saved = read + Self.line("c", "L1") + "\n"
-        let ledger = try box.write(saved, to: "main.jsonl")
-        let plan = try LedgerOrder.plan(Data(read.utf8), order: nil)
-        #expect(throws: LedgerOrder.Failure.self) {
-            try LedgerOrder.write(plan.content, to: ledger, replacing: Data(read.utf8))
+        let text = Self.line("b", "L9") + "\n" + Self.line("a", "L2") + "\n"
+        let ledger = try box.write(text, to: "main.jsonl")
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: ledger.path)
+        let read = try #require(LedgerOrder.read(ledger))
+        let plan = try LedgerOrder.plan(read.data, order: nil)
+        var expected = Data(text.utf8)
+        switch change {
+        case .moreBytes:
+            expected.append(Data((Self.line("c", "L1") + "\n").utf8))
+            try expected.write(to: ledger)
+        case .sameBytesNewFile:
+            // What an editor's atomic save does: another file with the same bytes under the name.
+            try FileManager.default.moveItem(at: ledger, to: box.url.appendingPathComponent("old"))
+            try Data(text.utf8).write(to: ledger)
+            try FileManager.default.removeItem(at: box.url.appendingPathComponent("old"))
+        case .permissions:
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledger.path)
+        case .link:
+            try FileManager.default.moveItem(at: ledger, to: box.url.appendingPathComponent("real"))
+            try FileManager.default.createSymbolicLink(at: ledger, withDestinationURL: box.url.appendingPathComponent("real"))
         }
-        #expect(try Data(contentsOf: ledger) == Data(saved.utf8))
-        #expect(try FileManager.default.contentsOfDirectory(atPath: box.url.path) == ["main.jsonl"])
+        #expect(throws: LedgerOrder.Failure.self) {
+            _ = try LedgerOrder.write(plan.content, to: ledger, replacing: read)
+        }
+        #expect(try Data(contentsOf: ledger) == expected)
+        let names = try FileManager.default.contentsOfDirectory(atPath: box.url.path).sorted()
+        #expect(names == (change == .link ? ["main.jsonl", "real"] : ["main.jsonl"]))
+        if change == .permissions {
+            let mode = try #require(FileManager.default.attributesOfItem(atPath: ledger.path)[.posixPermissions] as? NSNumber)
+            #expect(mode.intValue == 0o600)
+        }
+        if change == .link {
+            #expect(try FileManager.default.destinationOfSymbolicLink(atPath: ledger.path).hasSuffix("/real"))
+        }
+    }
+
+    @Test func `An unchanged ledger is replaced, and the directory is synced`() throws {
+        let box = try Box()
+        let ledger = try box.write(Self.line("b", "L9") + "\n" + Self.line("a", "L2") + "\n", to: "main.jsonl")
+        let read = try #require(LedgerOrder.read(ledger))
+        let plan = try LedgerOrder.plan(read.data, order: nil)
+        #expect(try LedgerOrder.write(plan.content, to: ledger, replacing: read))
+        #expect(Self.ids(try Data(contentsOf: ledger)) == ["a", "b"])
+    }
+
+    @Test func `A pipe where the ledger or the main file is named is refused, not read`() throws {
+        let box = try Box()
+        _ = try box.write(Self.line("a", "L1") + "\n", to: "main.jsonl")
+        #expect(mkfifo(box.url.appendingPathComponent("pipe").path, 0o644) == 0)
+        #expect(swift(["--jsonl", "pipe"], in: box).exitCode == 2)
+        #expect(swift(["--jsonl", "main.jsonl", "--tex", "pipe"], in: box).exitCode == 2)
+    }
+
+    @Test func `The name of the main file is shown with its control characters escaped`() throws {
+        let box = try Box()
+        _ = try box.write("Text.\n", to: "ma\nin.tex")
+        _ = try box.write(Self.line("a", "other.tex:L1") + "\n", to: "main.jsonl")
+        let result = swift(["--jsonl", "main.jsonl", "--tex", "ma\nin.tex"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.count == 1 && !result.stderr[0].contains("\n"))
     }
 
     @Test func `A path is shown with its control characters escaped`() throws {

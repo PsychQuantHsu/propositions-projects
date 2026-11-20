@@ -592,7 +592,7 @@ F="$SEC"
            | select(.r | has("edits") and ((.edits | type) != "string" or (.edits | length) == 0 or .carry != true))
            | "line \(.l): edits is not a non-empty string on a record that carries carry"),
       (.[] | select($para and (.r | type == "object"))
-           | select(.r | def k: objects | select((.file | type) == "string" and ((.label | type) == "string" or (.starts | type) == "string")) | [.file, (if (.label | type) == "string" then ["label", .label] else ["starts", .starts] end)]; ([.from | arrays | .[] | k]) as $f | any((.replaces | arrays | .[] | k); . as $x | any($f[]; . == $x)))
+           | select(.r | def k: objects | select((.file | type) == "string" and (if has("label") then (.label | type) == "string" else (.starts | type) == "string" end)) | [.file, (if has("label") then ["label", .label] else ["starts", .starts] end)]; ([.from | arrays | .[] | k]) as $f | any((.replaces | arrays | .[] | k); . as $x | any($f[]; . == $x)))
            | "line \(.l): a locator is in both from and replaces"),
       (.[] | select(.r | type == "object")
            | select([.r.id, (if $para then (.r.points[]? | if type == "object" then .id else null end) else empty end)] | any(type != "string" or length == 0))
@@ -950,17 +950,22 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   sources. The same locator is never in both.
 - **Merging a source with a replaced passage.** When one of the records to merge has a locator
   in `from` that another has in `replaces`, do not merge yet: ask the author which of the two
-  the passage is for the merged paragraph. The answer is the author's instruction to take the
-  locator out of the other list on the record that has it there; do that first, then merge.
-  When the author wants the passage kept in both roles, the records are not merged.
+  the passage is for the merged paragraph. When the answer is "a source", take the locator
+  out of `replaces` on the record that has it there, then merge. When the answer is "a passage
+  it takes the place of", take it out of `from`, then merge, unless that record carries
+  `carry`: a moved block keeps its source, so the records are then not merged. When the author
+  wants the passage kept in both roles, the records are not merged either. The same holds
+  before a point of a moved block moves to a record whose `replaces` has a locator of the
+  block's `from`: a source it stays, or the point does not move.
 - **A moved block that changes record.** In every revision that makes another record stand
   for a moved block (a merge, a split, or the block's point moving to another record), the
   record that stands for the block afterwards carries `carry`, the `from` of the block and the
   `edits` that apply to it. When the changes cannot be divided between the records, or no
   record stands for the moved block any more, ask the author before writing. When the record that is to stand for the block has, in its `replaces`, a locator of the block's `from`,
-  ask the author first, as for a merge.
+  the rule above applies first.
 - **Merge.** The `from` of the record that replaces the merged records holds every locator of
-  the records it replaces, and its `replaces` every locator of their `replaces`.
+  the `from` lists of the records it replaces, and its `replaces` every locator of their
+  `replaces` lists, as they are after the rule above.
 - **Split and `replaces`.** When the original has `replaces`, each locator of it is in the
   `replaces` of at least one of the records that replace it.
 - **Split.** When the original has `from`, each record that replaces it has in its `from` at
@@ -1246,7 +1251,10 @@ asks, through revise.
    section file and `P="$STAGE/shown-paragraphs.jsonl"`. Run it every time, also when it ran before. When
    check stops at the write check that begins it, show nothing for approval. An empty
    paragraph file does not stop it there.
-4. Show the sections in the reply, each with the findings of the check on it.
+4. Show the sections in the reply, each with the findings of the check on it. What a finding
+   takes from the agent's report or from a record (an `id`, a quoted sentence, the agent's
+   sentence) goes inside a fenced code block whose fence is longer than any run of backticks
+   in it; the name of the kind and the layout are this skill's.
    - A section that was never approved is shown in full: its heading and `says`; every
      paragraph record naming it, with its points, what each `pending` names, its `note` and
      carried blocks marked; every record that carries `dropped`, with the reason.
@@ -1255,7 +1263,9 @@ asks, through revise.
      Say that the rest of the section is as it was approved. Show it in full when the author
      asks.
    - A section that stands as approved is shown as unchanged since its approval.
-   - Whichever of these two ways a section is shown, two things are always said beside the
+   - Whichever of these two ways a section is shown, and wherever else a paragraph record is
+     shown for approval (the approved copy of a record in a difference, the records of a
+     section removed since its approval), two things are always said beside the
      record they concern, as labelled quotations of the record and never as words of this
      skill: the `edits` of a record, with the sentence that the block is moved with these
      changes, not unchanged; and what a record's `replaces` names, with the sentence that the

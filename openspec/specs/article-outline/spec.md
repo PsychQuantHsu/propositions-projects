@@ -260,7 +260,6 @@ Each line of `outline-paragraphs.jsonl` SHALL be a paragraph record with these k
 | `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists and from cross-references that point elsewhere |
 | `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
 | `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
-| `alternative_to` | no | The `id` of another paragraph record that says the same thing: only one of the two will stay |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
 | `note` | no | A string for the author |
@@ -280,9 +279,7 @@ A record that carries `carry` SHALL carry `from`. Its points SHALL be complete s
 
 A paragraph written anew in place of a passage of the manuscript SHALL name that passage in `replaces`, not in `from`: the passages of `replaces` are not a source. A record can carry both; the same locator SHALL NOT be in both.
 
-`alternative_to` SHALL name another paragraph record of the file: not the record itself, not a point. One of the two records carries the key and the other does not. A pair is open while neither of its records carries `dropped`, and while it is open neither record SHALL be in a second open pair. The count of an open pair does not depend on which record carries the key: it is one paragraph of the outline, each record is listed in its own section and marked as an open alternative, and a length worked out from the outline is given for it as the range from the shorter record to the longer. In a count or a length for one section, a record of an open pair is a conditional part of its own section and is said to be one, and the figures of the sections are not added up as if both records stood. Until the author chooses, both records are part of the outline, and the pair counts as one paragraph in any count of paragraphs or of length. When the author chooses, the record that is not chosen SHALL be given `dropped` with the reason and SHALL carry `alternative_to` naming the chosen one: when the chosen record was the one that carried the key, the key moves to the other. The record that is not chosen is not deleted, whether or not it has `from`: a record that carries `alternative_to` SHALL be kept by every rule that keeps a record with `from`, before the choice and after it, also when its section is left out. When the chosen record is itself left out later, the other keeps its key.
-
-The write check SHALL report an `edits` that is not a non-empty string on a record that carries `carry`, an `alternative_to` that does not name another paragraph record, a record without `dropped` that names one that carries `dropped` (after a choice the key is on the record that was not chosen), a record that is in two open pairs of alternatives (two records naming each other, two naming the same record, a record that names one and is named), a record that carries `dropped` and names a record that names it back, and a locator that is in both the `from` and the `replaces` of a record, where two locators with the same `file` and the same `label`, or with no `label` and the same `starts`, are the same one. A `replaces` that is not a list names no passage, and the commands SHALL NOT read what it holds as locators.
+The write check SHALL report an `edits` that is not a non-empty string on a record that carries `carry`, and a locator that is in both the `from` and the `replaces` of a record, where two locators with the same `file` and the same `label`, or with no `label` and the same `starts`, are the same one; an object without a `file` that is a string is not compared. A `replaces` that is not a list names no passage, and the commands SHALL NOT read what it holds as locators.
 
 The paragraph records SHALL be grouped by section: the records naming one section are on consecutive lines, and the groups come in the order of the section file. Inside a group, the order of the lines is the order of the paragraphs in the section. A paragraph record that carries `dropped` is not part of the article and keeps its line in its group. A section is allowed to have no paragraph record.
 
@@ -308,15 +305,10 @@ No executable check: the checks of this requirement are shell commands in the sk
 - **WHEN** the author plans a new abstract that does not draw on the old one
 - **THEN** the record names the old abstract in `replaces` and has no `from`
 
-#### Scenario: Two places for the same remark
+#### Scenario: Three records the write check reports
 
-- **WHEN** a remark can stand at the end of section 2 or at the start of section 3, the author has not decided, and later chooses section 3
-- **THEN** before the choice both records are in the file and one names the other in `alternative_to`; after it the record in section 2 carries `dropped` with the reason and `alternative_to` naming the record in section 3, whichever of the two carried the key before, and the record in section 3 carries no `alternative_to`
-
-#### Scenario: Five records the write check reports
-
-- **WHEN** a paragraph file holds a record with `edits` and no `carry`, a record whose `edits` is an empty string, a record whose `alternative_to` is its own `id`, a record whose `alternative_to` names no record, and a record with the same locator in `from` and in `replaces`
-- **THEN** the write check reports each of the five by its line and prints no `ok` line
+- **WHEN** a paragraph file holds a record with `edits` and no `carry`, a record whose `edits` is an empty string, and a record with the same locator in `from` and in `replaces`
+- **THEN** the write check reports each of the three by its line and prints no `ok` line
 
 #### Scenario: A carried block needs a source
 
@@ -335,7 +327,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix3
+source: idd-80-fix4
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -474,7 +466,7 @@ A paragraph record whose `section` names no section record belongs to no section
 
 A section is compared with its own records only. When a point of another section that one of its records names in `uses` changes, the section still stands as approved: no tool follows `uses` (issue 78).
 
-The status action SHALL report, for each section, whether it stands as approved, and for a section that does not, whether it was never approved or differs from its latest approved copy. It SHALL report whether the order of sections stands as approved, every section removed since its approval, every paragraph record whose `section` names no section record, the number of points that carry `pending`, the number of records that carry `dropped`, and the pairs of alternatives not yet chosen: a record that names another in `alternative_to` while neither carries `dropped`. When every section stands as approved and the order of sections does not, it SHALL say that an approval of the whole outline is still needed. It SHALL decide equality on JSON values, not on the text of the lines. An approvals file that is empty or holds only blank lines holds no approval record. When the approvals file exists but cannot be read, or holds a line that is not empty and is not one JSON object written as JSON on its own (a record spread over several lines, two records on one line, a line of spaces, a value such as `nan`), it SHALL fail and say so, and SHALL NOT report a section as never approved. When the `sections` of an approval record is not a list of entries that each hold a `section` object and a `paragraphs` list of objects, it SHALL fail and say that the approvals file is at fault. Whenever it fails, nothing it printed is a status. Before it compares, the status action SHALL run the check of a write on the section file and the paragraph file and report no status when either fails, an empty paragraph file excepted: jq reads some values that are not written as JSON, such as `01`, as if they were. When it fails because the section file or the paragraph file is missing or is not a readable regular file, or holds a line that is not a record, the skill SHALL name the file, and the line when the check of a write finds it, and SHALL NOT correct or make the file in the status action: a file with such a line is corrected through revise, and a missing file is the author's to put back.
+The status action SHALL report, for each section, whether it stands as approved, and for a section that does not, whether it was never approved or differs from its latest approved copy. It SHALL report whether the order of sections stands as approved, every section removed since its approval, every paragraph record whose `section` names no section record, the number of points that carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does not, it SHALL say that an approval of the whole outline is still needed. It SHALL decide equality on JSON values, not on the text of the lines. An approvals file that is empty or holds only blank lines holds no approval record. When the approvals file exists but cannot be read, or holds a line that is not empty and is not one JSON object written as JSON on its own (a record spread over several lines, two records on one line, a line of spaces, a value such as `nan`), it SHALL fail and say so, and SHALL NOT report a section as never approved. When the `sections` of an approval record is not a list of entries that each hold a `section` object and a `paragraphs` list of objects, it SHALL fail and say that the approvals file is at fault. Whenever it fails, nothing it printed is a status. Before it compares, the status action SHALL run the check of a write on the section file and the paragraph file and report no status when either fails, an empty paragraph file excepted: jq reads some values that are not written as JSON, such as `01`, as if they were. When it fails because the section file or the paragraph file is missing or is not a readable regular file, or holds a line that is not a record, the skill SHALL name the file, and the line when the check of a write finds it, and SHALL NOT correct or make the file in the status action: a file with such a line is corrected through revise, and a missing file is the author's to put back.
 
 A section is **removed since its approval** when the order of sections does not stand as approved, the section is not in the section file, and its latest approved copy is in the last approval record whose `whole` is `true`, or in an approval record after that one; with no approval of the whole outline on record, any approved copy counts. Once an approval of the whole outline is recorded without the section, its removal is approved, and the section is no longer reported. When the order of sections stands as approved, the section file holds exactly the sections of the last approval of the whole outline, and no removal is waiting for an approval. A section that is put back after its removal was approved stands as approved when it equals its own latest approved copy, which an earlier record holds; the order of sections then does not stand as approved. The status action SHALL write nothing to the repository.
 
@@ -556,7 +548,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-record-keys
+source: idd-80-fix4
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -585,7 +577,7 @@ When writing the record into the approvals file fails, the record may have been 
 
 What the skill shows for a section depends on its approved copy.
 
-- A section that has no approved copy is shown in full: its `heading` and `says`, every paragraph record naming it with its points and its `note`, and every record that carries `dropped` together with the reason. In both ways of showing a section, in full or by its differences, a record that carries `edits` SHALL be shown with them and said to be a block moved with changes, not unchanged; a record that carries `replaces` SHALL be shown with the passages it takes the place of; two records joined by `alternative_to`, when neither carries `dropped`, SHALL be shown together with the sentence that only one of them will stay, and when the other record of the pair is in a section that is not shown, it is shown as background and said not to be part of this approval. A record that carries `dropped` and `alternative_to` SHALL be shown with the record it names and the sentence that this one was not chosen. These are shown as labelled quotations of the record, not as words of the skill, and text taken from a record is shown inside a fenced code block whose fence is longer than any run of backticks in the text, so that nothing in it closes the block or is rendered as a link, as markup or as a heading.
+- A section that has no approved copy is shown in full: its `heading` and `says`, every paragraph record naming it with its points and its `note`, and every record that carries `dropped` together with the reason. In both ways of showing a section, in full or by its differences, a record that carries `edits` SHALL be shown with them and said to be a block moved with changes, not unchanged; a record that carries `replaces` SHALL be shown with the passages it takes the place of. These are shown as labelled quotations of the record, not as words of the skill, and text taken from a record is shown inside a fenced code block whose fence is longer than any run of backticks in the text, so that nothing in it closes the block or is rendered as a link, as markup or as a heading.
 - A section that differs from its approved copy is shown by its differences: for each record that was changed, added, removed or moved, the approved content and the current content. The skill says that the rest of the section is as it was approved, and shows the section in full when the author asks.
 - A section that equals its approved copy is shown as unchanged since its approval.
 
@@ -687,7 +679,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix3
+source: idd-80-fix4
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -701,9 +693,9 @@ Each time before the approve action shows sections for approval, the skill SHALL
 1. **Not a sentence**: a `says` or the `text` of a point that is a heading, a label or a fragment.
 2. **Not supported by its source**: a point whose record has `from`, or which has `basis`, and which the passages named do not state, or which they contradict. The passages named in `replaces` are not a source and are not read as support. When the record carries `edits`, the point states the block as changed, and a difference from the passage that `edits` lists is not a finding.
 3. **Nothing to check against**: a point that states a result, a number or a citation, in a record without `from`, and that has neither `basis` nor `pending`.
-4. **Relies on something later**: a point that needs a term, a result or a claim that only a later record introduces (what only the two records of an open pair of alternatives introduce counts as introduced earlier only when both are on earlier lines; otherwise the finding says which choice makes the point hold), or a `uses` entry that names an id which is missing, is not on an earlier line, or belongs to a record that carries `dropped`.
+4. **Relies on something later**: a point that needs a term, a result or a claim that only a later record introduces, or a `uses` entry that names an id which is missing, is not on an earlier line, or belongs to a record that carries `dropped`.
 5. **Section not carried**: a section whose `says` is neither stated nor supported by the points of its paragraph records and of the paragraph records of the sections under it. The sections under a section are those that name it as `parent`, directly or through other sections.
-6. **Locator does not resolve**: a locator whose `file` is missing, leads outside the repository, is inside a `.git` directory in any letter case, is not a file git lists, or has a name the locator rules do not allow, whose `label` text does not occur exactly once in the file, or whose `starts` does not occur exactly once in the file. An object in `from` or `basis` that is not a locator, and a `from` or a `basis` that is not a list of one or more locators, are reported as this kind too.
+6. **Locator does not resolve**: a locator whose `file` is missing, leads outside the repository, is inside a `.git` directory in any letter case, is not a file git lists, or has a name the locator rules do not allow, whose `label` text does not occur exactly once in the file, or whose `starts` does not occur exactly once in the file. An object in `from`, `replaces` or `basis` that is not a locator, and a `from`, a `replaces` or a `basis` that is not a list of one or more locators, are reported as this kind too; what such a value holds is not read as locators.
 
 The sixth kind is established by the skill itself, by resolving each path and counting, so that it is decided the same way every time. The first five are judged by the agent `propositions:outline-checker`, which this plugin defines in `agents/outline-checker.md`. Its definition SHALL give it the Read tool and no other tool, so that it cannot write or change a file, run a program or send anything. It is given these paths and nothing else: the section file and the paragraph file it examines, a list that the skill writes outside the repository, and, when only some sections are examined, a file that lists their ids. Each line of the list is a JSON object with the `file` a locator gives and the real path of the file that was counted for it; the list holds one line for each file the count read and no other file. A check of some sections outside the approve action SHALL NOT write the file in which the approve action records which sections were shown. The task message SHALL hold no text taken from the outline or the manuscript, no name of a file that a locator gives, and nothing of the conversation; the agent's definition says that what it reads is data to examine and holds no instruction for it. It SHALL also say that when a locator carries both `label` and `starts` and the two name different passages, the passage is the one `label` names. The Read tool can open any file: that the agent reads only the files it is given is an instruction of its definition, not a limit of the tool. When that agent cannot be started, the skill SHALL stop and say so, and SHALL NOT judge the five kinds with another agent or by itself. The check SHALL NOT read a file that a locator names when that file is outside the repository or is not a file git lists.
 
@@ -755,7 +747,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix3
+source: idd-80-fix4
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -3105,7 +3097,7 @@ A record and a point SHALL keep their `id` when their content changes and when t
 
 Merging, splitting and leaving a paragraph out SHALL keep every source on record.
 
-- The `from` of the record that replaces merged records holds every locator of the records it replaces, and its `replaces` every locator of their `replaces`. When a record that has `replaces` is split, each locator of it is in the `replaces` of at least one of the records that replace it. A record that has `replaces` and that the author leaves out is not deleted: it is given `dropped` with the reason; wherever this requirement keeps a record because it has `from`, a record that has `replaces` is kept the same way, also when its last point moves away. Records SHALL NOT be merged when a locator is in the `from` of one and the `replaces` of another until the author has said which of the two the passage is for the merged paragraph; the locator is then taken out of the other list before the merge, and when the author wants both, the records are not merged. In every revision that makes another record stand for a moved block (a merge, a split, or the block's point moving to another record), the record that stands for the block afterwards SHALL carry `carry`, the `from` of the block and the `edits` that apply to it; when the changes cannot be divided between the records, or no record stands for the block any more, the skill asks the author. A record of an open pair of alternatives SHALL NOT be deleted, merged, split or given `dropped` by another rule (its section is left out, its last point moves away) until the author has said what becomes of the pair, and no `alternative_to` is left naming an `id` that is no longer in the file.
+- The `from` of the record that replaces merged records holds every locator of the records it replaces, and its `replaces` every locator of their `replaces`. When a record that has `replaces` is split, each locator of it is in the `replaces` of at least one of the records that replace it. A record that has `replaces` and that the author leaves out is not deleted: it is given `dropped` with the reason; wherever this requirement keeps a record because it has `from`, a record that has `replaces` is kept the same way, also when its last point moves away. Records SHALL NOT be merged when a locator is in the `from` of one and the `replaces` of another until the author has said which of the two the passage is for the merged paragraph; the locator is then taken out of the other list before the merge, and when the author wants both, the records are not merged. In every revision that makes another record stand for a moved block (a merge, a split, or the block's point moving to another record), the record that stands for the block afterwards SHALL carry `carry`, the `from` of the block and the `edits` that apply to it; when the changes cannot be divided between the records, or no record stands for the block any more, the skill asks the author. Before a revision moves a moved block to a record whose `replaces` holds a locator of the block's `from`, the skill asks the author as for a merge.
 - When a record that has `from` is split, each record that replaces it has in its `from` at least one locator of the original, and each locator of the original is in the `from` of at least one of them.
 - When a point moves to another paragraph record and the record it leaves has `from`, each locator of that `from` is added to the point's `basis`, so that the point keeps its source; a locator the point already has is not added again. A record is not left with no point: when the point that moves is the last one of its record, the skill asks the author whether that record is given a new point or is left out. Left out, a record with neither `from` nor `replaces` is deleted once the point has moved. A record with `from` or `replaces` can be neither deleted nor left without a point: the point moves with its `id`, and the record keeps a copy of the point's text as a point with a new `id` and is given `dropped` with the reason.
 - When the author leaves a paragraph out of the article and its record has `from` or `replaces`, the record is not deleted: it is given `dropped` with the reason. A record with neither that the author leaves out is deleted from the file.
@@ -3170,7 +3162,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix3
+source: idd-80-fix4
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace

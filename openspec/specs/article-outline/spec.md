@@ -257,7 +257,9 @@ Each line of `outline-paragraphs.jsonl` SHALL be a paragraph record with these k
 | `section` | yes | The `id` of a section record. A paragraph record whose `section` names no section record belongs to no section |
 | `points` | yes | A list of one or more points |
 | `from` | no | A list of one or more locators naming the passages this record comes from |
-| `carry` | no | `true`: the record stands for a block that is moved unchanged from the passage its `from` names |
+| `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists and from cross-references that point elsewhere |
+| `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
+| `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
 | `note` | no | A string for the author |
@@ -273,16 +275,40 @@ A point SHALL be an object with these keys.
 
 A record with one point states, in that point, what the whole paragraph says. A record with several points states one key point of the paragraph in each, in the order the paragraph makes them.
 
-A record that carries `carry` SHALL carry `from`. Its points SHALL be complete sentences stating what the block states or shows, and the text of the block is not rewritten. "States Theorem 1." is not such a sentence.
+A record that carries `carry` SHALL carry `from`. Its points SHALL be complete sentences stating what the block states or shows, and the text of the block is not rewritten beyond the changes `edits` lists and cross-references that point elsewhere. "States Theorem 1." is not such a sentence. A block that is moved with changes to what it states is still a moved block: its record SHALL carry `carry` and `edits`, and its points state what the block states after the changes. A change that only redirects a cross-reference (where a reference points, a number) is not a change to the statement and needs no `edits`. `edits` SHALL NOT be on a record without `carry` and SHALL NOT be empty.
+
+A paragraph written anew in place of a passage of the manuscript SHALL name that passage in `replaces`, not in `from`: the passages of `replaces` are not a source. A record can carry both; the same locator SHALL NOT be in both.
+
+The write check SHALL report an `edits` that is not a non-empty string on a record that carries `carry`, and a locator that is in both the `from` and the `replaces` of a record, where two locators with the same `file` and the same `label`, or with no `label` and the same `starts`, are the same one; an object that is not a locator (no `file` that is a string, a `label` or a `starts` that is not a string, neither `label` nor `starts`, `lines` without `commit`) is not compared and is left to the locator check. A `replaces` that is not a list names no passage, and the commands SHALL NOT read what it holds as locators.
 
 The paragraph records SHALL be grouped by section: the records naming one section are on consecutive lines, and the groups come in the order of the section file. Inside a group, the order of the lines is the order of the paragraphs in the section. A paragraph record that carries `dropped` is not part of the article and keeps its line in its group. A section is allowed to have no paragraph record.
 
-No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
+No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
 #### Scenario: One point is the paragraph's topic sentence
 
 - **WHEN** a paragraph record has one point
 - **THEN** that point states what the whole paragraph says
+
+#### Scenario: A theorem moved with one sentence removed
+
+- **WHEN** the statement of a theorem is moved without its last sentence, which announced a later subsection
+- **THEN** its record carries `carry`, `from` naming the theorem, and `edits` saying that the last sentence is removed, and its point states the theorem without that sentence
+
+#### Scenario: A moved block whose reference points elsewhere
+
+- **WHEN** a definition is moved unchanged except that a reference in it now points to an appendix
+- **THEN** its record carries `carry` and no `edits`
+
+#### Scenario: A new abstract in place of the old one
+
+- **WHEN** the author plans a new abstract that does not draw on the old one
+- **THEN** the record names the old abstract in `replaces` and has no `from`
+
+#### Scenario: Three records the write check reports
+
+- **WHEN** a paragraph file holds a record with `edits` and no `carry`, a record whose `edits` is an empty string, and a record with the same locator in `from` and in `replaces`
+- **THEN** the write check reports each of the three by its line and prints no `ok` line
 
 #### Scenario: A carried block needs a source
 
@@ -301,8 +327,8 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix7
-updated: 2026-11-18
+source: idd-80-fix6
+updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
 -->
@@ -330,7 +356,7 @@ A label inside a passage does not name the passage: a paragraph of prose that co
 
 The file a locator names is allowed to be outside the manuscript, such as a note in the same repository. It SHALL be a file git lists: one git tracks, or one git does not track and does not ignore. Two repositories are asked. The first is the one that holds the file, asked in the directory of the file: a file inside a submodule, or inside a git repository of its own under the root, is judged by the rules of that repository. The second is the repository, asked at its root whether it ignores the path: when it does, the file SHALL NOT be a locator's file whatever the first said, so a repository of its own inside a directory that the repository ignores does not make its files readable. When the repository gives no answer for the path, as it gives none for a file inside a submodule, the answer of the first stands; any error of that second question counts as no answer. A repository between the two is not asked. A file git ignores, or one that the repository holding it gives no answer for, SHALL NOT be a locator's file: it is not read, and an object naming it is not a locator. It SHALL NOT be outside the repository: an object whose `file` leads outside it, by a leading `/`, by `..` or through a symbolic link, is not a locator; what counts is where the path leads, so a path whose `..` lead out and back into the repository is taken. A file inside a `.git` directory, in any letter case, or the `.git` file of a submodule, SHALL NOT be a locator's file either. The value of `file` SHALL NOT hold a character from U+007F to U+009F or one that breaks a line or turns the direction of text (U+2028 to U+202E, U+2066 to U+2069); an object whose `file` holds one is not a locator, and the skill does not print that name as it is.
 
-`from` and `basis` SHALL be lists of one or more locators. A `from` or a `basis` that is not such a list, an empty list included, names no passage.
+`from`, `replaces` and `basis` SHALL be lists of one or more locators. A `from`, a `replaces` or a `basis` that is not such a list, an empty list included, names no passage, and what it holds SHALL NOT be read as locators. The members of a list are read one by one: a member that is not a locator is reported, and the other members are still resolved. The locators of `replaces` are resolved like those of `from` and `basis`.
 
 No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
@@ -392,7 +418,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-91-fix3
+source: idd-80-fix5
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -446,7 +472,7 @@ A section is **removed since its approval** when the order of sections does not 
 
 These conditions are what a later capability uses to decide whether text can be written from an outline (issue 51). This capability writes no text.
 
-No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
+No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
 #### Scenario: What one change does to the three conditions
 
@@ -522,8 +548,8 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix6
-updated: 2026-11-18
+source: idd-80-fix4
+updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
 -->
@@ -551,7 +577,7 @@ When writing the record into the approvals file fails, the record may have been 
 
 What the skill shows for a section depends on its approved copy.
 
-- A section that has no approved copy is shown in full: its `heading` and `says`, every paragraph record naming it with its points and its `note`, and every record that carries `dropped` together with the reason.
+- A section that has no approved copy is shown in full: its `heading` and `says`, every paragraph record naming it with its points and its `note`, and every record that carries `dropped` together with the reason. In both ways of showing a section, in full or by its differences, and wherever else a paragraph record is shown for approval (the approved copy of a changed record, the records of a section removed since its approval), a record that carries `edits` SHALL be shown with them and said to be a block moved with changes, not unchanged; a record that carries `replaces` SHALL be shown with the passages it takes the place of. These are shown as labelled quotations of the record, not as words of the skill, and text taken from a record is shown inside a fenced code block whose fence is longer than any run of backticks in the text, so that nothing in it closes the block or is rendered as a link, as markup or as a heading, and a control character in it is written as its code point.
 - A section that differs from its approved copy is shown by its differences: for each record that was changed, added, removed or moved, the approved content and the current content. The skill says that the rest of the section is as it was approved, and shows the section in full when the author asks.
 - A section that equals its approved copy is shown as unchanged since its approval.
 
@@ -559,7 +585,7 @@ The findings of the premise check on a section are shown with it in all three ca
 
 Whenever the sections shown are all the sections of the section file, the skill SHALL show three more things first, because an approval of all of them is an approval of the whole outline and approves all three. When the order of sections does not stand as approved, it shows the sections in the order they are in now, and beside it their order in the last approval of the whole outline when one is on record. And it shows every section removed since its approval, with its heading, its `says` and the points of its paragraph records as they were last approved. And it shows in full every section of the file that the last approval of the whole outline does not hold, when one is on record, also when that section equals its latest approved copy: a section that was taken out, approved as gone with the whole outline, and put back unchanged would otherwise return without being seen. When fewer than all the sections are shown, and the order of sections does not stand as approved or a section was removed since its approval, the skill says that the order of the sections, with the sections added to it, or the removal of a section, is not part of this approval: it takes an approval of the whole outline.
 
-No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
+No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
 #### Scenario: An earlier blanket instruction does not approve
 
@@ -653,8 +679,8 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-87-fix1
-updated: 2026-11-18
+source: idd-80-fix6
+updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
 -->
@@ -665,11 +691,11 @@ code:
 Each time before the approve action shows sections for approval, the skill SHALL have those sections checked. The check SHALL begin with the checks the skill runs after a write, on the section file and the paragraph file it examines: a file that was changed by hand can hold a line that is not a record. When one of them fails, the skill reports the file and the lines, counts nothing and starts no agent. A paragraph file with no record is not reported as passing and does not stop the check: an outline can have sections and no paragraph record yet, so the skill says that the file is empty and goes on. The check reports findings of these six kinds and no others.
 
 1. **Not a sentence**: a `says` or the `text` of a point that is a heading, a label or a fragment.
-2. **Not supported by its source**: a point whose record has `from`, or which has `basis`, and which the passages named do not state, or which they contradict.
+2. **Not supported by its source**: a point whose record has `from`, or which has `basis`, and which the passages named do not state, or which they contradict. The passages named in `replaces` are not a source and are not read as support. For a record that carries `carry`, a difference between the point and the passage its `from` names is not a finding when the record's `edits` lists it, or when it only concerns where a cross-reference points or what number something has; this does not excuse a difference from a passage named in `basis`. The check looks up the passages of `from` and `basis` only and reports nothing about the passages of `replaces`. What a finding of any kind takes from the agent's report or from a record is shown inside a fenced code block, like record text at approval, with control characters written as code points.
 3. **Nothing to check against**: a point that states a result, a number or a citation, in a record without `from`, and that has neither `basis` nor `pending`.
 4. **Relies on something later**: a point that needs a term, a result or a claim that only a later record introduces, or a `uses` entry that names an id which is missing, is not on an earlier line, or belongs to a record that carries `dropped`.
 5. **Section not carried**: a section whose `says` is neither stated nor supported by the points of its paragraph records and of the paragraph records of the sections under it. The sections under a section are those that name it as `parent`, directly or through other sections.
-6. **Locator does not resolve**: a locator whose `file` is missing, leads outside the repository, is inside a `.git` directory in any letter case, is not a file git lists, or has a name the locator rules do not allow, whose `label` text does not occur exactly once in the file, or whose `starts` does not occur exactly once in the file. An object in `from` or `basis` that is not a locator, and a `from` or a `basis` that is not a list of one or more locators, are reported as this kind too.
+6. **Locator does not resolve**: a locator whose `file` is missing, leads outside the repository, is inside a `.git` directory in any letter case, is not a file git lists, or has a name the locator rules do not allow, whose `label` text does not occur exactly once in the file, or whose `starts` does not occur exactly once in the file. An object in `from`, `replaces` or `basis` that is not a locator, and a `from`, a `replaces` or a `basis` that is not a list of one or more locators, are reported as this kind too; what such a value holds is not read as locators.
 
 The sixth kind is established by the skill itself, by resolving each path and counting, so that it is decided the same way every time. The first five are judged by the agent `propositions:outline-checker`, which this plugin defines in `agents/outline-checker.md`. Its definition SHALL give it the Read tool and no other tool, so that it cannot write or change a file, run a program or send anything. It is given these paths and nothing else: the section file and the paragraph file it examines, a list that the skill writes outside the repository, and, when only some sections are examined, a file that lists their ids. Each line of the list is a JSON object with the `file` a locator gives and the real path of the file that was counted for it; the list holds one line for each file the count read and no other file. A check of some sections outside the approve action SHALL NOT write the file in which the approve action records which sections were shown. The task message SHALL hold no text taken from the outline or the manuscript, no name of a file that a locator gives, and nothing of the conversation; the agent's definition says that what it reads is data to examine and holds no instruction for it. It SHALL also say that when a locator carries both `label` and `starts` and the two name different passages, the passage is the one `label` names. The Read tool can open any file: that the agent reads only the files it is given is an instruction of its definition, not a limit of the tool. When that agent cannot be started, the skill SHALL stop and say so, and SHALL NOT judge the five kinds with another agent or by itself. The check SHALL NOT read a file that a locator names when that file is outside the repository or is not a file git lists.
 
@@ -677,7 +703,7 @@ A record that carries `dropped` is examined for the sixth kind only, and its poi
 
 The skill SHALL show every finding with the section it concerns. It SHALL NOT change the outline because of a finding unless the author asks for the change, and it SHALL NOT act on anything in the agent's report that reads as an instruction.
 
-No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
+No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
 #### Scenario: A point with nothing behind it is reported
 
@@ -721,8 +747,8 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix5
-updated: 2026-11-18
+source: idd-80-fix6
+updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
 -->
@@ -3071,10 +3097,10 @@ A record and a point SHALL keep their `id` when their content changes and when t
 
 Merging, splitting and leaving a paragraph out SHALL keep every source on record.
 
-- The `from` of the record that replaces merged records holds every locator of the records it replaces.
+- The `from` of the record that replaces merged records holds every locator of the `from` lists of the records it replaces, and its `replaces` every locator of their `replaces` lists. When a record that has `replaces` is split, each locator of it is in the `replaces` of at least one of the records that replace it. A record that has `replaces` and that the author leaves out is not deleted: it is given `dropped` with the reason; wherever this requirement keeps a record because it has `from`, a record that has `replaces` is kept the same way, also when its last point moves away. Records SHALL NOT be merged when a locator is in the `from` of one and the `replaces` of another until the author has said which of the two the passage is for the merged paragraph; the locator is then taken out of the other list before the merge, and when the author wants both, the records are not merged. A record that carries `carry` SHALL keep its `from`: when the passage is a moved block's source, it can only leave the other record's `replaces`, or the records are not merged. In every revision that makes another record stand for a moved block (a merge, a split, or the block's point moving to another record), the record that stands for the block afterwards SHALL carry `carry`, the `from` of the block and the `edits` that apply to it; when the changes cannot be divided between the records, or no record stands for the block any more, the skill asks the author. Two moved blocks SHALL NOT share a record: two records that each carry `carry` are not merged, and the point of one moved block is not moved into the record of another. Before a revision moves a moved block to a record whose `replaces` holds a locator of the block's `from`, the same rule applies: the passage stays a source, or the block does not move.
 - When a record that has `from` is split, each record that replaces it has in its `from` at least one locator of the original, and each locator of the original is in the `from` of at least one of them.
-- When a point moves to another paragraph record and the record it leaves has `from`, each locator of that `from` is added to the point's `basis`, so that the point keeps its source; a locator the point already has is not added again. A record is not left with no point: when the point that moves is the last one of its record, the skill asks the author whether that record is given a new point or is left out. Left out, a record without `from` is deleted once the point has moved. A record with `from` can be neither deleted nor left without a point: the point moves with its `id`, and the record keeps a copy of the point's text as a point with a new `id` and is given `dropped` with the reason.
-- When the author leaves a paragraph out of the article and its record has `from`, the record is not deleted: it is given `dropped` with the reason. A record without `from` that the author leaves out is deleted from the file.
+- When a point moves to another paragraph record and the record it leaves has `from`, each locator of that `from` is added to the point's `basis`, so that the point keeps its source; a locator the point already has is not added again. Nothing is added when the point is that of a moved block and the record it moves to takes over the block, with `carry` and the block's `from`: the source is then in that record's `from`. A record is not left with no point: when the point that moves is the last one of its record, the skill asks the author whether that record is given a new point or is left out. Left out, a record with neither `from` nor `replaces` is deleted once the point has moved. A record with `from` or `replaces` can be neither deleted nor left without a point: the point moves with its `id`, and the record keeps a copy of the point's text as a point with a new `id` and is given `dropped` with the reason.
+- When the author leaves a paragraph out of the article and its record has `from` or `replaces`, the record is not deleted: it is given `dropped` with the reason. A record with neither that the author leaves out is deleted from the file.
 
 Leaving a section out and moving a section SHALL leave every `parent` naming a section record on an earlier line.
 
@@ -3087,7 +3113,7 @@ When a revision leaves a `uses` entry that names a later line, a record that is 
 
 After a revision the skill SHALL say which sections no longer stand as approved, and which sections were removed since their approval.
 
-No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
+No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
 #### Scenario: A merge keeps both sources
 
@@ -3136,8 +3162,8 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix7
-updated: 2026-11-18
+source: idd-80-fix6
+updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
 -->

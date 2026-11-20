@@ -14,7 +14,7 @@ A line of the ledger is an anchor when, with the white space around it removed, 
 
 The command prints, in this order: one line for the places that hold several propositions, when there are any, with at most twenty of them; then `already in reading order`, or `<n> line(s) move`; then, after writing, `written: <the ledger as it was named>`. It exits with 0 when the ledger is in reading order or was written, with 1 for a dry run in which lines would move, and with 2, with one line on standard error that starts with `error: ` (after one line for each line of the manuscript that holds an import macro the input tree does not follow, when `--tex` is given and the tree could be read), when the ledger is not a regular file or cannot be read, the main file is not a regular file, a line that is neither empty nor a comment is not JSON, a location is missing or cannot be parsed or cannot be placed, the ledger cannot be replaced, or an argument is wrong. When it exits with 2 the ledger is as it was. A path in a message is shown with its control characters escaped.
 
-Writing replaces the ledger through a temporary file beside it that is given the ledger's permission bits (its owner, group and access-control list are those of a new file), and removes that file when it does not replace the ledger; a command that is killed can leave it. The command reads the ledger through one open file and keeps which file that was (device and inode), its permission bits and its bytes. It SHALL replace the ledger only when, at the last look before the replacement, the path is not a symbolic link and one open file there gives the same file, the same permission bits and the same bytes. A ledger named through a symbolic link is therefore refused when it would be rewritten, and so is one that was saved in the meantime (by writing into it or by putting another file with the same bytes in its place) or whose permissions were changed, all with exit 2 and the ledger as it was. A change in the moment between that look and the replacement is not caught. After the replacement the command syncs the directory; when that fails it still exits with 0, and says on standard error that the ledger was replaced and that the old one may be back after a crash.
+Writing replaces the ledger through a temporary file beside it that is given the ledger's permission bits (its owner, group and access-control list are those of a new file), and removes that file when it does not replace the ledger; a command that is killed can leave it. The command reads the ledger through one open file and keeps which file that was (device and inode), its permission bits and its bytes. It SHALL replace the ledger only when, at the last look before the replacement, the path is not a symbolic link, one open file there gives the same file, the same permission bits and the same bytes, that file's size and time of change are the same before and after it is reread, and the path still names it afterwards. It refuses also when the new file cannot be given the ledger's permission bits exactly. A ledger named through a symbolic link is therefore refused when it would be rewritten, and so is one that was saved in the meantime (by writing into it or by putting another file with the same bytes in its place) or whose permissions were changed, all with exit 2 and the ledger as it was. A change in the moment between that look and the replacement is not caught. The main file is looked at once before the input tree is read; a file put in its place in between is read as it then is. After the replacement the command syncs the directory; when that fails it still exits with 0, and says on standard error that the ledger was replaced and that the old one may be back after a crash.
 
 #### Scenario: A ledger out of reading order is reported
 
@@ -37,15 +37,15 @@ Writing replaces the ledger through a temporary file beside it that is given the
 
 - **GIVEN** a ledger out of order that is named through a symbolic link; or one that, after the command read it, gained a line, was replaced by another file with the same bytes, had its permissions changed from `644` to `600`, or was replaced by a link to a file with the same bytes
 - **WHEN** the command is to write
-- **THEN** it refuses and says why, the file has the bytes and the permissions it had after that change, a link still names its file, and no other file is beside it
+- **THEN** it refuses and says which of the two it met, a link or a change, the file has the bytes and the permissions it had after that change, a link still names its file, and no other file is beside it
 
 
 <!-- @trace
-source: idd-59-fix2
+source: idd-59-fix3
 updated: 2026-11-21
 code:
-  - propositions-projects.code-workspace
   - Sources/PropositionsKit/LedgerOrder.swift
+  - propositions-projects.code-workspace
   - tests/PropositionsKitTests/LedgerOrderTests.swift
 -->
 
@@ -64,7 +64,9 @@ For such a manuscript, called with `--jsonl` and `--write` written in full, the 
 - Options. The Python tool takes an abbreviation of an option (`--w` for `--write`); the command does not.
 - The ledger's path. The Python tool drops a final `/.` before it looks for the file; the command hands the path to the system as it was given.
 - The command reads JSON strictly: a line the Python tool accepts though it is not JSON by the standard (`NaN`, for one) is refused.
-- The ledger's name after `written: ` is shown as it was given; the Python tool drops a leading `./` and a doubled slash.
+- The ledger's name after `written: ` is shown as it was given; the Python tool drops a `.` part anywhere in it and a doubled slash.
+- A ledger whose name starts with a hyphen: the Python tool takes `--jsonl -1`; the command needs `--jsonl=-1`.
+- A location whose line number is written with more digits than Python converts (several thousand, leading zeroes included) ends the Python tool with a traceback; the command reads the number.
 - What the two write on standard error, when they refuse, differs in wording.
 
 The Python tool stays in the plugin, unchanged, until a released binary has this command and the skill that calls the tool is changed to call the command; that change removes the Python tool.
@@ -102,11 +104,11 @@ The Python tool stays in the plugin, unchanged, until a released binary has this
 
 
 <!-- @trace
-source: idd-59-fix2
+source: idd-59-fix3
 updated: 2026-11-21
 code:
-  - propositions-projects.code-workspace
   - Sources/PropositionsKit/LedgerOrder.swift
+  - propositions-projects.code-workspace
   - tests/PropositionsKitTests/LedgerOrderTests.swift
 -->
 

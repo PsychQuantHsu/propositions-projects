@@ -225,9 +225,11 @@ struct LedgerOrderTests {
             try FileManager.default.moveItem(at: ledger, to: box.url.appendingPathComponent("real"))
             try FileManager.default.createSymbolicLink(at: ledger, withDestinationURL: box.url.appendingPathComponent("real"))
         }
-        #expect(throws: LedgerOrder.Failure.self) {
+        let failure = #expect(throws: LedgerOrder.Failure.self) {
             _ = try LedgerOrder.write(plan.content, to: ledger, replacing: read)
         }
+        // It says why: a link is not reported as a change, nor a change as a link.
+        #expect(failure?.message.contains(change == .link ? "named through a link" : "changed while it was being ordered") == true)
         #expect(try Data(contentsOf: ledger) == expected)
         let names = try FileManager.default.contentsOfDirectory(atPath: box.url.path).sorted()
         #expect(names == (change == .link ? ["main.jsonl", "real"] : ["main.jsonl"]))
@@ -264,6 +266,13 @@ struct LedgerOrderTests {
         let result = swift(["--jsonl", "main.jsonl", "--tex", "ma\nin.tex"], in: box)
         #expect(result.exitCode == 2)
         #expect(result.stderr.count == 1 && !result.stderr[0].contains("\n"))
+    }
+
+    @Test func `The ledger's name is printed as it was given`() throws {
+        let box = try Box()
+        _ = try box.write(Self.line("b", "L9") + "\n" + Self.line("a", "L2") + "\n", to: "p/main.jsonl")
+        let result = swift(["--jsonl=p/./main.jsonl", "--write"], in: box)
+        #expect(result == CommandResult(stdout: ["2 line(s) move", "written: p/./main.jsonl"], exitCode: 0))
     }
 
     @Test func `A path is shown with its control characters escaped`() throws {

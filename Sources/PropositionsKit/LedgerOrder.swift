@@ -196,6 +196,11 @@ public enum LedgerOrder {
         guard written, fchmod(descriptor, read.mode) == 0, fsync(descriptor) == 0 else {
             throw Failure(message: "cannot write the new ledger; nothing was changed")
         }
+        // The system can drop a bit it was asked to set (set-group-id, for one).
+        var made = stat()
+        guard fstat(descriptor, &made) == 0, made.st_mode & 0o7777 == read.mode else {
+            throw Failure(message: "the new ledger cannot be given the permissions of the ledger; nothing was changed")
+        }
         let directory = open(url.deletingLastPathComponent().path, O_RDONLY)
         defer { if directory >= 0 { close(directory) } }
         // The last look: one open file, not reached through a link, gives identity, mode and bytes.
@@ -205,9 +210,18 @@ public enum LedgerOrder {
                 ? "the ledger is named through a link; nothing was written. Name the file itself"
                 : "the ledger can no longer be read; nothing was written")
         }
+        var before = stat(), after = stat(), named = stat()
+        let lookedBefore = fstat(current, &before) == 0
         let now = snapshot(of: current)
+        let lookedAfter = fstat(current, &after) == 0
         close(current)
-        guard now == read else {
+        // The file was not written to while it was reread, and the path still names it and no link.
+        let steady = lookedBefore && lookedAfter && before.st_size == after.st_size
+            && before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec
+            && before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec
+            && lstat(url.path, &named) == 0 && named.st_mode & S_IFMT == S_IFREG
+            && named.st_dev == read.device && named.st_ino == read.inode
+        guard now == read, steady else {
             throw Failure(message: "the ledger changed while it was being ordered; nothing was written. Run the command again")
         }
         guard rename(temporary, url.path) == 0 else { throw Failure(message: "cannot put the new ledger in place; nothing was changed") }

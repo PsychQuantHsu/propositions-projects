@@ -242,6 +242,8 @@ lines is the order of the sections in the article.
 | `role` | no | One of `abstract`, `introduction`, `background`, `formal_setup`, `method`, `results`, `proofs`, `discussion`, `conclusion`, `appendix` |
 | `parent` | no | The `id` of a section record on an earlier line |
 | `dropped` | no | A non-empty string giving the reason the section is left out of the article |
+| `moved_to` | no | A non-empty string naming where a section that is left out goes: another article, or a part that has no outline here. Only on a record that carries `dropped` |
+| `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the main text |
 
 `says` is a sentence. A heading, a label or a list of topics does not state
 what the section says.
@@ -269,8 +271,9 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists and from cross-references that point elsewhere |
 | `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
 | `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
-| `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
+| `uses` | no | A list whose entries are ids, each the `id` of a paragraph record on an earlier line or of a point of such a record, or references to another outline (see "Several articles from one manuscript") |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
+| `moved_to` | no | A non-empty string naming where a paragraph that is left out goes. Only on a record that carries `dropped` |
 | `note` | no | A string for the author |
 
 A point is an object.
@@ -279,7 +282,7 @@ A point is an object.
 |---|---|---|
 | `id` | yes | A non-empty string, different from the `id` of every other point and of every paragraph record |
 | `text` | yes | One complete sentence stating one key point of the paragraph |
-| `basis` | no | A list of one or more locators naming what supports the point |
+| `basis` | no | A list of one or more entries naming what supports the point: locators, or references to another outline |
 | `pending` | no | A non-empty string naming what the author still has to supply before the point can be written |
 
 **One point or several.** A record with one point states, in that point, what
@@ -330,6 +333,42 @@ never declares that it uses something that comes later.
 {"id": "p-2", "section": "s-intro", "points": [{"id": "p-2.1", "text": "The method proposed here does not need that assumption."}, {"id": "p-2.2", "text": "A simulation will report how the two methods compare.", "pending": "the simulation has not been run"}], "uses": ["p-1.1"]}
 {"id": "p-7", "section": "s-model", "carry": true, "points": [{"id": "p-7.1", "text": "Theorem 1 states that the interval covers the true value at the nominal rate."}], "from": [{"file": "manuscript/main.tex", "label": "thm:main"}]}
 ```
+
+## Several articles from one manuscript
+
+An outline is one article. When a finished manuscript is cut into several
+articles, each article has its own outline directory with its own three files,
+and the outline derived from the long manuscript stays as the record of where
+everything came from. Three things then cross from one outline to another, and
+each has a place.
+
+**Where something went.** A section or a paragraph that is left out of this
+article because it goes to another one carries `dropped` with the reason and
+`moved_to`, a string in the author's words naming where it goes. `dropped`
+alone means that it is left out; with `moved_to` it was moved. The string is
+for the reader: the skill does not resolve it. A record with `moved_to` is
+kept like any record with `dropped`.
+
+**Which part.** A section record can carry `part`: `main`, `appendix` or
+`supplement`. It says which part of this article the section is in; it does
+not change the order of the sections or what the premise check does. `role`
+says what a section does in the argument and `part` where it is printed: an
+appendix of proofs has the `role` `proofs` and the `part` `appendix`.
+
+**What another article establishes.** An entry of `uses`, or of the `basis`
+of a point, can be a reference to another outline: an object with `outline`,
+the path of that outline's directory from the repository's root, and `id`,
+the `id` of a paragraph record or of a point in its paragraph file. It has no
+`file`. The other outline is in the same repository, and is not this outline:
+a record of the same outline is named by its `id` alone. The skill confirms
+that the directory is inside the repository and outside `.git`, that its
+paragraph file is a regular file that is JSON, and that the `id` is in it. A
+reference that fails one of these does not resolve and is a finding of the
+sixth kind. Nothing else is checked: the skill does not read what the other
+record says, whether it carries `dropped`, or whether the other article comes
+first, and the premise check does not judge a point against it. Whether two
+articles that reuse one passage of the manuscript say the same thing about it
+is not checked either: each outline names the passage in its own `from`.
 
 ## Locators
 
@@ -1112,6 +1151,12 @@ instead of twice, not all of them.
 
 In a `starts` the third case shows up when the locator is resolved, because the
 words no longer occur in the file. In a `says` or a `text` nothing catches it.
+
+The write check also confirms, in both files, that `moved_to` is a non-empty
+string on a record that carries `dropped`, and in the section file that `part`
+is one of `main`, `appendix` and `supplement`. Each time the premise check
+runs, and after a revision that wrote one, the skill confirms every reference
+to another outline as "Several articles from one manuscript" says.
 
 When derive or draft has written locators, and each time the premise check
 runs, the skill resolves every locator: the file exists inside the repository

@@ -305,16 +305,21 @@ The paragraph records SHALL be grouped by section: the records naming one sectio
 
 No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
 
-An outline is one article. When a manuscript is cut into several articles, each article SHALL have its own outline directory. A reference to another outline is an object with `outline`, the path of that outline's directory from the repository's root, and `id`, the `id` of a paragraph record or of a point in its paragraph file; it has no `file`. The other outline SHALL be in the same repository and SHALL NOT be this outline. The skill SHALL confirm that the directory is inside the repository and outside `.git`, that its paragraph file is a regular file that is not a symbolic link and is JSON, and that the `id` is in it; a reference that fails one of these does not resolve and is reported as a finding of the sixth kind of the premise check. Nothing else is checked: the skill does not read what the other record says, whether it carries `dropped`, or whether the other article comes first, and the premise check does not judge a point against it. A point whose `basis` holds such a reference has a `basis`. A reference to another outline is not a locator and is not resolved as one.
+An outline is one article. When a manuscript is cut into several articles, each article SHALL have its own outline directory. A reference to another outline is an object with `outline`, the path of that outline's directory from the repository's root, and `id`, the `id` of a paragraph record or of a point in its paragraph file; it has no `file`. An object with `outline` is always such a reference and never a locator, however it is written. The other outline SHALL be in the same git repository, whose root directory counts and whose submodules and repositories of its own do not, and SHALL NOT be this outline. The skill SHALL confirm that the directory is in the repository and outside `.git`, that its paragraph file is a regular file that is not a symbolic link and is JSON, and that the `id` is in it; a reference that fails one of these does not resolve and is reported, with each record that names it, as a finding of the sixth kind of the premise check; so is a `uses` that is not a list, and an entry of it that is neither an id nor a reference. Derive, draft and revise SHALL go on only when no such finding is left. A record with `moved_to` SHALL NOT be deleted, whether or not it has `from` or `replaces`; when the author takes it back, `dropped` and `moved_to` are removed together. At approval, `moved_to`, `part` and a reference's directory and `id` are shown as text taken from a record, and each reference is said to have resolved, not resolved, or not been checked. Nothing else is checked: the skill does not read what the other record says, whether it carries `dropped`, or whether the other article comes first, and the premise check does not judge a point against it. A point whose `basis` holds such a reference has a `basis`. A reference to another outline is not a locator and is not resolved as one.
 
 #### Scenario: A point that rests on a result of the first paper
 
 - **WHEN** a point of the second article's outline has in its `basis` `{"outline": "paper-a/propositions", "id": "p-12.1"}`, and the paragraph file in that directory has a point with that `id`
 - **THEN** the reference resolves, and the premise check reports nothing about it
 
-#### Scenario: Six references that do not resolve
+#### Scenario: An outline in the repository's root directory
 
-- **WHEN** references name an `id` that is not in the other outline, a directory outside the repository, a directory inside `.git`, a directory with no paragraph file, this outline's own directory, and an object with `outline` and no `id`
+- **WHEN** this outline is in `paper-b/propositions`, the other outline's files are in the root directory of the repository, and a reference names the outline `.`
+- **THEN** the reference resolves when the `id` is there
+
+#### Scenario: Seven references that do not resolve
+
+- **WHEN** references name an `id` that is not in the other outline, a directory outside the repository, a directory inside `.git`, a directory with no paragraph file, a directory in a repository of its own under the root, this outline's own directory, and an object with `outline` and no `id`
 - **THEN** each is reported with the record that names it, as a reference that does not resolve
 
 #### Scenario: One point is the paragraph's topic sentence
@@ -359,7 +364,7 @@ An outline is one article. When a manuscript is cut into several articles, each 
 
 
 <!-- @trace
-source: idd-92-per-article
+source: idd-92-fix1
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace

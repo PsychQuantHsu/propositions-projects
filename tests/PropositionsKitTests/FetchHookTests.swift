@@ -102,16 +102,17 @@ struct FetchHookTests {
         try Self.payload.write(to: box.appendingPathComponent("payload"), atomically: true, encoding: .utf8)
         let stubs: [String: String] = [
             "curl": """
-                echo "curl $*" >> "\(log)"
+                printf 'curl' >> "\(log)"; for a in "$@"; do printf ' [%s]' "$a" >> "\(log)"; done; echo >> "\(log)"
                 [ -z "$STUB_CURL_FAIL" ] || { echo "curl: (22) stand-in failure" >&2; exit 22; }
                 out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
+                printf '%s' "$out" > "\(box.path)/downloaded-to"
                 if [ -n "${STUB_PAYLOAD+set}" ]; then printf '%s' "$STUB_PAYLOAD" > "$out"; else /bin/cat "\(box.path)/payload" > "$out"; fi
                 """,
-            // Accepts exactly: --verify --strict -R=<the requirement for the signer's team> <a file>.
+            // Accepts exactly: --verify --strict -R=<the requirement for the signer's team> <the file curl wrote>.
             "codesign": """
                 echo "codesign $# $1 $2" >> "\(log)"
                 [ -z "$STUB_BAD_SIGNATURE" ] || { echo "stand-in: invalid signature" >&2; exit 1; }
-                [ "$#" = 4 ] && [ "$1" = "--verify" ] && [ "$2" = "--strict" ] && [ "$3" = "-R=$STUB_REQUIREMENT" ] && [ -f "$4" ]
+                [ "$#" = 4 ] && [ "$1" = "--verify" ] && [ "$2" = "--strict" ] && [ "$3" = "-R=$STUB_REQUIREMENT" ] && [ -f "$4" ] && [ "$4" = "$(/bin/cat "\(box.path)/downloaded-to")" ]
                 """,
             "uname": "echo \"${STUB_UNAME-Darwin}\"",
         ]
@@ -178,11 +179,11 @@ struct FetchHookTests {
         #expect(Self.lines(outcome.output) == ["propositions: installed the command-line tool v9.9.9"])
         #expect(outcome.others.isEmpty)
         let curl = try #require(outcome.calls.first { $0.hasPrefix("curl ") })
-        #expect(curl.hasPrefix("curl -q "))
-        #expect(curl.contains(" --proto =https "))
-        #expect(curl.contains(" --connect-timeout 5 --max-time 30 --max-filesize 52428800 "))
+        // Each argument as curl got it: -q first, redirects followed, HTTPS only, the three limits.
+        #expect(curl.hasPrefix("curl [-q] [-fsL] [--proto] [=https] [--connect-timeout] [5] [--max-time] [30] "
+            + "[--max-filesize] [52428800] [-o] ["))
         #expect(curl.hasSuffix(
-            " https://github.com/PsychQuantHsu/propositions-projects/releases/download/propositions-cli-v9.9.9/propositions"))
+            "] [https://github.com/PsychQuantHsu/propositions-projects/releases/download/propositions-cli-v9.9.9/propositions]"))
         #expect(outcome.calls.contains("codesign 4 --verify --strict"))
     }
 
@@ -293,11 +294,13 @@ struct FetchHookTests {
         ("version=9.9.9\nversion=2.0.0\nsha256=\(hash)\nteam=\(team)\n", 0o644, "form"),
         (goodLock + "extra=1\n", 0o644, "form"),
         (goodLock + "\n", 0o644, "form"),
+        (goodLock + "\0", 0o644, "form"),
+        ("version=9.9.9\0\nsha256=\(hash)\nteam=\(team)\n", 0o644, "form"),
         ("sha256=\(hash)\nversion=9.9.9\nteam=\(team)\n", 0o644, "version"),
         ("", 0o644, "version"),
         (nil, 0o644, "form"),
-        (goodLock, 0o000, "form"),
-    ]
+        // A file without permission to read is unreadable only to a user who is not root.
+    ] + (getuid() == 0 ? [] : [(goodLock, 0o000, "form")])
 
     // spec-example: citation-order / an unusable lock file fetches nothing
     @Test(arguments: unusableLocks)
@@ -320,12 +323,13 @@ struct FetchHookTests {
     @Test func `The lock file has a version, a hash and the signing team`() throws {
         let lock = try String(contentsOf: repositoryRoot.appendingPathComponent("plugins/propositions/hooks/cli.lock"),
                               encoding: .utf8)
-        let lines = lock.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        try #require(lines.count == 4)
+        // Three lines, with or without the newline after the third, and nothing after it.
+        var lines = lock.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        if lines.count == 4, lines[3].isEmpty { lines.removeLast() }
+        try #require(lines.count == 3)
         #expect(lines[0].wholeMatch(of: /version=[0-9]+\.[0-9]+\.[0-9]+/) != nil)
         #expect(lines[1].wholeMatch(of: /sha256=[0-9a-f]{64}/) != nil)
         #expect(lines[2] == "team=6W377FS7BS")
-        #expect(lines[3].isEmpty)
     }
 
     // MARK: run-cli.sh
@@ -369,10 +373,10 @@ struct FetchHookTests {
     }
 
     // spec-example: citation-order / the launcher runs nothing with an unusable lock
-    @Test(arguments: unusableLocks.filter { $0.2 != "sha256" && $0.0?.contains("sha256=\(hash)\n") != false })
+    @Test(arguments: unusableLocks.filter { $0.2 != "sha256" })
     func `Runs nothing with an unusable lock, though the binary is there`(lock: String?, mode: Int, part: String) throws {
-        // Every case here leaves the pinned hash readable or the lock absent, so the matching
-        // executable is in place and only the lock's form can stop the launcher.
+        // Every row but the two with another `sha256` value. The matching executable is in place,
+        // so only the lock's form can stop the launcher.
         let outcome = try run(script: "run-cli.sh", arguments: ["cite-order"], lock: lock, lockMode: mode,
                               existing: .file(Self.payload, mode: 0o755))
         #expect(outcome.exitCode == 3)
@@ -387,19 +391,50 @@ struct FetchHookTests {
         #expect(outcome.output.hasPrefix("propositions: NOT RUN (usage"))
     }
 
+    static let launcherCall =
+        #"bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX""#
+
+    /// What keeps a skill's text from calling the tool only through the launcher, once. Inside a
+    /// code fence, the one line that names the tool, its launcher, a subcommand or the data
+    /// directory is the launcher call; prose outside a fence may name them.
+    static func launcherProblems(in skill: String) -> [String] {
+        var problems: [String] = []
+        var fenced = false
+        var calls = 0
+        let names = ["run-cli.sh", "cite-order", "CLAUDE_PLUGIN_DATA", "propositions outline", "bin/propositions"]
+        for line in skill.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            if line.hasPrefix("```") { fenced.toggle(); continue }
+            guard fenced else { continue }
+            if line == launcherCall { calls += 1; continue }
+            if names.contains(where: line.contains) || line.wholeMatch(of: /\s*propositions\s.*/) != nil
+                || line.hasSuffix("\\") && line.contains("propositions") {
+                problems.append("a command line other than the launcher call: \(line)")
+            }
+        }
+        if calls != 1 { problems.append("the launcher call occurs \(calls) times") }
+        if skill.contains(".claude/plugins/data") { problems.append("a fixed path to a data directory") }
+        return problems
+    }
+
     // spec-example: citation-order / the skill calls the binary only through the launcher
     @Test func `The skill calls the binary once, through the launcher`() throws {
         let skill = try String(
             contentsOf: repositoryRoot.appendingPathComponent("plugins/propositions/skills/propositions/SKILL.md"),
             encoding: .utf8)
-        let call = #"bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX""#
-        let lines = Self.lines(skill)
-        #expect(lines.filter { $0 == call }.count == 1)
-        // No other line runs the tool: none names the launcher, the data directory or a subcommand with options.
-        #expect(lines.filter { $0.contains("run-cli.sh") && $0 != call && !$0.contains("`run-cli.sh`") }.isEmpty)
-        #expect(lines.filter { $0.contains("cite-order --") && $0 != call }.isEmpty)
-        #expect(!skill.contains("bin/propositions"))
-        #expect(!skill.contains(".claude/plugins/data"))
-        #expect(lines.filter { $0.contains("CLAUDE_PLUGIN_DATA") && $0 != call }.isEmpty)
+        #expect(Self.launcherProblems(in: skill) == [])
+    }
+
+    @Test(arguments: [
+        #"propositions cite-order  --jsonl "$JSONL" --tex "$TEX""#,
+        "propositions \\\n  cite-order",
+        #""$HOME/.claude/plugins/data/propositions-x/bin/propositions-abc" cite-order"#,
+        #"[ -x "$CLI" ] && "$CLI" cite-order"#,
+        launcherCall,
+    ])
+    func `A second way of calling the tool in the skill is found`(extra: String) throws {
+        let skill = "Text.\n\n```bash\n\(Self.launcherCall)\n```\n\nMore.\n\n```bash\n\(extra)\n```\n"
+        #expect(!Self.launcherProblems(in: skill).isEmpty)
+        #expect(Self.launcherProblems(in: "```bash\n\(Self.launcherCall)\n```\n").isEmpty)
+        #expect(!Self.launcherProblems(in: "No call at all.\n").isEmpty)
     }
 }

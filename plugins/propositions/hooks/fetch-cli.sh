@@ -30,8 +30,10 @@ case "$(basename "$DATA")" in propositions|propositions-*) ;; *) exit 0 ;; esac
 # The lock is exactly three lines: version=, sha256=, team=, in that order.
 unusable() { echo "propositions: cli.lock has no usable $1; the command-line tool was not fetched"; exit 0; }
 L1=""; L2=""; L3=""; L4=""; MORE=""
-[ -f "$LOCK" ] && [ -r "$LOCK" ] || unusable "form (the file cannot be read)"
-{ IFS= read -r L1; IFS= read -r L2; IFS= read -r L3; if IFS= read -r L4 || [ -n "$L4" ]; then MORE=1; fi; } < "$LOCK" 2>/dev/null
+# A file that cannot be opened, or that holds a NUL byte (which read would drop), is unusable.
+[ -f "$LOCK" ] && LC_ALL=C tr -d '\000' 2>/dev/null < "$LOCK" | cmp -s - "$LOCK" 2>/dev/null \
+  || unusable "form (the file cannot be read, or holds a NUL byte)"
+{ IFS= read -r L1; IFS= read -r L2; IFS= read -r L3; if IFS= read -r L4 || [ -n "$L4" ]; then MORE=1; fi; } 2>/dev/null < "$LOCK"
 [ -z "$MORE" ] || unusable "form (three lines: version, sha256, team)"
 [[ "$L1" =~ ^version=([0-9]+\.[0-9]+\.[0-9]+)$ ]] || unusable version
 VERSION="${BASH_REMATCH[1]}"

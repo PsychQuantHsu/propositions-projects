@@ -11,6 +11,10 @@
 # When the pinned binary is not there, it prints one line that starts with
 # "propositions: NOT RUN" and exits 3. The subcommands use 0, 1 and 2, so 3 always means that
 # the check did not run. A skill reports such a check as not run, never as passed.
+#
+# One case is outside this: the pinned file is there and has the pinned hash, and the system
+# still cannot start it. Then the shell's own message is printed and the status is the shell's
+# (126 or 127), which is none of 0 to 3. A skill reports every status but 0 as not checked.
 set -u
 
 not_run() { echo "propositions: NOT RUN ($1)"; exit 3; }
@@ -20,7 +24,6 @@ DATA="$1"; shift
 
 HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
 LOCK="$HERE/cli.lock"
-[ -f "$LOCK" ] || not_run "the plugin has no cli.lock"
 
 # The skill writes the data directory as ${CLAUDE_PLUGIN_DATA}, which Claude Code replaces when
 # it loads the skill. Where it was not replaced, the shell gives nothing, or the directory of
@@ -31,8 +34,9 @@ case "$(basename "$DATA")" in
 esac
 
 L1=""; L2=""; L3=""; L4=""; MORE=""
-[ -r "$LOCK" ] || not_run "cli.lock is unusable"
-{ IFS= read -r L1; IFS= read -r L2; IFS= read -r L3; if IFS= read -r L4 || [ -n "$L4" ]; then MORE=1; fi; } < "$LOCK" 2>/dev/null
+[ -f "$LOCK" ] && LC_ALL=C tr -d '\000' 2>/dev/null < "$LOCK" | cmp -s - "$LOCK" 2>/dev/null \
+  || not_run "cli.lock is unusable"
+{ IFS= read -r L1; IFS= read -r L2; IFS= read -r L3; if IFS= read -r L4 || [ -n "$L4" ]; then MORE=1; fi; } 2>/dev/null < "$LOCK"
 [ -z "$MORE" ] || not_run "cli.lock is unusable"
 [[ "$L1" =~ ^version=([0-9]+\.[0-9]+\.[0-9]+)$ ]] || not_run "cli.lock is unusable"
 VERSION="${BASH_REMATCH[1]}"

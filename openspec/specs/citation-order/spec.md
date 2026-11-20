@@ -346,7 +346,7 @@ code:
 ---
 ### Requirement: A plugin session fetches the pinned binary and verifies it
 
-The `propositions` plugin SHALL have, in its `hooks/` directory, a SessionStart hook `fetch-cli.sh`, a launcher `run-cli.sh`, and a lock file `cli.lock`. The lock file SHALL be exactly three lines, in this order: `version=` and three numbers separated by dots (the release), `sha256=` and 64 lower-case hexadecimal digits, `team=` and ten characters that are digits or upper-case letters (the signing team). A lock file of any other form is unusable: a repeated line, a fourth line (an empty one included), a file that is missing or cannot be read. A missing newline after the third line is accepted.
+The `propositions` plugin SHALL have, in its `hooks/` directory, a SessionStart hook `fetch-cli.sh`, a launcher `run-cli.sh`, and a lock file `cli.lock`. The lock file SHALL be exactly three lines, in this order: `version=` and three numbers separated by dots (the release), `sha256=` and 64 lower-case hexadecimal digits, `team=` and ten characters that are digits or upper-case letters (the signing team). A lock file of any other form is unusable: a repeated line, a fourth line (an empty one included), a NUL byte anywhere in the file, a file that is missing or cannot be read. A missing newline after the third line is accepted.
 
 **What this guards against.** A downloaded file that is not the release the lock names, or that was altered on the way; and a skill running a binary of another pin, a session of another plugin version that starts in the meantime included. It is no guard against a process that can already write in the user's home directory: such a process can change the skill itself.
 
@@ -358,7 +358,7 @@ The hook SHALL do nothing at all, whatever is at that path left as it is, in the
 
 The hook SHALL always exit with 0 and SHALL print at most one line, the messages of the tools it runs not shown: a session does not fail because the binary could not be fetched. It decides nothing about a ledger or an outline.
 
-**The launcher.** `run-cli.sh <data directory> <subcommand> [arguments]` SHALL run `bin/propositions-<sha256>` under that data directory, the path of the pin in the lock, with the arguments it is given, each passed on as it came, and exit with what the binary exits with, only when all of these hold: the last component of the data directory is `propositions` or starts with `propositions-`; the lock file is usable, by the same rule as for the hook, the `team` line included; `bin` is not a symbolic link; the binary is a regular file, not a link, that can be executed; and its SHA-256 is the one in the lock. In every other case, a call without a subcommand included, it SHALL run nothing, print one line that starts with `propositions: NOT RUN (` and gives the reason, and exit with 3. The subcommands exit with 0, 1 or 2, so 3 means only that nothing ran. The launcher compares the hash each time it is called: what a session finds at its start is not what a later call relies on.
+**The launcher.** `run-cli.sh <data directory> <subcommand> [arguments]` SHALL run `bin/propositions-<sha256>` under that data directory, the path of the pin in the lock, with the arguments it is given, each passed on as it came, and exit with what the binary exits with, only when all of these hold: the last component of the data directory is `propositions` or starts with `propositions-`; the lock file is usable, by the same rule as for the hook, the `team` line included; `bin` is not a symbolic link; the binary is a regular file, not a link, that can be executed; and its SHA-256 is the one in the lock. In every other case, a call without a subcommand included, it SHALL run nothing, print one line that starts with `propositions: NOT RUN (` and gives the reason, and exit with 3. The subcommands exit with 0, 1 or 2, so 3 means only that nothing ran. One case falls outside this: when the file is there with the pinned hash and the system still cannot start it, the shell's own message is printed and the status is the shell's, 126 or 127; the skill reports every status but 0 as not checked. The launcher compares the hash each time it is called: what a session finds at its start is not what a later call relies on.
 
 **The skill.** The skill for the mechanical gate (`/propositions:propositions`, Operation A) SHALL run `propositions cite-order` after the ledger validator, through the launcher and in no other way, with the data directory written as `${CLAUDE_PLUGIN_DATA}` in its text, which Claude Code replaces when it loads the skill (the Bash tool's environment does not hold this plugin's value). It SHALL report the citation direction as checked only when the command exits with 0, and as not checked for every other result. A warning from the command does not fail the operation. On a system or in a session without the pinned binary the citation direction is therefore not checked, and nothing else checks it.
 
@@ -378,7 +378,7 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 
 - **GIVEN** a lock file with version `9.9.9`, the SHA-256 of a stand-in file and a team, and stand-ins that serve that file and accept that team
 - **WHEN** the hook runs with a data directory named `propositions-test`
-- **THEN** it downloads from the release `propositions-cli-v9.9.9` with the options named above, hands `codesign` the requirement for the team in the lock, the file is at `bin/propositions-<sha256>` under the data directory and can be executed, the hook prints the one line that it installed version 9.9.9, exits with 0, and leaves no other file in the data directory
+- **THEN** it downloads from the release `propositions-cli-v9.9.9` with the options named above and with redirects followed, hands `codesign` the file it downloaded and the requirement for the team in the lock, the file is at `bin/propositions-<sha256>` under the data directory and can be executed, the hook prints the one line that it installed version 9.9.9, exits with 0, and leaves no other file in the data directory
 
 ##### Example: the hook is silent when the pinned binary is already there
 
@@ -442,10 +442,12 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 | two `version=` lines | the form |
 | a fourth line | the form |
 | an empty fourth line | the form |
+| a NUL byte after the third line | the form |
+| a NUL byte inside the first line | the form |
 | the `sha256=` line first | `version` |
 | an empty file | `version` |
 | no file | the form |
-| a file that cannot be read | the form |
+| a file that cannot be read (not tried when the tests run as root) | the form |
 
 - **WHEN** the hook runs
 - **THEN** it prints one line that says the lock has no usable part of that name, runs no download, installs nothing, and exits with 0
@@ -454,7 +456,7 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 
 - **GIVEN** `plugins/propositions/hooks/cli.lock` of the repository
 - **WHEN** it is read
-- **THEN** it has exactly three lines: `version=` with three numbers, `sha256=` with 64 lower-case hexadecimal digits, and `team=6W377FS7BS`
+- **THEN** it has exactly three lines, with or without a newline after the third: `version=` with three numbers, `sha256=` with 64 lower-case hexadecimal digits, and `team=6W377FS7BS`
 
 ##### Example: the launcher runs the pinned binary with the arguments it is given
 
@@ -482,7 +484,7 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 
 - **GIVEN** the text of the skill `/propositions:propositions`
 - **WHEN** it is read
-- **THEN** it holds the line `bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX"` exactly once, no other line that calls the launcher, names `CLAUDE_PLUGIN_DATA` or gives `cite-order` an option, and neither `bin/propositions` nor `.claude/plugins/data`
+- **THEN** it holds the line `bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX"` exactly once inside a code fence, no other line inside a code fence that names the launcher, `cite-order`, `CLAUDE_PLUGIN_DATA` or `bin/propositions` or that starts with `propositions`, and nowhere `.claude/plugins/data`; a text with a second call, with other spacing or by another path, is found by the same check
 
 ##### Example: the launcher runs nothing with an unusable lock
 
@@ -490,20 +492,6 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 - **WHEN** the launcher is called with `cite-order`
 - **THEN** nothing runs, the launcher prints one line that starts with `propositions: NOT RUN (` and names `cli.lock`, and exits with 3
 
-<!-- @trace
-source: idd-46-fix1
-updated: 2026-11-20
-code:
-  - docs/RELEASE-FLOW.md
-  - plugins/propositions/hooks/hooks.json
-  - CLAUDE.md
-  - tests/PropositionsKitTests/FetchHookTests.swift
-  - plugins/propositions/docs/OBLIGATIONS.md
-  - plugins/propositions/hooks/fetch-cli.sh
-  - plugins/propositions/hooks/run-cli.sh
-  - plugins/propositions/skills/propositions/SKILL.md
-  - propositions-projects.code-workspace
--->
 
 <!-- @trace
 source: idd-46-fix2
@@ -514,4 +502,14 @@ code:
   - tests/PropositionsKitTests/FetchHookTests.swift
   - plugins/propositions/hooks/fetch-cli.sh
   - plugins/propositions/hooks/run-cli.sh
+-->
+
+<!-- @trace
+source: idd-46-fix3
+updated: 2026-11-20
+code:
+  - plugins/propositions/hooks/run-cli.sh
+  - tests/PropositionsKitTests/FetchHookTests.swift
+  - propositions-projects.code-workspace
+  - plugins/propositions/hooks/fetch-cli.sh
 -->

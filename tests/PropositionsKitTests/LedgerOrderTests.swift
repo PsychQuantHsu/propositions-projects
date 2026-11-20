@@ -225,6 +225,8 @@ struct LedgerOrderTests {
             try FileManager.default.moveItem(at: ledger, to: box.url.appendingPathComponent("real"))
             try FileManager.default.createSymbolicLink(at: ledger, withDestinationURL: box.url.appendingPathComponent("real"))
         }
+        // The permissions of the file the name leads to, just before the attempt.
+        let modeBefore = try #require(FileManager.default.attributesOfItem(atPath: ledger.resolvingSymlinksInPath().path)[.posixPermissions] as? NSNumber)
         let failure = #expect(throws: LedgerOrder.Failure.self) {
             _ = try LedgerOrder.write(plan.content, to: ledger, replacing: read)
         }
@@ -233,10 +235,9 @@ struct LedgerOrderTests {
         #expect(try Data(contentsOf: ledger) == expected)
         let names = try FileManager.default.contentsOfDirectory(atPath: box.url.path).sorted()
         #expect(names == (change == .link ? ["main.jsonl", "real"] : ["main.jsonl"]))
-        if change == .permissions {
-            let mode = try #require(FileManager.default.attributesOfItem(atPath: ledger.path)[.posixPermissions] as? NSNumber)
-            #expect(mode.intValue == 0o600)
-        }
+        let modeAfter = try #require(FileManager.default.attributesOfItem(atPath: ledger.resolvingSymlinksInPath().path)[.posixPermissions] as? NSNumber)
+        #expect(modeAfter == modeBefore)
+        if change == .permissions { #expect(modeAfter.intValue == 0o600) }
         if change == .link {
             #expect(try FileManager.default.destinationOfSymbolicLink(atPath: ledger.path).hasSuffix("/real"))
         }

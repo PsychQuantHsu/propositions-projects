@@ -216,11 +216,15 @@ public enum LedgerOrder {
         let lookedAfter = fstat(current, &after) == 0
         close(current)
         // The file was not written to while it was reread, and the path still names it and no link.
-        let steady = lookedBefore && lookedAfter && before.st_size == after.st_size
-            && before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec
-            && before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec
+        // Size, time of modification, time of change and mode: a write or a chmod in between shows.
+        func same(_ a: stat, _ b: stat) -> Bool {
+            a.st_size == b.st_size && a.st_mode == b.st_mode
+                && a.st_mtimespec.tv_sec == b.st_mtimespec.tv_sec && a.st_mtimespec.tv_nsec == b.st_mtimespec.tv_nsec
+                && a.st_ctimespec.tv_sec == b.st_ctimespec.tv_sec && a.st_ctimespec.tv_nsec == b.st_ctimespec.tv_nsec
+        }
+        let steady = lookedBefore && lookedAfter && same(before, after)
             && lstat(url.path, &named) == 0 && named.st_mode & S_IFMT == S_IFREG
-            && named.st_dev == read.device && named.st_ino == read.inode
+            && named.st_dev == read.device && named.st_ino == read.inode && same(after, named)
         guard now == read, steady else {
             throw Failure(message: "the ledger changed while it was being ordered; nothing was written. Run the command again")
         }

@@ -7,8 +7,8 @@
 與測試 target，共 22 個 Swift 檔。裡面有兩組檢查：引用方向（`propositions cite-order`，#46）與綱要三個檔的格式、狀態、
 來源指標（`propositions outline check`、`status`、`locators`，#78）。發布過的 binary（`propositions-cli-v0.1.0`）只有前者；
 propositions plugin 在 session 開始時用 hook 取得鎖定版本的 binary（只有 macOS；`hooks/fetch-cli.sh`，#46），
-`/propositions:propositions` 的 Operation A 呼叫 `cite-order`；綱要的三個子命令還沒有 skill 呼叫（#102）。
-其餘受追蹤的可執行程式碼是 72 個 Python 檔、5 個 shell 檔，
+`/propositions:propositions` 的 Operation A 經由 `hooks/run-cli.sh` 呼叫 `cite-order`；綱要的三個子命令還沒有 skill 呼叫（#102）。
+其餘受追蹤的可執行程式碼是 72 個 Python 檔、6 個 shell 檔，
 另外有 3 段寫在 SKILL.md 裡的 Python 程式（見〈既有檔〉）。skill 用 `python3 "$VALIDATOR"` 這類寫法呼叫
 plugin 內的腳本，所以使用者端要有 Python 3.10 以上；帳冊附檔用到 `move`／`type` 時還要裝 PyYAML。
 
@@ -48,19 +48,22 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 這是封閉列舉，只有四類，不得依性質相似類推出第五類。
 
 1. **Swift binary 還不存在、或使用端沒有 binary 時才需要的殼層。** 這一類只有三種：
-   - plugin 取得 binary 的殼層：propositions plugin 的 SessionStart hook `hooks/fetch-cli.sh`（做法見本條末段）。
+   - plugin 取得並啟動 binary 的殼層：propositions plugin 的 `hooks/fetch-cli.sh`（SessionStart hook）與
+     `hooks/run-cli.sh`（skill 經由它呼叫 binary），做法見本條末段。
      **不要照抄 Akashic-Library 把它放進 plugin 的 `bin/`**；
    - 編排 `codesign`、`notarytool` 的 release 腳本，照 Akashic-Library 的 `scripts/release-signed.sh` 寫；
    - 根目錄 `scripts/` 的轉接層，但只限於使用者依〈移植〉第 6 步決定保留它們之後，改寫成只取得並呼叫
      binary 的版本。
 
    **它們只做串接**：檢查 binary 在不在、下載、依序呼叫外部 CLI。裡面一旦出現領域判斷，就把它移進
-   Swift。目前這一類有 2 個檔：`scripts/release-signed.sh`（簽章發布，只由維護者執行）與
-   `plugins/propositions/hooks/fetch-cli.sh`。後者的做法是維護者 2026-11-20 定的：session 開始時把
-   `hooks/cli.lock` 鎖定的那一版下載到 plugin 的資料目錄（`CLAUDE_PLUGIN_DATA` 底下的 `bin/`，不是 plugin 目錄的
-   `bin/`：plugin 的目錄一旦有 `bin/`，claude.ai 與 Cowork 就不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的
-   PATH 上），下載的檔要同時符合鎖定的 SHA-256 與簽章的 Team 才安裝；不符、下載失敗或不是 macOS 時不留下任何
-   binary，skill 退回原本的指令。skill 裡檢查 binary 在不在的那兩行屬於〈不適用〉第 1 類的指令列。
+   Swift。目前這一類有 3 個檔：`scripts/release-signed.sh`（簽章發布，只由維護者執行），以及
+   `plugins/propositions/hooks/` 的 `fetch-cli.sh` 與 `run-cli.sh`。用 SessionStart hook 取得 binary 是維護者
+   2026-11-20 定的；細節是實作時取的：`fetch-cli.sh` 在 session 開始時把 `hooks/cli.lock` 鎖定的那一版下載到
+   plugin 的資料目錄（`CLAUDE_PLUGIN_DATA` 底下的 `bin/`，不是 plugin 目錄的 `bin/`：plugin 的目錄一旦有 `bin/`，
+   claude.ai 與 Cowork 就不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的 PATH 上），下載的檔要同時有鎖定的
+   SHA-256 與鎖定那個 Team 的 Developer ID 簽章才安裝。`run-cli.sh` 每次執行前再比對一次 SHA-256，只執行鎖定的
+   那一版；其他情形印出 `propositions: NOT RUN` 並以 3 結束，skill 把那一項回報成沒有檢查。skill 裡因此只有一行
+   呼叫 `run-cli.sh` 的指令列（〈不適用〉第 1 類）。
 2. **本規則成文前就已存在的程式碼（grandfathered）**，逐項列在下方〈既有檔〉。
    - 可以修 bug，也可以做不改變行為的小改，例如改訊息字句、補註解、重新命名區域變數。
    - 不得在它們旁邊新增同類檔案，也不得加入下列任何一種新功能。這是封閉列舉，只有四種：
@@ -99,8 +102,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
    **退場條件**：`propositions` CLI 的子命令涵蓋上面列的每一項工作之後，把這份 SKILL.md 的指令區塊換成
    呼叫子命令，然後刪掉這一條例外。#78 做的是寫入檢查、來源指標與狀態三項；其餘幾項還沒有子命令時，
-   那幾項照這一條留著，這一條也留著。現在不寫成 Swift 的原因是綱要的
-   子命令還沒有寫（package 已由 #46 建好，binary 也還沒有發布）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
+   那幾項照這一條留著，這一條也留著。現在 skill 還不呼叫子命令的原因有兩個：plugin 鎖定的 binary（0.1.0）沒有
+   綱要的子命令，而且 16 項裡只有 3 項有子命令（#102）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
 
 ## 不適用
 
@@ -229,5 +232,5 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 ## 語言組成（2026-11-20 量，只計受追蹤的檔）
 
-Swift 22、Python 72、shell 5（其中 2 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 22、Python 72、shell 6（其中 3 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

@@ -68,24 +68,24 @@ Report by exit code:
 
 After the validator, run the citation-direction check. It is a command of the `propositions`
 command-line tool, which the plugin's session-start hook fetches on macOS (a signed release,
-checked against the SHA-256 and the signing team pinned in `hooks/cli.lock`). Where the tool is
-not there (another system, no network at session start, a plugin loaded without its hooks) the
-check does not run: say so in the report, and do not report the citation direction as checked.
+checked against the SHA-256 and the signing team pinned in `hooks/cli.lock`). `run-cli.sh` runs
+that binary only when it is the pinned one, and otherwise prints `propositions: NOT RUN` with the
+reason and exits 3 (another system, no network at session start, a plugin loaded without its
+hooks, a binary of another version).
 
 ```bash
-CLI="${CLAUDE_PLUGIN_DATA}/bin/propositions"
-[ -x "$CLI" ] || CLI="$HOME/.claude/plugins/data/propositions-propositions-projects/bin/propositions"
-[ -x "$CLI" ] || echo "cite-order: NOT RUN (the propositions command-line tool is not installed)"
-[ ! -x "$CLI" ] || "$CLI" cite-order --jsonl "$JSONL" --tex "$TEX"
+bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX"
 ```
 
-| `cite-order` result | Action |
-|---------------------|--------|
+Only exit 0 means that the citation direction was checked.
+
+| Result | Action |
+|--------|--------|
 | exit 0, no warning | report that no proposition cites a later one |
 | exit 0, warnings | list them. A warning does not fail Operation A: a roadmap or a promissory note may point forward, and the author judges each one |
-| exit 1 | the check is incomplete: show what it could not read, and report the citation direction as not checked |
-| exit 2 | tool error — show stderr |
-| `NOT RUN` | report that the citation direction was not checked, and why |
+| exit 1 | the check is incomplete: show what it could not read, and report the citation direction as **not checked** |
+| exit 3 (`NOT RUN`) | report the citation direction as **not checked**, with the reason printed |
+| exit 2, or any other result (the command could not start, or was stopped) | report the citation direction as **not checked**, and show what was printed |
 
 ### R1-R13 coverage (the validator's contract)
 

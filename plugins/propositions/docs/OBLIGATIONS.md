@@ -328,7 +328,7 @@ findings, or leaves records, about units under an id of its own.
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
 | `order:ledger` | The dry run of `reorder-ledger.py` | The construct-batch skill |
-| `order:cites` | `propositions cite-order`, a command of the Swift package at the root of the repository. A plugin session fetches the binary on macOS; where it is not there the check does not run, and the entry is unverified | The spec `citation-order` |
+| `order:cites` | `propositions cite-order`, a command of the Swift package at the root of the repository. A plugin session fetches the binary on macOS; where the pinned binary is not there the check does not run, and the entry is unverified | The spec `citation-order` |
 | `audit:R1`, `R2`, `R3` | `audit-symbols.py`, `audit-citations.py` and `audit-code-manuscript.py`, in that order. `audit:R2` stands for both rules of the citation script, which it labels R2 and R2-bis | `rules/manuscript-consistency-audit.md` |
 | `proofread:L1` to `L5`, `proofread:E1` to `E7` | The per-proposition walk of the proofread skill | The proofread skill |
 

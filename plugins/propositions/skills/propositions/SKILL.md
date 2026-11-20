@@ -70,11 +70,13 @@ After the validator, run the citation-direction check. It is a command of the `p
 command-line tool, which the plugin's session-start hook fetches on macOS (a signed release,
 checked against the SHA-256 and the signing team pinned in `hooks/cli.lock`). `run-cli.sh` runs
 that binary only when it is the pinned one, and otherwise prints `propositions: NOT RUN` with the
-reason and exits 3 (another system, no network at session start, a plugin loaded without its
-hooks, a binary of another version).
+reason and exits 3. The pinned binary can be missing on another system, when the session that
+would have fetched it started without a network, or when the plugin was loaded without its hooks;
+once it is installed, none of these keeps the check from running. The two paths are written as
+`--jsonl=` and `--tex=` so that a path is never read as an option.
 
 ```bash
-bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX"
+bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl="$JSONL" --tex="$TEX"
 ```
 
 Only exit 0 means that the citation direction was checked.

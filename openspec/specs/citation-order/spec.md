@@ -360,7 +360,7 @@ The hook SHALL always exit with 0 and SHALL print at most one line, the messages
 
 **The launcher.** `run-cli.sh <data directory> <subcommand> [arguments]` SHALL run `bin/propositions-<sha256>` under that data directory, the path of the pin in the lock, with the arguments it is given, each passed on as it came, and exit with what the binary exits with, only when all of these hold: the last component of the data directory is `propositions` or starts with `propositions-`; the lock file is usable, by the same rule as for the hook, the `team` line included; `bin` is not a symbolic link; the binary is a regular file, not a link, that can be executed; and its SHA-256 is the one in the lock. In every other case, a call without a subcommand included, it SHALL run nothing, print one line that starts with `propositions: NOT RUN (` and gives the reason, and exit with 3. The subcommands exit with 0, 1 or 2, so 3 means only that nothing ran. One case falls outside this: when the file is there with the pinned hash and the system still cannot start it, the shell's own message is printed and the status is the shell's, 126 or 127; the skill reports every status but 0 as not checked. The launcher compares the hash each time it is called: what a session finds at its start is not what a later call relies on.
 
-**The skill.** The skill for the mechanical gate (`/propositions:propositions`, Operation A) SHALL run `propositions cite-order` after the ledger validator, through the launcher and in no other way, with the data directory written as `${CLAUDE_PLUGIN_DATA}` in its text, which Claude Code replaces when it loads the skill (the Bash tool's environment does not hold this plugin's value). It SHALL report the citation direction as checked only when the command exits with 0, and as not checked for every other result. A warning from the command does not fail the operation. On a system or in a session without the pinned binary the citation direction is therefore not checked, and nothing else checks it.
+**The skill.** The skill for the mechanical gate (`/propositions:propositions`, Operation A) SHALL run `propositions cite-order` after the ledger validator, through the launcher and in no other way, with the data directory written as `${CLAUDE_PLUGIN_DATA}` in its text, which Claude Code replaces when it loads the skill (the Bash tool's environment does not hold this plugin's value). It writes the two paths as `--jsonl=` and `--tex=`, so that a path that starts with a hyphen is not read as an option. It SHALL report the citation direction as checked only when the command exits with 0, and as not checked for every other result. A warning from the command does not fail the operation. On a system or in a session without the pinned binary the citation direction is therefore not checked, and nothing else checks it.
 
 Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` and `uname`; nothing is downloaded in a test. The stand-in for `codesign` checks the arguments it is handed, the requirement character for character, and not a signature: that Apple's tool accepts the requirement and a release passes it is checked by hand when the lock is changed. No test starts two sessions at once: that sessions of two pins do not disturb each other rests on each pin having its own path. The lock file of the repository is tested for its form only: that it names a release that exists, and that release's hash, is checked by the maintainer when the lock is changed (`docs/RELEASE-FLOW.md`). Of the skill, a test checks that its text holds the one call through the launcher and no path to the binary; what a model does with that text has no test.
 
@@ -378,7 +378,7 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 
 - **GIVEN** a lock file with version `9.9.9`, the SHA-256 of a stand-in file and a team, and stand-ins that serve that file and accept that team
 - **WHEN** the hook runs with a data directory named `propositions-test`
-- **THEN** it downloads from the release `propositions-cli-v9.9.9` with the options named above and with redirects followed, hands `codesign` the file it downloaded and the requirement for the team in the lock, the file is at `bin/propositions-<sha256>` under the data directory and can be executed, the hook prints the one line that it installed version 9.9.9, exits with 0, and leaves no other file in the data directory
+- **THEN** it runs one download, from the release `propositions-cli-v9.9.9`, with the options named above, redirects followed and no other option, hands `codesign` the file it downloaded and the requirement for the team in the lock, the file is at `bin/propositions-<sha256>` under the data directory and can be executed, the hook prints the one line that it installed version 9.9.9, exits with 0, and leaves no other file in the data directory
 
 ##### Example: the hook is silent when the pinned binary is already there
 
@@ -478,13 +478,13 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 | a link to the stand-in file, executable | the tool is not installed |
 | the stand-in file, executable, in a `bin` that is a link | the tool is not installed |
 
-- **THEN** nothing runs, the launcher prints one line that starts with `propositions: NOT RUN (`, and exits with 3
+- **THEN** the file at the pinned path is not started, the launcher prints one line that starts with `propositions: NOT RUN (`, and exits with 3
 
 ##### Example: the skill calls the binary only through the launcher
 
 - **GIVEN** the text of the skill `/propositions:propositions`
 - **WHEN** it is read
-- **THEN** it holds the line `bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX"` exactly once inside a code fence, no other line inside a code fence that names the launcher, `cite-order`, `CLAUDE_PLUGIN_DATA` or `bin/propositions` or that starts with `propositions`, and nowhere `.claude/plugins/data`; a text with a second call, with other spacing or by another path, is found by the same check
+- **THEN** it holds the line `bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl="$JSONL" --tex="$TEX"` exactly once inside a code fence (of backticks or tildes, indented or not), no other line inside a code fence that names the launcher, `cite-order`, `CLAUDE_PLUGIN_DATA` or `bin/propositions` or that starts with `propositions`, and nowhere `.claude/plugins/data`; a text with a second call, with other spacing or by another path, is found by the same check
 
 ##### Example: the launcher runs nothing with an unusable lock
 
@@ -493,16 +493,6 @@ Both scripts are tested under `/bin/bash` with stand-ins for `curl`, `codesign` 
 - **THEN** nothing runs, the launcher prints one line that starts with `propositions: NOT RUN (` and names `cli.lock`, and exits with 3
 
 
-<!-- @trace
-source: idd-46-fix2
-updated: 2026-11-20
-code:
-  - propositions-projects.code-workspace
-  - docs/RELEASE-FLOW.md
-  - tests/PropositionsKitTests/FetchHookTests.swift
-  - plugins/propositions/hooks/fetch-cli.sh
-  - plugins/propositions/hooks/run-cli.sh
--->
 
 <!-- @trace
 source: idd-46-fix3
@@ -512,4 +502,13 @@ code:
   - tests/PropositionsKitTests/FetchHookTests.swift
   - propositions-projects.code-workspace
   - plugins/propositions/hooks/fetch-cli.sh
+-->
+
+<!-- @trace
+source: idd-46-fix4
+updated: 2026-11-20
+code:
+  - tests/PropositionsKitTests/FetchHookTests.swift
+  - plugins/propositions/skills/propositions/SKILL.md
+  - propositions-projects.code-workspace
 -->

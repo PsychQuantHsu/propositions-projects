@@ -143,7 +143,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
    - 參考稿件在作者的私有 repo，位置不寫進這個公開 repo；需要時問使用者。
    - 刻意的差異逐條列在該次的 issue。
 3. **先發布，再換呼叫端。** 還沒有 release 時，先依〈例外〉第 1 類建立發布腳本；plugin 怎麼取得 binary
-   由維護者在第一次發布時決定（〈例外〉第 1 類末段）。發布簽過章的
+   照〈例外〉第 1 類末段：SessionStart hook 取得 `hooks/cli.lock` 鎖定的那一版，skill 經由 `hooks/run-cli.sh` 呼叫；
+   不在 plugin 的目錄放 `bin/`。發布之後要在同一個 plugin 變更裡改 `cli.lock`，plugin 才會換用新的 binary。發布簽過章的
    release 會讓檔案離開這台電腦，依全域 `CLAUDE.md`〈不可逆的事 Claude 不自己做〉，先列 operation
    格式等使用者確認。發布後用 plugin 實際取得的那份 binary 跑一次要切換的 skill。
 4. **同一個變更改掉所有指向舊 `.py` 的地方**：skill（含 SKILL.md 裡的程式區塊）、`plugins/*/rules/`

@@ -10,8 +10,9 @@ import Testing
 /// (docs/RELEASE-FLOW.md).
 struct FetchHookTests {
     /// The stand-in binary is a shell script, so that run-cli.sh can run it. It prints how many
-    /// arguments it got and each of them, and exits with STUB_EXIT.
-    static let payload = "#!/bin/sh\necho \"$#\"\nfor a in \"$@\"; do echo \"[$a]\"; done\nexit \"${STUB_EXIT:-0}\"\n"
+    /// arguments it got and each of them, and exits with STUB_EXIT. On entry it makes the file
+    /// STUB_MARKER names, so that a test can tell whether it ran, whatever was printed.
+    static let payload = "#!/bin/sh\n[ -z \"$STUB_MARKER\" ] || : > \"$STUB_MARKER\"\necho \"$#\"\nfor a in \"$@\"; do echo \"[$a]\"; done\nexit \"${STUB_EXIT:-0}\"\n"
     static let team = "TEAMID1234"
     static let hash = sha256(payload)
     static let goodLock = lock(team: team)
@@ -37,6 +38,8 @@ struct FetchHookTests {
         let exitCode: Int32
         let output: String
         let calls: [String]
+        /// Whether the stand-in binary was started.
+        let ran: Bool
         /// What is at `bin/propositions-<pinned hash>` under the data directory.
         let binary: Entry
         /// Every other entry under the data directory, and under the directory a linked `bin` names.
@@ -122,7 +125,8 @@ struct FetchHookTests {
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
         }
         var environment = ["PATH": "\(tools.path):/usr/bin:/bin", "HOME": box.path, "TMPDIR": box.path,
-                           "STUB_REQUIREMENT": Self.requirement(team: signer)]
+                           "STUB_REQUIREMENT": Self.requirement(team: signer),
+                           "STUB_MARKER": box.appendingPathComponent("ran").path]
         let data = box.appendingPathComponent(dataName ?? "unused")
         let bin = data.appendingPathComponent("bin")
         let pinned = bin.appendingPathComponent("propositions-\(Self.hash)")
@@ -162,7 +166,7 @@ struct FetchHookTests {
             + Self.listing(of: elsewhere, prefix: "elsewhere/")
         let calls = ((try? String(contentsOfFile: log, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
         return Outcome(exitCode: process.terminationStatus, output: String(decoding: output, as: UTF8.self),
-                       calls: calls, binary: binIsLink ? .other("bin is a link") : Self.entry(at: pinned),
+                       calls: calls, ran: fm.fileExists(atPath: box.appendingPathComponent("ran").path), binary: binIsLink ? .other("bin is a link") : Self.entry(at: pinned),
                        others: others.sorted())
     }
 
@@ -178,12 +182,13 @@ struct FetchHookTests {
         #expect(outcome.binary == .file(content: Self.payload, executable: true))
         #expect(Self.lines(outcome.output) == ["propositions: installed the command-line tool v9.9.9"])
         #expect(outcome.others.isEmpty)
-        let curl = try #require(outcome.calls.first { $0.hasPrefix("curl ") })
-        // Each argument as curl got it: -q first, redirects followed, HTTPS only, the three limits.
-        #expect(curl.hasPrefix("curl [-q] [-fsL] [--proto] [=https] [--connect-timeout] [5] [--max-time] [30] "
-            + "[--max-filesize] [52428800] [-o] ["))
-        #expect(curl.hasSuffix(
-            "] [https://github.com/PsychQuantHsu/propositions-projects/releases/download/propositions-cli-v9.9.9/propositions]"))
+        // One download, and every argument curl got: -q first, redirects followed, HTTPS only, the
+        // three limits, the output in the data directory's bin, the release's address. Nothing else.
+        let downloads = outcome.calls.filter { $0.hasPrefix("curl") }
+        try #require(downloads.count == 1)
+        let expected = /curl \[-q\] \[-fsL\] \[--proto\] \[=https\] \[--connect-timeout\] \[5\] \[--max-time\] \[30\] \[--max-filesize\] \[52428800\] \[-o\] \[[^\[\]]*\/propositions-test\/bin\/\.fetch\.[A-Za-z0-9]+\] \[https:\/\/github\.com\/PsychQuantHsu\/propositions-projects\/releases\/download\/propositions-cli-v9\.9\.9\/propositions\]/
+        #expect(downloads[0].wholeMatch(of: expected) != nil, "\(downloads[0])")
+        #expect(!outcome.ran)
         #expect(outcome.calls.contains("codesign 4 --verify --strict"))
     }
 
@@ -341,6 +346,7 @@ struct FetchHookTests {
                               existing: .file(Self.payload, mode: 0o755), environment: ["STUB_EXIT": "\(status)"])
         #expect(outcome.exitCode == status)
         #expect(outcome.output == "3\n[cite-order]\n[--tex]\n[a b.tex]\n")
+        #expect(outcome.ran)
     }
 
     // spec-example: citation-order / the launcher runs nothing but the pinned binary
@@ -361,6 +367,7 @@ struct FetchHookTests {
         #expect(Self.lines(outcome.output).count == 1)
         #expect(outcome.output.hasPrefix("propositions: NOT RUN ("))
         #expect(outcome.output.contains(message))
+        #expect(!outcome.ran)
     }
 
     @Test(arguments: ["codex-openai-codex", nil] as [String?])
@@ -370,6 +377,7 @@ struct FetchHookTests {
         #expect(outcome.exitCode == 3)
         #expect(Self.lines(outcome.output).count == 1)
         #expect(outcome.output.hasPrefix("propositions: NOT RUN (the plugin's data directory"))
+        #expect(!outcome.ran)
     }
 
     // spec-example: citation-order / the launcher runs nothing with an unusable lock
@@ -383,30 +391,34 @@ struct FetchHookTests {
         #expect(Self.lines(outcome.output).count == 1)
         #expect(outcome.output.hasPrefix("propositions: NOT RUN ("))
         #expect(outcome.output.contains("cli.lock"))
+        #expect(!outcome.ran)
     }
 
     @Test func `Runs nothing without a subcommand`() throws {
         let outcome = try run(script: "run-cli.sh", existing: .file(Self.payload, mode: 0o755))
         #expect(outcome.exitCode == 3)
         #expect(outcome.output.hasPrefix("propositions: NOT RUN (usage"))
+        #expect(!outcome.ran)
     }
 
     static let launcherCall =
-        #"bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX""#
+        #"bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl="$JSONL" --tex="$TEX""#
 
     /// What keeps a skill's text from calling the tool only through the launcher, once. Inside a
-    /// code fence, the one line that names the tool, its launcher, a subcommand or the data
-    /// directory is the launcher call; prose outside a fence may name them.
+    /// code fence (backticks or tildes, indented or not), the one line that names the tool, its
+    /// launcher, a subcommand or the data directory is the launcher call; prose outside a fence
+    /// may name them.
     static func launcherProblems(in skill: String) -> [String] {
         var problems: [String] = []
         var fenced = false
         var calls = 0
         let names = ["run-cli.sh", "cite-order", "CLAUDE_PLUGIN_DATA", "propositions outline", "bin/propositions"]
         for line in skill.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
-            if line.hasPrefix("```") { fenced.toggle(); continue }
+            let start = line.drop { $0 == " " || $0 == "\t" }
+            if start.hasPrefix("```") || start.hasPrefix("~~~") { fenced.toggle(); continue }
             guard fenced else { continue }
             if line == launcherCall { calls += 1; continue }
-            if names.contains(where: line.contains) || line.wholeMatch(of: /\s*propositions\s.*/) != nil
+            if names.contains(where: line.contains) || line.wholeMatch(of: /\s*propositions(\s.*)?/) != nil
                 || line.hasSuffix("\\") && line.contains("propositions") {
                 problems.append("a command line other than the launcher call: \(line)")
             }
@@ -425,14 +437,17 @@ struct FetchHookTests {
     }
 
     @Test(arguments: [
-        #"propositions cite-order  --jsonl "$JSONL" --tex "$TEX""#,
-        "propositions \\\n  cite-order",
-        #""$HOME/.claude/plugins/data/propositions-x/bin/propositions-abc" cite-order"#,
-        #"[ -x "$CLI" ] && "$CLI" cite-order"#,
-        launcherCall,
+        "```bash\npropositions cite-order  --jsonl \"$JSONL\" --tex \"$TEX\"\n```",
+        "```bash\npropositions \\\n  cite-order\n```",
+        "```bash\npropositions\n```",
+        "```bash\n\"$HOME/.claude/plugins/data/propositions-x/bin/propositions-abc\" cite-order\n```",
+        "```bash\n[ -x \"$CLI\" ] && \"$CLI\" cite-order\n```",
+        "~~~bash\npropositions cite-order\n~~~",
+        "   ```bash\n   propositions cite-order\n   ```",
+        "```bash\n\(launcherCall)\n```",
     ])
-    func `A second way of calling the tool in the skill is found`(extra: String) throws {
-        let skill = "Text.\n\n```bash\n\(Self.launcherCall)\n```\n\nMore.\n\n```bash\n\(extra)\n```\n"
+    func `A second way of calling the tool in the skill is found`(block: String) throws {
+        let skill = "Text.\n\n```bash\n\(Self.launcherCall)\n```\n\nMore.\n\n\(block)\n"
         #expect(!Self.launcherProblems(in: skill).isEmpty)
         #expect(Self.launcherProblems(in: "```bash\n\(Self.launcherCall)\n```\n").isEmpty)
         #expect(!Self.launcherProblems(in: "No call at all.\n").isEmpty)

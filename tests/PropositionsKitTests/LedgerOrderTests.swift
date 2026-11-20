@@ -56,6 +56,8 @@ struct LedgerOrderTests {
         ("a line that is not JSON", line("a", "L2") + "\n{oops\n"),
         ("an empty ledger", ""),
         ("only comments", "// nothing\n\n"),
+        ("a comment whose slashes carry a combining mark", line("b", "L9") + "\n//\u{0301} note\n" + line("a", "L2") + "\n"),
+        ("white space that Python strips and does not split at", "\u{A0}" + line("b", "L9") + "\u{3000}\n\u{2003}" + line("a", "L2") + "\n"),
     ]
 
     // spec-example: ledger-order / a manuscript of one file is ordered as the Python tool orders it
@@ -132,11 +134,12 @@ struct LedgerOrderTests {
                        ("a4", "sections/a.tex:L4"), ("m3", "L3"), ("b2", "sections/b.tex:L2"), ("m5", "main.tex:L5")]
         let shuffled = [inOrder[6], inOrder[3], inOrder[0], inOrder[5], inOrder[2], inOrder[4], inOrder[1]]
         let (box, ledger) = try manuscript(shuffled.map { Self.line($0.0, $0.1) + "\n" }.joined())
+        let before = try Data(contentsOf: ledger)
         let dry = swift(["--jsonl", "p/main.jsonl", "--tex", "main.tex"], in: box)
-        #expect(dry.exitCode == 1)
-        #expect(dry.stdout == ["7 line(s) move"])
+        #expect(dry == CommandResult(stdout: ["7 line(s) move"], exitCode: 1))
+        #expect(try Data(contentsOf: ledger) == before)
         let written = swift(["--jsonl", "p/main.jsonl", "--tex", "main.tex", "--write"], in: box)
-        #expect(written.exitCode == 0)
+        #expect(written == CommandResult(stdout: ["7 line(s) move", "written: p/main.jsonl"], exitCode: 0))
         #expect(Self.ids(try Data(contentsOf: ledger)) == inOrder.map(\.0))
         #expect(swift(["--jsonl", "p/main.jsonl", "--tex", "main.tex"], in: box)
             == CommandResult(stdout: ["already in reading order"], exitCode: 0))
@@ -175,6 +178,44 @@ struct LedgerOrderTests {
         #expect(result.stderr.first?.contains(message) == true)
         #expect(try Data(contentsOf: ledger) == Data(text.utf8))
         #expect(try FileManager.default.contentsOfDirectory(atPath: ledger.deletingLastPathComponent().path) == ["main.jsonl"])
+        // Nothing beside the directory either, where a temporary file for `--jsonl p` would go.
+        #expect(try FileManager.default.contentsOfDirectory(atPath: box.url.path).sorted() == ["main.tex", "p", "sections"])
+    }
+
+    // spec-example: ledger-order / a ledger that is a link, or that changed, is not replaced
+    @Test func `Does not replace a ledger that is a link`() throws {
+        let box = try Box()
+        let text = Self.line("b", "L9") + "\n" + Self.line("a", "L2") + "\n"
+        let real = try box.write(text, to: "real/main.jsonl")
+        try FileManager.default.createSymbolicLink(at: box.url.appendingPathComponent("main.jsonl"), withDestinationURL: real)
+        #expect(swift(["--jsonl", "main.jsonl"], in: box) == CommandResult(stdout: ["2 line(s) move"], exitCode: 1))
+        let result = swift(["--jsonl", "main.jsonl", "--write"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stdout == ["2 line(s) move"])
+        #expect(result.stderr.count == 1 && result.stderr[0].contains("not a regular file"))
+        #expect(try Data(contentsOf: real) == Data(text.utf8))
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: box.url.appendingPathComponent("main.jsonl").path) == real.path)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: box.url.path).sorted() == ["main.jsonl", "real"])
+    }
+
+    @Test func `Does not replace a ledger that changed after it was read`() throws {
+        let box = try Box()
+        let read = Self.line("b", "L9") + "\n" + Self.line("a", "L2") + "\n"
+        let saved = read + Self.line("c", "L1") + "\n"
+        let ledger = try box.write(saved, to: "main.jsonl")
+        let plan = try LedgerOrder.plan(Data(read.utf8), order: nil)
+        #expect(throws: LedgerOrder.Failure.self) {
+            try LedgerOrder.write(plan.content, to: ledger, replacing: Data(read.utf8))
+        }
+        #expect(try Data(contentsOf: ledger) == Data(saved.utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: box.url.path) == ["main.jsonl"])
+    }
+
+    @Test func `A path is shown with its control characters escaped`() throws {
+        let box = try Box()
+        let result = swift(["--jsonl", "no\nfile.jsonl"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.count == 1 && !result.stderr[0].contains("\n"))
     }
 
     @Test func `An input tree that cannot be read is refused`() throws {

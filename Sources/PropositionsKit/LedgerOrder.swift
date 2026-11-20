@@ -72,7 +72,9 @@ public enum LedgerOrder {
             }
             let body = stripped(text)
             var anchor: (key: [Int], place: String)?
-            if !body.isEmpty, !body.hasPrefix("//") {
+            // Two slashes as code points, as Python's startswith has it: a combining mark after
+            // them does not make the line something else.
+            if !body.isEmpty, !body.unicodeScalars.starts(with: "//".unicodeScalars) {
                 let value: JSONValue
                 do {
                     value = try JSONValue.parse(body)
@@ -131,20 +133,26 @@ public enum LedgerOrder {
         return (position, "\(CiteOrder.visible(file)):\(location.start)")
     }
 
-    /// Replaces the file through a temporary file beside it, keeping its permissions.
-    public static func write(_ content: Data, to url: URL) throws {
+    /// Replaces the ledger through a temporary file beside it, with the ledger's permission bits.
+    ///
+    /// `read` is what the plan was made from: the ledger is replaced only if it is still a regular
+    /// file, not a link, that holds those bytes. A save made in between is so not overwritten;
+    /// the moment between that last look and the rename is the one that remains.
+    public static func write(_ content: Data, to url: URL, replacing read: Data) throws {
         var info = stat()
-        guard stat(url.path, &info) == 0 else { throw Failure(message: "cannot read the permissions of the ledger") }
+        guard lstat(url.path, &info) == 0 else { throw Failure(message: "the ledger is no longer there; nothing was written") }
+        guard info.st_mode & S_IFMT == S_IFREG else {
+            throw Failure(message: "the ledger is not a regular file (a link, for one); nothing was written. Name the file itself")
+        }
         var template = Array((url.path + ".XXXXXX").utf8CString)
         let descriptor = mkstemp(&template)
-        guard descriptor >= 0 else { throw Failure(message: "cannot write beside the ledger") }
+        guard descriptor >= 0 else { throw Failure(message: "cannot write beside the ledger; nothing was written") }
         let temporary = String(cString: template)
         var done = false
         defer {
             close(descriptor)
             if !done { unlink(temporary) }
         }
-        guard fchmod(descriptor, info.st_mode & 0o7777) == 0 else { throw Failure(message: "cannot set the permissions of the new ledger") }
         let written = content.withUnsafeBytes { buffer -> Bool in
             var offset = 0
             while offset < buffer.count {
@@ -154,9 +162,23 @@ public enum LedgerOrder {
             }
             return true
         }
-        guard written, fsync(descriptor) == 0 else { throw Failure(message: "cannot write the new ledger") }
-        guard rename(temporary, url.path) == 0 else { throw Failure(message: "cannot put the new ledger in place") }
+        guard written, fchmod(descriptor, info.st_mode & 0o7777) == 0, fsync(descriptor) == 0 else {
+            throw Failure(message: "cannot write the new ledger; nothing was changed")
+        }
+        var now = stat()
+        guard lstat(url.path, &now) == 0, now.st_mode & S_IFMT == S_IFREG, now.st_ino == info.st_ino,
+              FileManager.default.contents(atPath: url.path) == read
+        else {
+            throw Failure(message: "the ledger changed while it was being ordered; nothing was written. Run the command again")
+        }
+        guard rename(temporary, url.path) == 0 else { throw Failure(message: "cannot put the new ledger in place; nothing was changed") }
         done = true
+        // So that the rename itself survives a crash. A failure here leaves the new ledger in place.
+        let directory = open(url.deletingLastPathComponent().path, O_RDONLY)
+        if directory >= 0 {
+            fsync(directory)
+            close(directory)
+        }
     }
 }
 
@@ -174,18 +196,20 @@ public enum LedgerOrderRun {
             CommandResult(stderr: ["error: \(message)"], exitCode: 2)
         }
         let ledgerURL = resolve(jsonl)
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: ledgerURL.path, isDirectory: &isDirectory), !isDirectory.boolValue,
-              let data = FileManager.default.contents(atPath: ledgerURL.path)
-        else {
-            return refuse("ledger not found: \(jsonl)")
+        // A regular file, looked at before it is opened: a pipe at that path is not read.
+        var info = stat()
+        guard stat(ledgerURL.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
+            return refuse("ledger not found: \(CiteOrder.visible(jsonl))")
+        }
+        guard let data = FileManager.default.contents(atPath: ledgerURL.path) else {
+            return refuse("cannot read the ledger \(CiteOrder.visible(jsonl))")
         }
         var order: ReadingOrder?
         var notes: [String] = []
         if let tex {
             let mainURL = resolve(tex)
             guard FileManager.default.fileExists(atPath: mainURL.path) else {
-                return refuse("cannot read the main file \(tex)")
+                return refuse("cannot read the main file \(CiteOrder.visible(tex))")
             }
             do {
                 let tree = try ReadingOrder(mainFile: mainURL)
@@ -219,12 +243,12 @@ public enum LedgerOrderRun {
         out.append("\(plan.moved) line(s) move")
         guard write else { return CommandResult(stdout: out, stderr: notes, exitCode: 1) }
         do {
-            try LedgerOrder.write(plan.content, to: ledgerURL)
+            try LedgerOrder.write(plan.content, to: ledgerURL, replacing: data)
         } catch let failure as LedgerOrder.Failure {
             return CommandResult(stdout: out, stderr: notes + ["error: \(failure.message)"], exitCode: 2)
         } catch {
             return CommandResult(stdout: out, stderr: notes + ["error: the ledger could not be written"], exitCode: 2)
         }
-        return CommandResult(stdout: out + ["written: \(jsonl)"], stderr: notes, exitCode: 0)
+        return CommandResult(stdout: out + ["written: \(CiteOrder.visible(jsonl))"], stderr: notes, exitCode: 0)
     }
 }

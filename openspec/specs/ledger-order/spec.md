@@ -12,9 +12,9 @@ The command-line tool SHALL have a subcommand `propositions ledger-order --jsonl
 
 A line of the ledger is an anchor when, with the white space around it removed, it is a JSON object that has no key `retired`. Every other line (a retired proposition, a line that starts with `//`, an empty line, a JSON value that is not an object) stays behind the anchor it followed; such lines before the first anchor stay at the head. Anchors are put in the order of where their `location` starts. Anchors that start at the same place keep the order they had, and the command reports each such place, because only a reader can tell whether that order is right. Lines are moved and never edited: each keeps its bytes, its line ending included; a last line without a line feed is given one. The count the command prints is the number of line positions that hold another line than before.
 
-The command prints, in this order: one line for the places that hold several propositions, when there are any, with at most twenty of them; then `already in reading order`, or `<n> line(s) move`; then, after writing, `written: <the ledger as it was named>`. It exits with 0 when the ledger is in reading order or was written, with 1 for a dry run in which lines would move, and with 2, with one line on standard error that starts with `error: `, when the ledger or the main file cannot be read, a line that is neither empty nor a comment is not JSON, a location is missing or cannot be parsed or cannot be placed, or an argument is wrong. When it exits with 2 it has written nothing.
+The command prints, in this order: one line for the places that hold several propositions, when there are any, with at most twenty of them; then `already in reading order`, or `<n> line(s) move`; then, after writing, `written: <the ledger as it was named>`. It exits with 0 when the ledger is in reading order or was written, with 1 for a dry run in which lines would move, and with 2, with one line on standard error that starts with `error: ` (after a line for each import macro the input tree does not follow, when `--tex` is given and there are any), when the ledger is not a regular file or cannot be read, the main file cannot be read, a line that is neither empty nor a comment is not JSON, a location is missing or cannot be parsed or cannot be placed, the ledger cannot be replaced, or an argument is wrong. When it exits with 2 the ledger is as it was. A path in a message is shown with its control characters escaped.
 
-Writing replaces the ledger through a temporary file beside it, with the ledger's permissions, and leaves no other file.
+Writing replaces the ledger through a temporary file beside it that is given the ledger's permission bits (its owner, group and access-control list are those of a new file), and removes that file when it does not replace the ledger; a command that is killed can leave it. The command SHALL replace the ledger only when, at the last look before the replacement, it is still the same regular file, not a link, and holds the bytes the order was worked out from: a ledger named through a symbolic link is refused, and so is one that was saved in the meantime, both with exit 2 and the ledger as it was. A save in the moment between that look and the replacement is not caught.
 
 #### Scenario: A ledger out of reading order is reported
 
@@ -33,16 +33,20 @@ Writing replaces the ledger through a temporary file beside it, with the ledger'
 - **WHEN** the command runs with `--write`
 - **THEN** it prints `3 line(s) move` and `written: main.jsonl`, exits with 0, the ledger holds the line of `a`, then the line of `b`, then the line of `r`, each with the bytes it had, its permissions are `640`, no other file is beside it, and a second dry run prints `already in reading order`
 
+##### Example: a ledger that is a link, or that changed, is not replaced
+
+- **GIVEN** a ledger out of order that is named through a symbolic link, or a ledger that gained a line after the command read it
+- **WHEN** the command is to write
+- **THEN** it exits with 2 and says why, the file has the bytes it had, the link still names its file, and no other file is beside it
+
 
 <!-- @trace
-source: idd-59-ledger-order
+source: idd-59-fix1
 updated: 2026-11-21
 code:
-  - Sources/PropositionsKit/CLI.swift
   - Sources/PropositionsKit/LedgerOrder.swift
-  - propositions-projects.code-workspace
-  - CLAUDE.md
   - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - propositions-projects.code-workspace
 -->
 
 ---
@@ -52,11 +56,14 @@ Without `--tex`, the place of an anchor SHALL be the first line of its `location
 
 For such a manuscript the command SHALL print on standard output what `reorder-ledger.py` prints, exit as it exits, and write the file it writes. These are the differences, all of them on input the Python tool mishandles or refuses:
 
-- The Python tool reads and writes the ledger as text, so a ledger with carriage returns is written back without them. The command keeps every byte of a line.
-- The Python tool splits a line at a form feed, a vertical tab, the three separator controls and the Unicode line and paragraph separators, when one stands unescaped in the ledger. The command splits at a line feed only.
-- The Python tool ends with a traceback and exit 1 on a ledger that is not UTF-8. The command refuses it with exit 2.
-- What the two write on standard error, when they refuse, differs in wording.
+- Line endings. The Python tool reads the ledger as text: it turns a carriage return, alone or before a line feed, into a line feed, and it splits a line at a form feed, a vertical tab, the three separator controls, the next-line control and the Unicode line and paragraph separators when one stands unescaped. For a ledger that holds any of these, where its lines end, the count it prints, its exit status and the file it writes can all differ. The command splits at a line feed only and keeps every byte of a line.
+- A ledger named through a symbolic link, with `--write`: the Python tool replaces the link with a file. The command refuses.
+- A ledger saved by another program between reading and writing: the Python tool overwrites it. The command refuses.
+- Failures of the file system (a ledger that cannot be read, a directory that cannot be written), a ledger that is not UTF-8, and a line whose JSON is beyond what Python's parser takes (an integer of several thousand digits, very deep nesting): the Python tool ends with a traceback and exit 1. The command refuses with exit 2, or reads the line.
+- A line number too large for a 64-bit integer is read by the Python tool and refused by the command.
 - The command reads JSON strictly: a line the Python tool accepts though it is not JSON by the standard (`NaN`, for one) is refused.
+- The ledger's name after `written: ` is shown as it was given; the Python tool drops a leading `./` and a doubled slash.
+- What the two write on standard error, when they refuse, differs in wording.
 
 The Python tool stays in the plugin, unchanged, until a released binary has this command and the skill that calls the tool is changed to call the command; that change removes the Python tool.
 
@@ -85,20 +92,20 @@ The Python tool stays in the plugin, unchanged, until a released binary has this
 | a line that is not JSON |
 | an empty ledger |
 | a ledger of comments only |
+| a comment whose two slashes are followed by a combining mark |
+| lines with white space outside ASCII before and after |
 
 - **WHEN** the command and `reorder-ledger.py` run on a copy each
 - **THEN** standard output, the exit status and the bytes of the ledger afterwards are the same for both, and the command leaves no other file
 
 
 <!-- @trace
-source: idd-59-ledger-order
+source: idd-59-fix1
 updated: 2026-11-21
 code:
-  - Sources/PropositionsKit/CLI.swift
   - Sources/PropositionsKit/LedgerOrder.swift
-  - propositions-projects.code-workspace
-  - CLAUDE.md
   - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - propositions-projects.code-workspace
 -->
 
 ---

@@ -20,6 +20,11 @@ public enum PropositionsCLI {
                     jsonl: ledgerOrder.jsonl, tex: ledgerOrder.tex, write: ledgerOrder.write,
                     workingDirectory: workingDirectory)
             }
+            if let paragraphs = command as? ParagraphsOptions {
+                return ParagraphsRun.run(
+                    jsonl: paragraphs.jsonl, tex: paragraphs.tex, structure: paragraphs.structure,
+                    workingDirectory: workingDirectory)
+            }
             if let check = command as? OutlineCheckOptions {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
             }
@@ -47,6 +52,7 @@ public enum PropositionsCLI {
         let words = Array((arguments.first == "help" ? Array(arguments.dropFirst()) : arguments).prefix { !$0.hasPrefix("-") })
         if words.first == "cite-order" { return Root.helpMessage(for: CiteOrderOptions.self) }
         if words.first == "ledger-order" { return Root.helpMessage(for: LedgerOrderOptions.self) }
+        if words.first == "paragraphs" { return Root.helpMessage(for: ParagraphsOptions.self) }
         guard words.first == "outline" else { return Root.helpMessage() }
         switch words.dropFirst().first {
         case "check": return Root.helpMessage(for: OutlineCheckOptions.self)
@@ -66,7 +72,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, OutlineOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -115,6 +121,31 @@ struct LedgerOrderOptions: ParsableCommand {
 
     @Flag(help: "Rewrite the ledger.")
     var write = false
+}
+
+struct ParagraphsOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "paragraphs",
+        abstract: "Propose the paragraph plan of a structure sidecar from the TeX source.",
+        discussion: """
+            Each run of non-blank lines of a file is a paragraph. A proposition belongs to the \
+            paragraph that holds the first line of its location; paragraphs without a proposition \
+            are skipped. With --structure, a proposition that a section starts with starts a \
+            paragraph. A location may name any file of the main file's \\input tree; a paragraph \
+            does not run from one file into another. Propositions are taken in the ledger's \
+            order. Prints the `paragraphs` list as JSON.
+            Exit codes: 0 the list was printed; 2 an input cannot be read, a location cannot be \
+            used, or an argument is wrong.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+
+    @Option(help: "The manuscript's main file.")
+    var tex: String
+
+    @Option(help: "A structure sidecar whose sections the paragraphs must not cross.")
+    var structure: String?
 }
 
 struct OutlineOptions: ParsableCommand {

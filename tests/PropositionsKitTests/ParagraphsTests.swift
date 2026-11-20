@@ -13,9 +13,15 @@ struct ParagraphsTests {
         PropositionsCLI.run(["paragraphs"] + arguments, workingDirectory: box.url)
     }
 
-    static func firsts(_ result: CommandResult) throws -> [String] {
+    /// The whole list that was printed: every entry has to be an object with exactly `id` and
+    /// `first_prop`, both strings, or the test that asks fails.
+    static func plan(_ result: CommandResult) throws -> [[String]] {
         let value = try JSONValue.parse(result.stdout.joined(separator: "\n"))
-        return (value.array ?? []).compactMap { $0.members?.last { $0.key == "first_prop" }?.value.string }
+        return try #require(value.array).map { entry in
+            let members = try #require(entry.members)
+            try #require(members.map(\.key) == ["id", "first_prop"])
+            return try members.map { try #require($0.value.string) }
+        }
     }
 
     // MARK: the same as the Python tool, for a manuscript of one file
@@ -49,7 +55,15 @@ struct ParagraphsTests {
         Case(name: "a structure without sections", tex: tex, ledger: line("a", "L1") + "\n", structure: "{}"),
         Case(name: "carriage returns in the manuscript", tex: "One.\r\nTwo.\r\n\r\nFour.\r\n",
              ledger: line("a", "L2") + "\n" + line("b", "L4") + "\n"),
+        Case(name: "an input of the main file that leads nowhere", tex: "One.\n\\IfFileExists{draft.tex}{\\input{draft}}{}\n\nFour.\n",
+             ledger: line("a", "L1") + "\n" + line("b", "L2") + "\n" + line("c", "L4") + "\n"),
+        Case(name: "a row that is white space outside JSON's only", tex: tex, ledger: line("a", "L1") + "\n\u{A0}\n" + line("b", "L4") + "\n"),
+        Case(name: "a row with white space outside JSON's before the object", tex: tex, ledger: "\u{A0}" + line("a", "L1") + "\n"),
+        Case(name: "a section start in another spelling of the same letters", tex: tex,
+             ledger: line("caf\u{E9}", "L1") + "\n" + line("x", "L2") + "\n", structure: "{\"sections\":[{\"first_prop\":\"cafe\u{301}\"},{\"first_prop\":\"x\"}]}"),
+        Case(name: "sections that is an object", tex: tex, ledger: line("a", "L1") + "\n" + line("b", "L2") + "\n", structure: #"{"sections":{"first_prop":"b"}}"#),
         Case(name: "a location in another file", tex: tex, ledger: line("a", "sections/a.tex:L1") + "\n"),
+        Case(name: "a location from the root of the file system", tex: tex, ledger: line("a", "/main.tex:L1") + "\n"),
         Case(name: "a location on a blank line", tex: tex, ledger: line("a", "L3") + "\n"),
         Case(name: "a location past the end", tex: tex, ledger: line("a", "L99") + "\n"),
         Case(name: "a location that cannot be parsed", tex: tex, ledger: line("a", "nowhere") + "\n"),
@@ -78,12 +92,13 @@ struct ParagraphsTests {
         process.standardOutput = stdout
         process.standardError = FileHandle.nullDevice
         try process.run()
-        let printed = String(decoding: stdout.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let printed = stdout.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
 
         let result = swift(arguments, in: box)
         #expect(result.exitCode == process.terminationStatus)
-        #expect(result.stdout.joined(separator: "\n") == (printed.hasSuffix("\n") ? String(printed.dropLast()) : printed))
+        // Byte for byte, the final newline included: the executable prints each line with one.
+        #expect(Data(result.stdout.map { $0 + "\n" }.joined().utf8) == printed)
         if result.exitCode == 2 {
             #expect(result.stdout.isEmpty)
             #expect(result.stderr.count == 1 && result.stderr[0].hasPrefix("error: "))
@@ -101,7 +116,7 @@ struct ParagraphsTests {
                                  "  \"first_prop\": \"c\"", " },", " {", "  \"id\": \"p-3\",", "  \"first_prop\": \"d\"", " }", "]"])
         _ = try box.write(#"{"sections":[{"first_prop":"a"},{"first_prop":"e"}]}"#, to: "structure.json")
         let split = swift(["--jsonl", "main.jsonl", "--tex", "main.tex", "--structure", "structure.json"], in: box)
-        #expect(try Self.firsts(split) == ["a", "c", "d", "e"])
+        #expect(try Self.plan(split) == [["p-1", "a"], ["p-2", "c"], ["p-3", "d"], ["p-4", "e"]])
     }
 
     // MARK: a manuscript of several files
@@ -127,7 +142,7 @@ struct ParagraphsTests {
         #expect(result.stderr.isEmpty)
         // a1 leaves main's run; m3 comes back to the run m1 was in, and still starts a paragraph,
         // because the proposition before it was in another file.
-        #expect(try Self.firsts(result) == ["m1", "a1", "a4", "m3", "b1", "b3"])
+        #expect(try Self.plan(result) == [["p-1", "m1"], ["p-2", "a1"], ["p-3", "a4"], ["p-4", "m3"], ["p-5", "b1"], ["p-6", "b3"]])
     }
 
     // spec-example: paragraph-plan / a location outside the input tree is refused
@@ -135,6 +150,8 @@ struct ParagraphsTests {
         ("sections/unused.tex:L1", "not in the manuscript's input tree"),
         ("sections/none.tex:L1", "not in the manuscript's input tree"),
         ("/abs/a.tex:L1", "not in the manuscript's input tree"),
+        ("/main.tex:L1", "not in the manuscript's input tree"),
+        ("/sections/a.tex:L1", "not in the manuscript's input tree"),
         ("sections/a.tex:L3", "not inside a TeX paragraph"),
         ("sections/b.tex:L9", "not inside a TeX paragraph"),
     ])
@@ -164,7 +181,7 @@ struct ParagraphsTests {
 
     @Test func `A comment line of the ledger is passed over`() throws {
         let box = try manuscript("// a note\n" + Self.line("a", "L1") + "\n")
-        #expect(try Self.firsts(swift(["--jsonl", "p/main.jsonl", "--tex", "main.tex"], in: box)) == ["a"])
+        #expect(try Self.plan(swift(["--jsonl", "p/main.jsonl", "--tex", "main.tex"], in: box)) == [["p-1", "a"]])
     }
 
     @Test func `The command states its interface`() throws {

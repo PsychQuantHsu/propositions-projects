@@ -42,7 +42,9 @@ public enum Paragraphs {
         for (index, raw) in lines.enumerated() {
             let body = LedgerOrder.stripped(raw)
             if body.isEmpty || body.unicodeScalars.starts(with: "//".unicodeScalars) { continue }
-            guard let value = try? JSONValue.parse(body) else {
+            // The line as it is, not the stripped one: white space that is not JSON's (a no-break
+            // space, for one) is not removed before the line is read, as in the Python tool.
+            guard let value = try? JSONValue.parse(raw) else {
                 throw Failure(message: "\(name) line \(index + 1): invalid JSON")
             }
             guard let members = value.members, !members.contains(where: { $0.key == "retired" }) else { continue }
@@ -55,18 +57,27 @@ public enum Paragraphs {
     }
 
     /// The `first_prop` of each section of a structure sidecar.
-    static func sectionStarts(structure text: String, name: String) throws -> Set<String> {
+    ///
+    /// Ids are kept as code points: two spellings of one letter are two ids, as in Python.
+    /// `sections` that is an object or a string gives no section, as iterating it in Python does;
+    /// a `first_prop` that is not a string names no proposition.
+    static func sectionStarts(structure text: String, name: String) throws -> Set<[UInt32]> {
         guard let value = try? JSONValue.parse(text) else { throw Failure(message: "\(name): invalid JSON") }
         guard let members = value.members else { throw Failure(message: "\(name): not a JSON object") }
         guard let sections = members.last(where: { $0.key == "sections" })?.value else { return [] }
-        guard let list = sections.array else { throw Failure(message: "\(name): sections is not a list") }
-        return Set(list.compactMap { $0.members?.last { $0.key == "first_prop" }?.value.string })
+        if let list = sections.array {
+            return Set(list.compactMap { $0.members?.last { $0.key == "first_prop" }?.value.string }.map(scalars))
+        }
+        if sections.members != nil || sections.string != nil { return [] }
+        throw Failure(message: "\(name): sections is not a list")
     }
+
+    static func scalars(_ text: String) -> [UInt32] { text.unicodeScalars.map(\.value) }
 
     /// `lines(of:)` gives the lines of a file of the input tree by the name `position` knows it
     /// under (`nil` for the main file), or `nil` when the file is not in the tree.
     static func derive(
-        propositions: [(id: String, location: String?)], starts: Set<String>, lines: (String?) throws -> [String]?
+        propositions: [(id: String, location: String?)], starts: Set<[UInt32]>, lines: (String?) throws -> [String]?
     ) throws -> [Paragraph] {
         var runsByFile: [String: [Int?]] = [:]
         var firsts: [String] = []
@@ -77,6 +88,11 @@ public enum Paragraphs {
                 throw Failure(message: "cannot parse the location of \(name)")
             }
             let shown = CiteOrder.visible(raw)
+            // A path from the root of the file system is in no tree; it is refused before the
+            // name is normalised, which would drop its first slash.
+            if let named = location.file, named.hasPrefix("/") {
+                throw Failure(message: "location \(shown) of \(name) names a file that is not in the manuscript's input tree")
+            }
             let key = location.file.map(ReadingOrder.normalise).flatMap { $0 == "main.tex" ? nil : $0 }
             let file = key ?? ""
             if runsByFile[file] == nil {
@@ -89,7 +105,7 @@ public enum Paragraphs {
             guard location.start <= ids.count, let run = ids[location.start - 1] else {
                 throw Failure(message: "location \(shown) of \(name) is not inside a TeX paragraph")
             }
-            if previous?.file != file || previous?.run != run || starts.contains(proposition.id) {
+            if previous?.file != file || previous?.run != run || starts.contains(scalars(proposition.id)) {
                 firsts.append(proposition.id)
             }
             previous = (file, run)
@@ -157,19 +173,27 @@ public enum ParagraphsRun {
         // The same order of checks as the Python tool: the main file, the structure, the ledger.
         let mainURL = resolve(tex)
         guard regularFile(mainURL) != nil else { return refuse("TeX file not found, or not UTF-8: \(CiteOrder.visible(tex))") }
-        let order: ReadingOrder
-        do {
-            order = try ReadingOrder(mainFile: mainURL)
-        } catch {
-            return refuse(CiteOrder.visible("\(error)"))
+        // The input tree is read only when a location names another file: a manuscript of one file
+        // is answered though an \input of its main file leads nowhere, as the Python tool answers it.
+        var tree: (files: Set<String>, root: URL)?
+        var notes: [String] = []
+        func filesOfTree() throws -> (files: Set<String>, root: URL) {
+            if let tree { return tree }
+            let order: ReadingOrder
+            do {
+                order = try ReadingOrder(mainFile: mainURL)
+            } catch {
+                throw Paragraphs.Failure(message: CiteOrder.visible("\(error)"))
+            }
+            notes = order.skippedImports.map {
+                "[warn] non-standard import macro skipped at \(CiteOrder.visible($0)) (\\subimport/\\subfile/\\import unsupported)"
+            }
+            let made = (Set(order.files.dropFirst()), mainURL.resolvingSymlinksInPath().standardizedFileURL.deletingLastPathComponent())
+            tree = made
+            return made
         }
-        let notes = order.skippedImports.map {
-            "[warn] non-standard import macro skipped at \(CiteOrder.visible($0)) (\\subimport/\\subfile/\\import unsupported)"
-        }
-        let root = mainURL.resolvingSymlinksInPath().standardizedFileURL.deletingLastPathComponent()
-        let inTree = Set(order.files.dropFirst())
         do {
-            var starts: Set<String> = []
+            var starts: Set<[UInt32]> = []
             if let structure {
                 guard let text = regularFile(resolve(structure)) else {
                     throw Paragraphs.Failure(message: "structure sidecar not found, or not UTF-8: \(CiteOrder.visible(structure))")
@@ -184,8 +208,9 @@ public enum ParagraphsRun {
                 ledger: ledger, name: CiteOrder.visible(URL(fileURLWithPath: jsonl).lastPathComponent))
             let paragraphs = try Paragraphs.derive(propositions: propositions, starts: starts) { key in
                 guard let key else { return LatexLine.splitLines(regularFile(mainURL) ?? "") }
-                guard inTree.contains(key) else { return nil }
-                guard let text = regularFile(root.appendingPathComponent(key)) else {
+                let tree = try filesOfTree()
+                guard tree.files.contains(key) else { return nil }
+                guard let text = regularFile(tree.root.appendingPathComponent(key)) else {
                     throw Paragraphs.Failure(message: "cannot read \(CiteOrder.visible(key))")
                 }
                 return LatexLine.splitLines(text)

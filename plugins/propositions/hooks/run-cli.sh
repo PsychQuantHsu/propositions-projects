@@ -4,8 +4,9 @@
 #   bash run-cli.sh <plugin data directory> <subcommand> [arguments...]
 #
 # A shell of the first kind the Swift rule allows (.claude/rules/swift-is-the-implementation-
-# language.md, exception 1): it checks that the binary fetch-cli.sh installed is there and has
-# the SHA-256 in cli.lock, then runs it. It decides nothing about a ledger or an outline.
+# language.md, exception 1): it checks that the binary fetch-cli.sh installed for this pin
+# (bin/propositions-<sha256>, a path no other pin uses) is there and has the SHA-256 in cli.lock,
+# then runs it. It decides nothing about a ledger or an outline.
 #
 # When the pinned binary is not there, it prints one line that starts with
 # "propositions: NOT RUN" and exits 3. The subcommands use 0, 1 and 2, so 3 always means that
@@ -29,18 +30,20 @@ case "$(basename "$DATA")" in
   *) not_run "the plugin's data directory is not known here" ;;
 esac
 
-LINES=()
-while IFS= read -r line || [ -n "$line" ]; do LINES+=("$line"); done < "$LOCK"
-[ "${#LINES[@]}" = 3 ] || not_run "cli.lock is unusable"
-[[ "${LINES[0]}" =~ ^version=([0-9]+\.[0-9]+\.[0-9]+)$ ]] || not_run "cli.lock is unusable"
+L1=""; L2=""; L3=""; L4=""; MORE=""
+[ -r "$LOCK" ] || not_run "cli.lock is unusable"
+{ IFS= read -r L1; IFS= read -r L2; IFS= read -r L3; if IFS= read -r L4 || [ -n "$L4" ]; then MORE=1; fi; } < "$LOCK" 2>/dev/null
+[ -z "$MORE" ] || not_run "cli.lock is unusable"
+[[ "$L1" =~ ^version=([0-9]+\.[0-9]+\.[0-9]+)$ ]] || not_run "cli.lock is unusable"
 VERSION="${BASH_REMATCH[1]}"
-[[ "${LINES[1]}" =~ ^sha256=([0-9a-f]{64})$ ]] || not_run "cli.lock is unusable"
+[[ "$L2" =~ ^sha256=([0-9a-f]{64})$ ]] || not_run "cli.lock is unusable"
 WANT="${BASH_REMATCH[1]}"
+[[ "$L3" =~ ^team=([0-9A-Z]{10})$ ]] || not_run "cli.lock is unusable"
 
-BIN="$DATA/bin/propositions"
+BIN="$DATA/bin/propositions-$WANT"
 [ ! -L "$DATA/bin" ] && [ -f "$BIN" ] && [ ! -L "$BIN" ] && [ -x "$BIN" ] \
   || not_run "the command-line tool v$VERSION is not installed; it is fetched at session start, on macOS only"
 [ "$(shasum -a 256 "$BIN" 2>/dev/null | cut -d' ' -f1)" = "$WANT" ] \
-  || not_run "the command-line tool that is installed is not v$VERSION, the version this plugin is pinned to"
+  || not_run "the file in the place of the command-line tool v$VERSION does not have the pinned SHA-256"
 
 exec "$BIN" "$@"

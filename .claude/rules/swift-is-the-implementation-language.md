@@ -59,7 +59,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
    Swift。目前這一類有 3 個檔：`scripts/release-signed.sh`（簽章發布，只由維護者執行），以及
    `plugins/propositions/hooks/` 的 `fetch-cli.sh` 與 `run-cli.sh`。用 SessionStart hook 取得 binary 是維護者
    2026-11-20 定的；細節是實作時取的：`fetch-cli.sh` 在 session 開始時把 `hooks/cli.lock` 鎖定的那一版下載到
-   plugin 的資料目錄（`CLAUDE_PLUGIN_DATA` 底下的 `bin/`，不是 plugin 目錄的 `bin/`：plugin 的目錄一旦有 `bin/`，
+   plugin 的資料目錄（`CLAUDE_PLUGIN_DATA` 底下的 `bin/`，檔名帶鎖定的 SHA-256，每一版一個路徑；不是 plugin 目錄的 `bin/`：plugin 的目錄一旦有 `bin/`，
    claude.ai 與 Cowork 就不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的 PATH 上），下載的檔要同時有鎖定的
    SHA-256 與鎖定那個 Team 的 Developer ID 簽章才安裝。`run-cli.sh` 每次執行前再比對一次 SHA-256，只執行鎖定的
    那一版；其他情形印出 `propositions: NOT RUN` 並以 3 結束，skill 把那一項回報成沒有檢查。skill 裡因此只有一行

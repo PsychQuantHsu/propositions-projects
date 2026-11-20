@@ -3,15 +3,30 @@ import Foundation
 import Testing
 @testable import PropositionsKit
 
-/// plugins/propositions/hooks/fetch-cli.sh and run-cli.sh, run with stand-ins for curl, codesign
-/// and uname. Nothing is downloaded: the stand-in curl writes a fixed payload where the hook asks.
+/// plugins/propositions/hooks/fetch-cli.sh and run-cli.sh, run by /bin/bash with stand-ins for
+/// curl, codesign and uname. Nothing is downloaded: the stand-in curl writes a fixed payload
+/// where the hook asks. The stand-in codesign checks the arguments it is given, not a signature:
+/// that Apple's tool accepts the requirement is checked by hand against a release
+/// (docs/RELEASE-FLOW.md).
 struct FetchHookTests {
-    /// The stand-in binary is a shell script, so that run-cli.sh can run it.
-    static let payload = "#!/bin/sh\necho \"ran: $*\"\n"
+    /// The stand-in binary is a shell script, so that run-cli.sh can run it. It prints how many
+    /// arguments it got and each of them, and exits with STUB_EXIT.
+    static let payload = "#!/bin/sh\necho \"$#\"\nfor a in \"$@\"; do echo \"[$a]\"; done\nexit \"${STUB_EXIT:-0}\"\n"
     static let team = "TEAMID1234"
-    static let goodLock = "version=9.9.9\nsha256=\(sha256(payload))\nteam=\(team)\n"
+    static let hash = sha256(payload)
+    static let goodLock = lock(team: team)
 
-    /// What is at the binary's path after a run.
+    static func lock(version: String = "9.9.9", hash: String = hash, team: String) -> String {
+        "version=\(version)\nsha256=\(hash)\nteam=\(team)\n"
+    }
+
+    /// The requirement the hook has to hand to codesign for a team, character for character.
+    static func requirement(team: String) -> String {
+        "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and "
+            + "certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"\(team)\""
+    }
+
+    /// What is at a path after a run. Only a confirmed absence is `nothing`.
     enum Entry: Equatable {
         case nothing
         case file(content: String, executable: Bool)
@@ -21,16 +36,19 @@ struct FetchHookTests {
     struct Outcome {
         let exitCode: Int32
         let output: String
-        let calls: String
+        let calls: [String]
+        /// What is at `bin/propositions-<pinned hash>` under the data directory.
         let binary: Entry
-        /// Every entry of the data directory other than `bin/propositions`, as relative paths.
+        /// Every other entry under the data directory, and under the directory a linked `bin` names.
         let others: [String]
     }
 
-    /// What is put at the binary's path before the run.
+    /// What is put in place before the run, at the pinned path unless `name` says otherwise.
     enum Existing {
         case file(String, mode: Int)
         case directory
+        /// A link at the pinned path to a matching executable kept elsewhere.
+        case linkToPinned
     }
 
     static func sha256(_ text: String) -> String {
@@ -38,34 +56,50 @@ struct FetchHookTests {
     }
 
     static func entry(at url: URL) -> Entry {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else {
+            return errno == ENOENT ? .nothing : .other("lstat failed: \(errno)")
+        }
+        guard info.st_mode & S_IFMT == S_IFREG else { return .other("mode \(String(info.st_mode & S_IFMT, radix: 8))") }
+        guard let data = FileManager.default.contents(atPath: url.path) else { return .other("unreadable file") }
+        return .file(content: String(decoding: data, as: UTF8.self), executable: info.st_mode & 0o100 != 0)
+    }
+
+    static func listing(of directory: URL, prefix: String = "") -> [String] {
         let fm = FileManager.default
-        guard let attributes = try? fm.attributesOfItem(atPath: url.path) else { return .nothing }
-        let type = attributes[.type] as? FileAttributeType
-        guard type == .typeRegular else { return .other(type?.rawValue ?? "unknown") }
-        let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
-        let data = fm.contents(atPath: url.path) ?? Data()
-        return .file(content: String(decoding: data, as: UTF8.self), executable: mode & 0o100 != 0)
+        var isDirectory: ObjCBool = false
+        guard fm.fileExists(atPath: directory.path, isDirectory: &isDirectory) else { return [] }
+        guard let enumerator = fm.enumerator(atPath: directory.path) else { return ["\(prefix)<cannot be listed>"] }
+        return enumerator.compactMap { $0 as? String }.map { prefix + $0 }
     }
 
     /// Runs one of the two scripts from a copy of the hooks directory. `dataName` nil leaves
-    /// CLAUDE_PLUGIN_DATA unset (and gives run-cli.sh an empty first argument).
+    /// CLAUDE_PLUGIN_DATA unset (and gives run-cli.sh an empty first argument). `lock` nil leaves
+    /// no lock file; `lockMode` is its permission.
     func run(script name: String = "fetch-cli.sh", arguments: [String] = [], dataName: String? = "propositions-test",
-             lock: String? = goodLock, existing: Existing? = nil, binIsLink: Bool = false,
-             environment extra: [String: String] = [:]) throws -> Outcome {
+             lock: String? = goodLock, lockMode: Int = 0o644, signer: String = team, existing: Existing? = nil,
+             binIsLink: Bool = false, environment extra: [String: String] = [:]) throws -> Outcome {
         let fm = FileManager.default
         let box = fm.temporaryDirectory.appendingPathComponent("hook-test-\(UUID().uuidString)")
         let tools = box.appendingPathComponent("tools")
         let hooks = box.appendingPathComponent("hooks")
-        try fm.createDirectory(at: tools, withIntermediateDirectories: true)
-        try fm.createDirectory(at: hooks, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: box) }
-        let log = box.appendingPathComponent("calls.log").path
-        let source = repositoryRoot.appendingPathComponent("plugins/propositions/hooks/\(name)")
-        let script = hooks.appendingPathComponent(name)
-        try fm.copyItem(at: source, to: script)
-        if let lock {
-            try lock.write(to: hooks.appendingPathComponent("cli.lock"), atomically: true, encoding: .utf8)
+        let elsewhere = box.appendingPathComponent("elsewhere")
+        for directory in [tools, hooks, elsewhere] {
+            try fm.createDirectory(at: directory, withIntermediateDirectories: true)
         }
+        defer {
+            try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: hooks.appendingPathComponent("cli.lock").path)
+            try? fm.removeItem(at: box)
+        }
+        let log = box.appendingPathComponent("calls.log").path
+        let script = hooks.appendingPathComponent(name)
+        try fm.copyItem(at: repositoryRoot.appendingPathComponent("plugins/propositions/hooks/\(name)"), to: script)
+        if let lock {
+            let url = hooks.appendingPathComponent("cli.lock")
+            try lock.write(to: url, atomically: true, encoding: .utf8)
+            try fm.setAttributes([.posixPermissions: lockMode], ofItemAtPath: url.path)
+        }
+        try Self.payload.write(to: box.appendingPathComponent("payload"), atomically: true, encoding: .utf8)
         let stubs: [String: String] = [
             "curl": """
                 echo "curl $*" >> "\(log)"
@@ -73,42 +107,40 @@ struct FetchHookTests {
                 out=""; while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
                 if [ -n "${STUB_PAYLOAD+set}" ]; then printf '%s' "$STUB_PAYLOAD" > "$out"; else /bin/cat "\(box.path)/payload" > "$out"; fi
                 """,
-            // Accepts a file only when the requirement it is given names the stand-in team.
+            // Accepts exactly: --verify --strict -R=<the requirement for the signer's team> <a file>.
             "codesign": """
-                echo "codesign $*" >> "\(log)"
+                echo "codesign $# $1 $2" >> "\(log)"
                 [ -z "$STUB_BAD_SIGNATURE" ] || { echo "stand-in: invalid signature" >&2; exit 1; }
-                case "$*" in
-                  *"Developer"*) exit 1 ;;
-                  *"field.1.2.840.113635.100.6.2.6"*"field.1.2.840.113635.100.6.1.13"*"subject.OU] = \\"${STUB_TEAM-\(Self.team)}\\""*) exit 0 ;;
-                  *) exit 1 ;;
-                esac
+                [ "$#" = 4 ] && [ "$1" = "--verify" ] && [ "$2" = "--strict" ] && [ "$3" = "-R=$STUB_REQUIREMENT" ] && [ -f "$4" ]
                 """,
             "uname": "echo \"${STUB_UNAME-Darwin}\"",
         ]
-        try Self.payload.write(to: box.appendingPathComponent("payload"), atomically: true, encoding: .utf8)
         for (stub, body) in stubs {
             let url = tools.appendingPathComponent(stub)
             try ("#!/bin/sh\n" + body + "\n").write(to: url, atomically: true, encoding: .utf8)
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
         }
-        var environment = ["PATH": "\(tools.path):/usr/bin:/bin", "HOME": box.path, "TMPDIR": box.path]
+        var environment = ["PATH": "\(tools.path):/usr/bin:/bin", "HOME": box.path, "TMPDIR": box.path,
+                           "STUB_REQUIREMENT": Self.requirement(team: signer)]
         let data = box.appendingPathComponent(dataName ?? "unused")
-        let binary = data.appendingPathComponent("bin/propositions")
+        let bin = data.appendingPathComponent("bin")
+        let pinned = bin.appendingPathComponent("propositions-\(Self.hash)")
         if dataName != nil {
             environment["CLAUDE_PLUGIN_DATA"] = data.path
-            if binIsLink {
-                let elsewhere = box.appendingPathComponent("elsewhere")
-                try fm.createDirectory(at: elsewhere, withIntermediateDirectories: true)
-                try fm.createDirectory(at: data, withIntermediateDirectories: true)
-                try fm.createSymbolicLink(at: data.appendingPathComponent("bin"), withDestinationURL: elsewhere)
-            }
+            try fm.createDirectory(at: data, withIntermediateDirectories: true)
+            if binIsLink { try fm.createSymbolicLink(at: bin, withDestinationURL: elsewhere) }
+            if existing != nil { try fm.createDirectory(at: bin, withIntermediateDirectories: true) }
             switch existing {
             case .file(let content, let mode):
-                try fm.createDirectory(at: binary.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try content.write(to: binary, atomically: true, encoding: .utf8)
-                try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: binary.path)
+                try content.write(to: pinned, atomically: true, encoding: .utf8)
+                try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: pinned.path)
             case .directory:
-                try fm.createDirectory(at: binary.appendingPathComponent("inside"), withIntermediateDirectories: true)
+                try fm.createDirectory(at: pinned.appendingPathComponent("inside"), withIntermediateDirectories: true)
+            case .linkToPinned:
+                let real = elsewhere.appendingPathComponent("real")
+                try Self.payload.write(to: real, atomically: true, encoding: .utf8)
+                try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: real.path)
+                try fm.createSymbolicLink(at: pinned, withDestinationURL: real)
             case nil:
                 break
             }
@@ -124,29 +156,34 @@ struct FetchHookTests {
         try process.run()
         let output = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        var others: [String] = []
-        if let enumerator = fm.enumerator(atPath: data.path) {
-            for case let path as String in enumerator where path != "bin" && path != "bin/propositions" {
-                others.append(path)
-            }
-        }
-        let elsewhere = (try? fm.contentsOfDirectory(atPath: box.appendingPathComponent("elsewhere").path)) ?? []
+        let skipped: Set<String> = binIsLink ? ["bin"] : ["bin", "bin/propositions-\(Self.hash)"]
+        let others = Self.listing(of: data).filter { !skipped.contains($0) }
+            + Self.listing(of: elsewhere, prefix: "elsewhere/")
+        let calls = ((try? String(contentsOfFile: log, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
         return Outcome(exitCode: process.terminationStatus, output: String(decoding: output, as: UTF8.self),
-                       calls: (try? String(contentsOfFile: log, encoding: .utf8)) ?? "",
-                       binary: Self.entry(at: binary), others: others.sorted() + elsewhere.map { "elsewhere/\($0)" })
+                       calls: calls, binary: binIsLink ? .other("bin is a link") : Self.entry(at: pinned),
+                       others: others.sorted())
     }
 
     static func lines(_ text: String) -> [String] { text.split(separator: "\n").map(String.init) }
 
+    // MARK: fetch-cli.sh
+
     // spec-example: citation-order / the hook installs the binary that has the pinned hash and team
-    @Test func `Installs the binary that has the pinned hash and team`() throws {
-        let outcome = try run()
+    @Test(arguments: [team, "OTHERTEAM9"])
+    func `Installs the binary that has the pinned hash and the team of the lock`(lockTeam: String) throws {
+        let outcome = try run(lock: Self.lock(team: lockTeam), signer: lockTeam)
         #expect(outcome.exitCode == 0)
         #expect(outcome.binary == .file(content: Self.payload, executable: true))
         #expect(Self.lines(outcome.output) == ["propositions: installed the command-line tool v9.9.9"])
-        #expect(outcome.calls.contains("releases/download/propositions-cli-v9.9.9/propositions"))
-        #expect(outcome.calls.contains("curl -q "))
         #expect(outcome.others.isEmpty)
+        let curl = try #require(outcome.calls.first { $0.hasPrefix("curl ") })
+        #expect(curl.hasPrefix("curl -q "))
+        #expect(curl.contains(" --proto =https "))
+        #expect(curl.contains(" --connect-timeout 5 --max-time 30 --max-filesize 52428800 "))
+        #expect(curl.hasSuffix(
+            " https://github.com/PsychQuantHsu/propositions-projects/releases/download/propositions-cli-v9.9.9/propositions"))
+        #expect(outcome.calls.contains("codesign 4 --verify --strict"))
     }
 
     // spec-example: citation-order / the hook is silent when the pinned binary is already there
@@ -156,30 +193,43 @@ struct FetchHookTests {
         #expect(outcome.output.isEmpty)
         #expect(outcome.calls.isEmpty)
         #expect(outcome.binary == .file(content: Self.payload, executable: true))
+        #expect(outcome.others.isEmpty)
     }
 
     // spec-example: citation-order / the hook replaces what is not the pinned binary
-    @Test(arguments: [("older binary\n", 0o755), (payload, 0o644)])
-    func `Replaces a file of another version, or one that cannot be run`(content: String, mode: Int) throws {
+    @Test(arguments: [("cut off", 0o755), (payload, 0o644)])
+    func `Replaces a file with other content, or one that cannot be run`(content: String, mode: Int) throws {
         let outcome = try run(existing: .file(content, mode: mode))
         #expect(outcome.exitCode == 0)
         #expect(outcome.binary == .file(content: Self.payload, executable: true))
-        #expect(outcome.calls.contains("curl "))
+        #expect(outcome.calls.contains { $0.hasPrefix("curl ") })
+        #expect(outcome.others.isEmpty)
+    }
+
+    // spec-example: citation-order / the hook leaves the binary of another pin alone
+    @Test func `Leaves the binary of another pin where it is`() throws {
+        let other = "f".padding(toLength: 64, withPad: "f", startingAt: 0)
+        // The lock names another hash; the file at the first pin's path stands for another pin's binary.
+        let outcome = try run(lock: Self.lock(hash: other, team: Self.team), existing: .file(Self.payload, mode: 0o755),
+                              environment: ["STUB_CURL_FAIL": "1"])
+        #expect(outcome.exitCode == 0)
+        #expect(outcome.binary == .file(content: Self.payload, executable: true))
+        #expect(outcome.output.contains("could not download"))
         #expect(outcome.others.isEmpty)
     }
 
     // spec-example: citation-order / a failed check leaves no binary
     @Test(arguments: [
-        (["STUB_PAYLOAD": "something else\n"], "pinned SHA-256"),
-        (["STUB_PAYLOAD": ""], "pinned SHA-256"),
-        (["STUB_TEAM": "OTHERTEAM1"], "Developer ID signature of the pinned team"),
-        (["STUB_BAD_SIGNATURE": "1"], "Developer ID signature of the pinned team"),
-        (["STUB_CURL_FAIL": "1"], "could not download"),
-    ])
-    func `Installs nothing, and leaves no file of another version, when a check fails`(
-        environment: [String: String], message: String
+        (["STUB_PAYLOAD": "something else\n"], team, "pinned SHA-256"),
+        (["STUB_PAYLOAD": ""], team, "pinned SHA-256"),
+        ([:], "OTHERTEAM9", "Developer ID signature of the pinned team"),
+        (["STUB_BAD_SIGNATURE": "1"], team, "Developer ID signature of the pinned team"),
+        (["STUB_CURL_FAIL": "1"], team, "could not download"),
+    ] as [([String: String], String, String)])
+    func `Installs nothing, and leaves nothing in its place, when a check fails`(
+        environment: [String: String], signer: String, message: String
     ) throws {
-        let outcome = try run(existing: .file("older binary\n", mode: 0o755), environment: environment)
+        let outcome = try run(signer: signer, existing: .file("cut off", mode: 0o755), environment: environment)
         #expect(outcome.exitCode == 0)
         #expect(outcome.binary == .nothing)
         #expect(Self.lines(outcome.output).count == 1)
@@ -193,14 +243,14 @@ struct FetchHookTests {
         ("codex-openai-codex", [:]),
         ("my-propositions", [:]),
     ])
-    func `Leaves everything as it is on another system or in another plugin's directory`(
+    func `Leaves everything as it is on another system or in a directory named for another plugin`(
         dataName: String, environment: [String: String]
     ) throws {
-        let outcome = try run(dataName: dataName, existing: .file("older binary\n", mode: 0o755), environment: environment)
+        let outcome = try run(dataName: dataName, existing: .file("cut off", mode: 0o755), environment: environment)
         #expect(outcome.exitCode == 0)
         #expect(outcome.output.isEmpty)
         #expect(outcome.calls.isEmpty)
-        #expect(outcome.binary == .file(content: "older binary\n", executable: true))
+        #expect(outcome.binary == .file(content: "cut off", executable: true))
         #expect(outcome.others.isEmpty)
     }
 
@@ -228,98 +278,128 @@ struct FetchHookTests {
         #expect(Self.lines(outcome.output).count == 1)
         #expect(outcome.output.contains("cannot remove"))
         #expect(outcome.calls.isEmpty)
-        #expect(outcome.binary == .other(FileAttributeType.typeDirectory.rawValue))
-        #expect(outcome.others == ["bin/propositions/inside"])
+        #expect(outcome.others == ["bin/propositions-\(Self.hash)/inside"])
     }
 
+    static let unusableLocks: [(String?, Int, String)] = [
+        ("version=1.0;rm\nsha256=\(hash)\nteam=\(team)\n", 0o644, "version"),
+        ("version=1.0\nsha256=\(hash)\nteam=\(team)\n", 0o644, "version"),
+        ("version=1..0\nsha256=\(hash)\nteam=\(team)\n", 0o644, "version"),
+        ("version=1.0.0.0\nsha256=\(hash)\nteam=\(team)\n", 0o644, "version"),
+        ("version=1.0.0\nsha256=abc\nteam=\(team)\n", 0o644, "sha256"),
+        ("version=1.0.0\nsha256=\(hash.uppercased())\nteam=\(team)\n", 0o644, "sha256"),
+        ("version=9.9.9\nsha256=\(hash)\nteam=\n", 0o644, "team"),
+        ("version=9.9.9\nsha256=\(hash)\nteam=short\n", 0o644, "team"),
+        ("version=9.9.9\nversion=2.0.0\nsha256=\(hash)\nteam=\(team)\n", 0o644, "form"),
+        (goodLock + "extra=1\n", 0o644, "form"),
+        (goodLock + "\n", 0o644, "form"),
+        ("sha256=\(hash)\nversion=9.9.9\nteam=\(team)\n", 0o644, "version"),
+        ("", 0o644, "version"),
+        (nil, 0o644, "form"),
+        (goodLock, 0o000, "form"),
+    ]
+
     // spec-example: citation-order / an unusable lock file fetches nothing
-    @Test(arguments: [
-        ("version=1.0;rm\nsha256=\(sha256(payload))\nteam=\(team)\n", "version"),
-        ("version=1.0\nsha256=\(sha256(payload))\nteam=\(team)\n", "version"),
-        ("version=1..0\nsha256=\(sha256(payload))\nteam=\(team)\n", "version"),
-        ("version=1.0.0.0\nsha256=\(sha256(payload))\nteam=\(team)\n", "version"),
-        ("version=1.0.0\nsha256=abc\nteam=\(team)\n", "sha256"),
-        ("version=1.0.0\nsha256=\(sha256(payload).uppercased())\nteam=\(team)\n", "sha256"),
-        ("version=1.0.0\nsha256=\(sha256(payload))\nteam=\n", "team"),
-        ("version=1.0.0\nsha256=\(sha256(payload))\nteam=short\n", "team"),
-        ("version=1.0.0\nversion=2.0.0\nsha256=\(sha256(payload))\nteam=\(team)\n", "form"),
-        (goodLock + "extra=1\n", "form"),
-        ("sha256=\(sha256(payload))\nversion=1.0.0\nteam=\(team)\n", "version"),
-    ])
-    func `Fetches nothing when the lock file is unusable`(lock: String, field: String) throws {
-        let outcome = try run(lock: lock)
+    @Test(arguments: unusableLocks)
+    func `Fetches nothing when the lock file is unusable`(lock: String?, mode: Int, part: String) throws {
+        let outcome = try run(lock: lock, lockMode: mode)
         #expect(outcome.exitCode == 0)
         #expect(Self.lines(outcome.output).count == 1)
-        #expect(outcome.output.contains("no usable \(field)"))
+        #expect(outcome.output.contains("no usable \(part)"))
         #expect(outcome.calls.isEmpty)
         #expect(outcome.binary == .nothing)
         #expect(outcome.others.isEmpty)
+    }
+
+    @Test func `A lock file without a final newline is read`() throws {
+        let outcome = try run(lock: String(Self.goodLock.dropLast()))
+        #expect(outcome.binary == .file(content: Self.payload, executable: true))
     }
 
     // spec-example: citation-order / the repository's lock file has the three fields
     @Test func `The lock file has a version, a hash and the signing team`() throws {
         let lock = try String(contentsOf: repositoryRoot.appendingPathComponent("plugins/propositions/hooks/cli.lock"),
                               encoding: .utf8)
-        let lines = Self.lines(lock)
-        #expect(lines.count == 3)
-        #expect(lines[0].wholeMatch(of: /version=\d+\.\d+\.\d+/) != nil)
+        let lines = lock.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        try #require(lines.count == 4)
+        #expect(lines[0].wholeMatch(of: /version=[0-9]+\.[0-9]+\.[0-9]+/) != nil)
         #expect(lines[1].wholeMatch(of: /sha256=[0-9a-f]{64}/) != nil)
         #expect(lines[2] == "team=6W377FS7BS")
+        #expect(lines[3].isEmpty)
     }
 
     // MARK: run-cli.sh
 
     // spec-example: citation-order / the launcher runs the pinned binary with the arguments it is given
-    @Test func `Runs the pinned binary with the arguments it is given`() throws {
+    @Test(arguments: [0, 1, 2] as [Int32])
+    func `Runs the pinned binary with the arguments it is given and exits as it does`(status: Int32) throws {
         let outcome = try run(script: "run-cli.sh", arguments: ["cite-order", "--tex", "a b.tex"],
-                              existing: .file(Self.payload, mode: 0o755))
-        #expect(outcome.exitCode == 0)
-        #expect(outcome.output == "ran: cite-order --tex a b.tex\n")
+                              existing: .file(Self.payload, mode: 0o755), environment: ["STUB_EXIT": "\(status)"])
+        #expect(outcome.exitCode == status)
+        #expect(outcome.output == "3\n[cite-order]\n[--tex]\n[a b.tex]\n")
     }
 
     // spec-example: citation-order / the launcher runs nothing but the pinned binary
     @Test(arguments: [
-        (Existing?.none, "is not installed"),
-        (.file("#!/bin/sh\necho other version\n", mode: 0o755), "is not v9.9.9"),
-        (.file(payload, mode: 0o644), "is not installed"),
-        (.directory, "is not installed"),
-    ] as [(Existing?, String)])
+        (Existing?.none, false, "is not installed"),
+        (.file("#!/bin/sh\necho 1\n", mode: 0o755), false, "does not have the pinned SHA-256"),
+        (.file(payload, mode: 0o644), false, "is not installed"),
+        (.directory, false, "is not installed"),
+        (.linkToPinned, false, "is not installed"),
+        (.file(payload, mode: 0o755), true, "is not installed"),
+    ] as [(Existing?, Bool, String)])
     func `Runs nothing, and says so with exit 3, when the pinned binary is not there`(
-        existing: Existing?, message: String
+        existing: Existing?, binIsLink: Bool, message: String
     ) throws {
-        let outcome = try run(script: "run-cli.sh", arguments: ["cite-order"], existing: existing)
+        // With a linked `bin`, the matching executable is put behind the link.
+        let outcome = try run(script: "run-cli.sh", arguments: ["cite-order"], existing: existing, binIsLink: binIsLink)
         #expect(outcome.exitCode == 3)
         #expect(Self.lines(outcome.output).count == 1)
         #expect(outcome.output.hasPrefix("propositions: NOT RUN ("))
         #expect(outcome.output.contains(message))
     }
 
-    @Test(arguments: [("codex-openai-codex", goodLock as String?), (nil, goodLock), ("propositions-test", nil),
-                      ("propositions-test", "version=1.0\nsha256=abc\nteam=x\n")] as [(String?, String?)])
-    func `Runs nothing for another plugin's directory or without a usable lock`(dataName: String?, lock: String?) throws {
-        let outcome = try run(script: "run-cli.sh", arguments: ["cite-order"], dataName: dataName, lock: lock,
+    @Test(arguments: ["codex-openai-codex", nil] as [String?])
+    func `Runs nothing for a directory named for another plugin, or for none`(dataName: String?) throws {
+        let outcome = try run(script: "run-cli.sh", arguments: ["cite-order"], dataName: dataName,
                               existing: .file(Self.payload, mode: 0o755))
         #expect(outcome.exitCode == 3)
-        #expect(outcome.output.hasPrefix("propositions: NOT RUN ("))
-        #expect(!outcome.output.contains("ran:"))
+        #expect(Self.lines(outcome.output).count == 1)
+        #expect(outcome.output.hasPrefix("propositions: NOT RUN (the plugin's data directory"))
     }
 
-    @Test func `Runs nothing through a linked directory or without a subcommand`() throws {
-        let linked = try run(script: "run-cli.sh", arguments: ["cite-order"], binIsLink: true)
-        #expect(linked.exitCode == 3)
-        let bare = try run(script: "run-cli.sh", existing: .file(Self.payload, mode: 0o755))
-        #expect(bare.exitCode == 3)
-        #expect(bare.output.hasPrefix("propositions: NOT RUN (usage"))
+    // spec-example: citation-order / the launcher runs nothing with an unusable lock
+    @Test(arguments: unusableLocks.filter { $0.2 != "sha256" && $0.0?.contains("sha256=\(hash)\n") != false })
+    func `Runs nothing with an unusable lock, though the binary is there`(lock: String?, mode: Int, part: String) throws {
+        // Every case here leaves the pinned hash readable or the lock absent, so the matching
+        // executable is in place and only the lock's form can stop the launcher.
+        let outcome = try run(script: "run-cli.sh", arguments: ["cite-order"], lock: lock, lockMode: mode,
+                              existing: .file(Self.payload, mode: 0o755))
+        #expect(outcome.exitCode == 3)
+        #expect(Self.lines(outcome.output).count == 1)
+        #expect(outcome.output.hasPrefix("propositions: NOT RUN ("))
+        #expect(outcome.output.contains("cli.lock"))
+    }
+
+    @Test func `Runs nothing without a subcommand`() throws {
+        let outcome = try run(script: "run-cli.sh", existing: .file(Self.payload, mode: 0o755))
+        #expect(outcome.exitCode == 3)
+        #expect(outcome.output.hasPrefix("propositions: NOT RUN (usage"))
     }
 
     // spec-example: citation-order / the skill calls the binary only through the launcher
-    @Test func `The skill calls the binary only through the launcher`() throws {
+    @Test func `The skill calls the binary once, through the launcher`() throws {
         let skill = try String(
             contentsOf: repositoryRoot.appendingPathComponent("plugins/propositions/skills/propositions/SKILL.md"),
             encoding: .utf8)
         let call = #"bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl "$JSONL" --tex "$TEX""#
-        #expect(skill.contains(call))
+        let lines = Self.lines(skill)
+        #expect(lines.filter { $0 == call }.count == 1)
+        // No other line runs the tool: none names the launcher, the data directory or a subcommand with options.
+        #expect(lines.filter { $0.contains("run-cli.sh") && $0 != call && !$0.contains("`run-cli.sh`") }.isEmpty)
+        #expect(lines.filter { $0.contains("cite-order --") && $0 != call }.isEmpty)
         #expect(!skill.contains("bin/propositions"))
         #expect(!skill.contains(".claude/plugins/data"))
+        #expect(lines.filter { $0.contains("CLAUDE_PLUGIN_DATA") && $0 != call }.isEmpty)
     }
 }

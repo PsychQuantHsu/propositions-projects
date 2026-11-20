@@ -1,7 +1,8 @@
 #!/bin/bash
 # SessionStart hook of the propositions plugin: puts the `propositions` binary this plugin
-# version is pinned to into the plugin's data directory. The skills call it through
-# run-cli.sh, which checks the pin again each time it runs the binary.
+# version is pinned to into the plugin's data directory, as bin/propositions-<sha256>. The skills
+# call it through run-cli.sh, which checks the pin again each time it runs the binary. Binaries
+# of other pins are left where they are: a session of another plugin version may be using one.
 #
 # A shell of the first kind the Swift rule allows (.claude/rules/swift-is-the-implementation-
 # language.md, exception 1): it checks whether the binary is there, downloads it, and runs
@@ -24,23 +25,25 @@ REPO="PsychQuantHsu/propositions-projects"
 # carry another plugin's CLAUDE_PLUGIN_DATA; writing there would put a binary in that plugin's
 # directory, so anything not named after this plugin is left alone.
 case "$(basename "$DATA")" in propositions|propositions-*) ;; *) exit 0 ;; esac
-[ -f "$LOCK" ] || exit 0
 [ "$(uname -s)" = "Darwin" ] || exit 0         # the release is a macOS binary
 
 # The lock is exactly three lines: version=, sha256=, team=, in that order.
 unusable() { echo "propositions: cli.lock has no usable $1; the command-line tool was not fetched"; exit 0; }
-LINES=()
-while IFS= read -r line || [ -n "$line" ]; do LINES+=("$line"); done < "$LOCK"
-[ "${#LINES[@]}" = 3 ] || unusable "form (three lines: version, sha256, team)"
-[[ "${LINES[0]}" =~ ^version=([0-9]+\.[0-9]+\.[0-9]+)$ ]] || unusable version
+L1=""; L2=""; L3=""; L4=""; MORE=""
+[ -f "$LOCK" ] && [ -r "$LOCK" ] || unusable "form (the file cannot be read)"
+{ IFS= read -r L1; IFS= read -r L2; IFS= read -r L3; if IFS= read -r L4 || [ -n "$L4" ]; then MORE=1; fi; } < "$LOCK" 2>/dev/null
+[ -z "$MORE" ] || unusable "form (three lines: version, sha256, team)"
+[[ "$L1" =~ ^version=([0-9]+\.[0-9]+\.[0-9]+)$ ]] || unusable version
 VERSION="${BASH_REMATCH[1]}"
-[[ "${LINES[1]}" =~ ^sha256=([0-9a-f]{64})$ ]] || unusable sha256
+[[ "$L2" =~ ^sha256=([0-9a-f]{64})$ ]] || unusable sha256
 WANT="${BASH_REMATCH[1]}"
-[[ "${LINES[2]}" =~ ^team=([0-9A-Z]{10})$ ]] || unusable team
+[[ "$L3" =~ ^team=([0-9A-Z]{10})$ ]] || unusable team
 TEAM="${BASH_REMATCH[1]}"
 
 BIN_DIR="$DATA/bin"
-BIN="$BIN_DIR/propositions"
+# The file name holds the pinned hash: each pin has a path of its own, which a session of another
+# plugin version never writes to or removes.
+BIN="$BIN_DIR/propositions-$WANT"
 sum() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
 
 [ ! -L "$BIN_DIR" ] || { echo "propositions: the directory for the command-line tool is a link; it was not fetched"; exit 0; }
@@ -48,9 +51,9 @@ sum() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
 # Already the pinned binary, and it can be run: nothing to do, and nothing to print.
 if [ -f "$BIN" ] && [ ! -L "$BIN" ] && [ -x "$BIN" ] && [ "$(sum "$BIN")" = "$WANT" ]; then exit 0; fi
 
-# Anything else at that path is not the pinned binary: remove it first.
+# Anything else at that path is not the pinned binary (a cut-off or altered file): remove it first.
 if [ -e "$BIN" ] || [ -L "$BIN" ]; then
-  rm -f "$BIN" 2>/dev/null || { echo "propositions: cannot remove the command-line tool of another version; the skills will not run it"; exit 0; }
+  rm -f "$BIN" 2>/dev/null || { echo "propositions: cannot remove what is in the place of the command-line tool; the skills will not run it"; exit 0; }
 fi
 
 mkdir -p "$BIN_DIR" 2>/dev/null || { echo "propositions: cannot make the directory for the command-line tool; it was not fetched"; exit 0; }

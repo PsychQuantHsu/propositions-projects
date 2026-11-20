@@ -316,12 +316,19 @@ locator is not in both, and the write check reports one that is.
 two places and the author has not decided, both records are written and one
 of them names the other in `alternative_to`. The `id` it names is that of
 another paragraph record in the file; the write check reports one that names
-itself, a point, or no record. Until the author decides, both records are
-part of the outline and are shown together, and status counts the pair once
-as an alternative not yet chosen. When the author chooses, the record that is
-not chosen is given `dropped` with the reason and keeps its `alternative_to`,
-so that what it was an alternative to stays on record; it is not deleted,
-whether or not it has `from`. Any other displayed formula or derivation is not a
+itself, a point, or no record. One of the two carries the key and the other
+does not, and while the choice is open neither is in a second pair: the write
+check reports two records that name each other, two that name the same record,
+and a record that both names one and is named. Until the author decides, both
+records are part of the outline and are shown together, and status counts the
+pair once as an alternative not yet chosen. When the author chooses, the
+record that is not chosen is given `dropped` with the reason and carries
+`alternative_to` naming the chosen one, so that what it was an alternative to
+stays on record: when the chosen record was the one that carried the key, the
+key moves to the other. The record that is not chosen is not deleted, whether
+or not it has `from`. A record of a pair is not deleted, merged or split until
+the author has said what becomes of the pair, and no `alternative_to` is left
+naming an `id` that is no longer in the file. Any other displayed formula or derivation is not a
 block of its own: with no blank line on either side it belongs to the record of
 the paragraph it stands in, and with a blank line on one side only it belongs
 to the record of the paragraph on the other side.
@@ -604,18 +611,22 @@ What the skill shows for a section depends on its approved copy.
 
 - A section that has no approved copy is shown in full: its `heading` and
   `says`, every paragraph record naming it with its points and its `note`, and
-  every record that carries `dropped` together with the reason. A record that
-  carries `edits` is shown with them, and is said to be a block moved with
-  changes, not unchanged; a record that carries `replaces` is shown with the
-  passages it takes the place of; two records joined by `alternative_to`, when
-  neither carries `dropped`, are shown together with the sentence that only
-  one of them will stay.
+  every record that carries `dropped` together with the reason.
 - A section that differs from its approved copy is shown by its differences:
   for each record that was changed, added, removed or moved, the approved
   content and the current content. The skill says that the rest of the section
   is as it was approved, and shows the section in full when the author asks.
 - A section that equals its approved copy is shown as unchanged since its
   approval.
+- In both ways of showing a section, three things are said beside the record
+  they concern, as labelled quotations of the record and not as words of the
+  skill: a record's `edits`, with the sentence that the block is moved with
+  these changes, not unchanged; what a record's `replaces` names, with the
+  sentence that the record takes the place of those passages; and two records
+  joined by `alternative_to`, when neither carries `dropped`, together with
+  the sentence that only one of them will stay. When the other record of such
+  a pair is in a section that is not shown, it is shown as background and said
+  not to be part of this approval.
 
 The findings of the premise check on a section are shown with it in all three
 cases.
@@ -912,7 +923,10 @@ that file is the author's decision.
   `replaces`. When a record that has `replaces` is split, each locator of it is
   in the `replaces` of at least one of the records that replace it. A record
   that has `replaces` and that the author leaves out is not deleted: like a
-  record with `from`, it is given `dropped` with the reason.
+  record with `from`, it is given `dropped` with the reason. Records are not
+  merged when a locator is in the `from` of one and the `replaces` of another:
+  the skill asks the author which of the two the passage is for the merged
+  paragraph.
 - When a record that has `from` is split, each record that replaces it has in
   its `from` at least one locator of the original, and each locator of the
   original is in the `from` of at least one of them.
@@ -922,16 +936,17 @@ that file is the author's decision.
   again. A record is not left with no point: when the
   point that moves is the last one of its record, the skill asks the author
   whether that record is given a new point or is left out. Left out, a record
-  without `from` is deleted once the point has moved. A record with `from` can
-  be neither deleted nor left without a point: the point moves with its `id`,
+  with neither `from` nor `replaces` is deleted once the point has moved. A
+  record with `from` or `replaces` can be neither deleted nor left without a point: the point moves with its `id`,
   and the record keeps a copy of the point's text as a point with a new `id`
   and is given `dropped` with the reason.
 - A record's `note` stays with it when it changes, moves or is given
   `dropped`; a record that replaces merged records holds their notes, and
   each record that replaces a split record holds its note.
 - When the author leaves a paragraph out of the article and its record has
-  `from`, the record is not deleted: it is given `dropped` with the reason. A
-  record without `from` that the author leaves out is deleted from the file.
+  `from` or `replaces`, the record is not deleted: it is given `dropped` with
+  the reason. A record with neither that the author leaves out is deleted from
+  the file.
 - When the author leaves a section out, three things happen in this order.
   First, the sections under it are settled: each is left out with it, or is
   given another `parent` or none, as the author says; the skill asks when the
@@ -1073,8 +1088,9 @@ reads as infinite). In the
 paragraph file it also confirms that every point has an `id`, that `points`,
 where a record has it, is a list, that `edits` is a non-empty string on a
 record that carries `carry`, that `alternative_to` names another paragraph
-record of the file, and that no locator is in both the `from` and the
-`replaces` of a record. The shape of a key that a section record
+record of the file, that no record without `dropped` is in two pairs of
+alternatives, and that no locator is in both the `from` and the `replaces` of
+a record. The shape of a key that a section record
 carries and this document does not define is not checked, a key named `points`
 included; the control-character test still reads every string and key name.
 When any of

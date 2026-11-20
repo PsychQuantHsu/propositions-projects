@@ -595,8 +595,12 @@ F="$SEC"
            | .[] | select($para and (.r | type == "object"))
            | select(.r | has("alternative_to") and (.alternative_to as $a | ($a | type) != "string" or $a == .id or (any($ids[]; . == $a) | not)))
            | "line \(.l): alternative_to does not name another paragraph record"),
+      (map(select($para and (.r | type == "object") and (.r | has("dropped") | not))) as $live
+           | $live[] | select((.r.alternative_to | type) == "string") | .r.alternative_to as $a | .r.id as $me | .l as $l
+           | select($a != $me and any($live[]; (.r.id == $a and (.r | has("alternative_to"))) or (.l != $l and .r.alternative_to == $a) or (.r.alternative_to == $me)))
+           | "line \($l): its alternative is part of another pair of alternatives"),
       (.[] | select($para and (.r | type == "object"))
-           | select(.r | ([.from[]?]) as $f | any(.replaces[]?; . as $x | any($f[]; . == $x)))
+           | select(.r | ([.from[]?]) as $f | any((.replaces | arrays | .[]); . as $x | any($f[]; . == $x)))
            | "line \(.l): a locator is in both from and replaces"),
       (.[] | select(.r | type == "object")
            | select([.r.id, (if $para then (.r.points[]? | if type == "object" then .id else null end) else empty end)] | any(type != "string" or length == 0))
@@ -618,8 +622,9 @@ a key included, holds a control character; every record has an `id` that is a no
 string, and in the paragraph file every point has one too, and no `id` repeats among the records of the file and, in the paragraph
 file, their points; in the paragraph file, `points`, where a record has it, is a list,
 `edits` is a non-empty string on a record that carries `carry`, `alternative_to` names another
-paragraph record of the file, and no locator is in both the `from` and the `replaces` of a
-record. The
+paragraph record of the file, no record without `dropped` is in two pairs of alternatives (two
+records naming each other count as two), and no locator is in both the `from` and the
+`replaces` of a record. The
 shape of a key that a section record carries and this skill does not define is not checked, a
 key named `points` included; the control-character test still reads every string and every key
 name. A file with no record prints `EMPTY`, which is never a pass. An empty section file is
@@ -667,8 +672,8 @@ file.
 
 ```bash
 P="$PAR"
-[ -f "$P" ] && : > "$STAGE/checker-files.jsonl" && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | ([.from[]?] + [.replaces[]?] + [.points[]? | objects | .basis[]?])[] | objects | .file | strings | select(clean)] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/locator-files.txt" && echo 'ok locator files listed'
-[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (.[] | . as $r | (if has("from") and ((.from | type) != "array" or (.from | length) == 0) then "\($r.id | tojson) has a from that is not a list of one or more locators" else empty end), (if has("replaces") and ((.replaces | type) != "array" or (.replaces | length) == 0) then "\($r.id | tojson) has a replaces that is not a list of one or more locators" else empty end), (.points[]? | objects | select(has("basis") and ((.basis | type) != "array" or (.basis | length) == 0)) | "\($r.id | tojson) has a basis that is not a list of one or more locators")), ([.[] | . as $r | ([.from[]?] + [.replaces[]?] + [.points[]? | objects | .basis[]?])[] | {id: $r.id, loc: .}] | (.[] | select((.loc | type) != "object" or (.loc.file | type) != "string") | "\(.id | tojson) has a locator without a file"), (.[] | select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean | not)) | "\(.id | tojson) has a locator whose file name holds a control character"), (map(select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean)) | {f: .loc.file, id: .id}) | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))")), "ok names listed"' "$P"
+[ -f "$P" ] && : > "$STAGE/checker-files.jsonl" && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | ([.from[]?] + [.replaces | arrays | .[]] + [.points[]? | objects | .basis[]?])[] | objects | .file | strings | select(clean)] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/locator-files.txt" && echo 'ok locator files listed'
+[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (.[] | . as $r | (if has("from") and ((.from | type) != "array" or (.from | length) == 0) then "\($r.id | tojson) has a from that is not a list of one or more locators" else empty end), (if has("replaces") and ((.replaces | type) != "array" or (.replaces | length) == 0) then "\($r.id | tojson) has a replaces that is not a list of one or more locators" else empty end), (.points[]? | objects | select(has("basis") and ((.basis | type) != "array" or (.basis | length) == 0)) | "\($r.id | tojson) has a basis that is not a list of one or more locators")), ([.[] | . as $r | ([.from[]?] + [.replaces | arrays | .[]] + [.points[]? | objects | .basis[]?])[] | {id: $r.id, loc: .}] | (.[] | select((.loc | type) != "object" or (.loc.file | type) != "string") | "\(.id | tojson) has a locator without a file"), (.[] | select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean | not)) | "\(.id | tojson) has a locator whose file name holds a control character"), (map(select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean)) | {f: .loc.file, id: .id}) | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))")), "ok names listed"' "$P"
 ```
 
 Without `ok locator files listed` and `ok names listed`, the paragraph file is missing or a line
@@ -690,7 +695,7 @@ P="$PAR"
 N=1
 FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
 [ -f "$P" ] && [ -n "$FILE" ] && [ "${FILE#/}" = "$FILE" ] && T0=$(realpath "$R/$FILE") && [ -f "$T0" ] && T="$(builtin cd -P -- "${T0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${T0##*/}" && [ "$T" -ef "$R/$FILE" ] && [ ! -L "$T" ] && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { T1=$(find "${T%/*}" -maxdepth 1 -type f -samefile "$T" 2>/dev/null) && [ "$T1" -ef "$T" ] && T=$T1; true; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "${T%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$T" >/dev/null 2>&1 || { U=$(printf '%s' "$T" | LC_ALL=C tr 'a-zA-Z' 'A-Za-z') && [ "$U" -ef "$T" ] && git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "${T%/*}" ls-files --cached --error-unmatch -- ":(literal,icase)$T" >/dev/null 2>&1; }; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$T" 2>/dev/null; [ "$?" != 0 ]; } && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -n -c --arg f "$FILE" --arg p "$T" '{file: $f, path: $p}' >> "$STAGE/checker-files.jsonl" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
-  [ .[] | . as $r | ([.from[]?] + [.replaces[]?] + [.points[]? | objects | .basis[]?])[] | objects | select(.file == $f)
+  [ .[] | . as $r | ([.from[]?] + [.replaces | arrays | .[]] + [.points[]? | objects | .basis[]?])[] | objects | select(.file == $f)
     | (if (has("starts") or has("label")) | not then "\($r.id | tojson): a locator has neither label nor starts" else empty end),
       (if has("lines") and (has("commit") | not) then "\($r.id | tojson): a locator has lines without commit" else empty end),
       (if has("starts") and ((.starts | type) != "string") then "\($r.id | tojson): starts is not a string" else empty end),
@@ -955,10 +960,23 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   sources. The same locator is never in both.
 - **Two records, one of which will stay.** When the author has not decided between two places
   for the same thing, write both records and give one `alternative_to` with the `id` of the
-  other. When the author chooses, give the record that is not chosen `dropped` with the reason
-  and keep its `alternative_to`; do not delete it, whether or not it has `from`.
+  other; the other carries none, and neither is in a second pair while the choice is open.
+  When the author chooses, the record that is not chosen gets `dropped` with the reason and
+  carries `alternative_to` naming the chosen one: when the chosen record was the one that
+  carried the key, take it off that record and put it on the other. Do not delete the record
+  that is not chosen, whether or not it has `from`.
+- **A record that is one of two alternatives.** Before a record that carries `alternative_to`,
+  or that another record names in it, is deleted, merged or split, ask the author what becomes
+  of the pair: the choice is made (the rule above), the other record names the replacement, or
+  the pair is given up and the key is removed. Do not leave an `alternative_to` that names an
+  `id` no longer in the file.
+- **Merging a source with a replaced passage.** When one of the records to merge has a locator
+  in `from` that another has in `replaces`, do not merge: ask the author which of the two the
+  passage is for the merged paragraph.
 - **Merge.** The `from` of the record that replaces the merged records holds every locator of
   the records it replaces, and its `replaces` every locator of their `replaces`.
+- **Split and `replaces`.** When the original has `replaces`, each locator of it is in the
+  `replaces` of at least one of the records that replace it.
 - **Split.** When the original has `from`, each record that replaces it has in its `from` at
   least one locator of the original, and each locator of the original is in the `from` of at
   least one of them.
@@ -970,7 +988,7 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   1. Settle the sections under it, those that name it as `parent`: each is left out with it, or
      is given another `parent` or none, as the author says. Ask when the author has not said.
   2. Leave out each paragraph record naming the section, by the rule above: a record with
-     `from` stays with `dropped`, a record without `from` is deleted.
+     `from` or `replaces` stays with `dropped`, a record with neither is deleted.
   3. Look at what still names the section after steps 1 and 2. When no paragraph record and no
      section record names it, delete the section record; otherwise keep it and give it
      `dropped` with the reason.
@@ -989,8 +1007,8 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   is the last one of its record, tell the author and ask which of these two is wanted, and
   do it before the write check.
   - The record gets a new point, which the author gives.
-  - The record is left out. A record without `from` is deleted once the point has moved. A
-    record with `from` can be neither deleted nor left without a point: the point moves with
+  - The record is left out. A record with neither `from` nor `replaces` is deleted once the
+    point has moved. A record with `from` or `replaces` can be neither deleted nor left without a point: the point moves with
     its `id`, and the record keeps a copy of the point's text as a point with a new `id` and
     gets `dropped` with the author's reason. Its `from` stays as it is.
 - **`note`.** A record's `note` stays with it when its content changes, when it moves and when
@@ -1248,16 +1266,20 @@ asks, through revise.
 4. Show the sections in the reply, each with the findings of the check on it.
    - A section that was never approved is shown in full: its heading and `says`; every
      paragraph record naming it, with its points, what each `pending` names, its `note` and
-     carried blocks marked; every record that carries `dropped`, with the reason. Show the
-     `edits` of a record with its points and say that the block is moved with these changes,
-     not unchanged; show what a record's `replaces` names and say that the record takes the
-     place of those passages; show two records joined by `alternative_to`, when neither
-     carries `dropped`, together, and say that only one of them will stay.
+     carried blocks marked; every record that carries `dropped`, with the reason.
    - A section that differs from its approved copy is shown by its differences: for each record
      that was changed, added, removed or moved, the approved content and the current content.
      Say that the rest of the section is as it was approved. Show it in full when the author
      asks.
    - A section that stands as approved is shown as unchanged since its approval.
+   - Whichever of these two ways a section is shown, three things are always said beside the
+     record they concern, as labelled quotations of the record and never as words of this
+     skill: the `edits` of a record, with the sentence that the block is moved with these
+     changes, not unchanged; what a record's `replaces` names, with the sentence that the
+     record takes the place of those passages; and, for two records joined by
+     `alternative_to` when neither carries `dropped`, both records together with the sentence
+     that only one of them will stay. When the other record of such a pair is in a section
+     that is not shown, show it as background and say that it is not part of this approval.
 
    When every section of the file is shown, show three more things before the sections, from
    the second command of status. An approval of all of them is an approval of the whole

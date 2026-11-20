@@ -40,9 +40,16 @@ public struct JSONNumber: Hashable, Sendable {
 
     /// The number as a positive whole number written out in digits, or nil when it is not one.
     /// Two such numbers compare by length and then digit by digit, whatever their size.
-    public var positiveInteger: String? {
-        guard !negative, !digits.isEmpty, exponent >= 0, exponent <= 4096 else { return nil }
-        return digits + String(repeating: "0", count: exponent)
+    public var isPositiveInteger: Bool { !negative && !digits.isEmpty && exponent >= 0 }
+
+    /// Whether two positive whole numbers are in order, the first not above the second. The
+    /// trailing zeros are not written out, so a number of any size compares.
+    public static func inOrder(_ a: JSONNumber, _ b: JSONNumber) -> Bool {
+        let la = a.digits.count + a.exponent, lb = b.digits.count + b.exponent
+        if la != lb { return la < lb }
+        let width = max(a.digits.count, b.digits.count)
+        func padded(_ n: JSONNumber) -> String { n.digits + String(repeating: "0", count: width - n.digits.count) }
+        return padded(a) <= padded(b)
     }
 
     /// Whether `jq`, which keeps a number as a double, reads this one as infinite (`1e400`).

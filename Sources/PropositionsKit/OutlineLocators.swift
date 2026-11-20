@@ -16,9 +16,10 @@ public enum OutlineLocators {
     /// for another repository than the one the directory is in.
     static var environment: [String: String] {
         var all = ProcessInfo.processInfo.environment
-        for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX"] {
+        for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT"] {
             all[name] = nil
         }
+        for name in all.keys where name.hasPrefix("GIT_CONFIG_KEY_") || name.hasPrefix("GIT_CONFIG_VALUE_") { all[name] = nil }
         return all
     }
 
@@ -114,7 +115,7 @@ public enum OutlineLocators {
         let path = real.path
         // Paths are compared byte by byte: Swift's own comparison takes two spellings of one
         // accented letter for the same text, and a file system can hold both.
-        let rootBytes = Array((rootPath + "/").utf8), pathBytes = Array(path.utf8)
+        let rootBytes = Array((rootPath.hasSuffix("/") ? rootPath : rootPath + "/").utf8), pathBytes = Array(path.utf8)
         guard pathBytes.count > rootBytes.count, Array(pathBytes[..<rootBytes.count]) == rootBytes else { return nil }
         let inside = "/" + String(decoding: pathBytes[rootBytes.count...], as: UTF8.self).lowercased() + "/"
         guard !inside.contains("/.git/") else { return nil }

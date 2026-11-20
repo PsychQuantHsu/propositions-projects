@@ -143,10 +143,10 @@ public enum OutlineCheck {
         if value.has("lines") {
             if !value.has("commit") { return "a locator has lines without commit" }
             let numbers = value["lines"]?.array ?? []
-            let pair = numbers.compactMap { item -> String? in
-                if case let .number(n) = item { return n.positiveInteger } else { return nil }
+            let pair = numbers.compactMap { item -> JSONNumber? in
+                if case let .number(n) = item, n.isPositiveInteger { return n } else { return nil }
             }
-            let ordered = pair.count == 2 && (pair[0].count < pair[1].count || (pair[0].count == pair[1].count && pair[0] <= pair[1]))
+            let ordered = pair.count == 2 && JSONNumber.inOrder(pair[0], pair[1])
             if numbers.count != 2 || !ordered { return "lines is not a list of two line numbers, the first and the last" }
         }
         if value.has("commit"), value["commit"]?.nonEmptyString == nil { return "commit is not a non-empty string" }
@@ -165,7 +165,10 @@ public enum OutlineCheck {
     /// The key two locators share when they name the same passage by the same means.
     private static func locatorKey(_ value: JSONValue) -> [JSONKey]? {
         guard locatorProblem(value) == nil, let file = value["file"]?.string else { return nil }
-        if let label = value["label"]?.string { return [JSONKey(file), JSONKey("label"), JSONKey(label)] }
+        if let label = value["label"]?.string {
+            let squeezed = String(decoding: OutlineLocators.squeezed(Array(label.utf8), trim: false), as: UTF8.self)
+            return [JSONKey(file), JSONKey("label"), JSONKey(squeezed)]
+        }
         if let starts = value["starts"]?.string {
             // As the resolver reads it: runs of white space are one space, and the ends are trimmed.
             let squeezed = String(decoding: OutlineLocators.squeezed(Array(starts.utf8), trim: true), as: UTF8.self)
@@ -312,6 +315,7 @@ public enum OutlineCheck {
                 continue
             }
             var seenSections = Set<JSONKey>()
+            var seenIds = Set<JSONKey>()
             for entry in entries {
                 let section = entry["section"]
                 let paragraphs = entry["paragraphs"]?.array
@@ -322,7 +326,15 @@ public enum OutlineCheck {
                         && !(copy["points"]?.array ?? []).isEmpty
                         && (copy["points"]?.array ?? []).allSatisfy { $0["id"]?.nonEmptyString != nil && $0["text"]?.nonEmptyString != nil }
                 }
-                let sectionFits = section?["heading"]?.nonEmptyString != nil && section?["says"]?.nonEmptyString != nil
+                var sectionFits = section?["heading"]?.nonEmptyString != nil && section?["says"]?.nonEmptyString != nil
+                if let section, section.has("role"), !(section["role"]?.string.map(roles.contains) ?? false) { sectionFits = false }
+                if let section, section.has("part"), !(section["part"]?.string.map(parts.contains) ?? false) { sectionFits = false }
+                for copy in paragraphs ?? [] {
+                    let ids = ([copy["id"]] + (copy["points"]?.array ?? []).map { $0["id"] }).compactMap { $0?.string }
+                    for id in ids where !seenIds.insert(JSONKey(id)).inserted {
+                        report("the id \(JSONValue.quoted(id)) is used twice in one approval")
+                    }
+                }
                 if let sectionId, !seenSections.insert(JSONKey(sectionId)).inserted {
                     report("the section \(JSONValue.quoted(sectionId)) has two entries in one approval")
                 }
@@ -346,7 +358,7 @@ public enum OutlineCheck {
         let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
         let days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
         guard (1...12).contains(month), (1...days[month - 1]).contains(number(8..<10)), number(11..<13) <= 23,
-              number(14..<16) <= 59, number(17..<19) <= 60 else { return false }
+              number(14..<16) <= 59, number(17..<19) <= 59 else { return false }
         var i = 19
         if s[i] == "." {
             i += 1

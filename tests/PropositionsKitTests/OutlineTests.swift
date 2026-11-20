@@ -56,6 +56,7 @@ private let paragraphCases: [(String, String)] = [
         (paragraph("p-1", "s-a", extra: #","from":[{"outline":"b","id":"q"}]"#), "from: a reference to another outline stands where only locators go"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a"}],"replaces":[{"file":"m.tex","label":"a","starts":"x"}]"#), "a locator is in both from and replaces"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","starts":"The  bound"}],"replaces":[{"file":"m.tex","starts":" The bound"}]"#), "a locator is in both from and replaces"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"thm:  main"}],"replaces":[{"file":"m.tex","label":"thm: main"}]"#), "a locator is in both from and replaces"),
         (paragraph("p-1", "s-a", extra: #","uses":"p-0""#), "uses is not a list"),
         (paragraph("p-1", "s-a", extra: #","uses":[""]"#), "uses has an entry that is neither an id nor a reference to another outline"),
         (paragraph("p-1", "s-a", extra: #","uses":[{"outline":"b"}]"#), "uses: a reference to another outline is not an object with outline and id, and without file"),
@@ -76,6 +77,9 @@ private let approvalCases: [(String, String)] = [
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[{"id":"p","section":"s-a"}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]},{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, #"the section "s-a" has two entries in one approval"#),
+        (#"{"approved_at":"2026-02-15T12:34:60Z","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S.","role":7},"paragraphs":[]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[{"id":"p","section":"s-a","points":[{"id":"p.1","text":"T."}]},{"id":"p","section":"s-a","points":[{"id":"p.2","text":"T."}]}]}]}"#, #"the id "p" is used twice in one approval"#),
         (#"{"approved_at":"2026-99-99T99:99:99+99:99","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[{}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[{"id":"p","section":"s-b"}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
@@ -136,7 +140,19 @@ struct JSONValueTests {
         #expect(value["id"]?.string == "b")
     }
 
+    @Test func `Whole numbers of any size are put in order`() throws {
+        func n(_ text: String) throws -> JSONNumber {
+            guard case let .number(n) = try JSONValue.parse(text) else { throw JSONError(description: "not a number") }
+            return n
+        }
+        #expect(try JSONNumber.inOrder(n("1"), n("1e4097")) && JSONNumber.inOrder(n("12"), n("12.0")) && JSONNumber.inOrder(n("99"), n("1e2")))
+        #expect(try !JSONNumber.inOrder(n("1e4097"), n("1")) && !JSONNumber.inOrder(n("13"), n("12")) && !JSONNumber.inOrder(n("101"), n("1e2")))
+        #expect(try !n("2.5").isPositiveInteger && !n("-1").isPositiveInteger && !n("0").isPositiveInteger && n("1e3").isPositiveInteger)
+        #expect(OutlineCheck.findings(outline(paragraphs: [paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[1,1e12],"commit":"c"}]"#)])) == [])
+    }
+
     @Test func `Numbers keep their value at any size`() throws {
+        #expect(try JSONValue.parse("1e-999999999999999") != JSONValue.parse("2e-999999999999999"))
         #expect(try JSONValue.parse("1e-2147483648") != JSONValue.parse("1e-2147483649"))
         #expect(throws: JSONError.self) { try JSONValue.parse("1e9999999999999999") }
         func beyond(_ text: String) throws -> Bool {
@@ -388,6 +404,14 @@ struct OutlineLocatorTests {
         guard names.count == 2 else { return }   // a file system that folds the two spellings holds one file
         let record = #"{"id":"p-1","section":"s-a","from":[{"file":"caf\u00e9.tex","starts":"Alpha"},{"file":"cafe\u0301.tex","starts":"Alpha"}],"points":[{"id":"p-1.1","text":"T."}]}"#
         #expect(OutlineLocators.findings(paragraphs: Outline.lines(of: record + "\n"), root: repository.root) == [#""p-1": starts occurs 0 times, not once"#])
+    }
+
+    @Test func `A root that is the root of the file system holds every path under it`() {
+        // Asked without git: the path check alone decides, and it must not look for "//".
+        let asked = OutlineLocators.readable("no/such/file.tex", rootPath: "/", git: { _, _ in 1 })
+        #expect(asked == nil)
+        let found = OutlineLocators.readable("etc/hosts", rootPath: "/", git: { _, arguments in arguments.contains("ls-files") ? 0 : 1 })
+        #expect(found != nil)
     }
 
     @Test func `A file through a symbolic link that leads outside is not read`() throws {

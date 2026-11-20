@@ -48,8 +48,11 @@ public struct Outline: Sendable {
         // approved: only a file that does not exist is.
         let approvals = text(Outline.approvalFile)
         let approvalPath = directory.appendingPathComponent(Outline.approvalFile).path
-        if approvals == nil, (try? FileManager.default.attributesOfItem(atPath: approvalPath)) != nil {
-            throw ReadError.missing(Outline.approvalFile)
+        if approvals == nil {
+            // Absent only when the system says there is no such file; any other failure to look
+            // at it is a file that cannot be read.
+            var info = stat()
+            if lstat(approvalPath, &info) == 0 || errno != ENOENT { throw ReadError.missing(Outline.approvalFile) }
         }
         self.sections = Outline.lines(of: sections)
         self.paragraphs = Outline.lines(of: paragraphs)

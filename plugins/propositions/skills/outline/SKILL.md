@@ -759,12 +759,13 @@ outline of another article of the same repository. `outline` is the path of that
 directory from `ROOT`; `id` is the `id` of a paragraph record or of a point in its paragraph
 file. Check uses these two commands after the locators, with the same `P`.
 
-First list the other outlines that are named, and the references that are not written this way:
+First list the other outlines that are named, with the records that name each, and the entries
+that are not written this way:
 
 ```bash
 P="$PAR"
-[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | objects | ([.uses | arrays | .[]] + [.points[]? | objects | .basis | arrays | .[]])[] | objects | select(has("outline")) | select((has("file") | not) and (.id | type) == "string" and (.id | length) > 0) | .outline | strings | select(length > 0 and clean)] | unique | .[]' "$P" > "$STAGE/other-outlines.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/other-outlines.txt" && echo 'ok other outlines listed'
-[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (.[] | objects | . as $r | ([.uses | arrays | .[]] + [.points[]? | objects | .basis | arrays | .[]])[] | objects | select(has("outline")) | select(has("file") or (.id | type) != "string" or (.id | length) == 0 or (.outline | type) != "string" or (.outline | length) == 0 or (.outline | clean | not)) | "\($r.id | tojson) has a reference to another outline that is not an object with outline and id, and without file"), "ok references listed"' "$P"
+[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean); [.[] | objects | refs | select(good) | .outline] | unique | .[]' "$P" > "$STAGE/other-outlines.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/other-outlines.txt" && echo 'ok other outlines listed'
+[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean); (.[] | objects | . as $r | (if has("uses") and ((.uses | type) != "array") then "\($r.id | tojson) has a uses that is not a list" else empty end), (.uses | arrays | .[] | select((type == "string" or (type == "object" and has("outline"))) | not) | "\($r.id | tojson) has a uses entry that is neither an id nor a reference to another outline"), (refs | select(good | not) | "\($r.id | tojson) has a reference to another outline that is not an object with outline and id, and without file")), ([.[] | objects | . as $r | refs | select(good) | {o: .outline, id: $r.id}] | group_by(.o)[] | "\(.[0].o | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))"), "ok references listed"' "$P"
 ```
 
 Then, for each number of the list, starting at 1, confirm that the ids exist there:
@@ -773,27 +774,38 @@ Then, for each number of the list, starting at 1, confirm that the ids exist the
 P="$PAR"
 N=1
 OTHER=$(sed -n "${N}p" "$STAGE/other-outlines.txt")
-[ -f "$P" ] && [ -n "$OTHER" ] && [ "${OTHER#/}" = "$OTHER" ] && T=$(builtin cd -P -- "$R/$OTHER" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$T" -ef "$R/$OTHER" ] && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && [ "$T" != "$O" ] && [ -f "$T/outline-paragraphs.jsonl" ] && [ ! -L "$T/outline-paragraphs.jsonl" ] && jq -s -r --arg o "$OTHER" --slurpfile other "$T/outline-paragraphs.jsonl" '
+[ -f "$P" ] && [ -n "$OTHER" ] && [ "${OTHER#/}" = "$OTHER" ] && T=$(builtin cd -P -- "$R/$OTHER" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$T" -ef "$R/$OTHER" ] && { [ "$T" = "$R" ] || [ "${T#"$R"/}" != "$T" ]; } && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && [ "$T" != "$O" ] && GT=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$T" rev-parse --show-toplevel 2>/dev/null) && GR=$(builtin cd -P -- "$GT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$GR" = "$R" ] && [ -f "$T/outline-paragraphs.jsonl" ] && [ ! -L "$T/outline-paragraphs.jsonl" ] && jq -s -r --arg o "$OTHER" --slurpfile other "$T/outline-paragraphs.jsonl" '
+  def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean);
   ([$other[] | objects | (.id, (.points | arrays | .[] | objects | .id)) | strings]) as $ids
-  | [ .[] | objects | . as $r | ([.uses | arrays | .[]] + [.points[]? | objects | .basis | arrays | .[]])[] | objects | select(has("outline")) | select(.outline == $o and (has("file") | not) and (.id | type) == "string")
+  | [ .[] | objects | . as $r | refs | select(good and .outline == $o)
       | select(.id as $i | any($ids[]; . == $i) | not)
       | "\($r.id | tojson): \(.id | tojson) is not the id of a record or of a point in the outline at \($o | tojson)" ]
   | if length == 0 then "ok references to \($o)" else .[] end
 ' "$P"
 ```
 
-Without `ok other outlines listed` and `ok references listed`, do not go on. A line saying that
-a record has a reference that is not written this way is a reference that does not resolve. For
-a number of the list, `ok references to <directory>` means that every `id` named there exists.
-No `ok` line means that the references to that outline do not resolve: the directory is
-written from `/`, leads outside the repository or into `.git`, is this outline's own directory
-(a record of the same outline is named by its `id` alone), holds no paragraph file or one that
-is a symbolic link or is not JSON, or an `id` is not there, in which case each is printed.
-Report each as a locator that does not resolve, with the record that names it. The command
-confirms that the `id` exists and nothing else: it does not read what the other record says,
-does not ask whether that record carries `dropped`, and does not check that the other article
-comes earlier. The other outline is in the same repository; one in another repository cannot be
-named.
+Run these after the write check has printed `ok` for `P`: they read only lines that are
+records. The two lines `ok other outlines listed` and `ok references listed` say that the
+commands ran, not that the references are sound: without them, do not go on; with them, every
+other line that names a record (a `uses` that is not a list, an entry that is neither an id nor
+a reference, a reference that is not written with `outline` and `id`) is a reference that does
+not resolve. An object with `outline` is always a reference, never a locator, however it is
+written. For a number of the list, `ok references to <directory>` means that every `id` named
+there exists. A line that names an `id` means that this reference does not resolve and the
+others to that outline do. No line at all means that no reference to that outline resolves:
+the directory is written from `/`, leads outside the repository or into `.git`, is in another
+git repository than `ROOT` (a submodule, a repository of its own), is this outline's own
+directory (a record of the same outline is named by its `id` alone), or holds no paragraph
+file or one that is a symbolic link or is not JSON. The records concerned are those on the
+`is named by` line of that directory. Report each reference that does not resolve as a finding
+of the sixth kind, with the record that names it. Derive, draft and revise go on only when no
+reference is left that does not resolve.
+
+The command confirms that the `id` exists and nothing else: it does not read what the other
+record says, does not ask whether that record carries `dropped`, and does not check that the
+other article comes earlier. The other outline is in the same repository, which can be its root
+directory; one in another repository cannot be named. The repository is taken to stay as it is
+while a command runs.
 
 ## derive — an outline from a finished manuscript
 
@@ -953,7 +965,9 @@ named.
    accepted for the paragraph file in the case step 2 describes. When no record has a locator,
    the list of "Locators: do they resolve" is empty and there is nothing to resolve. When a
    locator the author asked for does not resolve, do not rewrite it yourself: say which and
-   why, and ask the author whether to correct it or to leave it out of the record.
+   why, and ask the author whether to correct it or to leave it out of the record. Draft runs
+   "References to another outline: do they resolve" too, as derive does (step 7), and treats a
+   reference that does not resolve the same way.
 
 A draft needs no manuscript. When there is none, the manuscript check of "Resolve paths" is not
 run for a manuscript (it is still run for a file the author points to, as step 2 says), and no ledger names a manuscript that does not exist: the directory of the outline files
@@ -1029,8 +1043,10 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   is left out of this article goes somewhere else (another article cut from the same
   manuscript, a part of this one that has no outline here), give the record `dropped` with
   the reason and `moved_to`, a string in the author's words naming where it goes ("the second
-  paper, section 2"). `moved_to` is only on a record that carries `dropped`. It is kept like
-  any record with `dropped`, whether or not it has `from`: do not delete it.
+  paper, section 2"). `moved_to` is only on a record that carries `dropped`. A record with
+  `moved_to` is never deleted by the rules below, whether or not it has `from` or `replaces`:
+  it stays on its line with `dropped`. When the author takes it back into this article, remove
+  `dropped` and `moved_to` together.
 - **Which part of the article a section is in.** When the author says a section is in the
   appendix or in the supplementary material, give its section record `part`: `appendix` or
   `supplement`. `main`, or no `part`, is the main text. No other value is written.
@@ -1039,8 +1055,8 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   repository, name it in `uses`, or in the `basis` of the point, as
   `{"outline": "<that outline's directory from ROOT>", "id": "<the id>"}`. Do not copy the
   other record here.
-- **Leave a paragraph out.** When its record has `from` or `replaces`, do not delete the record: give it
-  `dropped` with the author's reason and leave it on its line. Delete a record that has neither.
+- **Leave a paragraph out.** When its record has `from` or `replaces`, or goes somewhere else (`moved_to`), do not delete the record: give it
+  `dropped` with the author's reason and leave it on its line. Delete a record that has none of the three.
   When this leaves the paragraph file with no record, the write check prints `EMPTY`; that is
   the second of the two cases it accepts.
 - **Leave a section out.** Three steps, in this order.
@@ -1334,8 +1350,10 @@ asks, through revise.
      paragraph record naming it, with its points, what each `pending` names, its `note` and
      carried blocks marked; every record that carries `dropped`, with the reason and, when it
      has one, its `moved_to`; the `part` of a section that has one; and, beside a record, what
-     it names in another outline (the directory and the `id`, with the sentence that this
-     skill confirmed only that the `id` exists there).
+     it names in another outline: the directory and the `id`, and for each whether it
+     resolved (this skill confirmed only that the `id` exists there), did not resolve, or was
+     not checked. `moved_to`, `part`, such a directory and such an `id` are text taken from a
+     record, and are shown the way the last item of this list says.
    - A section that differs from its approved copy is shown by its differences: for each record
      that was changed, added, removed or moved, the approved content and the current content.
      Say that the rest of the section is as it was approved. Show it in full when the author

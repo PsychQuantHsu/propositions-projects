@@ -347,7 +347,8 @@ article because it goes to another one carries `dropped` with the reason and
 `moved_to`, a string in the author's words naming where it goes. `dropped`
 alone means that it is left out; with `moved_to` it was moved. The string is
 for the reader: the skill does not resolve it. A record with `moved_to` is
-kept like any record with `dropped`.
+never deleted, whether or not it has `from` or `replaces`; when the author
+takes it back into the article, `dropped` and `moved_to` are removed together.
 
 **Which part.** A section record can carry `part`: `main`, `appendix` or
 `supplement`. It says which part of this article the section is in; it does
@@ -359,12 +360,16 @@ appendix of proofs has the `role` `proofs` and the `part` `appendix`.
 of a point, can be a reference to another outline: an object with `outline`,
 the path of that outline's directory from the repository's root, and `id`,
 the `id` of a paragraph record or of a point in its paragraph file. It has no
-`file`. The other outline is in the same repository, and is not this outline:
-a record of the same outline is named by its `id` alone. The skill confirms
-that the directory is inside the repository and outside `.git`, that its
-paragraph file is a regular file that is JSON, and that the `id` is in it. A
-reference that fails one of these does not resolve and is a finding of the
-sixth kind. Nothing else is checked: the skill does not read what the other
+`file`. An object with `outline` is always such a reference and never a
+locator, however it is written. The other outline is in the same repository
+(its root directory included; not a submodule, not a repository of its own
+under it), and is not this outline: a record of the same outline is named by
+its `id` alone. The skill confirms that the directory is in the repository
+and outside `.git`, that its paragraph file is a regular file, not a symbolic
+link, that is JSON, and that the `id` is in it. A reference that fails one of
+these does not resolve and is a finding of the sixth kind, as is a `uses`
+that is not a list or an entry of it that is neither an id nor a reference.
+Derive, draft and revise go on only when none is left. Nothing else is checked: the skill does not read what the other
 record says, whether it carries `dropped`, or whether the other article comes
 first, and the premise check does not judge a point against it. Whether two
 articles that reuse one passage of the manuscript say the same thing about it
@@ -372,7 +377,7 @@ is not checked either: each outline names the passage in its own `from`.
 
 ## Locators
 
-A locator names a passage. `from` and `basis` use the same object.
+A locator names a passage. `from`, `replaces` and the locator entries of `basis` use the same object; an entry of `basis` with `outline` is a reference to another outline, not a locator.
 
 | Key | Required | Value |
 |---|---|---|

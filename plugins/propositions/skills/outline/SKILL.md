@@ -65,9 +65,13 @@ This skill keeps three things, and its rules and commands are there for them.
 
 1. In the repository it writes the three outline files and no other file.
 2. It reads no file outside the repository, other than its own (the temporary files it made
-   in the stage directory, and the files of this plugin) and the files git itself reads when
+   in the stage directory, and the files of this plugin), the ledgers' `_meta.json` files of
+   the outermost repository the manuscript is checked out in, which it reads to find the
+   ledger before the root is set, and the files git itself reads when
    it is asked (its configuration, its global ignore file, and the git directory of the
-   repository wherever it is, which for a linked worktree is in the repository the worktree
+   repository, of the outermost repository and the repositories between them, and of a
+   repository of its own under the outermost one that holds a ledger or a directory offered for
+   the outline, wherever it is, which for a linked worktree is in the repository the worktree
    belongs to).
 3. It records an approval only from words the author typed in the message it answers.
 
@@ -91,7 +95,7 @@ them, tell the author.
 | 5 | The shell sets `noclobber`, or makes `cp` ask before it overwrites | Some commands fail, print no `ok` line, and the skill stops | None |
 | 6 | The machine's temporary directory hands down an access-control list | The stage directory has mode 700, which says nothing about such a list: the copies in it can be readable by someone else | None |
 | 7 | A file system that does not give a file the same identity each time it is asked (some network volumes) | The test "is this the same file" can fail for a right path, and the command stops or leaves the file unread | None |
-| 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root this skill takes is not the root of the manuscript's repository | The second |
+| 8 | The environment sets a variable that steers git, such as `GIT_DIR` or `GIT_WORK_TREE` | Git answers for another repository than the one the directory is in, and the root this skill takes is not the root of the outline directory's repository | The second |
 | 9 | Text that the skill or the checker reads (the manuscript, a file a locator names, a file the author points to, the outline files) asks the reader to read another file | The Read tool of the checker agent, and of this skill, can open any path; only the rules (the checker's definition, rule 5 below) keep them to the files they are given | The second |
 | 10 | The repository's root is the root of the file system | The machine's temporary directory is then inside the repository, and the first command does not see that in this one case: it makes its stage directory there before it stops | The first |
 
@@ -166,7 +170,7 @@ locators are resolved, because the words no longer occur in the file.
 
 Establish the action and `MAIN` from the request, or by asking once (AskUserQuestion, all at
 once). A draft can run with no manuscript yet; establish then the directory where the
-manuscript will be, which is used only to find the repository. `ROOT` and `STAGE` come from the first command below, never from an answer. `OUTDIR` comes
+manuscript will be, which is used only to find the repository. `ROOT` and `STAGE` come from the first command below, never from an answer; once `OUTDIR` is known, "The root is the repository of the outline directory" narrows `ROOT` to a repository inside the first one. `OUTDIR` comes
 from the ledgers of the repository, by the commands after it, and from the author only in the
 cases those commands leave open.
 
@@ -176,18 +180,20 @@ cases those commands leave open.
   says which repositories are asked), and whose path from the root holds no
   character that a locator's `file` may not hold. The second command below checks this and prints
   the path to use for it from then on.
-- `ROOT` — the root of the repository. The repository is the git repository that holds the
+- `ROOT` — the root of the repository, set in two steps. The first command gives the
+  outermost repository the manuscript is checked out in: the git repository that holds the
   manuscript, or, when that repository is checked out as a submodule of another (as git reports
-  it, from the index of the outer repository), the outermost
-  repository it is checked out in, however many levels of submodules lie between (no cap yet:
-  the maintainer has not decided whether to stop past some number of levels). When the
-  manuscript is in no git repository, the skill stops. A repository that sits inside
-  another without being its submodule is a repository of its own. Every `file` of a locator is a
-  path relative to `ROOT`; an outline kept inside a submodule therefore does not resolve in a
-  checkout of the submodule alone. When the manuscript's repository sits inside another without
-  being its submodule, a ledger of the outer repository is outside `ROOT`: it is not listed below,
-  and the outline cannot go beside it. The other way round, a directory under `ROOT` counts as
-  inside it even when it holds a git repository of its own.
+  it, from the index of the outer repository), the outermost repository above it, however many
+  levels of submodules lie between. That is the area in which ledgers and outline files are
+  looked for. Once `OUTDIR` is known, "The root is the repository of the outline directory"
+  below sets `ROOT` to the git repository that holds `OUTDIR` (issue 91), and every command from
+  then on uses that root. Every `file` of a locator is a path relative to it, so an outline kept
+  in a submodule resolves in a checkout of that submodule alone, and in any checkout that holds
+  it. When the manuscript is in no git repository, the skill stops. A repository that sits inside
+  another without being its submodule is a repository of its own. When the manuscript's
+  repository sits inside another without being its submodule, a ledger of the outer repository is
+  outside `ROOT`: it is not listed below, and the outline cannot go beside it. The other way round,
+  a directory under `ROOT` counts as inside it even when it holds a git repository of its own.
 - `OUTDIR` — the directory of the outline files.
 - `STAGE` — a directory outside the repository that the first command makes for this session's
   temporary files.
@@ -257,9 +263,9 @@ case of its letters swapped is the same file), and git tracks a path that differ
 in letter case (a file renamed on the disk in letter case alone, which git does not notice on
 such a file system), the file counts as tracked. It keeps the name it has by the rule above (its last part as the
 directory gives it), not the name git has; what git prints is not used. The list of `.tex` files in derive does the same. One such file is still
-refused: one whose name the outermost repository ignores, because it is asked about that name
+refused: one whose name the repository at `ROOT` ignores, because it is asked about that name
 and answers so; `git mv` to the name on the disk settles it. A file in a submodule is not
-refused that way, because the outermost repository gives no answer for it. A name that does not survive this, such as a
+refused that way, because the repository at `ROOT` gives no answer for it. A name that does not survive this, such as a
 directory whose name ends in a line break, stops the command or leaves the file unread.
 
 Every git command that reads a repository is run with two settings on its command line,
@@ -280,7 +286,8 @@ repository whose `.git` is a file, are found as before. Git knows the first sett
 version 2.38 on, which is why the first command asks for that version.
 
 The stage directory is made by `mktemp` with mode 700, and it holds a file `root.txt` with
-the root it was made for. Every later command tests the owner, the mode and that file. The
+the root: the outermost one at first, then the one "The root is the repository of the outline
+directory" sets. Every later command tests the owner, the mode and that file. The
 mode says nothing about an access-control list the temporary directory may hand down; the
 commands do not look at those.
 
@@ -366,7 +373,8 @@ A ledger names one file at most. `docs/SCHEMA.md` writes a ledger's `source.file
 "manuscript repo root"; when the ledger's repository is a submodule of another, that is read
 as the submodule's root by some ledgers and as the outermost root by others. The command reads
 it both ways, in this order: from the root of the git repository that holds the ledger (for a
-ledger inside a submodule, the submodule's root), and then from `ROOT`. The first reading that
+ledger inside a submodule, the submodule's root), and then from `ROOT` as the first command
+printed it. The first reading that
 leads to a regular file under the root of the ledger's own git repository decides, and the
 ledger names `MAIN` when that file is `MAIN`. A reading that leads to a file outside the
 ledger's own repository is not taken, so the ledger of another paper, kept in a submodule or
@@ -402,17 +410,95 @@ The command prints one of three `ok` lines, or none.
      same repository, so such a directory is offered, not taken. When there is nothing to
      offer, propose `propositions/` beside `MAIN`, where a ledger is put by convention, and
      say that the outline belongs in the ledger's directory, so that if a ledger is created
-     somewhere else later the three files move there.
+     somewhere else later the three files move there. A ledger's directory in a repository
+     that does not hold the manuscript (a submodule that holds only ledgers) cannot hold the
+     outline: "The root is the repository of the outline directory" stops for it, and the
+     author is asked for a directory of a repository that holds the manuscript.
 
    The directory the author names for a manuscript that does not exist yet (`DIR` of the
    first command) only finds the repository. It is not the directory of the outline files
    unless the author says so.
 
+### The root is the repository of the outline directory
+
+Run this once `OUTDIR` is known, before any other command, and again whenever `OUTDIR`
+changes. `STAGE` is as the first command printed it, `ROOT` is the root the stage directory
+records now (the one the first command printed, or the one an earlier run of this command
+printed), and `OUTDIR` is the directory of the outline files. `M` is the manuscript's main
+file, written from `/` (`MAIN` when the manuscript check has printed it); when there is no
+manuscript yet, it is the directory `DIR` that the first command was given, the directory
+where the manuscript will be or the nearest one above it.
+
+```bash
+ROOT='<the root, as printed>'; STAGE='<the stage directory, as printed>'
+OUTDIR='<the directory of the outline files>'
+M='<MAIN as printed, or DIR when there is no manuscript yet>'
+[ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${M#/}" != "$M" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
+OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && jq -n -e --arg n "${O#"$R"}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null 2>&1 && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP the outline directory is not a directory inside the repository and outside .git, or its path holds a character no locator can carry, or an outline file in it is a symbolic link'; exit 1; }
+if [ -d "$O" ]; then D=$O; else D=${O%/*}; fi; T=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$D" rev-parse --show-toplevel) && TR=$(builtin cd -P -- "$T" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$TR" -ef "$T" ] || { echo 'STOP git finds no repository for the outline directory'; exit 1; }
+{ [ "$TR" = "$R" ] || [ "${TR#"$R"/}" != "$TR" ]; } && [ "$TR" != / ] && { [ "$O" = "$TR" ] || [ "${O#"$TR"/}" != "$O" ]; } || { echo 'STOP the repository of the outline directory is not inside the repository, or does not hold the outline directory'; exit 1; }
+git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$TR" ls-files -s -z > "$S/links.bin" && jq -R -s -e --arg rel "${O#"$TR"/}" '[split("\u0000")[] | select(startswith("160000 ")) | split("\t")[1:] | join("\t")] | all(. as $p | ($rel != $p) and (($rel | startswith($p + "/")) | not))' "$S/links.bin" >/dev/null 2>&1 || { echo 'STOP the outline directory is inside a submodule that is not checked out'; exit 1; }
+{ if [ -f "$M" ]; then B0=$(realpath "$M") && B="$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${B0##*/}"; else B=$(builtin cd -P -- "$M" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P); fi; } && [ "$B" -ef "$M" ] || { echo 'STOP the manuscript, or the directory where it will be, is not a file or a directory that can be found'; exit 1; }
+[ "$B" = "$TR" ] || [ "${B#"$TR"/}" != "$B" ] || { echo 'STOP the manuscript, or the directory where it will be, is not in the repository of the outline directory'; exit 1; }
+printf '%s\n' "$TR" > "$S/root.txt" && printf 'ROOT=%s\n' "$TR" && echo 'ok the root is the repository of the outline directory'
+```
+
+The root is the git repository that holds the directory of the outline files (for a directory
+that does not exist yet, the directory that is to hold it), not the outermost repository the
+first command found. Every `file` of a locator is written from this root, so the outline
+resolves in every checkout of this repository: on its own, or as a submodule of any other.
+The command refuses an outline directory that the lines that begin every call would refuse,
+before it changes anything (known limit 4 apart: a repository with a configuration of its
+own can make git name a root that the next call then refuses), and the root it sets lies inside the first root: an answer of the
+author can choose the outline directory, but the boundary is still the one the first command
+found, narrowed to a repository inside it.
+
+- `ok the root is the repository of the outline directory`: from here on `ROOT` is the path on
+  the `ROOT=` line, and the stage directory records it. The lines that begin every call ask git
+  the same question each time and go on only when the repository that holds `OUTDIR` is `ROOT`:
+  a root that was never set (a new session, when the outline directory's repository is below
+  the outermost one), or an `OUTDIR` that was changed to a directory of another repository,
+  stops them until this command runs again. When there is
+  a manuscript, run the manuscript check again with this `ROOT`: its `NAME=` line, the path of
+  the main file from this root, is the `file` of every locator that names it. When this root is
+  the one the stage directory already recorded, nothing changes.
+- A `STOP` line: stop and tell the author why.
+  - The manuscript, or the directory where it will be, is not in the repository of the outline
+    directory: the outline directory is in a repository that does not hold the manuscript (a
+    submodule that holds only the ledger, or a repository of its own beside the manuscript's).
+    Say that the outline goes in a directory of a repository that holds the manuscript, and ask
+    for one.
+  - The outline directory is inside a submodule that is not checked out: files written there
+    could not be tracked, and would block checking the submodule out. Ask the author to check
+    it out (`git submodule update --init`) or to name another directory.
+  - Git finds no repository for the outline directory: besides a directory outside any
+    repository, this is a directory in or under one that is laid out like a git repository
+    (a `HEAD`, an `objects`, a `refs` and a `config`), where git refuses to answer. Ask for
+    another directory.
+
+The root can only move down. To choose an outline directory outside it later, start again from
+the first command: it makes a new stage directory, and what was shown from the old one no longer
+counts as shown.
+
+This skill does not convert an outline written before this rule (issue 91), which gives every
+`file` from the outermost repository, and does not try to recognise one. When the root is a
+repository below the outermost one, the locators of such an outline do not resolve, and check
+reports each of them. When the root is below the outermost repository and check reports
+locators that do not resolve, say that an outline written before issue 91 names its files from
+the outermost repository, and that the author can remove from each `file` the path from that
+repository down to this one (with revise; the sections whose records change then need approval
+again). A `file` outside the new root is reported too, and no locator can name it any more:
+the author removes that locator. One case is not reported and is left to the author: a `file`
+that by chance names another file under the new root that holds the same label or opening
+words. An outline written before issue 91 that sits in a repository that does not hold the
+manuscript is refused like any other outline directory there: the author moves its three files
+to a directory of a repository that holds the manuscript.
+
 ### The lines that begin every call
 
 ```bash
 ROOT='<the root, as printed>'; OUTDIR='<the directory of the outline files>'; STAGE='<the stage directory, as printed>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" && OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && jq -n -e --arg n "${O#"$R"}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null 2>&1 && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP a path does not begin with /, the stage directory is not the one the first command made for this repository, the outline directory is not a directory inside the repository and outside .git or its path holds a character no locator can carry, or an outline file is a symbolic link'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" && OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && jq -n -e --arg n "${O#"$R"}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null 2>&1 && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] && { if [ -d "$O" ]; then GD=$O; else GD=${O%/*}; fi; GT=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$GD" rev-parse --show-toplevel 2>/dev/null) && GR=$(builtin cd -P -- "$GT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$GR" = "$R" ]; } && git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" ls-files -s -z > "$S/links.bin" && jq -R -s -e --arg rel "${O#"$R"/}" '[split("\u0000")[] | select(startswith("160000 ")) | split("\t")[1:] | join("\t")] | all(. as $p | ($rel != $p) and (($rel | startswith($p + "/")) | not))' "$S/links.bin" >/dev/null 2>&1 || { echo 'STOP a path does not begin with /, the stage directory is not the one the first command made for this repository, the root is not the repository that holds the outline directory or the outline directory is in a submodule that is not checked out (run "The root is the repository of the outline directory"), the outline directory is not a directory inside the repository and outside .git or its path holds a character no locator can carry, or an outline file is a symbolic link'; exit 1; }
 STAGE=$S; SEC="$O/outline-sections.jsonl"; PAR="$O/outline-paragraphs.jsonl"; APP="$O/outline-approvals.jsonl"
 ```
 
@@ -425,7 +511,9 @@ goes on only when each of the three paths begins with `/`: an empty path, or one
 written out in full, would be taken from wherever the shell happens to be. It goes on only when
 the stage directory is the one the first command made for this repository: it exists, is
 outside the repository, belongs to this user, has mode 700, and holds
-the `root.txt` that names this root. A directory that fails one of these is not used, so a path
+the `root.txt` that names this root. It goes on only when git, asked in the outline directory
+(or the directory that is to hold it), names this root as its repository, and no directory on
+the way down to it is a submodule that is not checked out. A directory that fails one of these is not used, so a path
 that was copied wrongly cannot send the temporary files, or the removal of one, somewhere
 else. From there on `STAGE` is its real path. The guard then takes the real path of the
 outline directory, with every symbolic link in its path resolved, the last part included, and
@@ -442,7 +530,10 @@ refused: what counts is where it leads.
 
 When the stage directory is gone, or the conversation no longer has its path (a new session, a
 conversation that was summarised), run the first command of "Resolve paths" again: it makes a
-new one. Whatever was shown
+new one. Then run "The root is the repository of the outline directory" with the same `OUTDIR`,
+and the manuscript check with the root it prints: when the repository of `OUTDIR` is not the
+outermost one, the lines that begin every call stop for the new stage directory until that
+command has run. Whatever was shown
 from the old one no longer counts as shown: an approval needs the sections shown again.
 
 ## Pick the action
@@ -611,9 +702,9 @@ not inside a `.git` directory in any letter case, and is a file git lists: one i
 one it does not track and does not ignore. Two repositories are asked. The first is the one
 that holds the file, asked in the directory of the file: a file inside a submodule, or inside
 a repository of its own under `ROOT`, is judged by the rules of that repository. The second is
-the outermost repository, asked at `ROOT` whether it ignores the path: when it does, the file
+the repository at `ROOT`, asked whether it ignores the path: when it does, the file
 is not read, whatever the first said, so a repository of its own inside a directory that the
-outermost repository ignores does not make its files readable. When the outermost repository
+repository at `ROOT` ignores does not make its files readable. When the repository at `ROOT`
 gives no answer for the path, as it gives none for a file inside a submodule, the answer of
 the first stands; the command takes any error of that second question as no answer, whatever
 its cause. A repository between the two is not asked. A file git ignores is not read,

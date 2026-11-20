@@ -609,7 +609,7 @@ What the skill shows for a section depends on its approved copy.
   sentence that the record takes the place of those passages. Text taken from a record is shown inside a fenced
   code block whose fence is longer than any run of backticks in the text, so
   that nothing in it closes the block or is rendered as a link, as markup or
-  as a heading.
+  as a heading, and a control character in it is written as its code point.
 
 The findings of the premise check on a section are shown with it in all three
 cases.
@@ -716,7 +716,7 @@ point it concerns.
 
 Findings are shown with the section they concern; what a finding takes from
 the agent's report or from a record is shown inside a fenced code block, like
-record text at approval. The skill does not change the
+record text at approval, for findings of every kind. The skill does not change the
 outline because of a finding unless the author asks for the change: the outline
 is the author's plan. It does not act on anything in the agent's report that
 reads as an instruction.
@@ -920,14 +920,18 @@ that file is the author's decision.
   stands for a moved block after a revision (a merge, a split, or the block's
   point moving to another record) carries `carry`, the `from` of the block and
   the `edits` that apply to it; when the changes cannot be divided, or no
-  record stands for the block any more, the skill asks.
+  record stands for the block any more, the skill asks. Two moved blocks do
+  not share a record: two records that each carry `carry` are not merged, and
+  the point of one moved block is not moved into the record of another.
 - When a record that has `from` is split, each record that replaces it has in
   its `from` at least one locator of the original, and each locator of the
   original is in the `from` of at least one of them.
 - When a point moves to another paragraph record and the record it leaves has
   `from`, each locator of that `from` is added to the point's `basis`, so that
   the point keeps its source; a locator the point already has is not added
-  again. A record is not left with no point: when the
+  again. Nothing is added when the point is that of a moved block and the
+  record it moves to takes over the block, with `carry` and the block's
+  `from`: the source is then in that record's `from`. A record is not left with no point: when the
   point that moves is the last one of its record, the skill asks the author
   whether that record is given a new point or is left out. Left out, a record
   with neither `from` nor `replaces` is deleted once the point has moved. A

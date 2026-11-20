@@ -592,7 +592,7 @@ F="$SEC"
            | select(.r | has("edits") and ((.edits | type) != "string" or (.edits | length) == 0 or .carry != true))
            | "line \(.l): edits is not a non-empty string on a record that carries carry"),
       (.[] | select($para and (.r | type == "object"))
-           | select(.r | def k: objects | select((.file | type) == "string" and (if has("label") then (.label | type) == "string" else (.starts | type) == "string" end)) | [.file, (if has("label") then ["label", .label] else ["starts", .starts] end)]; ([.from | arrays | .[] | k]) as $f | any((.replaces | arrays | .[] | k); . as $x | any($f[]; . == $x)))
+           | select(.r | def k: objects | select((.file | type) == "string" and (has("label") or has("starts")) and ((has("label") | not) or (.label | type) == "string") and ((has("starts") | not) or (.starts | type) == "string") and ((has("lines") | not) or has("commit"))) | [.file, (if has("label") then ["label", .label] else ["starts", .starts] end)]; ([.from | arrays | .[] | k]) as $f | any((.replaces | arrays | .[] | k); . as $x | any($f[]; . == $x)))
            | "line \(.l): a locator is in both from and replaces"),
       (.[] | select(.r | type == "object")
            | select([.r.id, (if $para then (.r.points[]? | if type == "object" then .id else null end) else empty end)] | any(type != "string" or length == 0))
@@ -962,7 +962,10 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   record that stands for the block afterwards carries `carry`, the `from` of the block and the
   `edits` that apply to it. When the changes cannot be divided between the records, or no
   record stands for the moved block any more, ask the author before writing. When the record that is to stand for the block has, in its `replaces`, a locator of the block's `from`,
-  the rule above applies first.
+  the rule above applies first. Two moved blocks do not share a record: do not merge two records
+  that each carry `carry`, and do not move the point of one moved block into the record of
+  another. One `carry` and one `edits` cannot say which changes belong to which block. Tell
+  the author, and keep the two records.
 - **Merge.** The `from` of the record that replaces the merged records holds every locator of
   the `from` lists of the records it replaces, and its `replaces` every locator of their
   `replaces` lists, as they are after the rule above.
@@ -994,7 +997,10 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
 - **Move a point.** When a point moves to another paragraph record and the record it leaves has
   `from`, add each locator of that `from` to the point's `basis` (a locator already there is
   not added again), so that the point keeps its source. When the record it leaves has no
-  `from`, nothing is added. A record is never left with no point: when the point that moves
+  `from`, nothing is added. Nothing is added either when the point is that of a moved block
+  and the record it moves to takes over the block (it gets `carry` and the block's `from`, by
+  the rule on a moved block that changes record): the source is already in that record's
+  `from`, and a copy in `basis` would be checked without regard to `edits`. A record is never left with no point: when the point that moves
   is the last one of its record, tell the author and ask which of these two is wanted, and
   do it before the write check.
   - The record gets a new point, which the author gives.
@@ -1254,7 +1260,9 @@ asks, through revise.
 4. Show the sections in the reply, each with the findings of the check on it. What a finding
    takes from the agent's report or from a record (an `id`, a quoted sentence, the agent's
    sentence) goes inside a fenced code block whose fence is longer than any run of backticks
-   in it; the name of the kind and the layout are this skill's.
+   in it, with control characters written as code points as at approval; the name of the kind
+   and the layout are this skill's. This holds for findings of every kind, and also when check
+   is run on its own.
    - A section that was never approved is shown in full: its heading and `says`; every
      paragraph record naming it, with its points, what each `pending` names, its `note` and
      carried blocks marked; every record that carries `dropped`, with the reason.
@@ -1272,7 +1280,9 @@ asks, through revise.
      record takes the place of those passages. Put every text taken
      from a record (`edits`, a locator, an `id`, a point) inside a fenced code block whose
      fence is longer than any run of backticks in the text, so that nothing in it closes the
-     block or is rendered as a link, as markup or as a heading; the labels and
+     block or is rendered as a link, as markup or as a heading. Write a control character in
+     such text (below U+0020 other than a line break, U+007F to U+009F, U+2028 to U+202E,
+     U+2066 to U+2069) as its code point, such as `U+202E`, not as the character; the labels and
      the sentences above are this skill's and stand outside it.
 
    When every section of the file is shown, show three more things before the sections, from

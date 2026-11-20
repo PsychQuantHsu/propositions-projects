@@ -266,7 +266,10 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `section` | yes | The `id` of a section record. A paragraph record whose `section` names no section record belongs to no section (see "When a section stands as approved") |
 | `points` | yes | A list of one or more points |
 | `from` | no | A list of one or more locators naming the passages this record comes from |
-| `carry` | no | `true`: the record stands for a block that is moved unchanged from the passage its `from` names |
+| `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists |
+| `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
+| `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
+| `alternative_to` | no | The `id` of another paragraph record that says the same thing: only one of the two will stay |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
 | `note` | no | A string for the author |
@@ -290,7 +293,35 @@ before it and a blank line after it is one record that carries `carry`. Its
 points are complete sentences stating what the block states or shows ("Theorem
 1 states that the interval covers the true value at the nominal rate."), and the
 text of the block is not rewritten. "States Theorem 1." is not such a sentence. A record that carries `carry` has `from`: without it nothing
-says which block is moved. Any other displayed formula or derivation is not a
+says which block is moved. A block that is moved with changes to what it states
+(a sentence removed, a hypothesis added, a statement that no longer refers to a
+theorem moved elsewhere) is still a moved block: its record carries `carry`
+and `edits`, a string that lists those changes for the author, and its points
+state what the block states after them. A change that only redirects a
+cross-reference (where a `\ref` points, a number) is not a change to the
+statement and needs no `edits`. `edits` on a record without `carry` is a
+mistake, and so is an empty one: the write check reports both.
+
+**Passages a record takes the place of.** A paragraph that is written anew
+in place of a passage of the manuscript (an abstract, a roadmap of the
+sections) does not come from that passage, so the passage is not in its
+`from`. It is named in `replaces`, a list of locators that are checked like
+those of `from` and `basis`: each names one place. The passages of `replaces`
+are not a source: the premise check does not read them as support for the
+record's points. A record can carry both `from` and `replaces`, for a
+paragraph that draws on one passage and takes the place of another; the same
+locator is not in both, and the write check reports one that is.
+
+**Two records, one of which will stay.** When the same thing can stand in
+two places and the author has not decided, both records are written and one
+of them names the other in `alternative_to`. The `id` it names is that of
+another paragraph record in the file; the write check reports one that names
+itself, a point, or no record. Until the author decides, both records are
+part of the outline and are shown together, and status counts the pair once
+as an alternative not yet chosen. When the author chooses, the record that is
+not chosen is given `dropped` with the reason and keeps its `alternative_to`,
+so that what it was an alternative to stays on record; it is not deleted,
+whether or not it has `from`. Any other displayed formula or derivation is not a
 block of its own: with no blank line on either side it belongs to the record of
 the paragraph it stands in, and with a blank line on one side only it belongs
 to the record of the paragraph on the other side.
@@ -573,7 +604,12 @@ What the skill shows for a section depends on its approved copy.
 
 - A section that has no approved copy is shown in full: its `heading` and
   `says`, every paragraph record naming it with its points and its `note`, and
-  every record that carries `dropped` together with the reason.
+  every record that carries `dropped` together with the reason. A record that
+  carries `edits` is shown with them, and is said to be a block moved with
+  changes, not unchanged; a record that carries `replaces` is shown with the
+  passages it takes the place of; two records joined by `alternative_to`, when
+  neither carries `dropped`, are shown together with the sentence that only
+  one of them will stay.
 - A section that differs from its approved copy is shown by its differences:
   for each record that was changed, added, removed or moved, the approved
   content and the current content. The skill says that the rest of the section
@@ -872,7 +908,11 @@ that file is the author's decision.
   neither outline file and in no approval record. A replacement never takes
   the `id` of a record it replaces.
 - The `from` of the record that replaces merged records holds every locator of
-  the records it replaces.
+  the records it replaces, and its `replaces` every locator of their
+  `replaces`. When a record that has `replaces` is split, each locator of it is
+  in the `replaces` of at least one of the records that replace it. A record
+  that has `replaces` and that the author leaves out is not deleted: like a
+  record with `from`, it is given `dropped` with the reason.
 - When a record that has `from` is split, each record that replaces it has in
   its `from` at least one locator of the original, and each locator of the
   original is in the `from` of at least one of them.
@@ -906,7 +946,9 @@ that file is the author's decision.
   The skill asks when the author has not said.
 
 Because no source is ever discarded, the question "where did each passage of
-the original go" can be answered from the `from` lists, together with the
+the original go" can be answered from the `from` lists and the `replaces`
+lists (a passage named in a `replaces` went nowhere: the record that names it
+stands in its place), together with the
 `basis` of the points that were moved: every passage named in a `from` is
 a source of a record that is in the article, or of a record that carries
 `dropped` with its reason, and a point that was moved out of such a record
@@ -930,7 +972,10 @@ section that does not, whether it was never approved or differs from its latest
 approved copy. It reports whether the order of sections stands as approved,
 the sections removed since their approval,
 the paragraph records that name no section record, the number of points that
-carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does
+carry `pending`, the number of records that carry `dropped`, and the pairs of
+alternatives not yet chosen (a record that names another in `alternative_to`
+while neither carries `dropped`); such a pair counts as one paragraph, not
+two, in any count of paragraphs or of length. When every section stands as approved and the order of sections does
 not, it says that an approval of the whole outline is still needed. It decides
 equality on JSON values, not on the text of the lines. An approvals file that
 is empty or holds only blank lines holds no approval record. When the approvals
@@ -1025,8 +1070,11 @@ records or among the paragraph
 records and points, that no string holds a control character, and that no
 number is too large for jq to keep (such as `1e400`, which is JSON but which jq
 reads as infinite). In the
-paragraph file it also confirms that every point has an `id` and that `points`,
-where a record has it, is a list. The shape of a key that a section record
+paragraph file it also confirms that every point has an `id`, that `points`,
+where a record has it, is a list, that `edits` is a non-empty string on a
+record that carries `carry`, that `alternative_to` names another paragraph
+record of the file, and that no locator is in both the `from` and the
+`replaces` of a record. The shape of a key that a section record
 carries and this document does not define is not checked, a key named `points`
 included; the control-character test still reads every string and key name.
 When any of

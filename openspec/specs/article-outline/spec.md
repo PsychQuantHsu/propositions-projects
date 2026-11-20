@@ -257,7 +257,7 @@ Each line of `outline-paragraphs.jsonl` SHALL be a paragraph record with these k
 | `section` | yes | The `id` of a section record. A paragraph record whose `section` names no section record belongs to no section |
 | `points` | yes | A list of one or more points |
 | `from` | no | A list of one or more locators naming the passages this record comes from |
-| `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists |
+| `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists and from cross-references that point elsewhere |
 | `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
 | `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
 | `alternative_to` | no | The `id` of another paragraph record that says the same thing: only one of the two will stay |
@@ -280,9 +280,9 @@ A record that carries `carry` SHALL carry `from`. Its points SHALL be complete s
 
 A paragraph written anew in place of a passage of the manuscript SHALL name that passage in `replaces`, not in `from`: the passages of `replaces` are not a source. A record can carry both; the same locator SHALL NOT be in both.
 
-`alternative_to` SHALL name another paragraph record of the file: not the record itself, not a point. One of the two records carries the key and the other does not, and while the choice is open neither SHALL be in a second pair. Until the author chooses, both records are part of the outline, and the pair counts as one paragraph in any count of paragraphs or of length. When the author chooses, the record that is not chosen SHALL be given `dropped` with the reason and SHALL carry `alternative_to` naming the chosen one: when the chosen record was the one that carried the key, the key moves to the other. The record that is not chosen is not deleted, whether or not it has `from`.
+`alternative_to` SHALL name another paragraph record of the file: not the record itself, not a point. One of the two records carries the key and the other does not. A pair is open while neither of its records carries `dropped`, and while it is open neither record SHALL be in a second open pair. The count of an open pair does not depend on which record carries the key: it is one paragraph of the outline, each record is listed in its own section and marked as an open alternative, and a length worked out from the outline is given for it as the range from the shorter record to the longer. Until the author chooses, both records are part of the outline, and the pair counts as one paragraph in any count of paragraphs or of length. When the author chooses, the record that is not chosen SHALL be given `dropped` with the reason and SHALL carry `alternative_to` naming the chosen one: when the chosen record was the one that carried the key, the key moves to the other. The record that is not chosen is not deleted, whether or not it has `from`.
 
-The write check SHALL report an `edits` that is not a non-empty string on a record that carries `carry`, an `alternative_to` that does not name another paragraph record, a record without `dropped` that is in two pairs of alternatives (two records naming each other, two naming the same record, a record that names one and is named), and a locator that is in both the `from` and the `replaces` of a record. A `replaces` that is not a list names no passage, and the commands SHALL NOT read what it holds as locators.
+The write check SHALL report an `edits` that is not a non-empty string on a record that carries `carry`, an `alternative_to` that does not name another paragraph record, a record without `dropped` that names one that carries `dropped` (after a choice the key is on the record that was not chosen), a record that is in two open pairs of alternatives (two records naming each other, two naming the same record, a record that names one and is named), and a locator that is in both the `from` and the `replaces` of a record. A `replaces` that is not a list names no passage, and the commands SHALL NOT read what it holds as locators.
 
 The paragraph records SHALL be grouped by section: the records naming one section are on consecutive lines, and the groups come in the order of the section file. Inside a group, the order of the lines is the order of the paragraphs in the section. A paragraph record that carries `dropped` is not part of the article and keeps its line in its group. A section is allowed to have no paragraph record.
 
@@ -335,7 +335,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix1
+source: idd-80-fix2
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -585,7 +585,7 @@ When writing the record into the approvals file fails, the record may have been 
 
 What the skill shows for a section depends on its approved copy.
 
-- A section that has no approved copy is shown in full: its `heading` and `says`, every paragraph record naming it with its points and its `note`, and every record that carries `dropped` together with the reason. In both ways of showing a section, in full or by its differences, a record that carries `edits` SHALL be shown with them and said to be a block moved with changes, not unchanged; a record that carries `replaces` SHALL be shown with the passages it takes the place of; two records joined by `alternative_to`, when neither carries `dropped`, SHALL be shown together with the sentence that only one of them will stay, and when the other record of the pair is in a section that is not shown, it is shown as background and said not to be part of this approval. These are shown as labelled quotations of the record, not as words of the skill.
+- A section that has no approved copy is shown in full: its `heading` and `says`, every paragraph record naming it with its points and its `note`, and every record that carries `dropped` together with the reason. In both ways of showing a section, in full or by its differences, a record that carries `edits` SHALL be shown with them and said to be a block moved with changes, not unchanged; a record that carries `replaces` SHALL be shown with the passages it takes the place of; two records joined by `alternative_to`, when neither carries `dropped`, SHALL be shown together with the sentence that only one of them will stay, and when the other record of the pair is in a section that is not shown, it is shown as background and said not to be part of this approval. A record that carries `dropped` and `alternative_to` SHALL be shown with the record it names and the sentence that this one was not chosen. These are shown as labelled quotations of the record, not as words of the skill, and text taken from a record is shown inside a code span or a code block, so that nothing in it is rendered as a link, as markup or as a heading.
 - A section that differs from its approved copy is shown by its differences: for each record that was changed, added, removed or moved, the approved content and the current content. The skill says that the rest of the section is as it was approved, and shows the section in full when the author asks.
 - A section that equals its approved copy is shown as unchanged since its approval.
 
@@ -687,7 +687,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix1
+source: idd-80-fix2
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
@@ -3105,7 +3105,7 @@ A record and a point SHALL keep their `id` when their content changes and when t
 
 Merging, splitting and leaving a paragraph out SHALL keep every source on record.
 
-- The `from` of the record that replaces merged records holds every locator of the records it replaces, and its `replaces` every locator of their `replaces`. When a record that has `replaces` is split, each locator of it is in the `replaces` of at least one of the records that replace it. A record that has `replaces` and that the author leaves out is not deleted: it is given `dropped` with the reason; wherever this requirement keeps a record because it has `from`, a record that has `replaces` is kept the same way, also when its last point moves away. Records SHALL NOT be merged when a locator is in the `from` of one and the `replaces` of another: the skill asks the author which of the two the passage is for the merged paragraph. A record that carries `alternative_to`, or that another record names in it, SHALL NOT be deleted, merged or split until the author has said what becomes of the pair, and no `alternative_to` is left naming an `id` that is no longer in the file.
+- The `from` of the record that replaces merged records holds every locator of the records it replaces, and its `replaces` every locator of their `replaces`. When a record that has `replaces` is split, each locator of it is in the `replaces` of at least one of the records that replace it. A record that has `replaces` and that the author leaves out is not deleted: it is given `dropped` with the reason; wherever this requirement keeps a record because it has `from`, a record that has `replaces` is kept the same way, also when its last point moves away. Records SHALL NOT be merged when a locator is in the `from` of one and the `replaces` of another until the author has said which of the two the passage is for the merged paragraph; the locator is then taken out of the other list before the merge, and when the author wants both, the records are not merged. A record that replaces a record with `carry` and `edits` and still stands for the moved block SHALL keep `carry` and the `edits` that apply to it; when the changes cannot be divided between the new records, the skill asks the author. A record of an open pair of alternatives SHALL NOT be deleted, merged, split or given `dropped` by another rule (its section is left out, its last point moves away) until the author has said what becomes of the pair, and no `alternative_to` is left naming an `id` that is no longer in the file.
 - When a record that has `from` is split, each record that replaces it has in its `from` at least one locator of the original, and each locator of the original is in the `from` of at least one of them.
 - When a point moves to another paragraph record and the record it leaves has `from`, each locator of that `from` is added to the point's `basis`, so that the point keeps its source; a locator the point already has is not added again. A record is not left with no point: when the point that moves is the last one of its record, the skill asks the author whether that record is given a new point or is left out. Left out, a record with neither `from` nor `replaces` is deleted once the point has moved. A record with `from` or `replaces` can be neither deleted nor left without a point: the point moves with its `id`, and the record keeps a copy of the point's text as a point with a new `id` and is given `dropped` with the reason.
 - When the author leaves a paragraph out of the article and its record has `from` or `replaces`, the record is not deleted: it is given `dropped` with the reason. A record with neither that the author leaves out is deleted from the file.
@@ -3170,7 +3170,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix1
+source: idd-80-fix2
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace

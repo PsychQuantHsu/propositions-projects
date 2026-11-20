@@ -143,11 +143,11 @@ public enum OutlineCheck {
         if value.has("lines") {
             if !value.has("commit") { return "a locator has lines without commit" }
             let numbers = value["lines"]?.array ?? []
-            let pair = numbers.compactMap { item -> Int? in
-                guard case let .number(n) = item, !n.negative, !n.digits.isEmpty, n.exponent >= 0, n.digits.count + n.exponent <= 9 else { return nil }
-                return Int(n.digits + String(repeating: "0", count: n.exponent))
+            let pair = numbers.compactMap { item -> String? in
+                if case let .number(n) = item { return n.positiveInteger } else { return nil }
             }
-            if numbers.count != 2 || pair.count != 2 || pair[0] > pair[1] { return "lines is not a list of two line numbers, the first and the last" }
+            let ordered = pair.count == 2 && (pair[0].count < pair[1].count || (pair[0].count == pair[1].count && pair[0] <= pair[1]))
+            if numbers.count != 2 || !ordered { return "lines is not a list of two line numbers, the first and the last" }
         }
         if value.has("commit"), value["commit"]?.nonEmptyString == nil { return "commit is not a non-empty string" }
         return nil
@@ -166,7 +166,11 @@ public enum OutlineCheck {
     private static func locatorKey(_ value: JSONValue) -> [JSONKey]? {
         guard locatorProblem(value) == nil, let file = value["file"]?.string else { return nil }
         if let label = value["label"]?.string { return [JSONKey(file), JSONKey("label"), JSONKey(label)] }
-        if let starts = value["starts"]?.string { return [JSONKey(file), JSONKey("starts"), JSONKey(starts)] }
+        if let starts = value["starts"]?.string {
+            // As the resolver reads it: runs of white space are one space, and the ends are trimmed.
+            let squeezed = String(decoding: OutlineLocators.squeezed(Array(starts.utf8), trim: true), as: UTF8.self)
+            return [JSONKey(file), JSONKey("starts"), JSONKey(squeezed)]
+        }
         return nil
     }
 
@@ -307,6 +311,7 @@ public enum OutlineCheck {
                 report("sections is not a list of one or more entries")
                 continue
             }
+            var seenSections = Set<JSONKey>()
             for entry in entries {
                 let section = entry["section"]
                 let paragraphs = entry["paragraphs"]?.array
@@ -314,8 +319,14 @@ public enum OutlineCheck {
                 let copiesFit = (paragraphs ?? []).allSatisfy { copy in
                     copy.isObject && copy["id"]?.nonEmptyString != nil && sectionId != nil
                         && copy["section"]?.string.map(JSONKey.init) == sectionId.map(JSONKey.init)
+                        && !(copy["points"]?.array ?? []).isEmpty
+                        && (copy["points"]?.array ?? []).allSatisfy { $0["id"]?.nonEmptyString != nil && $0["text"]?.nonEmptyString != nil }
                 }
-                if !(section?.isObject ?? false) || sectionId == nil || paragraphs == nil || !copiesFit {
+                let sectionFits = section?["heading"]?.nonEmptyString != nil && section?["says"]?.nonEmptyString != nil
+                if let sectionId, !seenSections.insert(JSONKey(sectionId)).inserted {
+                    report("the section \(JSONValue.quoted(sectionId)) has two entries in one approval")
+                }
+                if !(section?.isObject ?? false) || sectionId == nil || !sectionFits || paragraphs == nil || !copiesFit {
                     report("an entry of sections does not hold a section record and a list of paragraph records")
                 }
             }
@@ -331,7 +342,10 @@ public enum OutlineCheck {
         guard s.count >= 20, digits(0..<4), s[4] == "-", digits(5..<7), s[7] == "-", digits(8..<10), s[10] == "T",
               digits(11..<13), s[13] == ":", digits(14..<16), s[16] == ":", digits(17..<19) else { return false }
         func number(_ range: Range<Int>) -> Int { Int(String(String.UnicodeScalarView(s[range]))) ?? -1 }
-        guard (1...12).contains(number(5..<7)), (1...31).contains(number(8..<10)), number(11..<13) <= 23,
+        let year = number(0..<4), month = number(5..<7)
+        let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+        let days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        guard (1...12).contains(month), (1...days[month - 1]).contains(number(8..<10)), number(11..<13) <= 23,
               number(14..<16) <= 59, number(17..<19) <= 60 else { return false }
         var i = 19
         if s[i] == "." {

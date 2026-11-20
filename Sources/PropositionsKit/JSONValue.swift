@@ -38,6 +38,13 @@ public struct JSONNumber: Hashable, Sendable {
         self.negative = significant.isEmpty ? false : negative
     }
 
+    /// The number as a positive whole number written out in digits, or nil when it is not one.
+    /// Two such numbers compare by length and then digit by digit, whatever their size.
+    public var positiveInteger: String? {
+        guard !negative, !digits.isEmpty, exponent >= 0, exponent <= 4096 else { return nil }
+        return digits + String(repeating: "0", count: exponent)
+    }
+
     /// Whether `jq`, which keeps a number as a double, reads this one as infinite (`1e400`).
     public var isBeyondDouble: Bool {
         guard !digits.isEmpty else { return false }
@@ -118,6 +125,8 @@ extension JSONValue {
             case "\"": out += "\\\""
             case "\\": out += "\\\\"
             case "\n": out += "\\n"
+            case "\u{08}": out += "\\b"
+            case "\u{0C}": out += "\\f"
             case "\t": out += "\\t"
             case "\r": out += "\\r"
             default:
@@ -250,24 +259,19 @@ private struct Parser {
             case UInt8(ascii: "t"): out.append(0x09)
             case UInt8(ascii: "u"):
                 var unit = try hex4()
-                var scalar: Unicode.Scalar? = nil
+                // A surrogate counts only as a pair, the high one first. One that stands alone
+                // names no character, and is refused: read as U+FFFD it would equal a real one.
+                let lone = JSONError(description: "an escape names half of a surrogate pair")
+                if (0xDC00...0xDFFF).contains(unit) { throw lone }
                 if (0xD800...0xDBFF).contains(unit) {
-                    // A high surrogate counts only with the low one that follows it.
-                    let saved = index
-                    if peek == UInt8(ascii: "\\"), index + 1 < bytes.count, bytes[index + 1] == UInt8(ascii: "u") {
-                        index += 2
-                        let low = try hex4()
-                        if (0xDC00...0xDFFF).contains(low) {
-                            unit = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00)
-                            scalar = Unicode.Scalar(unit)
-                        } else {
-                            index = saved
-                        }
-                    }
-                } else {
-                    scalar = Unicode.Scalar(unit)
+                    guard peek == UInt8(ascii: "\\"), index + 1 < bytes.count, bytes[index + 1] == UInt8(ascii: "u") else { throw lone }
+                    index += 2
+                    let low = try hex4()
+                    guard (0xDC00...0xDFFF).contains(low) else { throw lone }
+                    unit = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00)
                 }
-                out.append(contentsOf: Array(String(Character(scalar ?? "\u{FFFD}")).utf8))
+                guard let scalar = Unicode.Scalar(unit) else { throw lone }
+                out.append(contentsOf: Array(String(Character(scalar)).utf8))
             default: throw JSONError(description: "an escape inside a string is not one JSON has")
             }
         }
@@ -310,7 +314,9 @@ private struct Parser {
             guard !written.isEmpty else { throw failure }
             // The exponent is kept exactly, so that two numbers that differ stay different.
             // One too long to keep is refused: no outline needs it.
-            guard written.count <= 15, let size = Int(written) else {
+            // Zeros in front do not count; an exponent of more than fifteen digits is refused.
+            let significant = written.drop { $0 == "0" }
+            guard significant.count <= 15, let size = Int(significant.isEmpty ? "0" : significant) else {
                 throw JSONError(description: "a number has an exponent too long to keep")
             }
             exponent = sign * size

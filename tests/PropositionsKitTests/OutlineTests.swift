@@ -49,11 +49,13 @@ private let paragraphCases: [(String, String)] = [
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[1],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[2.5,-1],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[9,3],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[1000000001,1000000000],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"/etc/hosts","starts":"localhost"}]"#), "from: a locator's file is not a path from the root"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m\u202e.tex","label":"a"}]"#), "from: a locator's file name holds a control character"),
         (paragraph("p-1", "s-a", extra: #","replaces":[{"file":"m.tex","starts":7}]"#), "replaces: starts is not a string"),
         (paragraph("p-1", "s-a", extra: #","from":[{"outline":"b","id":"q"}]"#), "from: a reference to another outline stands where only locators go"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a"}],"replaces":[{"file":"m.tex","label":"a","starts":"x"}]"#), "a locator is in both from and replaces"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","starts":"The  bound"}],"replaces":[{"file":"m.tex","starts":" The bound"}]"#), "a locator is in both from and replaces"),
         (paragraph("p-1", "s-a", extra: #","uses":"p-0""#), "uses is not a list"),
         (paragraph("p-1", "s-a", extra: #","uses":[""]"#), "uses has an entry that is neither an id nor a reference to another outline"),
         (paragraph("p-1", "s-a", extra: #","uses":[{"outline":"b"}]"#), "uses: a reference to another outline is not an object with outline and id, and without file"),
@@ -64,13 +66,17 @@ private let paragraphCases: [(String, String)] = [
     ]
 
 private let approvalCases: [(String, String)] = [
-        (#"{"approved_at":"2026-11-13","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
-        (#"{"approved_at":"2026-11-13T16:30:00Z","statement":"","sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "statement is not a non-empty string"),
+        (#"{"approved_at":"2026-11-13","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
+        (#"{"approved_at":"2026-11-13T16:30:00Z","statement":"","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "statement is not a non-empty string"),
         (#"{"approved_at":"2026-11-13T16:30:00.5-05:00","statement":"ok","sections":[]}"#, "sections is not a list of one or more entries"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"}}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
-        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","whole":false,"sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "whole is not true"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","whole":false,"sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "whole is not true"),
         ("not json", "not a JSON object"),
-        (#"{"approved_at":"2026-99-99T99:99:99+99:99","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
+        (#"{"approved_at":"2026-02-30T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[{"id":"p","section":"s-a"}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]},{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, #"the section "s-a" has two entries in one approval"#),
+        (#"{"approved_at":"2026-99-99T99:99:99+99:99","statement":"ok","sections":[{"section":{"id":"s-a","heading":"A","says":"S."},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[{}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[{"id":"p","section":"s-b"}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
     ]
@@ -143,16 +149,20 @@ struct JSONValueTests {
 
     @Test func `Lines end at a line feed, and bytes that are not UTF-8 are not JSON`() {
         let crlf = Outline.lines(of: Data("{\"id\":\"a\"}\r\n\r\n{\"id\":\"b\"}\r\n".utf8))
-        #expect(crlf.map(\.number) == [1, 2, 3] && crlf[0].value?["id"]?.string == "a" && crlf[1].value == nil && crlf[2].value?["id"]?.string == "b")
+        #expect(crlf.map(\.number) == [1, 3] && crlf[0].value?["id"]?.string == "a" && crlf[1].value?["id"]?.string == "b")
         let bad = Outline.lines(of: Data([0x7B, 0x22, 0x61, 0x22, 0x3A, 0x22, 0xFF, 0x22, 0x7D, 0x0A]))
         #expect(bad.count == 1 && bad[0].value == nil)
         let nul = Outline.lines(of: Data([0x7B, 0x7D, 0x00, 0x78, 0x0A]))
         #expect(nul.count == 1 && nul[0].value == nil)
     }
 
-    @Test func `Escapes are read, and a lone surrogate becomes U+FFFD`() throws {
+    @Test func `Escapes are read, and half of a surrogate pair is refused`() throws {
         #expect(try JSONValue.parse(#""\ud83d\ude00\n\u0041""#).string == "😀\nA")
-        #expect(try JSONValue.parse(#""\ud83d x""#).string == "\u{FFFD} x")
+        for text in [#""\ud83d x""#, #""\ude00""#, #""\ud83d\u0041""#] {
+            #expect(throws: JSONError.self) { try JSONValue.parse(text) }
+        }
+        #expect(JSONValue.quoted("old\u{08}\u{0C}\u{01}\u{2028}") == #""old\b\f\u0001\u2028""#)
+        #expect(try JSONValue.parse("1e0000000000000000") == JSONValue.parse("1"))
     }
 }
 
@@ -406,7 +416,8 @@ struct OutlineCommandTests {
         let repository = try Repository(["o/outline-sections.jsonl": sectionA + "\n", "o/outline-paragraphs.jsonl": paragraph("p-1", "s-a") + "\n"])
         let locators = PropositionsCLI.run(["outline", "locators", "o", "--root", "."], workingDirectory: repository.root)
         #expect(locators == CommandResult(stdout: ["ok locators"], exitCode: 0))
-        #expect(PropositionsCLI.run(["outline", "locators", ".", "--root", "o"], workingDirectory: repository.root).exitCode == 2)
+        #expect(PropositionsCLI.run(["outline", "locators", "o", "--root", "o"], workingDirectory: repository.root)
+            == CommandResult(stderr: ["outline locators: the root o is not the root of a git repository"], exitCode: 2))
     }
 
     // spec-example: article-outline / a missing file and a wrong argument
@@ -437,6 +448,14 @@ struct OutlineCommandTests {
         try FileManager.default.createDirectory(at: approvals, withIntermediateDirectories: false)
         let status = PropositionsCLI.run(["outline", "status", "o"], workingDirectory: files.root)
         #expect(status == CommandResult(stderr: ["outline status: cannot read outline-approvals.jsonl in o"], exitCode: 2))
+    }
+
+    @Test func `An outline file that is a symbolic link is not read`() throws {
+        let files = try directory(["o/outline-sections.jsonl": sectionA + "\n", "elsewhere.jsonl": paragraph("p-1", "s-a") + "\n"])
+        try FileManager.default.createSymbolicLink(
+            at: files.root.appendingPathComponent("o/outline-paragraphs.jsonl"), withDestinationURL: files.root.appendingPathComponent("elsewhere.jsonl"))
+        #expect(PropositionsCLI.run(["outline", "check", "o"], workingDirectory: files.root)
+            == CommandResult(stderr: ["outline check: cannot read outline-paragraphs.jsonl in o"], exitCode: 2))
     }
 
     @Test func `Help for each subcommand`() {

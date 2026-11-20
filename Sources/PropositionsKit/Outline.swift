@@ -36,7 +36,11 @@ public struct Outline: Sendable {
     /// there; the approvals file does not.
     public init(directory: URL) throws {
         func text(_ name: String) -> Data? {
-            try? Data(contentsOf: directory.appendingPathComponent(name))
+            // A regular file only: a symbolic link could lead out of the directory, and a FIFO
+            // would hold the command.
+            let path = directory.appendingPathComponent(name).path
+            guard (try? FileManager.default.attributesOfItem(atPath: path))?[.type] as? FileAttributeType == .typeRegular else { return nil }
+            return FileManager.default.contents(atPath: path)
         }
         guard let sections = text(Outline.sectionFile) else { throw ReadError.missing(Outline.sectionFile) }
         guard let paragraphs = text(Outline.paragraphFile) else { throw ReadError.missing(Outline.paragraphFile) }
@@ -56,11 +60,13 @@ public struct Outline: Sendable {
 
     /// The lines of a file that are not empty, each read as JSON. Lines end at a line feed
     /// byte, so a file with CRLF line ends reads the same (the carriage return is white space
-    /// to JSON). A line that is not valid UTF-8 is not JSON.
+    /// to JSON, and a line that holds only one is empty). An empty line is passed over, as the
+    /// format says: every line that is not empty is one record. A line that is not valid UTF-8
+    /// is not JSON.
     static func lines(of data: Data) -> [OutlineLine] {
         var result: [OutlineLine] = []
         for (offset, line) in data.split(separator: 0x0A, omittingEmptySubsequences: false).enumerated()
-        where !line.isEmpty {
+        where !(line.isEmpty || Array(line) == [0x0D]) {
             let text = line.contains(0) ? nil : String(validatingUTF8: Array(line).map { CChar(bitPattern: $0) } + [0])
             result.append(OutlineLine(number: offset + 1, value: text.flatMap { try? JSONValue.parse($0) }))
         }

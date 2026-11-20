@@ -12,10 +12,21 @@ public enum OutlineLocators {
     /// Runs git and gives its exit status, or nil when git could not be started.
     public typealias Git = @Sendable (_ directory: URL, _ arguments: [String]) -> Int32?
 
+    /// The environment git is run with: the caller's, without the variables that make git answer
+    /// for another repository than the one the directory is in.
+    static var environment: [String: String] {
+        var all = ProcessInfo.processInfo.environment
+        for name in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_NAMESPACE", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX"] {
+            all[name] = nil
+        }
+        return all
+    }
+
     public static let git: Git = { directory, arguments in
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["git", "-c", "safe.bareRepository=explicit", "-c", "core.fsmonitor=false", "-C", directory.path] + arguments
+        process.environment = environment
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
@@ -29,6 +40,7 @@ public enum OutlineLocators {
         let process = Process(), pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["git", "-c", "safe.bareRepository=explicit", "-c", "core.fsmonitor=false", "-C", root.path, "rev-parse", "--show-toplevel"]
+        process.environment = environment
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice

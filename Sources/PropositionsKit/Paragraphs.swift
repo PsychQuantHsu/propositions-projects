@@ -93,7 +93,8 @@ public enum Paragraphs {
             if let named = location.file, named.hasPrefix("/") {
                 throw Failure(message: "location \(shown) of \(name) names a file that is not in the manuscript's input tree")
             }
-            let key = location.file.map(ReadingOrder.normalise).flatMap { $0 == "main.tex" ? nil : $0 }
+            // Exactly `main.tex` is the main file, as in the Python tool; `./main.tex` is not.
+            let key = location.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
             let file = key ?? ""
             if runsByFile[file] == nil {
                 guard let text = try lines(key) else {
@@ -168,7 +169,19 @@ public enum ParagraphsRun {
         func regularFile(_ url: URL) -> String? {
             var info = stat()
             guard stat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return nil }
-            return try? String(contentsOf: url, encoding: .utf8)
+            // Strict UTF-8 that keeps a byte-order mark where it is, as Python's text read does:
+            // a row that starts with one is then not JSON, in both tools.
+            guard let data = FileManager.default.contents(atPath: url.path) else { return nil }
+            var scalars = String.UnicodeScalarView()
+            var decoder = UTF8()
+            var bytes = data.makeIterator()
+            while true {
+                switch decoder.decode(&bytes) {
+                case .scalarValue(let scalar): scalars.append(scalar)
+                case .emptyInput: return String(scalars)
+                case .error: return nil
+                }
+            }
         }
         // The same order of checks as the Python tool: the main file, the structure, the ledger.
         let mainURL = resolve(tex)

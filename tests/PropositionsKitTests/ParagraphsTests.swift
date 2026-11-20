@@ -59,8 +59,13 @@ struct ParagraphsTests {
              ledger: line("a", "L1") + "\n" + line("b", "L2") + "\n" + line("c", "L4") + "\n"),
         Case(name: "a row that is white space outside JSON's only", tex: tex, ledger: line("a", "L1") + "\n\u{A0}\n" + line("b", "L4") + "\n"),
         Case(name: "a row with white space outside JSON's before the object", tex: tex, ledger: "\u{A0}" + line("a", "L1") + "\n"),
+        // The id with the composed letter is second in its run; only the other spelling starts a
+        // section. Compared by code points it does not split the run.
         Case(name: "a section start in another spelling of the same letters", tex: tex,
-             ledger: line("caf\u{E9}", "L1") + "\n" + line("x", "L2") + "\n", structure: "{\"sections\":[{\"first_prop\":\"cafe\u{301}\"},{\"first_prop\":\"x\"}]}"),
+             ledger: line("x", "L1") + "\n" + line("caf\u{E9}", "L2") + "\n", structure: "{\"sections\":[{\"first_prop\":\"cafe\u{301}\"}]}"),
+        Case(name: "a ledger that starts with a byte-order mark", tex: tex, ledger: "\u{FEFF}" + line("a", "L1") + "\n"),
+        Case(name: "a structure sidecar that starts with a byte-order mark", tex: tex, ledger: line("a", "L1") + "\n", structure: "\u{FEFF}{}"),
+        Case(name: "the main file written with a dot before it", tex: tex, ledger: line("a", "./main.tex:L1") + "\n"),
         Case(name: "sections that is an object", tex: tex, ledger: line("a", "L1") + "\n" + line("b", "L2") + "\n", structure: #"{"sections":{"first_prop":"b"}}"#),
         Case(name: "a location in another file", tex: tex, ledger: line("a", "sections/a.tex:L1") + "\n"),
         Case(name: "a location from the root of the file system", tex: tex, ledger: line("a", "/main.tex:L1") + "\n"),

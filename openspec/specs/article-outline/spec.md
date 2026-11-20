@@ -216,12 +216,31 @@ Each line of `outline-sections.jsonl` SHALL be a section record with these keys.
 | `role` | no | One of `abstract`, `introduction`, `background`, `formal_setup`, `method`, `results`, `proofs`, `discussion`, `conclusion`, `appendix` |
 | `parent` | no | The `id` of a section record on an earlier line |
 | `dropped` | no | A non-empty string giving the reason the section is left out of the article |
+| `moved_to` | no | A non-empty string naming where a section that is left out goes: another article, or a part that has no outline here. Only on a record that carries `dropped` |
+| `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the main text |
 
 The order of the lines SHALL be the order of the sections in the article. A heading, a label or a list of topics is not a sentence stating what the section says.
 
 A section record that carries `dropped` is not part of the article. It stays in the file so that the records naming it, and their sources, stay on record. Every paragraph record naming a section that carries `dropped` SHALL carry `dropped` too, and so SHALL every section record that names it as `parent`.
 
-No executable check: this change adds no test target; the examples and tests of this requirement are deferred to issue 78, which follows the Swift package (issue 46).
+No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
+
+`part` says where the section is printed and `role` what it does in the argument; `part` SHALL NOT change the order of the sections or what the premise check does. The write check SHALL report a `part` that is not one of the three values and a `moved_to` that is not a non-empty string on a record that carries `dropped`.
+
+#### Scenario: An appendix of proofs
+
+- **WHEN** the author says the section of proofs is in the appendix
+- **THEN** its section record carries `part` `appendix` and can carry `role` `proofs`
+
+#### Scenario: A section that goes to the second paper
+
+- **WHEN** a manuscript is cut into two articles and its section on extensions goes to the second one
+- **THEN** in the first article's outline the section record carries `dropped` with the reason and `moved_to` naming the second article, and it is not deleted
+
+#### Scenario: A part the format does not know
+
+- **WHEN** a section record carries `part` `online`
+- **THEN** the write check reports the line and prints no `ok` line
 
 #### Scenario: A heading is not what the section says
 
@@ -240,8 +259,8 @@ No executable check: this change adds no test target; the examples and tests of 
 
 
 <!-- @trace
-source: idd-75-fix1
-updated: 2026-11-15
+source: idd-92-per-article
+updated: 2026-11-20
 code:
   - propositions-projects.code-workspace
 -->
@@ -260,8 +279,9 @@ Each line of `outline-paragraphs.jsonl` SHALL be a paragraph record with these k
 | `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists and from cross-references that point elsewhere |
 | `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
 | `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
-| `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
+| `uses` | no | A list whose entries are ids, each the `id` of a paragraph record on an earlier line or of a point of such a record, or references to another outline |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
+| `moved_to` | no | A non-empty string naming where a paragraph that is left out goes. Only on a record that carries `dropped` |
 | `note` | no | A string for the author |
 
 A point SHALL be an object with these keys.
@@ -270,7 +290,7 @@ A point SHALL be an object with these keys.
 | --- | --- | --- |
 | `id` | yes | A non-empty string, different from the `id` of every other point and of every paragraph record |
 | `text` | yes | One complete sentence stating one key point of the paragraph |
-| `basis` | no | A list of one or more locators naming what supports the point |
+| `basis` | no | A list of one or more entries naming what supports the point: locators, or references to another outline |
 | `pending` | no | A non-empty string naming what the author still has to supply before the point can be written |
 
 A record with one point states, in that point, what the whole paragraph says. A record with several points states one key point of the paragraph in each, in the order the paragraph makes them.
@@ -284,6 +304,18 @@ The write check SHALL report an `edits` that is not a non-empty string on a reco
 The paragraph records SHALL be grouped by section: the records naming one section are on consecutive lines, and the groups come in the order of the section file. Inside a group, the order of the lines is the order of the paragraphs in the section. A paragraph record that carries `dropped` is not part of the article and keeps its line in its group. A section is allowed to have no paragraph record.
 
 No executable check: the checks of this requirement are shell commands in the skill's instructions, and this change adds no test of them to the repository; its acceptance ran outside the repository, and tests in the Swift test target are deferred to issue 78.
+
+An outline is one article. When a manuscript is cut into several articles, each article SHALL have its own outline directory. A reference to another outline is an object with `outline`, the path of that outline's directory from the repository's root, and `id`, the `id` of a paragraph record or of a point in its paragraph file; it has no `file`. The other outline SHALL be in the same repository and SHALL NOT be this outline. The skill SHALL confirm that the directory is inside the repository and outside `.git`, that its paragraph file is a regular file that is not a symbolic link and is JSON, and that the `id` is in it; a reference that fails one of these does not resolve and is reported as a finding of the sixth kind of the premise check. Nothing else is checked: the skill does not read what the other record says, whether it carries `dropped`, or whether the other article comes first, and the premise check does not judge a point against it. A point whose `basis` holds such a reference has a `basis`. A reference to another outline is not a locator and is not resolved as one.
+
+#### Scenario: A point that rests on a result of the first paper
+
+- **WHEN** a point of the second article's outline has in its `basis` `{"outline": "paper-a/propositions", "id": "p-12.1"}`, and the paragraph file in that directory has a point with that `id`
+- **THEN** the reference resolves, and the premise check reports nothing about it
+
+#### Scenario: Six references that do not resolve
+
+- **WHEN** references name an `id` that is not in the other outline, a directory outside the repository, a directory inside `.git`, a directory with no paragraph file, this outline's own directory, and an object with `outline` and no `id`
+- **THEN** each is reported with the record that names it, as a reference that does not resolve
 
 #### Scenario: One point is the paragraph's topic sentence
 
@@ -327,7 +359,7 @@ No executable check: the checks of this requirement are shell commands in the sk
 
 
 <!-- @trace
-source: idd-80-fix6
+source: idd-92-per-article
 updated: 2026-11-20
 code:
   - propositions-projects.code-workspace

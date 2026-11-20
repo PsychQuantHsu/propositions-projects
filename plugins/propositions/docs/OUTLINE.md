@@ -364,8 +364,8 @@ the `id` of a paragraph record or of a point in its paragraph file. It has no
 `file`. An object with `outline` is always such a reference and never a
 locator, however it is written; it goes in `uses` and `basis` only, and one in
 `from` or `replaces` is reported. The other outline is in the same repository
-(its root directory included; not a submodule, not a repository of its own
-under it), and is not this outline: a record of the same outline is named by
+(its root directory included; not a submodule, checked out or not, and not
+a repository of its own under it), and is not this outline: a record of the same outline is named by
 its `id` alone. The skill confirms that the directory is in the repository
 and outside `.git`, that its paragraph file is a regular file, not a symbolic
 link, that is JSON, and that the `id` is that of a paragraph record or of a
@@ -373,7 +373,10 @@ point in it (a section record's `id` is not). A reference that fails one of
 these does not resolve and is a finding of the sixth kind, as is a `uses`
 that is not a list or an entry of it that is neither a non-empty id nor a
 reference.
-Derive, draft and revise go on only when none is left. Nothing else is checked: the skill does not read what the other
+Derive, draft and revise go on only when none is left, and revise checks
+after every edit of the paragraph file: a record of another outline may have
+gone since the last check. With an empty paragraph file there is no reference
+to check. Nothing else is checked: the skill does not read what the other
 record says, whether it carries `dropped`, or whether the other article comes
 first, and the premise check does not judge a point against it. Whether two
 articles that reuse one passage of the manuscript say the same thing about it

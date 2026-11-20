@@ -595,12 +595,17 @@ F="$SEC"
            | .[] | select($para and (.r | type == "object"))
            | select(.r | has("alternative_to") and (.alternative_to as $a | ($a | type) != "string" or $a == .id or (any($ids[]; . == $a) | not)))
            | "line \(.l): alternative_to does not name another paragraph record"),
+      (map(select($para and (.r | type == "object"))) as $all
+           | $all[] | select((.r | has("dropped") | not) and (.r.alternative_to | type) == "string") | .r.alternative_to as $a | .l as $l
+           | select(any($all[]; .r.id == $a and (.r | has("dropped"))))
+           | "line \($l): alternative_to names a record that carries dropped; the key belongs on the record that is not chosen"),
       (map(select($para and (.r | type == "object") and (.r | has("dropped") | not))) as $live
-           | $live[] | select((.r.alternative_to | type) == "string") | .r.alternative_to as $a | .r.id as $me | .l as $l
-           | select($a != $me and any($live[]; (.r.id == $a and (.r | has("alternative_to"))) or (.l != $l and .r.alternative_to == $a) or (.r.alternative_to == $me)))
-           | "line \($l): its alternative is part of another pair of alternatives"),
+           | [$live[] | select((.r.alternative_to | type) == "string") | . as $x | select($x.r.alternative_to != $x.r.id and any($live[]; .r.id == $x.r.alternative_to)) | {l: $x.l, a: $x.r.id, b: $x.r.alternative_to}] as $open
+           | $open[] | . as $p
+           | select(any($open[]; .l != $p.l and (.a == $p.a or .a == $p.b or .b == $p.a or .b == $p.b)))
+           | "line \($p.l): its alternative is part of another pair of alternatives"),
       (.[] | select($para and (.r | type == "object"))
-           | select(.r | ([.from[]?]) as $f | any((.replaces | arrays | .[]); . as $x | any($f[]; . == $x)))
+           | select(.r | ([.from | arrays | .[]]) as $f | any((.replaces | arrays | .[]); . as $x | any($f[]; . == $x)))
            | "line \(.l): a locator is in both from and replaces"),
       (.[] | select(.r | type == "object")
            | select([.r.id, (if $para then (.r.points[]? | if type == "object" then .id else null end) else empty end)] | any(type != "string" or length == 0))
@@ -622,7 +627,9 @@ a key included, holds a control character; every record has an `id` that is a no
 string, and in the paragraph file every point has one too, and no `id` repeats among the records of the file and, in the paragraph
 file, their points; in the paragraph file, `points`, where a record has it, is a list,
 `edits` is a non-empty string on a record that carries `carry`, `alternative_to` names another
-paragraph record of the file, no record without `dropped` is in two pairs of alternatives (two
+paragraph record of the file, a record without `dropped` does not name one that carries
+`dropped` (after a choice the key is on the record that was not chosen), no record is in two
+open pairs of alternatives (a pair is open while neither of its records carries `dropped`; two
 records naming each other count as two), and no locator is in both the `from` and the
 `replaces` of a record. The
 shape of a key that a section record carries and this skill does not define is not checked, a
@@ -966,13 +973,20 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   carried the key, take it off that record and put it on the other. Do not delete the record
   that is not chosen, whether or not it has `from`.
 - **A record that is one of two alternatives.** Before a record that carries `alternative_to`,
-  or that another record names in it, is deleted, merged or split, ask the author what becomes
-  of the pair: the choice is made (the rule above), the other record names the replacement, or
+  or that another record names in it, is deleted, merged, split or given `dropped` by any rule
+  below (its section is left out, its last point moves away, the author leaves it out), while
+  neither record of the pair carries `dropped`, ask the author what becomes of the pair: the choice is made (the rule above), the other record names the replacement, or
   the pair is given up and the key is removed. Do not leave an `alternative_to` that names an
   `id` no longer in the file.
 - **Merging a source with a replaced passage.** When one of the records to merge has a locator
-  in `from` that another has in `replaces`, do not merge: ask the author which of the two the
-  passage is for the merged paragraph.
+  in `from` that another has in `replaces`, do not merge yet: ask the author which of the two
+  the passage is for the merged paragraph. The answer is the author's instruction to take the
+  locator out of the other list on the record that has it there; do that first, then merge.
+  When the author wants the passage kept in both roles, the records are not merged.
+- **Merging and splitting a moved block.** A record that replaces a record with `carry` and
+  `edits`, and still stands for the moved block, keeps `carry` and the `edits` that apply to
+  it. When the changes cannot be divided between the new records, or a new record no longer
+  stands for a moved block, ask the author before writing.
 - **Merge.** The `from` of the record that replaces the merged records holds every locator of
   the records it replaces, and its `replaces` every locator of their `replaces`.
 - **Split and `replaces`.** When the original has `replaces`, each locator of it is in the
@@ -1280,6 +1294,11 @@ asks, through revise.
      `alternative_to` when neither carries `dropped`, both records together with the sentence
      that only one of them will stay. When the other record of such a pair is in a section
      that is not shown, show it as background and say that it is not part of this approval.
+     A record that carries `dropped` and `alternative_to` is shown with the record it names
+     and the sentence that this one was not chosen and that one was. Put every text taken
+     from a record (`edits`, a locator, an `id`, a point) inside a code span or a code block,
+     so that nothing in it is rendered as a link, as markup or as a heading; the labels and
+     the sentences above are this skill's and stand outside it.
 
    When every section of the file is shown, show three more things before the sections, from
    the second command of status. An approval of all of them is an approval of the whole

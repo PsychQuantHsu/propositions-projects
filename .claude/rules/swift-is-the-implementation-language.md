@@ -4,9 +4,11 @@
 當時 #33 剛合併，又多了三支 Python 工具和第一個外部依賴 PyYAML。
 
 **現況（2026-11-20 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
-與測試 target，共 21 個 Swift 檔。裡面有兩組檢查：引用方向（`propositions cite-order`，#46）與綱要三個檔的格式、狀態、
+與測試 target，共 22 個 Swift 檔。裡面有兩組檢查：引用方向（`propositions cite-order`，#46）與綱要三個檔的格式、狀態、
 來源指標（`propositions outline check`、`status`、`locators`，#78）。發布過的 binary（`propositions-cli-v0.1.0`）只有前者；
-plugin 還沒有辦法取得 binary，所以沒有 skill 呼叫它。其餘受追蹤的可執行程式碼是 72 個 Python 檔、4 個 shell 檔，
+propositions plugin 在 session 開始時用 hook 取得鎖定版本的 binary（只有 macOS；`hooks/fetch-cli.sh`，#46），
+`/propositions:propositions` 的 Operation A 經由 `hooks/run-cli.sh` 呼叫 `cite-order`；綱要的三個子命令還沒有 skill 呼叫（#102）。
+其餘受追蹤的可執行程式碼是 72 個 Python 檔、6 個 shell 檔，
 另外有 3 段寫在 SKILL.md 裡的 Python 程式（見〈既有檔〉）。skill 用 `python3 "$VALIDATOR"` 這類寫法呼叫
 plugin 內的腳本，所以使用者端要有 Python 3.10 以上；帳冊附檔用到 `move`／`type` 時還要裝 PyYAML。
 
@@ -46,16 +48,22 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 這是封閉列舉，只有四類，不得依性質相似類推出第五類。
 
 1. **Swift binary 還不存在、或使用端沒有 binary 時才需要的殼層。** 這一類只有三種：
-   - plugin 取得 binary 的 wrapper。放在哪裡、下載後怎麼驗證還沒有定（見本條末段），**不要照抄
-     Akashic-Library 把它放進 plugin 的 `bin/`**；
+   - plugin 取得並啟動 binary 的殼層：propositions plugin 的 `hooks/fetch-cli.sh`（SessionStart hook）與
+     `hooks/run-cli.sh`（skill 經由它呼叫 binary），做法見本條末段。
+     **不要照抄 Akashic-Library 把它放進 plugin 的 `bin/`**；
    - 編排 `codesign`、`notarytool` 的 release 腳本，照 Akashic-Library 的 `scripts/release-signed.sh` 寫；
    - 根目錄 `scripts/` 的轉接層，但只限於使用者依〈移植〉第 6 步決定保留它們之後，改寫成只取得並呼叫
      binary 的版本。
 
    **它們只做串接**：檢查 binary 在不在、下載、依序呼叫外部 CLI。裡面一旦出現領域判斷，就把它移進
-   Swift。目前這一類有 1 個檔：`scripts/release-signed.sh`（簽章發布，只由維護者執行）。下載 binary 的
-   wrapper 還沒有：plugin 的目錄一旦有 `bin/`，claude.ai 與 Cowork 就不安裝這個 plugin，而且裡面的檔會出現在
-   Bash 工具的 PATH 上；怎麼發給 plugin、下載後怎麼驗證，等第一次發布時由維護者決定（#46）。
+   Swift。目前這一類有 3 個檔：`scripts/release-signed.sh`（簽章發布，只由維護者執行），以及
+   `plugins/propositions/hooks/` 的 `fetch-cli.sh` 與 `run-cli.sh`。用 SessionStart hook 取得 binary 是維護者
+   2026-11-20 定的；細節是實作時取的：`fetch-cli.sh` 在 session 開始時把 `hooks/cli.lock` 鎖定的那一版下載到
+   plugin 的資料目錄（`CLAUDE_PLUGIN_DATA` 底下的 `bin/`，檔名帶鎖定的 SHA-256，每一版一個路徑；不是 plugin 目錄的 `bin/`：plugin 的目錄一旦有 `bin/`，
+   claude.ai 與 Cowork 就不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的 PATH 上），下載的檔要同時有鎖定的
+   SHA-256 與鎖定那個 Team 的 Developer ID 簽章才安裝。`run-cli.sh` 每次執行前再比對一次 SHA-256，只執行鎖定的
+   那一版；其他情形印出 `propositions: NOT RUN` 並以 3 結束，skill 把那一項回報成沒有檢查。skill 裡因此只有一行
+   呼叫 `run-cli.sh` 的指令列（〈不適用〉第 1 類）。
 2. **本規則成文前就已存在的程式碼（grandfathered）**，逐項列在下方〈既有檔〉。
    - 可以修 bug，也可以做不改變行為的小改，例如改訊息字句、補註解、重新命名區域變數。
    - 不得在它們旁邊新增同類檔案，也不得加入下列任何一種新功能。這是封閉列舉，只有四種：
@@ -94,8 +102,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
    **退場條件**：`propositions` CLI 的子命令涵蓋上面列的每一項工作之後，把這份 SKILL.md 的指令區塊換成
    呼叫子命令，然後刪掉這一條例外。#78 做的是寫入檢查、來源指標與狀態三項；其餘幾項還沒有子命令時，
-   那幾項照這一條留著，這一條也留著。現在不寫成 Swift 的原因是綱要的
-   子命令還沒有寫（package 已由 #46 建好，binary 也還沒有發布）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
+   那幾項照這一條留著，這一條也留著。現在 skill 還不呼叫子命令的原因有兩個：plugin 鎖定的 binary（0.1.0）沒有
+   綱要的子命令，而且 16 項裡只有 3 項有子命令（#102）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
 
 ## 不適用
 
@@ -135,7 +143,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
    - 參考稿件在作者的私有 repo，位置不寫進這個公開 repo；需要時問使用者。
    - 刻意的差異逐條列在該次的 issue。
 3. **先發布，再換呼叫端。** 還沒有 release 時，先依〈例外〉第 1 類建立發布腳本；plugin 怎麼取得 binary
-   由維護者在第一次發布時決定（〈例外〉第 1 類末段）。發布簽過章的
+   照〈例外〉第 1 類末段：SessionStart hook 取得 `hooks/cli.lock` 鎖定的那一版，skill 經由 `hooks/run-cli.sh` 呼叫；
+   不在 plugin 的目錄放 `bin/`。發布之後要在同一個 plugin 變更裡改 `cli.lock`，plugin 才會換用新的 binary。發布簽過章的
    release 會讓檔案離開這台電腦，依全域 `CLAUDE.md`〈不可逆的事 Claude 不自己做〉，先列 operation
    格式等使用者確認。發布後用 plugin 實際取得的那份 binary 跑一次要切換的 skill。
 4. **同一個變更改掉所有指向舊 `.py` 的地方**：skill（含 SKILL.md 裡的程式區塊）、`plugins/*/rules/`
@@ -156,7 +165,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
   `apple-xcode-skills:test-modernizer`。
 - 外部套件比照 AkashicKit：YAML 用 Yams，命令列用 swift-argument-parser。
 - binary 隨 GitHub release 發布，簽章並 notarize（`scripts/release-signed.sh`，流程見 `docs/RELEASE-FLOW.md`）。
-  plugin 怎麼取得它還沒有定，不照 Akashic-Library 放 `bin/`（〈例外〉第 1 類末段）。
+  plugin 用 SessionStart hook 取得鎖定的版本，不照 Akashic-Library 放 `bin/`（〈例外〉第 1 類末段）；發布新的
+  binary 之後要改 `hooks/cli.lock` 的版本與 SHA-256，plugin 才會換用它。
   `plugin.json` 的版本和 binary 的 release tag 分開記，原因見 Akashic-Library #275：只改 plugin 外殼時
   也會升版本，但那個版本並沒有對應的 release。
 
@@ -219,8 +229,9 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 | 2026-11-17 | #75 第五輪驗證指出：第 4 類說整個指令區塊都算，接著列的 12 項工作卻漏了三段（確認還沒有綱要檔、顯示綱要目錄、記下展示了哪些節），退場條件依這份清單，於是那三段沒有退場條件 | 清單補成 14 項，對那份 SKILL.md 的 19 段指令逐段對過。**清單要跟著指令區塊走**：在那份 SKILL.md 加一段指令時，同一個變更裡把它做的事加進清單 |
 | 2026-11-19 | 本檔原本要 plugin 的 wrapper 照 Akashic-Library 的 `plugin/bin/akashic-mcp-wrapper.sh` 寫。#46 照做之後，驗證查到 Claude Code 的 plugin 文件：plugin 目錄有 `bin/` 時 claude.ai 與 Cowork 不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的 PATH 上 | 〈例外〉第 1 類、〈移植〉第 3 步、〈寫 Swift 之前〉三處改成「還沒有定、不放進 `bin/`」。這是實作時取的做法，維護者尚未確認，第一次發布時決定。Akashic-Library 的 wrapper 由 `.mcp.json` 呼叫、後面有已發布的 binary，情形不同 |
 | 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：判斷 `retired` 區塊是否格式正確、讀 `location`、數稿件檔的行。#46 的驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **三件事各有一個對齊的對象**：`retired` 照驗證器的 `retired_problem`，`location` 照 `parse_location_v16`，數行照寫 `location` 的工具 `refresh-prop-locations.py` 的 `read_tex_lines`（行在 LF、CR、CRLF 結束）。`tests/PropositionsKitTests/ParityTests.swift` 直接載入這三個 Python 函式、拿同一組輸入餵兩邊比對，改其中一邊而另一邊沒跟上時會失敗；改這三個 Python 函式時同一個變更要改 `Sources/PropositionsKit/`。`\input` 樹 Swift 版用自己的規則讀（寫在規格 `citation-order`），不是 `resolve_input_tree` 的副本（#94） |
+| 2026-11-20 | #46 的 binary 發布之後，維護者決定 plugin 用 SessionStart hook 取得它（「照你的建議，先做第 1 題」）。實作時的試跑把 binary 寫進了另一個 plugin 的資料目錄：shell 環境裡留著那個 plugin 的 `CLAUDE_PLUGIN_DATA` | 〈例外〉第 1 類改成現在的寫法。hook 只寫進名稱是 `propositions` 或以 `propositions-` 開頭的資料目錄，有測試。**skill 裡不要直接信任 shell 環境的 `CLAUDE_PLUGIN_DATA`**：Bash 工具的環境沒有這個 plugin 的值，有的話是別的 plugin 的；路徑要寫在 SKILL.md 的內文裡，由 Claude Code 載入時代換 |
 
 ## 語言組成（2026-11-20 量，只計受追蹤的檔）
 
-Swift 21、Python 72、shell 4（其中 1 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 22、Python 72、shell 6（其中 3 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

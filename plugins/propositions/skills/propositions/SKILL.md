@@ -64,6 +64,31 @@ Report by exit code:
 | `[FAIL]` line (exit 1) | report FAIL; surface the failing rule + offending prop IDs, then triage below |
 | crash / exit 2 | tool error — show stderr |
 
+### Citation direction (`order:cites`)
+
+After the validator, run the citation-direction check. It is a command of the `propositions`
+command-line tool, which the plugin's session-start hook fetches on macOS (a signed release,
+checked against the SHA-256 and the signing team pinned in `hooks/cli.lock`). `run-cli.sh` runs
+that binary only when it is the pinned one, and otherwise prints `propositions: NOT RUN` with the
+reason and exits 3. The pinned binary can be missing on another system, when the session that
+would have fetched it started without a network, or when the plugin was loaded without its hooks;
+once it is installed, none of these keeps the check from running. The two paths are written as
+`--jsonl=` and `--tex=` so that a path is never read as an option.
+
+```bash
+bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" cite-order --jsonl="$JSONL" --tex="$TEX"
+```
+
+Only exit 0 means that the citation direction was checked.
+
+| Result | Action |
+|--------|--------|
+| exit 0, no warning | report that no proposition cites a later one |
+| exit 0, warnings | list them. A warning does not fail Operation A: a roadmap or a promissory note may point forward, and the author judges each one |
+| exit 1 | the check is incomplete: show what it could not read, and report the citation direction as **not checked** |
+| exit 3 (`NOT RUN`) | report the citation direction as **not checked**, with the reason printed |
+| exit 2, or any other result (the command could not start, or was stopped) | report the citation direction as **not checked**, and show what was printed |
+
 ### R1-R13 coverage (the validator's contract)
 
 | Rule | Invariant |

@@ -71,4 +71,4 @@ gh release create "${TAG}" --title "propositions CLI v${VERSION}" \
   "${OUT}/${BINARY}" "${OUT}/${BINARY}.sha256"
 
 echo "released ${TAG}; sha256 $(cat "${OUT}/${BINARY}.sha256")"
-echo "No plugin downloads this binary yet: how a plugin fetches and verifies it is a later change."
+echo "A plugin keeps the version in its hooks/cli.lock: set version and sha256 there, in a plugin release, to move it to this one."

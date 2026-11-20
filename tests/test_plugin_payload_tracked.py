@@ -506,6 +506,7 @@ OBL_INVENTORY = (
     *(f"records:V{n}" for n in range(1, 7)),
     "coverage:text",
     "order:ledger",
+    "order:cites",
     *(f"audit:R{n}" for n in range(1, 4)),
     *(f"proofread:L{n}" for n in range(1, 6)),
     *(f"proofread:E{n}" for n in range(1, 8)),
@@ -533,7 +534,7 @@ OBL_PINNED_GAPS = {
     "index.profile-fits-manuscript": ("precondition", 70),
     "truth.cited-work-agrees": ("obligation", 50),
 }
-OBL_REQUIRED_OWNERS = (46, 49, 50, 55, 62, 66, 70)
+OBL_REQUIRED_OWNERS = (49, 50, 55, 62, 66, 70)
 # The entries whose check has to consult a source outside the manuscript's
 # repository. The mark is a key of its own, not a value of verified_by: two of
 # the four are decided by a reading, and the mark has to outlive the gap.
@@ -817,7 +818,7 @@ def _accounting_problems(table, vocabulary) -> list[str]:
 
 OBL_REVIEWED_BACKWARD = {
     "class": "obligation", "group": "dependence", "unit": "proposition", "applies": {"cites": ["present"]},
-    "check": "gap", "owner": 46, "verified_by": ["mechanical"], "on_warning": "judge",
+    "check": "order:cites", "owner": None, "verified_by": ["mechanical"], "on_warning": "judge",
 }
 
 
@@ -953,7 +954,13 @@ def _small_table() -> dict:
                 "id": "dependence.cites-backward", "class": "obligation", "group": "dependence",
                 "unit": "proposition", "applies": {"cites": ["present"]},
                 "criterion": "Every proposition this one cites comes earlier in reading order.",
-                "check": "gap", "owner": 46, "verified_by": ["mechanical"], "on_warning": "judge",
+                "check": "order:cites", "verified_by": ["mechanical"], "on_warning": "judge",
+            },
+            {
+                "id": "dependence.symbols-introduced", "class": "obligation", "group": "dependence",
+                "unit": "proposition",
+                "criterion": "Every symbol the proposition uses was introduced earlier.",
+                "check": "gap", "owner": 55, "verified_by": ["mechanical"], "on_warning": "judge",
             },
             {
                 "id": "support.cites-imply", "class": "obligation", "group": "support",
@@ -971,7 +978,8 @@ def _obl_entry(table: dict, entry_id: str) -> dict:
 
 
 INDEX_ROW = "index.text-in-manuscript"
-GAP_ROW = "dependence.cites-backward"
+BACKWARD_ROW = "dependence.cites-backward"
+GAP_ROW = "dependence.symbols-introduced"
 MODEL_ROW = "support.cites-imply"
 
 
@@ -1146,7 +1154,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (49, 50, 55, 62, 66, 70):   # 46 is in the small table
+    for owner in (49, 50, 62, 66, 70):   # 55 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
     for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
         assert _names(problems, [entry_id, "external_source"]), problems
@@ -1154,12 +1162,16 @@ def test_obligations_reviewed_entries_are_required():
 
 def test_obligations_reviewed_entry_cannot_be_changed():
     table = _small_table()
-    _obl_entry(table, GAP_ROW)["on_warning"] = "info"
-    assert _names(_reviewed_problems(table), [GAP_ROW, "on_warning"])
-    # The reviewed gap keeps the propositions it is decided for.
+    _obl_entry(table, BACKWARD_ROW)["on_warning"] = "info"
+    assert _names(_reviewed_problems(table), [BACKWARD_ROW, "on_warning"])
+    # The reviewed entry keeps the propositions it is decided for.
     table = _small_table()
-    _obl_entry(table, GAP_ROW)["applies"] = {"cites": ["absent"]}
-    assert _names(_reviewed_problems(table), [GAP_ROW, "applies"])
+    _obl_entry(table, BACKWARD_ROW)["applies"] = {"cites": ["absent"]}
+    assert _names(_reviewed_problems(table), [BACKWARD_ROW, "applies"])
+    # It keeps its check, and stays without an owner: it is no longer a gap.
+    table = _small_table()
+    _obl_entry(table, BACKWARD_ROW).update(check="gap", owner=46)
+    assert _names(_reviewed_problems(table), [BACKWARD_ROW, "check"])
     # An entry the spec does not name for it cannot gain the mark for an outside source.
     table = _small_table()
     _obl_entry(table, INDEX_ROW)["external_source"] = True
@@ -1195,7 +1207,7 @@ def test_obligations_reviewed_info_entry_keeps_its_rule():
 # spec-example: article-obligations / a document that names three entries
 def test_obligations_document_cannot_copy_the_table():
     table = _small_table()
-    text = " ".join(entry["id"] for entry in table["entries"])
+    text = " ".join(entry["id"] for entry in table["entries"][:3])
     assert _names(_document_problems(text, table), ["3", "entry ids"])
 
 
@@ -1374,7 +1386,7 @@ def test_obligations_forward_citation_entry(obligations):
 
 
 OBL_REVIEWED_ROWS = [
-    ("dependence.cites-backward", None, "obligation", "judge"),
+    ("dependence.cites-backward", "order:cites", "obligation", "judge"),
     (None, "structure:S6", "obligation", "judge"),
     ("index.arcs-do-not-cross", "structure:S7", "precondition", "info"),
     ("index.proposition-is-cited", "ledger:R3", "precondition", "info"),

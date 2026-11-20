@@ -46,7 +46,10 @@ private let paragraphCases: [(String, String)] = [
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex"}]"#), "from: a locator has neither label nor starts"),
         (paragraph("p-1", "s-a", extra: #","from":[{"label":"a"}]"#), "from: a locator has no file"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[1,2]}]"#), "from: a locator has lines without commit"),
-        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[1],"commit":"c"}]"#), "from: lines is not a list of two line numbers"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[1],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[2.5,-1],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"m.tex","label":"a","lines":[9,3],"commit":"c"}]"#), "from: lines is not a list of two line numbers, the first and the last"),
+        (paragraph("p-1", "s-a", extra: #","from":[{"file":"/etc/hosts","starts":"localhost"}]"#), "from: a locator's file is not a path from the root"),
         (paragraph("p-1", "s-a", extra: #","from":[{"file":"m\u202e.tex","label":"a"}]"#), "from: a locator's file name holds a control character"),
         (paragraph("p-1", "s-a", extra: #","replaces":[{"file":"m.tex","starts":7}]"#), "replaces: starts is not a string"),
         (paragraph("p-1", "s-a", extra: #","from":[{"outline":"b","id":"q"}]"#), "from: a reference to another outline stands where only locators go"),
@@ -67,6 +70,9 @@ private let approvalCases: [(String, String)] = [
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"}}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
         (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","whole":false,"sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "whole is not true"),
         ("not json", "not a JSON object"),
+        (#"{"approved_at":"2026-99-99T99:99:99+99:99","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[]}]}"#, "approved_at is not a time with its offset from UTC"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[{}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
+        (#"{"approved_at":"2026-11-13T16:30:00+08:00","statement":"ok","sections":[{"section":{"id":"s-a"},"paragraphs":[{"id":"p","section":"s-b"}]}]}"#, "an entry of sections does not hold a section record and a list of paragraph records"),
     ]
 
 private let changeCases: [(String, [String], [String], Bool, Bool, Bool)] = [
@@ -96,7 +102,7 @@ private let locatorCases: [(String, String?)] = [
         (#"{"file":"paper/main.tex","label":"thm:b"}"#, #""p-1": the label "thm:b" occurs 0 times as \label{…}, not once"#),
         (#"{"file":"paper/missing.tex","label":"thm:a"}"#, #""p-1": "paper/missing.tex" is not a file of the repository that git lists"#),
         (#"{"file":"../outside.tex","label":"thm:a"}"#, #""p-1": "../outside.tex" is not a file of the repository that git lists"#),
-        (#"{"file":"/etc/hosts","starts":"localhost"}"#, #""p-1": "/etc/hosts" is not a file of the repository that git lists"#),
+        (#"{"file":"/etc/hosts","starts":"localhost"}"#, #""p-1": a locator's file is not a path from the root"#),
         (#"{"file":".git/HEAD","starts":"ref"}"#, #""p-1": ".git/HEAD" is not a file of the repository that git lists"#),
         (#"{"file":"secret.env","starts":"API_KEY"}"#, #""p-1": "secret.env" is not a file of the repository that git lists"#),
         (#"{"file":"paper","label":"thm:a"}"#, #""p-1": "paper" is not a file of the repository that git lists"#),
@@ -122,6 +128,26 @@ struct JSONValueTests {
         let value = try JSONValue.parse(#"{"id":"a","id":"b"}"#)
         #expect(value.members?.count == 2)
         #expect(value["id"]?.string == "b")
+    }
+
+    @Test func `Numbers keep their value at any size`() throws {
+        #expect(try JSONValue.parse("1e-2147483648") != JSONValue.parse("1e-2147483649"))
+        #expect(throws: JSONError.self) { try JSONValue.parse("1e9999999999999999") }
+        func beyond(_ text: String) throws -> Bool {
+            guard case let .number(n) = try JSONValue.parse(text) else { return false }
+            return n.isBeyondDouble
+        }
+        #expect(try beyond("2e308") && beyond("1e400") && beyond("1.8e308"))
+        #expect(try !beyond("1.7e308") && !beyond("1e308") && !beyond("0e999") && !beyond("123456"))
+    }
+
+    @Test func `Lines end at a line feed, and bytes that are not UTF-8 are not JSON`() {
+        let crlf = Outline.lines(of: Data("{\"id\":\"a\"}\r\n\r\n{\"id\":\"b\"}\r\n".utf8))
+        #expect(crlf.map(\.number) == [1, 2, 3] && crlf[0].value?["id"]?.string == "a" && crlf[1].value == nil && crlf[2].value?["id"]?.string == "b")
+        let bad = Outline.lines(of: Data([0x7B, 0x22, 0x61, 0x22, 0x3A, 0x22, 0xFF, 0x22, 0x7D, 0x0A]))
+        #expect(bad.count == 1 && bad[0].value == nil)
+        let nul = Outline.lines(of: Data([0x7B, 0x7D, 0x00, 0x78, 0x0A]))
+        #expect(nul.count == 1 && nul[0].value == nil)
     }
 
     @Test func `Escapes are read, and a lone surrogate becomes U+FFFD`() throws {
@@ -336,6 +362,24 @@ struct OutlineLocatorTests {
         ])
     }
 
+    @Test func `Lists that are not lists, and lines that are not records, are reported`() throws {
+        let repository = try Repository(["main.tex": text])
+        let lines = [#"{"id":"p-1","section":"s-a","from":{"file":"main.tex","label":"missing"},"replaces":[],"points":[{"id":"p-1.1","text":"T.","basis":{}}]}"#, "[1]"]
+        #expect(OutlineLocators.findings(paragraphs: Outline.lines(of: lines.joined(separator: "\n") + "\n"), root: repository.root) == [
+            #""p-1": from is not a list of one or more locators"#, #""p-1": replaces is not a list of one or more locators"#,
+            #""p-1": basis is not a list of one or more locators or references to another outline"#, "line 2: not a JSON object",
+        ])
+    }
+
+    @Test func `Two spellings of one name are two files`() throws {
+        let repository = try Repository(["caf\u{00E9}.tex": "Alpha here.\n"])
+        try "Beta here.\n".write(to: repository.root.appendingPathComponent("cafe\u{0301}.tex"), atomically: true, encoding: .utf8)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: repository.root.path))?.filter { $0.hasSuffix(".tex") } ?? []
+        guard names.count == 2 else { return }   // a file system that folds the two spellings holds one file
+        let record = #"{"id":"p-1","section":"s-a","from":[{"file":"caf\u00e9.tex","starts":"Alpha"},{"file":"cafe\u0301.tex","starts":"Alpha"}],"points":[{"id":"p-1.1","text":"T."}]}"#
+        #expect(OutlineLocators.findings(paragraphs: Outline.lines(of: record + "\n"), root: repository.root) == [#""p-1": starts occurs 0 times, not once"#])
+    }
+
     @Test func `A file through a symbolic link that leads outside is not read`() throws {
         let repository = try Repository(["main.tex": text])
         let outside = FileManager.default.temporaryDirectory.appendingPathComponent("outline-outside-\(UUID().uuidString).tex")
@@ -357,8 +401,12 @@ struct OutlineCommandTests {
         #expect(PropositionsCLI.run(["outline", "check", "o"], workingDirectory: files.root) == CommandResult(stdout: ["ok outline check"], exitCode: 0))
         let status = PropositionsCLI.run(["outline", "status", files.root.appendingPathComponent("o").path], workingDirectory: files.root)
         #expect(status.exitCode == 0 && status.stdout.first == "\"s-a\"\tnever approved" && status.stdout.last == "ok status")
-        let locators = PropositionsCLI.run(["outline", "locators", "o", "--root", "."], workingDirectory: files.root)
+        let notARepository = PropositionsCLI.run(["outline", "locators", "o", "--root", "."], workingDirectory: files.root)
+        #expect(notARepository == CommandResult(stderr: ["outline locators: the root . is not the root of a git repository"], exitCode: 2))
+        let repository = try Repository(["o/outline-sections.jsonl": sectionA + "\n", "o/outline-paragraphs.jsonl": paragraph("p-1", "s-a") + "\n"])
+        let locators = PropositionsCLI.run(["outline", "locators", "o", "--root", "."], workingDirectory: repository.root)
         #expect(locators == CommandResult(stdout: ["ok locators"], exitCode: 0))
+        #expect(PropositionsCLI.run(["outline", "locators", ".", "--root", "o"], workingDirectory: repository.root).exitCode == 2)
     }
 
     // spec-example: article-outline / a missing file and a wrong argument
@@ -383,9 +431,10 @@ struct OutlineCommandTests {
             "o/outline-sections.jsonl": sectionA + "\n", "o/outline-paragraphs.jsonl": paragraph("p-1", "s-a") + "\n",
             "o/outline-approvals.jsonl": "",
         ])
-        let approvals = files.root.appendingPathComponent("o/outline-approvals.jsonl").path
-        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: approvals)
-        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: approvals) }
+        // A directory where the file should be: it is there and cannot be read, whoever runs the test.
+        let approvals = files.root.appendingPathComponent("o/outline-approvals.jsonl")
+        try FileManager.default.removeItem(at: approvals)
+        try FileManager.default.createDirectory(at: approvals, withIntermediateDirectories: false)
         let status = PropositionsCLI.run(["outline", "status", "o"], workingDirectory: files.root)
         #expect(status == CommandResult(stderr: ["outline status: cannot read outline-approvals.jsonl in o"], exitCode: 2))
     }
@@ -395,6 +444,8 @@ struct OutlineCommandTests {
             let help = PropositionsCLI.run(["outline", name, "--help"], workingDirectory: repositoryRoot)
             #expect(help.exitCode == 0 && help.stdout.contains { $0.contains("propositions outline \(name)") }, "\(name)")
         }
+        let named = PropositionsCLI.run(["outline", "status", "cite-order", "--help"], workingDirectory: repositoryRoot)
+        #expect(named.stdout.contains { $0.contains("propositions outline status") })
         let group = PropositionsCLI.run(["outline", "--help"], workingDirectory: repositoryRoot)
         #expect(group.exitCode == 0 && group.stdout.contains { $0.contains("locators") })
     }

@@ -37,12 +37,17 @@ public enum PropositionsCLI {
     }
 
     private static func help(for arguments: [String]) -> String {
-        if arguments.contains("cite-order") { return Root.helpMessage(for: CiteOrderOptions.self) }
-        guard arguments.contains("outline") else { return Root.helpMessage() }
-        if arguments.contains("check") { return Root.helpMessage(for: OutlineCheckOptions.self) }
-        if arguments.contains("status") { return Root.helpMessage(for: OutlineStatusOptions.self) }
-        if arguments.contains("locators") { return Root.helpMessage(for: OutlineLocatorsOptions.self) }
-        return Root.helpMessage(for: OutlineOptions.self)
+        // The command is named by the first words, not by any argument that happens to read
+        // like one: a directory can be called `status`.
+        let words = Array((arguments.first == "help" ? Array(arguments.dropFirst()) : arguments).prefix { !$0.hasPrefix("-") })
+        if words.first == "cite-order" { return Root.helpMessage(for: CiteOrderOptions.self) }
+        guard words.first == "outline" else { return Root.helpMessage() }
+        switch words.dropFirst().first {
+        case "check": return Root.helpMessage(for: OutlineCheckOptions.self)
+        case "status": return Root.helpMessage(for: OutlineStatusOptions.self)
+        case "locators": return Root.helpMessage(for: OutlineLocatorsOptions.self)
+        default: return Root.helpMessage(for: OutlineOptions.self)
+        }
     }
 
     private static func lines(_ text: String) -> [String] {

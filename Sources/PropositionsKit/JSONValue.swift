@@ -39,7 +39,13 @@ public struct JSONNumber: Hashable, Sendable {
     }
 
     /// Whether `jq`, which keeps a number as a double, reads this one as infinite (`1e400`).
-    public var isBeyondDouble: Bool { !digits.isEmpty && digits.count + exponent > 309 }
+    public var isBeyondDouble: Bool {
+        guard !digits.isEmpty else { return false }
+        let order = digits.count + exponent
+        if order > 309 { return true }
+        if order < 308 { return false }
+        return Double("0.\(digits)e\(order)")?.isInfinite ?? true
+    }
 }
 
 public struct JSONError: Error, CustomStringConvertible, Sendable {
@@ -302,9 +308,12 @@ private struct Parser {
             if peek == UInt8(ascii: "+") { index += 1 } else if peek == UInt8(ascii: "-") { sign = -1; index += 1 }
             let written = digits()
             guard !written.isEmpty else { throw failure }
-            // An exponent too long for an Int is as good as the largest one: the number is
-            // then zero or beyond every other number, and two such numbers are not compared.
-            exponent = sign * min(Int(written) ?? Int(Int32.max), Int(Int32.max))
+            // The exponent is kept exactly, so that two numbers that differ stay different.
+            // One too long to keep is refused: no outline needs it.
+            guard written.count <= 15, let size = Int(written) else {
+                throw JSONError(description: "a number has an exponent too long to keep")
+            }
+            exponent = sign * size
         }
         return JSONNumber(negative: negative, integer: integer, fraction: fraction, exponent: exponent)
     }

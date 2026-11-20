@@ -24,17 +24,46 @@ public enum OutlineLocators {
         return process.terminationStatus
     }
 
+    /// Whether `root` is the top directory of a git work tree, as git reports it.
+    public static func isWorkTreeRoot(_ root: URL) -> Bool {
+        let process = Process(), pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["git", "-c", "safe.bareRepository=explicit", "-c", "core.fsmonitor=false", "-C", root.path, "rev-parse", "--show-toplevel"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        do { try process.run() } catch { return false }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return false }
+        var top = Array(data)
+        if top.last == 0x0A { top.removeLast() }
+        let reported = URL(fileURLWithPath: String(decoding: top, as: UTF8.self)).resolvingSymlinksInPath().path
+        return Array(reported.utf8) == Array(root.resolvingSymlinksInPath().path.utf8)
+    }
+
     public static func findings(paragraphs: [OutlineLine], root: URL, git: Git = OutlineLocators.git) -> [String] {
         var out: [String] = []
         let rootPath = root.resolvingSymlinksInPath().path
-        var texts: [String: [UInt8]?] = [:]
+        var texts: [JSONKey: [UInt8]?] = [:]
         for line in paragraphs {
-            guard let record = line.value, record.isObject else { continue }
+            guard let record = line.value, record.isObject else {
+                out.append("line \(line.number): not a JSON object")
+                continue
+            }
             let owner = record["id"]?.string.map(JSONValue.quoted) ?? "line \(line.number)"
             var locators: [JSONValue] = []
-            for key in ["from", "replaces"] { locators += record[key]?.array ?? [] }
-            for point in record["points"]?.array ?? [] where point.isObject {
-                locators += (point["basis"]?.array ?? []).filter { !$0.has("outline") }
+            for key in ["from", "replaces"] where record.has(key) {
+                if let list = record[key]?.array, !list.isEmpty { locators += list } else {
+                    out.append("\(owner): \(key) is not a list of one or more locators")
+                }
+            }
+            for point in record["points"]?.array ?? [] where point.isObject && point.has("basis") {
+                if let list = point["basis"]?.array, !list.isEmpty {
+                    locators += list.filter { !$0.has("outline") }
+                } else {
+                    out.append("\(owner): basis is not a list of one or more locators or references to another outline")
+                }
             }
             for locator in locators {
                 if let problem = OutlineCheck.locatorProblem(locator) {
@@ -42,8 +71,9 @@ public enum OutlineLocators {
                     continue
                 }
                 guard let file = locator["file"]?.string else { continue }
-                if texts[file] == nil { texts[file] = .some(readable(file, rootPath: rootPath, git: git)) }
-                guard let stored = texts[file], let text = stored else {
+                let key = JSONKey(file)
+                if texts[key] == nil { texts[key] = .some(readable(file, rootPath: rootPath, git: git)) }
+                guard let stored = texts[key], let text = stored else {
                     out.append("\(owner): \(JSONValue.quoted(file)) is not a file of the repository that git lists")
                     continue
                 }
@@ -70,11 +100,14 @@ public enum OutlineLocators {
         guard !file.hasPrefix("/") else { return nil }
         let real = URL(fileURLWithPath: rootPath).appendingPathComponent(file).resolvingSymlinksInPath()
         let path = real.path
-        guard path.hasPrefix(rootPath + "/") else { return nil }
-        let inside = path.dropFirst(rootPath.count).lowercased()
-        guard !(inside + "/").contains("/.git/") else { return nil }
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue else { return nil }
+        // Paths are compared byte by byte: Swift's own comparison takes two spellings of one
+        // accented letter for the same text, and a file system can hold both.
+        let rootBytes = Array((rootPath + "/").utf8), pathBytes = Array(path.utf8)
+        guard pathBytes.count > rootBytes.count, Array(pathBytes[..<rootBytes.count]) == rootBytes else { return nil }
+        let inside = "/" + String(decoding: pathBytes[rootBytes.count...], as: UTF8.self).lowercased() + "/"
+        guard !inside.contains("/.git/") else { return nil }
+        let type = (try? FileManager.default.attributesOfItem(atPath: path))?[.type] as? FileAttributeType
+        guard type == .typeRegular else { return nil }
         let directory = real.deletingLastPathComponent()
         guard git(directory, ["--literal-pathspecs", "ls-files", "--cached", "--others", "--exclude-standard", "--error-unmatch", "--", path]) == 0 else {
             return nil

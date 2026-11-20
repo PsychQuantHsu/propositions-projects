@@ -77,7 +77,7 @@ public enum OutlineStatus {
         }
         var removed = latestIndex.filter { $0.index >= (whole ?? -1) && !currentOrder.contains($0.id) }.map(\.id)
         if let whole, entries[whole].map({ id($0.section) }) == currentOrder { removed = [] }
-        removed.sort { shown($0).unicodeScalars.lexicographicallyPrecedes(shown($1).unicodeScalars) }
+        removed.sort { ($0.string ?? "").unicodeScalars.lexicographicallyPrecedes(($1.string ?? "").unicodeScalars) }
         out.append("sections removed since their approval\t\(removed.count)" + (removed.isEmpty ? "" : "\t[" + removed.map(shown).joined(separator: ",") + "]"))
 
         let orphans = paragraphs.filter { record in !sections.contains { id($0) == (record["section"] ?? .null) } }.map(id)

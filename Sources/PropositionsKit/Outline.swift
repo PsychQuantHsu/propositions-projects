@@ -35,9 +35,8 @@ public struct Outline: Sendable {
     /// Reads the outline in `directory`. The section file and the paragraph file have to be
     /// there; the approvals file does not.
     public init(directory: URL) throws {
-        func text(_ name: String) -> String? {
-            guard let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return nil }
-            return String(decoding: data, as: UTF8.self)
+        func text(_ name: String) -> Data? {
+            try? Data(contentsOf: directory.appendingPathComponent(name))
         }
         guard let sections = text(Outline.sectionFile) else { throw ReadError.missing(Outline.sectionFile) }
         guard let paragraphs = text(Outline.paragraphFile) else { throw ReadError.missing(Outline.paragraphFile) }
@@ -48,15 +47,22 @@ public struct Outline: Sendable {
         if approvals == nil, (try? FileManager.default.attributesOfItem(atPath: approvalPath)) != nil {
             throw ReadError.missing(Outline.approvalFile)
         }
-        self.init(sections: sections, paragraphs: paragraphs, approvals: approvals)
+        self.sections = Outline.lines(of: sections)
+        self.paragraphs = Outline.lines(of: paragraphs)
+        self.approvals = approvals.map(Outline.lines(of:))
     }
 
-    /// The lines of a file that are not empty, each read as JSON. Lines end at a line feed.
-    static func lines(of text: String) -> [OutlineLine] {
+    static func lines(of text: String) -> [OutlineLine] { lines(of: Data(text.utf8)) }
+
+    /// The lines of a file that are not empty, each read as JSON. Lines end at a line feed
+    /// byte, so a file with CRLF line ends reads the same (the carriage return is white space
+    /// to JSON). A line that is not valid UTF-8 is not JSON.
+    static func lines(of data: Data) -> [OutlineLine] {
         var result: [OutlineLine] = []
-        for (offset, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
+        for (offset, line) in data.split(separator: 0x0A, omittingEmptySubsequences: false).enumerated()
         where !line.isEmpty {
-            result.append(OutlineLine(number: offset + 1, value: try? JSONValue.parse(String(line))))
+            let text = line.contains(0) ? nil : String(validatingUTF8: Array(line).map { CChar(bitPattern: $0) } + [0])
+            result.append(OutlineLine(number: offset + 1, value: text.flatMap { try? JSONValue.parse($0) }))
         }
         return result
     }

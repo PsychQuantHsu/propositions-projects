@@ -136,14 +136,18 @@ public enum OutlineCheck {
         if value.has("outline") { return "a reference to another outline stands where only locators go" }
         guard let file = value["file"]?.nonEmptyString else { return "a locator has no file" }
         if !OutlineText.isClean(file) { return "a locator's file name holds a control character" }
+        if file.hasPrefix("/") { return "a locator's file is not a path from the root" }
         if !value.has("label") && !value.has("starts") { return "a locator has neither label nor starts" }
         if value.has("label"), value["label"]?.string == nil { return "label is not a string" }
         if value.has("starts"), value["starts"]?.string == nil { return "starts is not a string" }
         if value.has("lines") {
             if !value.has("commit") { return "a locator has lines without commit" }
             let numbers = value["lines"]?.array ?? []
-            let twoNumbers = numbers.count == 2 && numbers.allSatisfy { if case .number = $0 { return true } else { return false } }
-            if !twoNumbers { return "lines is not a list of two line numbers" }
+            let pair = numbers.compactMap { item -> Int? in
+                guard case let .number(n) = item, !n.negative, !n.digits.isEmpty, n.exponent >= 0, n.digits.count + n.exponent <= 9 else { return nil }
+                return Int(n.digits + String(repeating: "0", count: n.exponent))
+            }
+            if numbers.count != 2 || pair.count != 2 || pair[0] > pair[1] { return "lines is not a list of two line numbers, the first and the last" }
         }
         if value.has("commit"), value["commit"]?.nonEmptyString == nil { return "commit is not a non-empty string" }
         return nil
@@ -159,10 +163,10 @@ public enum OutlineCheck {
     }
 
     /// The key two locators share when they name the same passage by the same means.
-    private static func locatorKey(_ value: JSONValue) -> [String]? {
+    private static func locatorKey(_ value: JSONValue) -> [JSONKey]? {
         guard locatorProblem(value) == nil, let file = value["file"]?.string else { return nil }
-        if let label = value["label"]?.string { return [file, "label", label] }
-        if let starts = value["starts"]?.string { return [file, "starts", starts] }
+        if let label = value["label"]?.string { return [JSONKey(file), JSONKey("label"), JSONKey(label)] }
+        if let starts = value["starts"]?.string { return [JSONKey(file), JSONKey("starts"), JSONKey(starts)] }
         return nil
     }
 
@@ -306,8 +310,12 @@ public enum OutlineCheck {
             for entry in entries {
                 let section = entry["section"]
                 let paragraphs = entry["paragraphs"]?.array
-                if !(section?.isObject ?? false) || section?["id"]?.nonEmptyString == nil
-                    || paragraphs == nil || !(paragraphs ?? []).allSatisfy(\.isObject) {
+                let sectionId = section?["id"]?.nonEmptyString
+                let copiesFit = (paragraphs ?? []).allSatisfy { copy in
+                    copy.isObject && copy["id"]?.nonEmptyString != nil && sectionId != nil
+                        && copy["section"]?.string.map(JSONKey.init) == sectionId.map(JSONKey.init)
+                }
+                if !(section?.isObject ?? false) || sectionId == nil || paragraphs == nil || !copiesFit {
                     report("an entry of sections does not hold a section record and a list of paragraph records")
                 }
             }
@@ -322,6 +330,9 @@ public enum OutlineCheck {
         }
         guard s.count >= 20, digits(0..<4), s[4] == "-", digits(5..<7), s[7] == "-", digits(8..<10), s[10] == "T",
               digits(11..<13), s[13] == ":", digits(14..<16), s[16] == ":", digits(17..<19) else { return false }
+        func number(_ range: Range<Int>) -> Int { Int(String(String.UnicodeScalarView(s[range]))) ?? -1 }
+        guard (1...12).contains(number(5..<7)), (1...31).contains(number(8..<10)), number(11..<13) <= 23,
+              number(14..<16) <= 59, number(17..<19) <= 60 else { return false }
         var i = 19
         if s[i] == "." {
             i += 1
@@ -331,6 +342,6 @@ public enum OutlineCheck {
         }
         if i == s.count - 1 { return s[i] == "Z" }
         return i + 6 == s.count && (s[i] == "+" || s[i] == "-") && digits(i + 1..<i + 3) && s[i + 3] == ":"
-            && digits(i + 4..<i + 6)
+            && digits(i + 4..<i + 6) && number(i + 1..<i + 3) <= 23 && number(i + 4..<i + 6) <= 59
     }
 }

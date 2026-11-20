@@ -117,6 +117,9 @@ public enum OutlineRun {
         guard FileManager.default.fileExists(atPath: rootURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             return CommandResult(stderr: ["outline locators: the root \(CiteOrder.visible(root)) is not a directory"], exitCode: 2)
         }
+        guard OutlineLocators.isWorkTreeRoot(rootURL) else {
+            return CommandResult(stderr: ["outline locators: the root \(CiteOrder.visible(root)) is not the root of a git repository"], exitCode: 2)
+        }
         let findings = OutlineLocators.findings(paragraphs: outline.paragraphs, root: rootURL)
         if findings.isEmpty { return CommandResult(stdout: ["ok locators"], exitCode: 0) }
         return CommandResult(stdout: findings, exitCode: 1)

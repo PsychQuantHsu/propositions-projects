@@ -269,7 +269,6 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `carry` | no | `true`: the record stands for a block that is moved from the passage its `from` names, unchanged apart from what `edits` lists and from cross-references that point elsewhere |
 | `edits` | no | A non-empty string listing the changes made to the statement of a moved block. Only on a record that carries `carry` |
 | `replaces` | no | A list of one or more locators naming the passages of the manuscript that this record takes the place of. They are not its source |
-| `alternative_to` | no | The `id` of another paragraph record that says the same thing: only one of the two will stay |
 | `uses` | no | A list of ids, each the `id` of a paragraph record on an earlier line or of a point of such a record |
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
 | `note` | no | A string for the author |
@@ -300,7 +299,10 @@ and `edits`, a string that lists those changes for the author, and its points
 state what the block states after them. A change that only redirects a
 cross-reference (where a `\ref` points, a number) is not a change to the
 statement and needs no `edits`. `edits` on a record without `carry` is a
-mistake, and so is an empty one: the write check reports both.
+mistake, and so is an empty one: the write check reports both. Any other displayed formula or derivation is not a
+block of its own: with no blank line on either side it belongs to the record of
+the paragraph it stands in, and with a blank line on one side only it belongs
+to the record of the paragraph on the other side.
 
 **Passages a record takes the place of.** A paragraph that is written anew
 in place of a passage of the manuscript (an abstract, a roadmap of the
@@ -312,42 +314,6 @@ record's points. A record can carry both `from` and `replaces`, for a
 paragraph that draws on one passage and takes the place of another; the same
 locator is not in both, and the write check reports one that is.
 
-**Two records, one of which will stay.** When the same thing can stand in
-two places and the author has not decided, both records are written and one
-of them names the other in `alternative_to`. The `id` it names is that of
-another paragraph record in the file; the write check reports one that names
-itself, a point, or no record. One of the two carries the key and the other
-does not. A pair is open while neither of its records carries `dropped`, and
-while it is open neither record is in a second open pair: the write check
-reports two records that name each other, two that name the same record, and
-a record that both names one and is named. It also reports a record without
-`dropped` that names one that carries `dropped`: after a choice the key is on
-the record that was not chosen. And it reports a record that carries
-`dropped` and names a record that names it back: a choice has one record that
-was not chosen. Until the author decides, both
-records are part of the outline and are shown together, and status counts the
-pair once as an alternative not yet chosen. The count does not depend on
-which of the two carries the key: an open pair is one paragraph of the
-outline, each of its records is listed in its own section and marked as an
-open alternative, and a length worked out from the outline is given for an
-open pair as the range from the shorter of the two to the longer. In a count
-or a length for one section, a record of an open pair is a conditional part of
-its own section and is said to be one; the figures of the sections are not
-added up as if both records stood. When the author chooses, the
-record that is not chosen is given `dropped` with the reason and carries
-`alternative_to` naming the chosen one, so that what it was an alternative to
-stays on record: when the chosen record was the one that carried the key, the
-key moves to the other. The record that is not chosen is not deleted, whether
-or not it has `from`: a record that carries `alternative_to` is kept by every
-rule that keeps a record with `from`, before the choice and after it, also
-when its section is left out. When the chosen record is itself left out
-later, the other keeps its key. A record of an open pair is not deleted, merged, split
-or given `dropped` by another rule (its section is left out, its last point
-moves away) until the author has said what becomes of the pair, and no `alternative_to` is left
-naming an `id` that is no longer in the file. Any other displayed formula or derivation is not a
-block of its own: with no blank line on either side it belongs to the record of
-the paragraph it stands in, and with a blank line on one side only it belongs
-to the record of the paragraph on the other side.
 
 **Order.** The paragraph records are grouped by section. The records naming one
 section are on consecutive lines, and the groups come in the order of the
@@ -634,17 +600,11 @@ What the skill shows for a section depends on its approved copy.
   is as it was approved, and shows the section in full when the author asks.
 - A section that equals its approved copy is shown as unchanged since its
   approval.
-- In both ways of showing a section, three things are said beside the record
+- In both ways of showing a section, two things are said beside the record
   they concern, as labelled quotations of the record and not as words of the
   skill: a record's `edits`, with the sentence that the block is moved with
-  these changes, not unchanged; what a record's `replaces` names, with the
-  sentence that the record takes the place of those passages; and two records
-  joined by `alternative_to`, when neither carries `dropped`, together with
-  the sentence that only one of them will stay. When the other record of such
-  a pair is in a section that is not shown, it is shown as background and said
-  not to be part of this approval. A record that carries `dropped` and
-  `alternative_to` is shown with the record it names and the sentence that
-  this one was not chosen. Text taken from a record is shown inside a fenced
+  these changes, not unchanged; and what a record's `replaces` names, with the
+  sentence that the record takes the place of those passages. Text taken from a record is shown inside a fenced
   code block whose fence is longer than any run of backticks in the text, so
   that nothing in it closes the block or is rendered as a link, as markup or
   as a heading.
@@ -1013,10 +973,7 @@ section that does not, whether it was never approved or differs from its latest
 approved copy. It reports whether the order of sections stands as approved,
 the sections removed since their approval,
 the paragraph records that name no section record, the number of points that
-carry `pending`, the number of records that carry `dropped`, and the pairs of
-alternatives not yet chosen (a record that names another in `alternative_to`
-while neither carries `dropped`); such a pair counts as one paragraph, not
-two, in any count of paragraphs or of length. When every section stands as approved and the order of sections does
+carry `pending` and the number of records that carry `dropped`. When every section stands as approved and the order of sections does
 not, it says that an approval of the whole outline is still needed. It decides
 equality on JSON values, not on the text of the lines. An approvals file that
 is empty or holds only blank lines holds no approval record. When the approvals
@@ -1113,10 +1070,7 @@ number is too large for jq to keep (such as `1e400`, which is JSON but which jq
 reads as infinite). In the
 paragraph file it also confirms that every point has an `id`, that `points`,
 where a record has it, is a list, that `edits` is a non-empty string on a
-record that carries `carry`, that `alternative_to` names another paragraph
-record of the file, that a record without `dropped` does not name one that
-carries `dropped`, that no record is in two open pairs of alternatives, and
-that no record that carries `dropped` names a record that names it back, and
+record that carries `carry`, and
 that no locator (the same `file` and `label`, or with no `label` the same
 `starts`) is in both the `from` and the `replaces` of
 a record. The shape of a key that a section record

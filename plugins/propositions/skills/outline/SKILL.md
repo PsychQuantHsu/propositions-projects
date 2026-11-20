@@ -591,26 +591,9 @@ F="$SEC"
       (.[] | select($para and (.r | type == "object"))
            | select(.r | has("edits") and ((.edits | type) != "string" or (.edits | length) == 0 or .carry != true))
            | "line \(.l): edits is not a non-empty string on a record that carries carry"),
-      (map(select($para and (.r | type == "object")) | .r.id) as $ids
-           | .[] | select($para and (.r | type == "object"))
-           | select(.r | has("alternative_to") and (.alternative_to as $a | ($a | type) != "string" or $a == .id or (any($ids[]; . == $a) | not)))
-           | "line \(.l): alternative_to does not name another paragraph record"),
-      (map(select($para and (.r | type == "object"))) as $all
-           | $all[] | select((.r | has("dropped") | not) and (.r.alternative_to | type) == "string") | .r.alternative_to as $a | .l as $l
-           | select(any($all[]; .r.id == $a and (.r | has("dropped"))))
-           | "line \($l): alternative_to names a record that carries dropped; the key belongs on the record that is not chosen"),
-      (map(select($para and (.r | type == "object") and (.r | has("dropped") | not))) as $live
-           | [$live[] | select((.r.alternative_to | type) == "string") | . as $x | select($x.r.alternative_to != $x.r.id and any($live[]; .r.id == $x.r.alternative_to)) | {l: $x.l, a: $x.r.id, b: $x.r.alternative_to}] as $open
-           | $open[] | . as $p
-           | select(any($open[]; .l != $p.l and (.a == $p.a or .a == $p.b or .b == $p.a or .b == $p.b)))
-           | "line \($p.l): its alternative is part of another pair of alternatives"),
       (.[] | select($para and (.r | type == "object"))
-           | select(.r | def k: objects | [.file, (if (.label | type) == "string" then ["label", .label] else ["starts", .starts] end)]; ([.from | arrays | .[] | k]) as $f | any((.replaces | arrays | .[] | k); . as $x | any($f[]; . == $x)))
+           | select(.r | def k: objects | select((.file | type) == "string" and ((.label | type) == "string" or (.starts | type) == "string")) | [.file, (if (.label | type) == "string" then ["label", .label] else ["starts", .starts] end)]; ([.from | arrays | .[] | k]) as $f | any((.replaces | arrays | .[] | k); . as $x | any($f[]; . == $x)))
            | "line \(.l): a locator is in both from and replaces"),
-      (map(select($para and (.r | type == "object"))) as $all
-           | $all[] | select((.r | has("dropped")) and (.r.alternative_to | type) == "string") | .r.alternative_to as $a | .r.id as $me | .l as $l
-           | select($a != $me and any($all[]; .r.id == $a and .r.alternative_to == $me))
-           | "line \($l): it and the record it names name each other in alternative_to"),
       (.[] | select(.r | type == "object")
            | select([.r.id, (if $para then (.r.points[]? | if type == "object" then .id else null end) else empty end)] | any(type != "string" or length == 0))
            | "line \(.l): a record or a point has no id"),
@@ -630,12 +613,7 @@ so such a byte is not reported); no string, the name of
 a key included, holds a control character; every record has an `id` that is a non-empty
 string, and in the paragraph file every point has one too, and no `id` repeats among the records of the file and, in the paragraph
 file, their points; in the paragraph file, `points`, where a record has it, is a list,
-`edits` is a non-empty string on a record that carries `carry`, `alternative_to` names another
-paragraph record of the file, a record without `dropped` does not name one that carries
-`dropped` (after a choice the key is on the record that was not chosen), no record is in two
-open pairs of alternatives (a pair is open while neither of its records carries `dropped`; two
-records naming each other count as two), no record that carries `dropped` names a record that
-names it back, and no locator (two locators with the same `file` and the same `label`, or with
+`edits` is a non-empty string on a record that carries `carry`, and no locator (two locators with the same `file` and the same `label`, or with
 no `label` and the same `starts`, are the same one) is in both the `from` and the
 `replaces` of a record. The
 shape of a key that a section record carries and this skill does not define is not checked, a
@@ -882,8 +860,7 @@ draft says what to do.
      again. A manuscript that has headings and nothing under them has no such file: say that
      draft builds an outline from its headings.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
-   points, with carried blocks marked. Derive writes no `edits`, `replaces` or
-   `alternative_to`: a finished manuscript has no change, replacement or alternative to record. Say how many sections, paragraph records and carried
+   points, with carried blocks marked. Derive writes no `edits` and no `replaces`: a finished manuscript has no change or replacement to record. Say how many sections, paragraph records and carried
    blocks there are, and name every included file that was not read: what it says is not in
    the outline.
 9. Ask whether to write the files into `OUTDIR` (AskUserQuestion). Only after the author agrees:
@@ -971,22 +948,6 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
 - **A paragraph that takes the place of a passage.** A paragraph written anew in place of a
   passage of the manuscript names that passage in `replaces`, not in `from`: `from` is for
   sources. The same locator is never in both.
-- **Two records, one of which will stay.** When the author has not decided between two places
-  for the same thing, write both records and give one `alternative_to` with the `id` of the
-  other; the other carries none, and neither is in a second pair while the choice is open.
-  When the author chooses, the record that is not chosen gets `dropped` with the reason and
-  carries `alternative_to` naming the chosen one: when the chosen record was the one that
-  carried the key, take it off that record and put it on the other. Do not delete the record
-  that is not chosen, whether or not it has `from`: a record that carries `alternative_to` is
-  kept by every rule below that keeps a record with `from` (a paragraph or a section left out,
-  a last point moved away), before the choice and after it. When the chosen record is itself
-  left out later, the record that was not chosen keeps its key; say so when it is shown.
-- **A record that is one of two alternatives.** Before a record that carries `alternative_to`,
-  or that another record names in it, is deleted, merged, split or given `dropped` by any rule
-  below (its section is left out, its last point moves away, the author leaves it out), while
-  neither record of the pair carries `dropped`, ask the author what becomes of the pair: the choice is made (the rule above), the other record names the replacement, or
-  the pair is given up and the key is removed. Do not leave an `alternative_to` that names an
-  `id` no longer in the file.
 - **Merging a source with a replaced passage.** When one of the records to merge has a locator
   in `from` that another has in `replaces`, do not merge yet: ask the author which of the two
   the passage is for the merged paragraph. The answer is the author's instruction to take the
@@ -996,7 +957,8 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   for a moved block (a merge, a split, or the block's point moving to another record), the
   record that stands for the block afterwards carries `carry`, the `from` of the block and the
   `edits` that apply to it. When the changes cannot be divided between the records, or no
-  record stands for the moved block any more, ask the author before writing.
+  record stands for the moved block any more, ask the author before writing. When the record that is to stand for the block has, in its `replaces`, a locator of the block's `from`,
+  ask the author first, as for a merge.
 - **Merge.** The `from` of the record that replaces the merged records holds every locator of
   the records it replaces, and its `replaces` every locator of their `replaces`.
 - **Split and `replaces`.** When the original has `replaces`, each locator of it is in the
@@ -1084,19 +1046,13 @@ jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/
       | "paragraph records that name no section\t\($o | length)\(if ($o | length) > 0 then "\t" + ($o | tojson) else "" end)"),
     "points that carry pending\t\([$pars[] | .points[]? | objects | select(has("pending"))] | length)",
     "records that carry dropped\t\([$secs[], $pars[] | select(has("dropped"))] | length)",
-    ([$pars[] | select((has("dropped") | not) and (.alternative_to | type) == "string") | . as $r | select(any($pars[]; .id == $r.alternative_to and (has("dropped") | not))) | [$r.id, $r.alternative_to]] as $alt
-      | "alternatives not yet chosen\t\($alt | length)\(if ($alt | length) > 0 then "\t" + ($alt | tojson) else "" end)"),
     "ok status"
 '
 ```
 
 It prints one line for each section, one for the order of sections, one for the sections
 removed since their approval, one for the paragraph records that name no section, the two
-counts, one for the alternatives not yet chosen (each pair as the two ids, the record that
-carries `alternative_to` first), and `ok status`. An open pair is one paragraph of the whole
-outline. In a count for one section, each record of an open pair is counted in its own section
-as a conditional paragraph and said to be one; the counts of the sections are then not added
-up as if both records stood, and a length for the whole outline is a range. A section counts as removed since its approval when the order of
+counts, and `ok status`. A section counts as removed since its approval when the order of
 sections does not stand as approved, the section is not in the section file, and its latest
 approved copy is in the last approval of the whole outline or in an approval record after that
 one; with no approval of the whole outline on record, any approved copy counts. Once an
@@ -1299,17 +1255,11 @@ asks, through revise.
      Say that the rest of the section is as it was approved. Show it in full when the author
      asks.
    - A section that stands as approved is shown as unchanged since its approval.
-   - Whichever of these two ways a section is shown, three things are always said beside the
+   - Whichever of these two ways a section is shown, two things are always said beside the
      record they concern, as labelled quotations of the record and never as words of this
      skill: the `edits` of a record, with the sentence that the block is moved with these
-     changes, not unchanged; what a record's `replaces` names, with the sentence that the
-     record takes the place of those passages; and, for two records joined by
-     `alternative_to` when neither carries `dropped`, both records together with the sentence
-     that only one of them will stay. When the other record of such a pair is in a section
-     that is not shown, show it as background and say that it is not part of this approval.
-     A record that carries `dropped` and `alternative_to` is shown with the record it names
-     and the sentence that this one was not chosen and that one was (or, when that one
-     carries `dropped` too, that it was left out later). Put every text taken
+     changes, not unchanged; and what a record's `replaces` names, with the sentence that the
+     record takes the place of those passages. Put every text taken
      from a record (`edits`, a locator, an `id`, a point) inside a fenced code block whose
      fence is longer than any run of backticks in the text, so that nothing in it closes the
      block or is rendered as a link, as markup or as a heading; the labels and
@@ -1431,8 +1381,7 @@ asks, through revise.
 End every action that wrote a file with: what was written and where; the result of the write
 check, with the sentence that no other check of the format exists until issue 78, apart from
 resolving the locators; which sections
-stand as approved; how many points carry `pending`, how many records carry `dropped` and how
-many pairs of alternatives are not chosen yet; for
+stand as approved; how many points carry `pending` and how many records carry `dropped`; for
 derive, the included files that were not read; and the next action. When the outline stands as approved, say that writing text from it is not available
 in this plugin yet (issue 51).
 

@@ -344,7 +344,8 @@ each has a place.
 
 **Where something went.** A section or a paragraph that is left out of this
 article because it goes to another one carries `dropped` with the reason and
-`moved_to`, a string in the author's words naming where it goes. `dropped`
+`moved_to`, a string in the author's words naming where it goes; `moved_to`
+needs a `dropped` that is a non-empty string. `dropped`
 alone means that it is left out; with `moved_to` it was moved. The string is
 for the reader: the skill does not resolve it. A record with `moved_to` is
 never deleted, whether or not it has `from` or `replaces`; when the author
@@ -361,14 +362,17 @@ of a point, can be a reference to another outline: an object with `outline`,
 the path of that outline's directory from the repository's root, and `id`,
 the `id` of a paragraph record or of a point in its paragraph file. It has no
 `file`. An object with `outline` is always such a reference and never a
-locator, however it is written. The other outline is in the same repository
+locator, however it is written; it goes in `uses` and `basis` only, and one in
+`from` or `replaces` is reported. The other outline is in the same repository
 (its root directory included; not a submodule, not a repository of its own
 under it), and is not this outline: a record of the same outline is named by
 its `id` alone. The skill confirms that the directory is in the repository
 and outside `.git`, that its paragraph file is a regular file, not a symbolic
-link, that is JSON, and that the `id` is in it. A reference that fails one of
+link, that is JSON, and that the `id` is that of a paragraph record or of a
+point in it (a section record's `id` is not). A reference that fails one of
 these does not resolve and is a finding of the sixth kind, as is a `uses`
-that is not a list or an entry of it that is neither an id nor a reference.
+that is not a list or an entry of it that is neither a non-empty id nor a
+reference.
 Derive, draft and revise go on only when none is left. Nothing else is checked: the skill does not read what the other
 record says, whether it carries `dropped`, or whether the other article comes
 first, and the premise check does not judge a point against it. Whether two
@@ -650,7 +654,9 @@ What the skill shows for a section depends on its approved copy.
   they concern, as labelled quotations of the record and not as words of the
   skill: a record's `edits`, with the sentence that the block is moved with
   these changes, not unchanged; and what a record's `replaces` names, with the
-  sentence that the record takes the place of those passages. Text taken from a record is shown inside a fenced
+  sentence that the record takes the place of those passages. What a record
+  names in another outline is shown the same way in both, with whether each
+  reference resolved, did not resolve, or was not checked. Text taken from a record is shown inside a fenced
   code block whose fence is longer than any run of backticks in the text, so
   that nothing in it closes the block or is rendered as a link, as markup or
   as a heading, and a control character in it is written as its code point.

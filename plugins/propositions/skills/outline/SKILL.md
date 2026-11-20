@@ -589,7 +589,7 @@ F="$SEC"
            | select(.r | has("points") and ((.points | type) != "array"))
            | "line \(.l): points is not a list"),
       (.[] | select(.r | type == "object")
-           | select(.r | has("moved_to") and ((.moved_to | type) != "string" or (.moved_to | length) == 0 or (has("dropped") | not)))
+           | select(.r | has("moved_to") and ((.moved_to | type) != "string" or (.moved_to | length) == 0 or (.dropped | type) != "string" or (.dropped | length) == 0))
            | "line \(.l): moved_to is not a non-empty string on a record that carries dropped"),
       (.[] | select(($para | not) and (.r | type == "object"))
            | select(.r | has("part") and (.part as $x | any("main", "appendix", "supplement"; . == $x) | not))
@@ -670,8 +670,8 @@ file.
 
 ```bash
 P="$PAR"
-[ -f "$P" ] && : > "$STAGE/checker-files.jsonl" && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | ([.from | arrays | .[]] + [.replaces | arrays | .[]] + [.points[]? | objects | .basis | arrays | .[] | select((type == "object" and has("outline")) | not)])[] | objects | .file | strings | select(clean)] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/locator-files.txt" && echo 'ok locator files listed'
-[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (.[] | . as $r | (if has("from") and ((.from | type) != "array" or (.from | length) == 0) then "\($r.id | tojson) has a from that is not a list of one or more locators" else empty end), (if has("replaces") and ((.replaces | type) != "array" or (.replaces | length) == 0) then "\($r.id | tojson) has a replaces that is not a list of one or more locators" else empty end), (.points[]? | objects | select(has("basis") and ((.basis | type) != "array" or (.basis | length) == 0)) | "\($r.id | tojson) has a basis that is not a list of one or more locators")), ([.[] | . as $r | ([.from | arrays | .[]] + [.replaces | arrays | .[]] + [.points[]? | objects | .basis | arrays | .[] | select((type == "object" and has("outline")) | not)])[] | {id: $r.id, loc: .}] | (.[] | select((.loc | type) != "object" or (.loc.file | type) != "string") | "\(.id | tojson) has a locator without a file"), (.[] | select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean | not)) | "\(.id | tojson) has a locator whose file name holds a control character"), (map(select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean)) | {f: .loc.file, id: .id}) | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))")), "ok names listed"' "$P"
+[ -f "$P" ] && : > "$STAGE/checker-files.jsonl" && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); [.[] | ([.from | arrays | .[] | select((type == "object" and has("outline")) | not)] + [.replaces | arrays | .[] | select((type == "object" and has("outline")) | not)] + [.points[]? | objects | .basis | arrays | .[] | select((type == "object" and has("outline")) | not)])[] | objects | .file | strings | select(clean)] | unique | .[]' "$P" > "$STAGE/locator-files.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/locator-files.txt" && echo 'ok locator files listed'
+[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); (.[] | . as $r | (if has("from") and ((.from | type) != "array" or (.from | length) == 0) then "\($r.id | tojson) has a from that is not a list of one or more locators" else empty end), (if has("replaces") and ((.replaces | type) != "array" or (.replaces | length) == 0) then "\($r.id | tojson) has a replaces that is not a list of one or more locators" else empty end), (.points[]? | objects | select(has("basis") and ((.basis | type) != "array" or (.basis | length) == 0)) | "\($r.id | tojson) has a basis that is not a list of one or more locators")), ([.[] | . as $r | ([.from | arrays | .[] | select((type == "object" and has("outline")) | not)] + [.replaces | arrays | .[] | select((type == "object" and has("outline")) | not)] + [.points[]? | objects | .basis | arrays | .[] | select((type == "object" and has("outline")) | not)])[] | {id: $r.id, loc: .}] | (.[] | select((.loc | type) != "object" or (.loc.file | type) != "string") | "\(.id | tojson) has a locator without a file"), (.[] | select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean | not)) | "\(.id | tojson) has a locator whose file name holds a control character"), (map(select((.loc | type) == "object" and (.loc.file | type) == "string" and (.loc.file | clean)) | {f: .loc.file, id: .id}) | group_by(.f)[] | "\(.[0].f | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))")), "ok names listed"' "$P"
 ```
 
 Without `ok locator files listed` and `ok names listed`, the paragraph file is missing or a line
@@ -693,7 +693,7 @@ P="$PAR"
 N=1
 FILE=$(sed -n "${N}p" "$STAGE/locator-files.txt")
 [ -f "$P" ] && [ -n "$FILE" ] && [ "${FILE#/}" = "$FILE" ] && T0=$(realpath "$R/$FILE") && [ -f "$T0" ] && T="$(builtin cd -P -- "${T0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${T0##*/}" && [ "$T" -ef "$R/$FILE" ] && [ ! -L "$T" ] && [ "${T#"$R"/}" != "$T" ] && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { T1=$(find "${T%/*}" -maxdepth 1 -type f -samefile "$T" 2>/dev/null) && [ "$T1" -ef "$T" ] && T=$T1; true; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false --literal-pathspecs -C "${T%/*}" ls-files --cached --others --exclude-standard --error-unmatch -- "$T" >/dev/null 2>&1 || { U=$(printf '%s' "$T" | LC_ALL=C tr 'a-zA-Z' 'A-Za-z') && [ "$U" -ef "$T" ] && git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "${T%/*}" ls-files --cached --error-unmatch -- ":(literal,icase)$T" >/dev/null 2>&1; }; } && { git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" check-ignore -q -- "$T" 2>/dev/null; [ "$?" != 0 ]; } && LC_ALL=C tr -s ' \t\r\n' ' ' < "$T" > "$STAGE/flat.txt" && jq -n -c --arg f "$FILE" --arg p "$T" '{file: $f, path: $p}' >> "$STAGE/checker-files.jsonl" && jq -s -r --rawfile t "$STAGE/flat.txt" --arg f "$FILE" '
-  [ .[] | . as $r | ([.from | arrays | .[]] + [.replaces | arrays | .[]] + [.points[]? | objects | .basis | arrays | .[] | select((type == "object" and has("outline")) | not)])[] | objects | select(.file == $f)
+  [ .[] | . as $r | ([.from | arrays | .[] | select((type == "object" and has("outline")) | not)] + [.replaces | arrays | .[] | select((type == "object" and has("outline")) | not)] + [.points[]? | objects | .basis | arrays | .[] | select((type == "object" and has("outline")) | not)])[] | objects | select(.file == $f)
     | (if (has("starts") or has("label")) | not then "\($r.id | tojson): a locator has neither label nor starts" else empty end),
       (if has("lines") and (has("commit") | not) then "\($r.id | tojson): a locator has lines without commit" else empty end),
       (if has("starts") and ((.starts | type) != "string") then "\($r.id | tojson): starts is not a string" else empty end),
@@ -757,7 +757,10 @@ An entry of `uses`, or of the `basis` of a point, can be an object `{"outline": 
 "id": "<id>"}` instead of an id or a locator: it names a paragraph record, or a point, of the
 outline of another article of the same repository. `outline` is the path of that outline's
 directory from `ROOT`; `id` is the `id` of a paragraph record or of a point in its paragraph
-file. Check uses these two commands after the locators, with the same `P`.
+file. Such an object goes in `uses` and `basis` only: in `from` or `replaces`, where only
+locators go, it is reported. Check uses these two commands after the locators. `P` is the
+paragraph file to examine, as for the locators: the first line of each command is written
+with `"$PAR"`, a staged file, or the copy that was shown, whichever is being examined.
 
 First list the other outlines that are named, with the records that name each, and the entries
 that are not written this way:
@@ -765,7 +768,7 @@ that are not written this way:
 ```bash
 P="$PAR"
 [ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean); [.[] | objects | refs | select(good) | .outline] | unique | .[]' "$P" > "$STAGE/other-outlines.txt" && jq -R -r '"\(input_line_number)\t\(.)"' "$STAGE/other-outlines.txt" && echo 'ok other outlines listed'
-[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean); (.[] | objects | . as $r | (if has("uses") and ((.uses | type) != "array") then "\($r.id | tojson) has a uses that is not a list" else empty end), (.uses | arrays | .[] | select((type == "string" or (type == "object" and has("outline"))) | not) | "\($r.id | tojson) has a uses entry that is neither an id nor a reference to another outline"), (refs | select(good | not) | "\($r.id | tojson) has a reference to another outline that is not an object with outline and id, and without file")), ([.[] | objects | . as $r | refs | select(good) | {o: .outline, id: $r.id}] | group_by(.o)[] | "\(.[0].o | tojson) is named by \(map(.id) | unique | map(tojson) | join(", "))"), "ok references listed"' "$P"
+[ -f "$P" ] && jq -s -r 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean); (.[] | objects | . as $r | (if has("uses") and ((.uses | type) != "array") then "\($r.id | tojson) has a uses that is not a list" else empty end), (.uses | arrays | .[] | select(((type == "string" and length > 0) or (type == "object" and has("outline"))) | not) | "\($r.id | tojson) has a uses entry that is neither an id nor a reference to another outline"), (([.from | arrays | .[]] + [.replaces | arrays | .[]])[] | objects | select(has("outline")) | "\($r.id | tojson) has a reference to another outline in from or replaces, where only locators go"), (refs | select(good | not) | "\($r.id | tojson) has a reference to another outline that is not an object with outline and id, and without file")), ([.[] | objects | . as $r | refs | select(good) | {o: .outline, id: $r.id, t: .id}] | group_by(.o)[] | "\(.[0].o | tojson) is named by \(map("\(.id | tojson) for \(.t | tojson)") | unique | join(", "))"), "ok references listed"' "$P"
 ```
 
 Then, for each number of the list, starting at 1, confirm that the ids exist there:
@@ -774,9 +777,9 @@ Then, for each number of the list, starting at 1, confirm that the ids exist the
 P="$PAR"
 N=1
 OTHER=$(sed -n "${N}p" "$STAGE/other-outlines.txt")
-[ -f "$P" ] && [ -n "$OTHER" ] && [ "${OTHER#/}" = "$OTHER" ] && T=$(builtin cd -P -- "$R/$OTHER" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$T" -ef "$R/$OTHER" ] && { [ "$T" = "$R" ] || [ "${T#"$R"/}" != "$T" ]; } && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && [ "$T" != "$O" ] && GT=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$T" rev-parse --show-toplevel 2>/dev/null) && GR=$(builtin cd -P -- "$GT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$GR" = "$R" ] && [ -f "$T/outline-paragraphs.jsonl" ] && [ ! -L "$T/outline-paragraphs.jsonl" ] && jq -s -r --arg o "$OTHER" --slurpfile other "$T/outline-paragraphs.jsonl" '
+[ -f "$P" ] && [ -n "$OTHER" ] && [ "${OTHER#/}" = "$OTHER" ] && T=$(builtin cd -P -- "$R/$OTHER" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$T" -ef "$R/$OTHER" ] && { [ "$T" = "$R" ] || [ "${T#"$R"/}" != "$T" ]; } && X=$(printf '%s/' "${T#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && [ "$T" != "$O" ] && GT=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$T" rev-parse --show-toplevel 2>/dev/null) && GR=$(builtin cd -P -- "$GT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$GR" = "$R" ] && GD1=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$T" rev-parse --absolute-git-dir 2>/dev/null) && GD2=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" rev-parse --absolute-git-dir 2>/dev/null) && [ -n "$GD1" ] && [ "$GD1" = "$GD2" ] && [ -f "$T/outline-paragraphs.jsonl" ] && [ ! -L "$T/outline-paragraphs.jsonl" ] && jq -s -r --arg o "$OTHER" --slurpfile other "$T/outline-paragraphs.jsonl" '
   def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); def refs: ([.uses | arrays | .[]] + [.points | arrays | .[] | objects | .basis | arrays | .[]])[] | objects | select(has("outline")); def good: (has("file") | not) and (.id | type) == "string" and (.id | length) > 0 and (.outline | type) == "string" and (.outline | length) > 0 and (.outline | clean);
-  ([$other[] | objects | (.id, (.points | arrays | .[] | objects | .id)) | strings]) as $ids
+  ([$other[] | objects | select(has("section") and ((.points | type) == "array")) | (.id, (.points[] | objects | .id)) | strings]) as $ids
   | [ .[] | objects | . as $r | refs | select(good and .outline == $o)
       | select(.id as $i | any($ids[]; . == $i) | not)
       | "\($r.id | tojson): \(.id | tojson) is not the id of a record or of a point in the outline at \($o | tojson)" ]
@@ -787,17 +790,19 @@ OTHER=$(sed -n "${N}p" "$STAGE/other-outlines.txt")
 Run these after the write check has printed `ok` for `P`: they read only lines that are
 records. The two lines `ok other outlines listed` and `ok references listed` say that the
 commands ran, not that the references are sound: without them, do not go on; with them, every
-other line that names a record (a `uses` that is not a list, an entry that is neither an id nor
-a reference, a reference that is not written with `outline` and `id`) is a reference that does
-not resolve. An object with `outline` is always a reference, never a locator, however it is
+other line that names a record (a `uses` that is not a list, an entry that is neither a
+non-empty id nor a reference, a reference that is not written with `outline` and `id`, a
+reference in `from` or `replaces`) is a reference that does not resolve. An object with `outline` is always a reference, never a locator, however it is
 written. For a number of the list, `ok references to <directory>` means that every `id` named
 there exists. A line that names an `id` means that this reference does not resolve and the
-others to that outline do. No line at all means that no reference to that outline resolves:
+others to that outline do. The ids of the other outline are those of its paragraph records
+(lines with `section` and a list `points`) and of their points. No line at all means that no reference to that outline resolves:
 the directory is written from `/`, leads outside the repository or into `.git`, is in another
-git repository than `ROOT` (a submodule, a repository of its own), is this outline's own
+git repository than `ROOT` (a submodule, a repository of its own, also one whose working tree
+is set to `ROOT`), is this outline's own
 directory (a record of the same outline is named by its `id` alone), or holds no paragraph
-file or one that is a symbolic link or is not JSON. The records concerned are those on the
-`is named by` line of that directory. Report each reference that does not resolve as a finding
+file or one that is a symbolic link or is not JSON. The references concerned are those on the
+`is named by` line of that directory, each as the record and the `id` it names. Report each reference that does not resolve as a finding
 of the sixth kind, with the record that names it. Derive, draft and revise go on only when no
 reference is left that does not resolve.
 
@@ -1099,8 +1104,10 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   `dropped`. Tell the author; do not delete the entry yourself.
 
 After the edits, run the write check on each file that was edited. When a `from` or a `basis`
-was written or changed, run "Locators: do they resolve"; when a `uses` or a `basis` names a
-record of another outline, run "References to another outline: do they resolve". Then run status and say which sections
+was written or changed, run "Locators: do they resolve"; when a `uses`, a `from`, a `replaces` or
+a `basis` was written or changed, whatever it holds, run "References to another outline: do they
+resolve". When either reports something that does not resolve, the revision is not finished:
+correct it with the author, or take the edit back, before reporting. Then run status and say which sections
 no longer stand as approved, and which sections were removed since their approval.
 
 ## status — what stands as approved
@@ -1350,10 +1357,7 @@ asks, through revise.
      paragraph record naming it, with its points, what each `pending` names, its `note` and
      carried blocks marked; every record that carries `dropped`, with the reason and, when it
      has one, its `moved_to`; the `part` of a section that has one; and, beside a record, what
-     it names in another outline: the directory and the `id`, and for each whether it
-     resolved (this skill confirmed only that the `id` exists there), did not resolve, or was
-     not checked. `moved_to`, `part`, such a directory and such an `id` are text taken from a
-     record, and are shown the way the last item of this list says.
+     it names in another outline.
    - A section that differs from its approved copy is shown by its differences: for each record
      that was changed, added, removed or moved, the approved content and the current content.
      Say that the rest of the section is as it was approved. Show it in full when the author
@@ -1365,7 +1369,11 @@ asks, through revise.
      record they concern, as labelled quotations of the record and never as words of this
      skill: the `edits` of a record, with the sentence that the block is moved with these
      changes, not unchanged; and what a record's `replaces` names, with the sentence that the
-     record takes the place of those passages. Put every text taken
+     record takes the place of those passages. A third thing is said the same way in both:
+     what a record names in another outline, as the directory and the `id`, and for each
+     whether it resolved (this skill confirmed only that the `id` exists there), did not
+     resolve, or was not checked. `moved_to`, `part`, such a directory and such an `id` are
+     text taken from a record. Put every text taken
      from a record (`edits`, a locator, an `id`, a point) inside a fenced code block whose
      fence is longer than any run of backticks in the text, so that nothing in it closes the
      block or is rendered as a link, as markup or as a heading. Write a control character in

@@ -74,3 +74,54 @@ public enum TschemaCheckPlaceholder {
         return CommandResult(stderr: message, exitCode: arguments.isEmpty || arguments == ["--help"] ? 0 : 2)
     }
 }
+
+/// `propositions outline check`, `status` and `locators`.
+public enum OutlineRun {
+    private static func resolve(_ path: String, _ workingDirectory: URL) -> URL {
+        path.hasPrefix("/") ? URL(fileURLWithPath: path) : workingDirectory.appendingPathComponent(path)
+    }
+
+    private static func read(_ directory: String, _ workingDirectory: URL, _ name: String)
+        -> (Outline?, CommandResult?)
+    {
+        do {
+            return (try Outline(directory: resolve(directory, workingDirectory)), nil)
+        } catch {
+            return (nil, CommandResult(stderr: ["outline \(name): \(error) in \(CiteOrder.visible(directory))"], exitCode: 2))
+        }
+    }
+
+    public static func check(directory: String, workingDirectory: URL) -> CommandResult {
+        let (outline, failure) = read(directory, workingDirectory, "check")
+        guard let outline else { return failure! }
+        let findings = OutlineCheck.findings(outline)
+        if findings.isEmpty { return CommandResult(stdout: ["ok outline check"], exitCode: 0) }
+        return CommandResult(stdout: findings, exitCode: 1)
+    }
+
+    public static func status(directory: String, workingDirectory: URL) -> CommandResult {
+        let (outline, failure) = read(directory, workingDirectory, "status")
+        guard let outline else { return failure! }
+        do {
+            return CommandResult(stdout: try OutlineStatus.lines(outline), exitCode: 0)
+        } catch {
+            return CommandResult(stderr: ["outline status: \(error)"], exitCode: 2)
+        }
+    }
+
+    public static func locators(directory: String, root: String, workingDirectory: URL) -> CommandResult {
+        let (outline, failure) = read(directory, workingDirectory, "locators")
+        guard let outline else { return failure! }
+        let rootURL = resolve(root, workingDirectory)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: rootURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return CommandResult(stderr: ["outline locators: the root \(CiteOrder.visible(root)) is not a directory"], exitCode: 2)
+        }
+        guard OutlineLocators.isWorkTreeRoot(rootURL) else {
+            return CommandResult(stderr: ["outline locators: the root \(CiteOrder.visible(root)) is not the root of a git repository"], exitCode: 2)
+        }
+        let findings = OutlineLocators.findings(paragraphs: outline.paragraphs, root: rootURL)
+        if findings.isEmpty { return CommandResult(stdout: ["ok locators"], exitCode: 0) }
+        return CommandResult(stdout: findings, exitCode: 1)
+    }
+}

@@ -292,7 +292,7 @@ figure, a table, or a displayed formula or derivation that has a blank line
 before it and a blank line after it is one record that carries `carry`. Its
 points are complete sentences stating what the block states or shows ("Theorem
 1 states that the interval covers the true value at the nominal rate."), and the
-text of the block is not rewritten. "States Theorem 1." is not such a sentence. A record that carries `carry` has `from`: without it nothing
+text of the block is not rewritten beyond the changes `edits` lists and cross-references that point elsewhere. "States Theorem 1." is not such a sentence. A record that carries `carry` has `from`: without it nothing
 says which block is moved. A block that is moved with changes to what it states
 (a sentence removed, a hypothesis added, a statement that no longer refers to a
 theorem moved elsewhere) is still a moved block: its record carries `carry`
@@ -322,18 +322,26 @@ while it is open neither record is in a second open pair: the write check
 reports two records that name each other, two that name the same record, and
 a record that both names one and is named. It also reports a record without
 `dropped` that names one that carries `dropped`: after a choice the key is on
-the record that was not chosen. Until the author decides, both
+the record that was not chosen. And it reports a record that carries
+`dropped` and names a record that names it back: a choice has one record that
+was not chosen. Until the author decides, both
 records are part of the outline and are shown together, and status counts the
 pair once as an alternative not yet chosen. The count does not depend on
 which of the two carries the key: an open pair is one paragraph of the
 outline, each of its records is listed in its own section and marked as an
 open alternative, and a length worked out from the outline is given for an
-open pair as the range from the shorter of the two to the longer. When the author chooses, the
+open pair as the range from the shorter of the two to the longer. In a count
+or a length for one section, a record of an open pair is a conditional part of
+its own section and is said to be one; the figures of the sections are not
+added up as if both records stood. When the author chooses, the
 record that is not chosen is given `dropped` with the reason and carries
 `alternative_to` naming the chosen one, so that what it was an alternative to
 stays on record: when the chosen record was the one that carried the key, the
 key moves to the other. The record that is not chosen is not deleted, whether
-or not it has `from`. A record of an open pair is not deleted, merged, split
+or not it has `from`: a record that carries `alternative_to` is kept by every
+rule that keeps a record with `from`, before the choice and after it, also
+when its section is left out. When the chosen record is itself left out
+later, the other keeps its key. A record of an open pair is not deleted, merged, split
 or given `dropped` by another rule (its section is left out, its last point
 moves away) until the author has said what becomes of the pair, and no `alternative_to` is left
 naming an `id` that is no longer in the file. Any other displayed formula or derivation is not a
@@ -636,9 +644,10 @@ What the skill shows for a section depends on its approved copy.
   a pair is in a section that is not shown, it is shown as background and said
   not to be part of this approval. A record that carries `dropped` and
   `alternative_to` is shown with the record it names and the sentence that
-  this one was not chosen. Text taken from a record is shown inside a code
-  span or a code block, so that nothing in it is rendered as a link, as markup
-  or as a heading.
+  this one was not chosen. Text taken from a record is shown inside a fenced
+  code block whose fence is longer than any run of backticks in the text, so
+  that nothing in it closes the block or is rendered as a link, as markup or
+  as a heading.
 
 The findings of the premise check on a section are shown with it in all three
 cases.
@@ -940,9 +949,10 @@ that file is the author's decision.
   until the author has said which of the two the passage is for the merged
   paragraph; the locator is then taken out of the other list before the merge.
   When the author wants both, the records are not merged. A record that
-  replaces a record with `carry` and `edits` and still stands for the moved
-  block keeps `carry` and the `edits` that apply to it; when the changes cannot
-  be divided, the skill asks.
+  stands for a moved block after a revision (a merge, a split, or the block's
+  point moving to another record) carries `carry`, the `from` of the block and
+  the `edits` that apply to it; when the changes cannot be divided, or no
+  record stands for the block any more, the skill asks.
 - When a record that has `from` is split, each record that replaces it has in
   its `from` at least one locator of the original, and each locator of the
   original is in the `from` of at least one of them.
@@ -1106,7 +1116,9 @@ where a record has it, is a list, that `edits` is a non-empty string on a
 record that carries `carry`, that `alternative_to` names another paragraph
 record of the file, that a record without `dropped` does not name one that
 carries `dropped`, that no record is in two open pairs of alternatives, and
-that no locator is in both the `from` and the `replaces` of
+that no record that carries `dropped` names a record that names it back, and
+that no locator (the same `file` and `label`, or with no `label` the same
+`starts`) is in both the `from` and the `replaces` of
 a record. The shape of a key that a section record
 carries and this document does not define is not checked, a key named `points`
 included; the control-character test still reads every string and key name.

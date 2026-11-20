@@ -69,8 +69,9 @@ This skill keeps three things, and its rules and commands are there for them.
    the outermost repository the manuscript is checked out in, which it reads to find the
    ledger before the root is set, and the files git itself reads when
    it is asked (its configuration, its global ignore file, and the git directory of the
-   repository, and of the outermost repository and the repositories between them, wherever it
-   is, which for a linked worktree is in the repository the worktree
+   repository, of the outermost repository and the repositories between them, and of a
+   repository of its own under the outermost one that holds a ledger or a directory offered for
+   the outline, wherever it is, which for a linked worktree is in the repository the worktree
    belongs to).
 3. It records an approval only from words the author typed in the message it answers.
 
@@ -435,8 +436,8 @@ M='<MAIN as printed, or DIR when there is no manuscript yet>'
 [ "${ROOT#/}" != "$ROOT" ] && [ "${STAGE#/}" != "$STAGE" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${M#/}" != "$M" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" || { echo 'STOP a path does not begin with /, or the stage directory is not the one the first command made for this repository'; exit 1; }
 OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && jq -n -e --arg n "${O#"$R"}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null 2>&1 && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] || { echo 'STOP the outline directory is not a directory inside the repository and outside .git, or its path holds a character no locator can carry, or an outline file in it is a symbolic link'; exit 1; }
 if [ -d "$O" ]; then D=$O; else D=${O%/*}; fi; T=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$D" rev-parse --show-toplevel) && TR=$(builtin cd -P -- "$T" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$TR" -ef "$T" ] || { echo 'STOP git finds no repository for the outline directory'; exit 1; }
-{ [ "$TR" = "$R" ] || [ "${TR#"$R"/}" != "$TR" ]; } && [ "$TR" != / ] || { echo 'STOP the repository of the outline directory is not inside the repository'; exit 1; }
-git -c safe.bareRepository=explicit -c core.fsmonitor=false -c core.quotePath=false -C "$TR" ls-files -s | jq -R -s -e --arg rel "${D#"$TR"/}" '[split("\n")[] | select(startswith("160000 ")) | split("\t")[1]] | all(. as $p | ($rel != $p) and (($rel | startswith($p + "/")) | not))' >/dev/null 2>&1 || { echo 'STOP the outline directory is inside a submodule that is not checked out'; exit 1; }
+{ [ "$TR" = "$R" ] || [ "${TR#"$R"/}" != "$TR" ]; } && [ "$TR" != / ] && { [ "$O" = "$TR" ] || [ "${O#"$TR"/}" != "$O" ]; } || { echo 'STOP the repository of the outline directory is not inside the repository, or does not hold the outline directory'; exit 1; }
+git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$TR" ls-files -s -z > "$S/links.bin" && jq -R -s -e --arg rel "${O#"$TR"/}" '[split("\u0000")[] | select(startswith("160000 ")) | split("\t")[1:] | join("\t")] | all(. as $p | ($rel != $p) and (($rel | startswith($p + "/")) | not))' "$S/links.bin" >/dev/null 2>&1 || { echo 'STOP the outline directory is inside a submodule that is not checked out'; exit 1; }
 { if [ -f "$M" ]; then B0=$(realpath "$M") && B="$(builtin cd -P -- "${B0%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${B0##*/}"; else B=$(builtin cd -P -- "$M" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P); fi; } && [ "$B" -ef "$M" ] || { echo 'STOP the manuscript, or the directory where it will be, is not a file or a directory that can be found'; exit 1; }
 [ "$B" = "$TR" ] || [ "${B#"$TR"/}" != "$B" ] || { echo 'STOP the manuscript, or the directory where it will be, is not in the repository of the outline directory'; exit 1; }
 printf '%s\n' "$TR" > "$S/root.txt" && printf 'ROOT=%s\n' "$TR" && echo 'ok the root is the repository of the outline directory'
@@ -447,15 +448,17 @@ that does not exist yet, the directory that is to hold it), not the outermost re
 first command found. Every `file` of a locator is written from this root, so the outline
 resolves in every checkout of this repository: on its own, or as a submodule of any other.
 The command refuses an outline directory that the lines that begin every call would refuse,
-before it changes anything, and the root it sets lies inside the first root: an answer of the
+before it changes anything (known limit 4 apart: a repository with a configuration of its
+own can make git name a root that the next call then refuses), and the root it sets lies inside the first root: an answer of the
 author can choose the outline directory, but the boundary is still the one the first command
 found, narrowed to a repository inside it.
 
 - `ok the root is the repository of the outline directory`: from here on `ROOT` is the path on
   the `ROOT=` line, and the stage directory records it. The lines that begin every call ask git
   the same question each time and go on only when the repository that holds `OUTDIR` is `ROOT`:
-  a root that was never set (a new session), or an `OUTDIR` that was changed to a directory of
-  another repository, stops them until this command runs again. When there is
+  a root that was never set (a new session, when the outline directory's repository is below
+  the outermost one), or an `OUTDIR` that was changed to a directory of another repository,
+  stops them until this command runs again. When there is
   a manuscript, run the manuscript check again with this `ROOT`: its `NAME=` line, the path of
   the main file from this root, is the `file` of every locator that names it. When this root is
   the one the stage directory already recorded, nothing changes.
@@ -480,19 +483,22 @@ counts as shown.
 This skill does not convert an outline written before this rule (issue 91), which gives every
 `file` from the outermost repository, and does not try to recognise one. When the root is a
 repository below the outermost one, the locators of such an outline do not resolve, and check
-reports each of them; when check reports that most locators of an outline do not resolve, say
-that an outline written before issue 91 names its files from the outermost repository, and
-that the author can remove from each `file` the path from that repository down to this one
-(with revise; the sections whose records change then need approval again). Two cases are not
-reported and are left to the author: a `file` that by chance names another file under the new
-root that holds the same label or opening words, and a `file` outside the new root, which no
-locator can name any more.
+reports each of them. When the root is below the outermost repository and check reports
+locators that do not resolve, say that an outline written before issue 91 names its files from
+the outermost repository, and that the author can remove from each `file` the path from that
+repository down to this one (with revise; the sections whose records change then need approval
+again). A `file` outside the new root is reported too, and no locator can name it any more:
+the author removes that locator. One case is not reported and is left to the author: a `file`
+that by chance names another file under the new root that holds the same label or opening
+words. An outline written before issue 91 that sits in a repository that does not hold the
+manuscript is refused like any other outline directory there: the author moves its three files
+to a directory of a repository that holds the manuscript.
 
 ### The lines that begin every call
 
 ```bash
 ROOT='<the root, as printed>'; OUTDIR='<the directory of the outline files>'; STAGE='<the stage directory, as printed>'
-[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" && OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && jq -n -e --arg n "${O#"$R"}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null 2>&1 && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] && { if [ -d "$O" ]; then GD=$O; else GD=${O%/*}; fi; GT=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$GD" rev-parse --show-toplevel 2>/dev/null) && GR=$(builtin cd -P -- "$GT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$GR" = "$R" ]; } && git -c safe.bareRepository=explicit -c core.fsmonitor=false -c core.quotePath=false -C "$R" ls-files -s | jq -R -s -e --arg rel "${GD#"$R"/}" '[split("\n")[] | select(startswith("160000 ")) | split("\t")[1]] | all(. as $p | ($rel != $p) and (($rel | startswith($p + "/")) | not))' >/dev/null 2>&1 || { echo 'STOP a path does not begin with /, the stage directory is not the one the first command made for this repository, the root is not the repository that holds the outline directory (run "The root is the repository of the outline directory" first), the outline directory is not a directory inside the repository and outside .git or its path holds a character no locator can carry, or an outline file is a symbolic link'; exit 1; }
+[ "${ROOT#/}" != "$ROOT" ] && [ "${OUTDIR#/}" != "$OUTDIR" ] && [ "${STAGE#/}" != "$STAGE" ] && [ -d "$STAGE" ] && R=$(builtin cd -P -- "$ROOT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$R" -ef "$ROOT" ] && S=$(builtin cd -P -- "$STAGE" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$S" -ef "$STAGE" ] && [ "$S" != "$R" ] && [ "${S#"$R"/}" = "$S" ] && [ -O "$S" ] && [ -n "$(find "$S" -maxdepth 0 -type d -perm 700)" ] && printf '%s\n' "$R" | cmp -s - "$S/root.txt" && OD=${OUTDIR%"${OUTDIR##*[!/]}"} && { { O=$(builtin cd -P -- "$OUTDIR" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$O" -ef "$OUTDIR" ]; } || { O="$(builtin cd -P -- "${OD%/*}" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P)/${OD##*/}" && [ "${O%/*}" -ef "${OD%/*}" ] && [ -n "${OD##*/}" ]; }; } && jq -n -e --arg n "${O#"$R"}" 'def clean: explode | all(. >= 32 and (. < 127 or . > 159) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297)); $n | clean' >/dev/null 2>&1 && { [ "$O" = "$R" ] || [ "${O#"$R"/}" != "$O" ]; } && X=$(printf '%s/' "${O#"$R"}" | tr 'A-Z' 'a-z') && [ "${X#*/.git/}" = "$X" ] && { [ -d "$O" ] || { [ ! -e "$O" ] && [ -d "${O%/*}" ]; }; } && [ ! -L "$O" ] && [ ! -L "$O/outline-sections.jsonl" ] && [ ! -L "$O/outline-paragraphs.jsonl" ] && [ ! -L "$O/outline-approvals.jsonl" ] && { if [ -d "$O" ]; then GD=$O; else GD=${O%/*}; fi; GT=$(git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$GD" rev-parse --show-toplevel 2>/dev/null) && GR=$(builtin cd -P -- "$GT" >/dev/null 2>&1 && PATH=/usr/bin:/bin env pwd -P) && [ "$GR" = "$R" ]; } && git -c safe.bareRepository=explicit -c core.fsmonitor=false -C "$R" ls-files -s -z > "$S/links.bin" && jq -R -s -e --arg rel "${O#"$R"/}" '[split("\u0000")[] | select(startswith("160000 ")) | split("\t")[1:] | join("\t")] | all(. as $p | ($rel != $p) and (($rel | startswith($p + "/")) | not))' "$S/links.bin" >/dev/null 2>&1 || { echo 'STOP a path does not begin with /, the stage directory is not the one the first command made for this repository, the root is not the repository that holds the outline directory or the outline directory is in a submodule that is not checked out (run "The root is the repository of the outline directory"), the outline directory is not a directory inside the repository and outside .git or its path holds a character no locator can carry, or an outline file is a symbolic link'; exit 1; }
 STAGE=$S; SEC="$O/outline-sections.jsonl"; PAR="$O/outline-paragraphs.jsonl"; APP="$O/outline-approvals.jsonl"
 ```
 

@@ -65,18 +65,20 @@ manuscript's), the skill stops and asks for a directory of a repository that
 does. It stops too when the outline directory is inside a submodule that is
 not checked out (files written there could not be tracked), and when git finds
 no repository for it, which includes a directory in or under one that is laid
-out like a git repository (see "What is checked today"). An outline written
+out like a git repository, where git refuses to answer. An outline written
 before this rule (issue #91) gives every `file` from the outermost repository.
 The skill does not convert such an outline and does not try to recognise one:
 when the root is a repository below the outermost one, its locators do not
 resolve and check reports each of them, and the skill then says that such an
 outline names its files from the outermost repository and that the path from
 that repository down to this one can be removed from each `file` with revise.
-Every section whose records change then no longer stands as approved. Two
-cases are not reported and are left to the author: a `file` that by chance
-names another file under the new root that holds the same label or opening
-words, and a `file` outside the new root, which no locator can name any
-more. When
+Every section whose records change then no longer stands as approved. A
+`file` outside the new root is reported too, and no locator can name it any
+more. One case is not reported and is left to the author: a `file` that by
+chance names another file under the new root that holds the same label or
+opening words. Such an outline in a repository that does not hold the
+manuscript is refused like any other outline directory there, and the author
+moves its three files. When
 the manuscript's repository sits inside another without being its submodule, a
 ledger of the outer repository is outside the repository: it does not name the
 manuscript for the skill, and the outline cannot go beside it. When no ledger
@@ -706,9 +708,10 @@ the user, has mode 700, and holds a note of the root it was made for. The
 first command writes the outermost root there, and the command that sets the
 root to the outline directory's repository rewrites it. Every command after
 that asks git which repository holds the outline directory and goes on only
-when it is the root the stage directory records, so a root that was never set,
-as after a new session, or an outline directory changed to one of another
-repository, stops them until that command runs again.
+when it is the root the stage directory records, so a root that was never set
+(after a new session, when the outline directory's repository is below the
+outermost one), or an outline directory changed to one of another repository,
+stops them until that command runs again.
 Every later command confirms all of that for the path it is given as the stage
 directory, and a directory that fails one of these is not used: the directory
 above the repository, the machine's temporary directory itself and the stage
@@ -743,8 +746,10 @@ and its rules and commands are there for them.
    checked out in, which it reads to find the ledger before the root is set,
    and the
    files git itself reads when it is asked (its configuration, its global
-   ignore file, and the git directory of the repository, and of the outermost
-   repository and the repositories between them, wherever it is, which
+   ignore file, and the git directory of the repository, of the outermost
+   repository and the repositories between them, and of a repository of its
+   own under the outermost one that holds a ledger or a directory offered for
+   the outline, wherever it is, which
    for a linked worktree is in the repository the worktree belongs to).
 3. It records an approval only from words the author typed in the message it
    answers.

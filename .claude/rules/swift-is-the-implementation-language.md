@@ -6,8 +6,8 @@
 **現況（2026-11-21 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
 與測試 target，共 38 個 Swift 檔。`propositions` 的子命令：引用方向（`cite-order`，#46）、綱要三個檔的格式、狀態與
 來源指標（`outline check`、`status`、`locators`，#78）、帳冊的行序（`ledger-order`，#59）、段落清單（`paragraphs`，#77）
-與兩支稽核（`audit symbols`、`citations`，#69），以及改版重抽的四個子命令（`revise relocate`、`retire`、`check`、`redirect`，#56；
-還沒有發布，skill 也還沒有呼叫）。binary 0.2.0（2026-11-21 發布）有這些子命令，propositions plugin 在
+與兩支稽核（`audit symbols`、`citations`，#69）；binary 0.2.0（2026-11-21 發布）有以上這些子命令。改版重抽的四個子命令（`revise relocate`、
+`retire`、`check`、`redirect`，#56）不在 0.2.0 裡，還沒有發布，skill 也還沒有呼叫。propositions plugin 在
 session 開始時用 hook 取得 `hooks/cli.lock` 鎖定的這一版（只有 macOS；`hooks/fetch-cli.sh`），skill 經由
 `hooks/run-cli.sh` 呼叫：`propositions` 的 Operation A 呼叫 `cite-order`，`construct` 呼叫 `paragraphs`，
 `construct-batch` 呼叫 `ledger-order`，`manuscript-audit` 讓 `run-audit.sh` 呼叫兩支稽核。綱要的子命令還沒有 skill 呼叫（#102）。

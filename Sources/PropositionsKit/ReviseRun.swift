@@ -38,7 +38,7 @@ public enum ReviseRun {
             return refuse("ledger not found, or not a regular file that can be read: \(CiteOrder.visible(jsonl))")
         }
         do {
-            let (new, out) = try ReviseLedger.retire(snapshot.data, retirements: retirements.map(ReviseLedger.retirement),
+            let (new, out) = try ReviseLedger.retire(snapshot.data, retirements: try retirements.map(ReviseLedger.retirement),
                                                      since: since, mechanism: mechanism, match: match, reason: reason, ref: ref)
             return finish(out, new: new, snapshot: snapshot, jsonl: jsonl, write: write, directory: workingDirectory)
         } catch let failure as Revise.Failure {

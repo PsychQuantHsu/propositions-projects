@@ -36,66 +36,85 @@ public enum Relocate {
         let range: Range<Int>
     }
 
-    /// Every place `needle` stands in `haystack`, as ranges of `haystack`.
-    static func occurrences(of needle: [Character], in haystack: [Character]) -> [Range<Int>] {
-        guard !needle.isEmpty, needle.count <= haystack.count else { return [] }
+    static func isWordScalar(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.properties.isAlphabetic || scalar.properties.numericType != nil || scalar == "_"
+    }
+
+    /// Every place `needle` stands in a file as a whole: not inside a `%` comment, and not part of a
+    /// longer word (`A is prime` does not stand in `A is primeval`).
+    static func occurrences(of needle: [Unicode.Scalar], in file: Revise.ManuscriptFile,
+                            map: (Range<Int>) -> Range<Int> = { $0 }, haystack: [Unicode.Scalar]? = nil) -> [Range<Int>] {
+        let text = haystack ?? file.text
+        guard !needle.isEmpty, needle.count <= text.count else { return [] }
         var found: [Range<Int>] = []
-        let first = needle[0]
         var index = 0
-        let last = haystack.count - needle.count
-        while index <= last {
-            if haystack[index] == first, haystack[index..<(index + needle.count)].elementsEqual(needle) {
-                found.append(index..<(index + needle.count))
+        while index <= text.count - needle.count {
+            if text[index] == needle[0], text[index..<(index + needle.count)].elementsEqual(needle) {
+                let original = map(index..<(index + needle.count))
+                let before = original.lowerBound > 0 ? file.text[original.lowerBound - 1] : nil
+                let after = original.upperBound < file.text.count ? file.text[original.upperBound] : nil
+                let joinsBefore = before.map { isWordScalar($0) && isWordScalar(file.text[original.lowerBound]) } ?? false
+                let joinsAfter = after.map { isWordScalar($0) && isWordScalar(file.text[original.upperBound - 1]) } ?? false
+                let inComment = original.contains { file.commented[$0] }
+                if !joinsBefore, !joinsAfter, !inComment { found.append(original) }
             }
             index += 1
         }
         return found
     }
 
-    /// The text with every run of white space as one space, and for each of its characters the
-    /// range of the original it stands for.
-    static func collapsed(_ text: [Character]) -> (chars: [Character], spans: [Range<Int>]) {
-        var chars: [Character] = []
+    static func isSpace(_ scalar: Unicode.Scalar) -> Bool { scalar.properties.isWhitespace }
+
+    /// The text with every run of white space as one space, and for each of its scalars the range
+    /// of the original it stands for.
+    static func collapsed(_ text: [Unicode.Scalar]) -> (scalars: [Unicode.Scalar], spans: [Range<Int>]) {
+        var scalars: [Unicode.Scalar] = []
         var spans: [Range<Int>] = []
         var index = 0
         while index < text.count {
-            if text[index].isWhitespace {
+            if isSpace(text[index]) {
                 let start = index
-                while index < text.count, text[index].isWhitespace { index += 1 }
-                chars.append(" ")
+                while index < text.count, isSpace(text[index]) { index += 1 }
+                scalars.append(" ")
                 spans.append(start..<index)
             } else {
-                chars.append(text[index])
+                scalars.append(text[index])
                 spans.append(index..<(index + 1))
                 index += 1
             }
         }
-        return (chars, spans)
+        return (scalars, spans)
     }
 
-    static func trimmed(_ text: [Character]) -> [Character] {
-        Array(text.drop(while: \.isWhitespace).reversed().drop(while: \.isWhitespace).reversed())
+    static func trimmed(_ text: [Unicode.Scalar]) -> [Unicode.Scalar] {
+        Array(text.drop(while: isSpace).reversed().drop(while: isSpace).reversed())
     }
 
-    /// Of several places, the one in the file the location names nearest its line; or the only
-    /// one; or none, when several places lie outside that file.
-    static func choose(_ found: [Occurrence], files: [Revise.ManuscriptFile], claimed: Location?) -> Occurrence?? {
-        if found.isEmpty { return .some(nil) }
+    enum Choice {
+        case none
+        case one(Occurrence)
+        case several
+    }
+
+    /// Of the places, the one in the file the location names nearest its line; or the only one.
+    /// Two places equally near, or several outside that file, are several.
+    static func choose(_ found: [Occurrence], files: [Revise.ManuscriptFile], claimed: Location?) -> Choice {
+        if found.isEmpty { return .none }
         let claimedName = claimed.map { $0.file.map(ReadingOrder.normalise) ?? "main.tex" }
         let inClaimed = found.filter { files[$0.file].name == claimedName }
         if !inClaimed.isEmpty, let claimed {
-            return inClaimed.min {
-                abs(files[$0.file].line(of: $0.range.lowerBound) - claimed.start)
-                    < abs(files[$1.file].line(of: $1.range.lowerBound) - claimed.start)
-            }
+            let distance = { (o: Occurrence) in abs(files[o.file].line(of: o.range.lowerBound) - claimed.start) }
+            let nearest = inClaimed.map(distance).min()!
+            let tied = inClaimed.filter { distance($0) == nearest }
+            return tied.count == 1 ? .one(tied[0]) : .several
         }
-        return found.count == 1 ? found[0] : nil
+        return found.count == 1 ? .one(found[0]) : .several
     }
 
     static func plan(ledger: Data, files: [Revise.ManuscriptFile]) throws -> [Result] {
         var results: [Result] = []
         let collapsedFiles = files.map { collapsed($0.text) }
-        for (index, line) in LedgerOrder.rawLines(ledger).enumerated() {
+        for (index, line) in Revise.lines(ledger).enumerated() {
             guard let raw = String(data: line, encoding: .utf8) else {
                 throw Revise.Failure(message: "line \(index + 1) of the ledger is not UTF-8")
             }
@@ -108,40 +127,39 @@ public enum Relocate {
             let id = members.last { $0.key == "id" }?.value.string ?? "?"
             let old = members.last { $0.key == "location" }?.value.string ?? ""
             guard let text = members.last(where: { $0.key == "text" })?.value.string,
-                  !trimmed(Array(text)).isEmpty
+                  !trimmed(Array(text.unicodeScalars)).isEmpty
             else {
                 throw Revise.Failure(message: "the proposition \(CiteOrder.visible(id)) on line \(index + 1) has no text")
             }
             let claimed = Location.parse(old)
-            let needle = Array(text)
+            let needle = Array(text.unicodeScalars)
             var found = files.indices.flatMap { file in
-                occurrences(of: needle, in: files[file].text).map { Occurrence(file: file, range: $0) }
+                occurrences(of: needle, in: files[file]).map { Occurrence(file: file, range: $0) }
             }
             var rewrapped = false
             if found.isEmpty {
-                let short = collapsed(trimmed(needle)).chars
+                let short = collapsed(trimmed(needle)).scalars
                 found = files.indices.flatMap { file -> [Occurrence] in
-                    let (chars, spans) = collapsedFiles[file]
-                    return occurrences(of: short, in: chars).map { range in
-                        Occurrence(file: file, range: spans[range.lowerBound].lowerBound..<spans[range.upperBound - 1].upperBound)
-                    }
+                    let (scalars, spans) = collapsedFiles[file]
+                    return occurrences(of: short, in: files[file], map: { spans[$0.lowerBound].lowerBound..<spans[$0.upperBound - 1].upperBound },
+                                       haystack: scalars).map { Occurrence(file: file, range: $0) }
                 }
                 rewrapped = !found.isEmpty
             }
             switch choose(found, files: files, claimed: claimed) {
-            case .some(.none) where found.isEmpty:
+            case .none:
                 results.append(Result(id: id, kind: .missing, old: old, new: [], text: nil, line: index + 1))
-            case .some(.some(let place)):
+            case .one(let place):
                 let location = files[place.file].location(of: place.range)
-                let newText = String(files[place.file].text[place.range])
                 if rewrapped {
-                    results.append(Result(id: id, kind: .rewrapped, old: old, new: [location], text: newText, line: index + 1))
-                } else if location == old || Location.parse(location).map({ sameLocation($0, claimed) }) == true {
+                    results.append(Result(id: id, kind: .rewrapped, old: old, new: [location],
+                                          text: files[place.file].string(place.range), line: index + 1))
+                } else if Location.parse(location).map({ sameLocation($0, claimed) }) == true {
                     results.append(Result(id: id, kind: .inPlace, old: old, new: [], text: nil, line: index + 1))
                 } else {
                     results.append(Result(id: id, kind: .moved, old: old, new: [location], text: nil, line: index + 1))
                 }
-            default:
+            case .several:
                 let places = found.map { files[$0.file].location(of: $0.range) }
                 results.append(Result(id: id, kind: .ambiguous, old: old, new: places, text: nil, line: index + 1))
             }
@@ -157,21 +175,19 @@ public enum Relocate {
     }
 
     /// The ledger with the moved and rewrapped propositions written again; every other line keeps
-    /// its bytes.
+    /// its bytes, a last line without a line feed included.
     static func rewritten(ledger: Data, results: [Result]) throws -> Data {
         let changes = Dictionary(results.filter { $0.kind == .moved || $0.kind == .rewrapped }.map { ($0.line, $0) },
                                  uniquingKeysWith: { a, _ in a })
         var out = Data()
-        for (index, line) in LedgerOrder.rawLines(ledger).enumerated() {
+        for (index, line) in Revise.lines(ledger).enumerated() {
             guard let change = changes[index + 1] else { out.append(line); continue }
-            let raw = String(decoding: line, as: UTF8.self)
-            let ending = raw.hasSuffix("\r\n") ? "\r\n" : "\n"
-            guard case let .object(members) = try JSONValue.parse(LedgerOrder.stripped(raw)) else {
+            guard case let .object(members) = try JSONValue.parse(LedgerOrder.stripped(String(decoding: line, as: UTF8.self))) else {
                 throw Revise.Failure(message: "line \(index + 1) of the ledger changed")
             }
             var updated = Revise.setting(members, "location", to: .string(change.new[0]))
             if let text = change.text { updated = Revise.setting(updated, "text", to: .string(text)) }
-            out.append(Data((Revise.dumps(.object(updated)) + ending).utf8))
+            out.append(Data((Revise.dumps(.object(updated)) + Revise.ending(of: line)).utf8))
         }
         return out
     }

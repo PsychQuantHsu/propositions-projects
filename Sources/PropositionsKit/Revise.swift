@@ -74,20 +74,51 @@ public enum Revise {
         return out
     }
 
-    /// One file of the manuscript: its text, its lines joined with line feeds, and where each
-    /// line starts, as the tool that writes `location` counts lines.
+    /// The lines of a ledger with their bytes as they are: a line keeps its line feed, and a last
+    /// line without one stays without one.
+    static func lines(_ data: Data) -> [Data] {
+        var lines: [Data] = []
+        var start = data.startIndex
+        for index in data.indices where data[index] == 0x0A {
+            lines.append(Data(data[start...index]))
+            start = data.index(after: index)
+        }
+        if start < data.endIndex { lines.append(Data(data[start...])) }
+        return lines
+    }
+
+    /// The line ending a line had, for a line written again: `\r\n`, `\n`, or none.
+    static func ending(of line: Data) -> String {
+        let raw = String(decoding: line, as: UTF8.self)
+        return raw.hasSuffix("\r\n") ? "\r\n" : raw.hasSuffix("\n") ? "\n" : ""
+    }
+
+    /// One file of the manuscript as Unicode scalars, compared as they are written (`é` and `e`
+    /// with a combining accent are different), its lines joined with line feeds, where each line
+    /// starts, and which scalars are inside a `%` comment.
     struct ManuscriptFile {
         /// The name a `location` gives it: `main.tex` for the main file.
         let name: String
-        let text: [Character]
+        let text: [Unicode.Scalar]
         let lineStarts: [Int]
+        let commented: [Bool]
 
         init(name: String, content: String) {
             self.name = name
-            text = Array(LatexLine.splitLines(content).joined(separator: "\n"))
+            text = Array(LatexLine.splitLines(content).joined(separator: "\n").unicodeScalars)
             var starts = [0]
-            for (offset, ch) in text.enumerated() where ch == "\n" { starts.append(offset + 1) }
+            for (offset, scalar) in text.enumerated() where scalar == "\n" { starts.append(offset + 1) }
             lineStarts = starts
+            var mask = [Bool](repeating: false, count: text.count)
+            var backslashes = 0
+            var inComment = false
+            for (offset, scalar) in text.enumerated() {
+                if scalar == "\n" { inComment = false; backslashes = 0; continue }
+                if !inComment, scalar == "%", backslashes % 2 == 0 { inComment = true }
+                mask[offset] = inComment
+                backslashes = scalar == "\\" ? backslashes + 1 : 0
+            }
+            commented = mask
         }
 
         func line(of offset: Int) -> Int {
@@ -99,11 +130,17 @@ public enum Revise {
             return low + 1
         }
 
-        /// `name:L<a>` or `name:L<a>-L<b>` for the characters of `range`.
+        /// `name:L<a>` or `name:L<a>-L<b>` for the scalars of `range`.
         func location(of range: Range<Int>) -> String {
             let start = line(of: range.lowerBound)
             let end = line(of: max(range.lowerBound, range.upperBound - 1))
             return end > start ? "\(name):L\(start)-L\(end)" : "\(name):L\(start)"
+        }
+
+        func string(_ range: Range<Int>) -> String {
+            var view = String.UnicodeScalarView()
+            view.append(contentsOf: text[range])
+            return String(view)
         }
     }
 

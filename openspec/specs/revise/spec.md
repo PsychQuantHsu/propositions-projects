@@ -10,21 +10,21 @@ TBD - created by archiving change 'idd-56-relocate'. Update Purpose after archiv
 
 The command-line tool SHALL have a subcommand `propositions revise relocate --jsonl <ledger> --tex <main file> [--write]` that looks for the text of each proposition of the ledger that has no key `retired`, in every file of the main file's input tree (read by the rules of the capability `citation-order`, lines counted as the tool that writes `location` counts them). Without `--write` it writes nothing.
 
-A text is first looked for as it is written. Where it stands nowhere, it is looked for with every run of white space, in the text and in the manuscript, read as one space, and the white space at its two ends left out. Each proposition SHALL come out in exactly one of these kinds:
+A text is first looked for as it is written, Unicode scalar by scalar (a letter with an accent written as one scalar is not the letter followed by a combining accent). A place counts only when the text stands there whole and outside a `%` comment: not where its first or last character continues a word (`A is prime` does not stand in `A is primeval`), and not where any of it is commented out. Where it stands nowhere, it is looked for with every run of white space, in the text and in the manuscript, read as one space, and the white space at its two ends left out. Each proposition SHALL come out in exactly one of these kinds:
 
 | Kind | When |
 | ---- | ---- |
 | in place | its text stands at the lines its `location` names (`L5` and `main.tex:L5` are the same lines) |
-| moved | its text, as written, stands elsewhere: in the file its `location` names, at the place nearest the line it names; or, when it does not stand in that file, at the one place in the manuscript it stands |
+| moved | its text, as written, stands elsewhere: in the file its `location` names, at the one place nearest the line it names; or, when it does not stand in that file, at the one place in the manuscript it stands |
 | rewrapped | its text stands only with other white space; the place is chosen as for moved |
-| ambiguous | its text does not stand in the file its `location` names, and stands at two places or more elsewhere |
+| ambiguous | two places in the file its `location` names are equally near the line it names, or its text does not stand in that file and stands at two places or more elsewhere |
 | missing | its text stands nowhere, with either reading |
 
 A text that the ledger validator matches only after its normalisation (of math, macros or comments) is missing here. The command does not decide what to do with a missing proposition: retiring it is another operation.
 
 The command SHALL print one line for each proposition that is moved (`moved <id>: <old> -> <new>`), rewrapped (`rewrapped <id>: <old> -> <new>`), ambiguous (`ambiguous <id>: <old>; its text stands at <place>, <place>`) or missing (`missing <id>: <old>`), in the order of the ledger, then the count of each kind. A new location is written `<file>:L<a>` or `<file>:L<a>-L<b>`, with `main.tex` for the main file, as the location refresh writes it.
 
-With `--write` the command SHALL write again only the lines of the moved and rewrapped propositions: a new `location`, and for a rewrapped one a new `text` that is the manuscript's text at that place, line breaks included. Such a line is written as the Python tools write a ledger line (`json.dumps(…, ensure_ascii=False)`): a key written twice keeps its first place and its last value, and a number keeps the way it was written. Every other line keeps its bytes. The ledger is replaced as `propositions ledger-order` replaces it (the capability `ledger-order`).
+With `--write` the command SHALL write again only the lines of the moved and rewrapped propositions: a new `location`, and for a rewrapped one a new `text` that is the manuscript's text at that place, line breaks included. Such a line is written as the Python tools write a ledger line (`json.dumps(…, ensure_ascii=False)`): a key written twice keeps its first place and its last value, and a number keeps the way it was written. Every other line keeps its bytes, a last line without a line feed included, and a line written again keeps the line ending it had. The ledger is replaced as `propositions ledger-order` replaces it (the capability `ledger-order`); as there, two programs that write the same ledger at the same moment are not kept apart. A location names the main file by `main.tex` or by no file at all, whatever the main file is called, as everywhere in this plugin.
 
 It exits with 0 when every proposition is in place, or when `--write` wrote every one that was moved or rewrapped and none is ambiguous or missing; with 1 when a dry run would change something or a proposition is ambiguous or missing; with 2, and one line on standard error that starts with `error: `, when the ledger or a file of the manuscript cannot be read, a line is not JSON, a proposition has no text, or an argument is wrong. When it exits with 2 the ledger is as it was.
 
@@ -49,28 +49,30 @@ It exits with 0 when every proposition is in place, or when `--write` wrote ever
 
 - **GIVEN** a ledger line with a quote, a backslash, a tab, control characters, a Unicode line separator, a delete character, characters outside ASCII, numbers and nested values; one with a key written twice; and an empty object
 - **WHEN** it is written again
-- **THEN** it is the string `json.dumps(json.loads(line), ensure_ascii=False)` gives for it
+- **THEN** it is, byte for byte, the string `json.dumps(json.loads(line), ensure_ascii=False)` gives for it; a number that Python would write otherwise (`1.00`, `-0`, `1E2`) keeps the way it was written
+
 
 <!-- @trace
-source: idd-56-relocate
+source: idd-56-fix1
 updated: 2026-11-21
 code:
-  - Sources/PropositionsKit/JSONValue.swift
-  - Sources/PropositionsKit/CLI.swift
-  - Sources/PropositionsKit/Relocate.swift
   - propositions-projects.code-workspace
-  - Sources/PropositionsKit/Revise.swift
   - tests/PropositionsKitTests/RelocateTests.swift
+  - Sources/PropositionsKit/Revise.swift
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - tests/PropositionsKitTests/ReviseLedgerTests.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - Sources/PropositionsKit/Relocate.swift
 -->
 
 ---
 ### Requirement: A retirement records the propositions that replace it
 
-The command-line tool SHALL have a subcommand `propositions revise retire --jsonl <ledger> --retire <id>[=<id>,<id>] … --since <YYYY-MM-DD> --reason <text> [--mechanism comment_env|line_comment|removed] [--match exact|by_reading] [--ref <text>] [--write]`. Each `--retire` names a live proposition and, after `=`, the ids of the live propositions that replace it, in order; with none, the passage was deleted. Without `--write` it writes nothing.
+The command-line tool SHALL have a subcommand `propositions revise retire --jsonl <ledger> --retire <id>[=<id>,<id>] … --since <YYYY-MM-DD> --reason <text> [--mechanism comment_env|line_comment|removed] [--match exact|by_reading] [--ref <text>] [--write]`. Each `--retire` names a live proposition and, after `=`, the ids of the live propositions that replace it, in order; the bare id says that the passage was deleted, and an empty id after `=` (`old=`, `old=b,,c`) is refused. Without `--write` it writes nothing.
 
 Each named proposition SHALL get a `retired` block with `since`, `mechanism` (by default `removed`), `match` (by default `exact`), `reason`, `ref` when one is given, and `replaced_by`, the list of the replacing ids, empty for a deletion (schema v1.8). The block is the last key of the line when the line had none; the line is written again as `propositions revise relocate` writes a line, and every other line keeps its bytes. The Python ledger validator reads the block as a well-formed retirement.
 
-The command SHALL refuse, with exit 2, one line on standard error that starts with `error: ` and nothing written, when: an id names no proposition or several lines; a proposition is already retired or named twice; a replacement names no proposition, is retired, is the proposition itself, or is retired by the same run; `--since` is not a calendar date; `--mechanism` or `--match` is not one of its values; or `--reason` is blank. It prints one line for each retirement, in the order of the ledger, and exits with 1 for a dry run and with 0 when it wrote the ledger.
+The command SHALL refuse, with exit 2, one line on standard error that starts with `error: ` and nothing written, when: an id names no proposition or several lines; a proposition is already retired or named twice; a replacement does not name exactly one live proposition (it names none, a retired one, or the id of several lines), is the proposition itself, or is retired by the same run; a retirement already in the ledger names a proposition of this run in its `replaced_by`; `--since` is not a Gregorian calendar date, checked without a time zone; `--mechanism` or `--match` is not one of its values; or `--reason` is blank. It prints one line for each retirement, in the order of the ledger, and exits with 1 for a dry run and with 0 when it wrote the ledger.
 
 #### Scenario: Retirements are written with what replaces them
 
@@ -85,32 +87,22 @@ The command SHALL refuse, with exit 2, one line on standard error that starts wi
 
 
 <!-- @trace
-source: idd-56-retire
+source: idd-56-fix1
 updated: 2026-11-21
 code:
-  - plugins/propositions/docs/OBLIGATIONS.md
-  - Sources/PropositionsKit/Relocate.swift
-  - Sources/PropositionsKit/ReviseRun.swift
-  - tests/PropositionsKitTests/RelocateTests.swift
-  - tests/PropositionsKitTests/ReviseLedgerTests.swift
-  - plugins/propositions/catalog/obligations.yaml
-  - plugins/propositions/skills/propositions/SKILL.md
-  - Sources/PropositionsKit/JSONValue.swift
   - propositions-projects.code-workspace
-  - Sources/PropositionsKit/ReviseLedger.swift
-  - plugins/propositions/templates/ledger/_meta.template.json
-  - Sources/PropositionsKit/CLI.swift
+  - tests/PropositionsKitTests/RelocateTests.swift
   - Sources/PropositionsKit/Revise.swift
-  - CLAUDE.md
-  - docs/SCHEMA.md
-tests:
-  - tests/test_plugin_payload_tracked.py
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - tests/PropositionsKitTests/ReviseLedgerTests.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - Sources/PropositionsKit/Relocate.swift
 -->
 
 ---
 ### Requirement: Every replaced_by names live propositions
 
-`propositions revise check --jsonl <ledger>` SHALL report, one line each with the ledger line, every `replaced_by` that is not a list, and every item of one that is not an id, names no proposition of the ledger, names a retired one, or names the retired proposition itself. It then prints the number of retirements whose `replaced_by` names live propositions only, the number whose `replaced_by` is empty, the number without `replaced_by`, and the number of problems. It writes nothing. It exits with 0 when there is no problem, with 1 when there is one, and with 2 when the ledger cannot be read or a line is not JSON. A retirement without `replaced_by` is not a problem: it was made before schema v1.8, or by hand. This check is `ledger:replaced-by` of the obligations table.
+`propositions revise check --jsonl <ledger>` SHALL report, one line each with the ledger line, every `replaced_by` that is not a list, and every item of one that is not an id, names no proposition of the ledger, names a retired one, names the id of several lines, or names the retired proposition itself. It then prints the number of retirements whose `replaced_by` names live propositions only, the number whose `replaced_by` is empty, the number without `replaced_by`, and the number of problems. It writes nothing. It exits with 0 when there is no problem, with 1 when there is one, and with 2 when the ledger cannot be read or a line is not JSON. A retirement without `replaced_by` is not a problem: it was made before schema v1.8, or by hand. This check is `ledger:replaced-by` of the obligations table.
 
 #### Scenario: A replacement that is not live is reported
 
@@ -125,34 +117,24 @@ tests:
 
 
 <!-- @trace
-source: idd-56-retire
+source: idd-56-fix1
 updated: 2026-11-21
 code:
-  - plugins/propositions/docs/OBLIGATIONS.md
-  - Sources/PropositionsKit/Relocate.swift
-  - Sources/PropositionsKit/ReviseRun.swift
-  - tests/PropositionsKitTests/RelocateTests.swift
-  - tests/PropositionsKitTests/ReviseLedgerTests.swift
-  - plugins/propositions/catalog/obligations.yaml
-  - plugins/propositions/skills/propositions/SKILL.md
-  - Sources/PropositionsKit/JSONValue.swift
   - propositions-projects.code-workspace
-  - Sources/PropositionsKit/ReviseLedger.swift
-  - plugins/propositions/templates/ledger/_meta.template.json
-  - Sources/PropositionsKit/CLI.swift
+  - tests/PropositionsKitTests/RelocateTests.swift
   - Sources/PropositionsKit/Revise.swift
-  - CLAUDE.md
-  - docs/SCHEMA.md
-tests:
-  - tests/test_plugin_payload_tracked.py
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - tests/PropositionsKitTests/ReviseLedgerTests.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - Sources/PropositionsKit/Relocate.swift
 -->
 
 ---
 ### Requirement: Citations of a retired proposition follow its replacements
 
-`propositions revise redirect --jsonl <ledger> --tex <main file> [--write]` SHALL replace, in the `cites` of each live proposition, each id of a retired proposition by the ids in its `replaced_by`, in their order, leaving out an id the list already holds and an id whose proposition does not come before the citing one in reading order (read by the rules of the capability `citation-order`). A cited retired proposition whose `replaced_by` is empty or absent is dropped. Every other citation is left as it is, a citation of a later live proposition included: that one is the citation-direction check's. Without `--write` it writes nothing.
+`propositions revise redirect --jsonl <ledger> --tex <main file> [--write]` SHALL replace, in the `cites` of each live proposition, each id of a retired proposition by the ids in its `replaced_by`, in their order, leaving out: an id the list cites directly or already gained, the citing proposition itself, and, when the citing proposition has a place in the reading order (read by the rules of the capability `citation-order`), an id whose proposition has none or does not come before it. A cited retired proposition whose `replaced_by` is empty or absent is dropped. Every other citation is left as it is and where it is, a citation of a later live proposition included: that one is the citation-direction check's. The command SHALL refuse, with exit 2 and nothing written, a `replaced_by` of a cited retirement that is not a list of ids each naming exactly one live proposition, and a `cites` that holds a value that is not an id. Without `--write` it writes nothing.
 
-It prints a line for each citation it drops (`drop <citing>: …`) and each it redirects (`redirect <citing>: <retired> -> <id>, <id>`). A citing proposition whose `location` is not in the input tree keeps its redirected citations without the check of order, and a line on standard error says so. Only the lines whose `cites` change are written again, as `propositions revise relocate` writes a line. It exits with 0 when it wrote the ledger or there is nothing to change (and prints `nothing to change`), with 1 for a dry run that would change it, and with 2 when a file cannot be read, a line is not JSON, or an argument is wrong.
+It prints a line for each citation it drops (`drop <citing>: …`), each it redirects (`redirect <citing>: <retired> -> <id>, <id>`), and each retired citation none of whose replacements is added. A citing proposition whose `location` is not in the input tree keeps its redirected citations without the check of order, and a line on standard error says so. Only the lines whose `cites` change are written again, as `propositions revise relocate` writes a line. It exits with 0 when it wrote the ledger or there is nothing to change (and prints `nothing to change`), with 1 for a dry run that would change it, and with 2 when a file cannot be read, a line is not JSON, or an argument is wrong.
 
 #### Scenario: A citation of a retired proposition is redirected
 
@@ -186,4 +168,17 @@ code:
   - docs/SCHEMA.md
 tests:
   - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-56-fix1
+updated: 2026-11-21
+code:
+  - propositions-projects.code-workspace
+  - tests/PropositionsKitTests/RelocateTests.swift
+  - Sources/PropositionsKit/Revise.swift
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - tests/PropositionsKitTests/ReviseLedgerTests.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - Sources/PropositionsKit/Relocate.swift
 -->

@@ -121,12 +121,13 @@ struct ReviseLedgerTests {
         let retiredLines = try lines()
         let result = run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex", "--write"], in: box)
         #expect(result.stdout == [
-            "drop c: c, which replaces old, does not come before it",
+            "drop c: c, which replaces old, is c itself",
             "redirect c: old -> b",
             "drop d: gone2 is retired and has no replacement",
             "redirect d: old -> b, c",
             "drop e: b, which replaces old, does not come before it",
             "drop e: c, which replaces old, does not come before it",
+            "drop e: old, whose replacements are cited already or cannot be cited",
             "written: main.jsonl",
         ])
         #expect(result.exitCode == 0)
@@ -137,6 +138,81 @@ struct ReviseLedgerTests {
         for index in [0, 1, 2, 5] { #expect(after[index] == retiredLines[index]) }
         #expect(run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex"], in: box)
             == CommandResult(stdout: ["nothing to change"], exitCode: 0))
+    }
+
+    // MARK: the first review
+
+    static let block = #""retired": {"since": "2026-11-21", "mechanism": "removed", "match": "exact", "reason": "x""#
+
+    @Test(arguments: [
+        ("\"replaced_by\": \"b\"", "is not a list of ids"),
+        ("\"replaced_by\": [\"b\", 7]", "is not a list of ids"),
+        ("\"replaced_by\": [\"nobody\"]", "is no proposition of the ledger"),
+    ])
+    func `Redirect refuses a replaced_by it cannot follow, and writes nothing`(list: String, message: String) throws {
+        let (box, file) = try ledger([Self.row("b", "L1", "First."), "{\"id\": \"old\", \"text\": \"x\", \(Self.block), \(list)}}",
+                                      Self.row("c", "L3", "Third.", cites: ["old"])])
+        let before = try Data(contentsOf: file)
+        let result = run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex", "--write"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.last?.contains(message) == true)
+        #expect(try Data(contentsOf: file) == before)
+    }
+
+    @Test func `Redirect keeps direct citations in place, adds a replacement once, and refuses a cites it cannot read`() throws {
+        let retired = "{\"id\": \"old\", \"text\": \"x\", \(Self.block), \"replaced_by\": [\"b\", \"b\", \"a\"]}}"
+        let (box, file) = try ledger([Self.row("a", "L1", "First."), Self.row("b", "L2", "Second."), retired,
+                                      Self.row("c", "L3", "Third.", cites: ["old", "b", "old"])])
+        let result = run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex", "--write"], in: box)
+        #expect(result.exitCode == 0)
+        let lines = String(decoding: try Data(contentsOf: file), as: UTF8.self).components(separatedBy: "\n")
+        #expect(lines[3] == Self.row("c", "L3", "Third.", cites: ["a", "b"]))
+        let (bad, badFile) = try ledger([retired, Self.row("a", "L1", "First."), Self.row("b", "L2", "Second."),
+                                         "{\"id\": \"c\", \"text\": \"Third.\", \"location\": \"L3\", \"cites\": [\"old\", 17]}"])
+        let before = try Data(contentsOf: badFile)
+        #expect(run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex", "--write"], in: bad).exitCode == 2)
+        #expect(try Data(contentsOf: badFile) == before)
+    }
+
+    @Test func `A last line without a line feed keeps its bytes when another line is written`() throws {
+        let box = try Box()
+        _ = try box.write(Self.main, to: "main.tex")
+        let text = Self.rows.joined(separator: "\n")
+        let file = try box.write(text, to: "main.jsonl")
+        #expect(run(Self.retireArguments + ["--write"], in: box).exitCode == 0)
+        let after = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+        #expect(after.hasSuffix(Self.rows[6]))
+        #expect(!after.hasSuffix("\n"))
+    }
+
+    @Test(arguments: [
+        (["--retire", "old="], "empty id"),
+        (["--retire", "old=b,,c"], "empty id"),
+        (["--retire", "b"], "replaces r (line"),
+        (["--retire", "old=dup"], "is the id of several lines"),
+    ])
+    func `Retire refuses empty ids, a retirement that would break another, and ids that are not unique`(arguments: [String], message: String) throws {
+        let (box, file) = try ledger(Self.rows + [Self.row("dup", "L1", "x"), Self.row("dup", "L2", "y"),
+                                                  "{\"id\": \"r\", \"text\": \"x\", \(Self.block), \"replaced_by\": [\"b\"]}}"])
+        let before = try Data(contentsOf: file)
+        let result = run(["retire", "--jsonl", "main.jsonl", "--since", "2026-11-21", "--reason", "x"] + arguments + ["--write"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.last?.contains(message) == true)
+        #expect(try Data(contentsOf: file) == before)
+        #expect(run(["check", "--jsonl", "main.jsonl"], in: box).exitCode == 0)
+    }
+
+    @Test(arguments: [("2011-12-30", true), ("2024-02-29", true), ("2026-02-29", false), ("2026-13-01", false), ("2026-1-01", false)])
+    func `A date is checked by the calendar, without a time zone`(date: String, valid: Bool) {
+        #expect(ReviseLedger.isDate(date) == valid)
+    }
+
+    @Test func `The check reports an id that names several lines`() throws {
+        let (box, _) = try ledger([Self.row("a", "L1", "x"), "{\"id\": \"a\", \"text\": \"y\", \(Self.block)}}",
+                                   "{\"id\": \"r\", \"text\": \"z\", \(Self.block), \"replaced_by\": [\"a\"]}}"])
+        let result = run(["check", "--jsonl", "main.jsonl"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.first == "line 3: r is replaced by a, which is the id of several lines")
     }
 
     @Test func `The commands state their interface`() throws {

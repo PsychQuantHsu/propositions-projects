@@ -110,9 +110,29 @@ struct RelocateTests {
         try process.run()
         input.fileHandleForWriting.write(Data(line.utf8))
         input.fileHandleForWriting.closeFile()
-        let python = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let python = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        #expect(Revise.dumps(try JSONValue.parse(line)) == python)
+        #expect(Data(Revise.dumps(try JSONValue.parse(line)).utf8) == python)
+    }
+
+    // MARK: the first review
+
+    @Test func `Only a whole text outside comments counts, compared as it is written, and a tie is ambiguous`() throws {
+        let box = try Box()
+        _ = try box.write("A is primeval.\n% A is prime.\nTie.\nX\nTie.\ncafe\u{301} au lait.\n", to: "main.tex")
+        let rows = [Self.line("p", "main.tex:L1", "A is prime"), Self.line("t", "main.tex:L4", "Tie."),
+                    Self.line("c", "main.tex:L6", "caf\u{E9} au lait.")]
+        _ = try box.write(rows.map { $0 + "\n" }.joined(), to: "main.jsonl")
+        #expect(run([], in: box).stdout == [
+            "missing p: main.tex:L1",
+            "ambiguous t: main.tex:L4; its text stands at main.tex:L3, main.tex:L5",
+            "missing c: main.tex:L6",
+            "0 in place, 0 moved, 0 rewrapped, 1 ambiguous, 2 missing",
+        ])
+    }
+
+    @Test func `A number keeps the way it was written`() throws {
+        #expect(Revise.dumps(try JSONValue.parse(#"{"a": 1.00, "b": -0, "c": 1E2}"#)) == #"{"a": 1.00, "b": -0, "c": 1E2}"#)
     }
 
     @Test func `The command states its interface`() throws {

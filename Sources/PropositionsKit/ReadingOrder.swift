@@ -70,7 +70,7 @@ public struct ReadingOrder: Sendable {
             var environment: String?  // the verbatim-like environment the scan is inside, if any
             for (index, raw) in LatexLine.splitLines(text).enumerated() {
                 let lineNumber = index + 1
-                let found = LatexLine.scan(raw, environment: &environment)
+                let found = LatexLine.scan(LatexLine.maskingInlineVerbatim(raw), environment: &environment)
                 if found.unsupportedImport { skipped.append("\(name):\(lineNumber)") }
                 for (offset, target) in found.targets.enumerated() {
                     if target.hasPrefix("/") || target.hasPrefix("\\\\") {
@@ -174,6 +174,31 @@ enum LatexLine {
         }
         if !current.isEmpty { lines.append(String(current)) }
         return lines
+    }
+
+    /// The line with the text of each `\verb|…|` and `\lstinline|…|` on it replaced by spaces, so
+    /// that a command written there as an example (`\verb|\input{x}|`) is not read, nor a `%` in it
+    /// taken for a comment. A span whose delimiter does not close on the line is left as it is.
+    static func maskingInlineVerbatim(_ line: String) -> String {
+        var chars = Array(line)
+        var index = 0
+        while index < chars.count {
+            guard chars[index] == "\\", index + 1 < chars.count else { index += 1; continue }
+            guard chars[index + 1].isLetter else { index += 2; continue }
+            var end = index + 1
+            while end < chars.count, chars[end].isLetter { end += 1 }
+            let name = String(chars[(index + 1)..<end])
+            guard name == "verb" || name == "lstinline" else { index = end; continue }
+            var at = end
+            if name == "verb", at < chars.count, chars[at] == "*" { at += 1 }
+            if name == "lstinline", at < chars.count, chars[at] == "[", let close = chars[at...].firstIndex(of: "]") { at = close + 1 }
+            guard at < chars.count, !chars[at].isLetter, !chars[at].isWhitespace else { index = end; continue }
+            let delimiter: Character = chars[at] == "{" ? "}" : chars[at]
+            guard let close = chars[(at + 1)...].firstIndex(of: delimiter) else { index = end; continue }
+            for i in (at + 1)..<close { chars[i] = " " }
+            index = close + 1
+        }
+        return String(chars)
     }
 
     /// What one line holds outside comments and verbatim-like environments.

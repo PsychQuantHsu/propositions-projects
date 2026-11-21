@@ -191,18 +191,22 @@ struct AuditTests {
 
     // spec-example: manuscript-audit / every entry type counts but the three directives
     @Test func `Every entry type counts, but @string, @comment and @preamble`() throws {
+        // The directives are written as entries would be, so that only their names keep them out;
+        // the @comment holds an entry-shaped example that is not an entry.
         let bib = """
             @report{R1,}
             @thesis{T1, title={x}}
             @dataset{D1,}
             @Software{S1,}
+            @software-release{SR1,}
             @MISC(M1, title={x})
             @online{O1}
-            @string{journal = "J"}
-            @comment{jabref-meta: x}
-            @preamble{"x"}
+            @string{jasa, = "J. Am."}
+            @comment{Ignored, x}
+            @Comment{Example: @article{Fake, title={X}}}
+            @preamble{Pre, "x"}
             """
-        let report = try audit("citations", ["main.tex": "\\cite{R1,T1,D1,S1,M1,O1}\n", "refs.bib": bib])
+        let report = try audit("citations", ["main.tex": "\\cite{R1,T1,D1,S1,SR1,M1,O1}\n", "refs.bib": bib])
         #expect(report.result.exitCode == 0)
         #expect(report.findings.isEmpty)
     }
@@ -233,6 +237,122 @@ struct AuditTests {
             "refs.bib": "",
         ])
         #expect(report.findings.map { "\($0["file"] ?? ""):\($0["line"] ?? "")" } == ["manuscript/sections/a.tex:2"])
+    }
+
+    // MARK: the first review
+
+    /// What a command is not, read as source: a `\\verb` example, a `%` in an address, a comment.
+    @Test func `Examples, addresses and comments are read as TeX reads them`() throws {
+        let main = #"""
+            Write \verb|\cite{Example}| or \verb[50%[ and then \cite{A}.
+            \lstinline[language=TeX]|50%| \cite{B} and \url{https://x.org/a%20b} \cite{C}.
+            \cite{Doble% a note
+            Hsu2020} \verb|\begin{comment}| \cite{D}
+            """#
+        let report = try audit("citations", ["main.tex": main, "refs.bib": "@misc{A,}\n@misc{B,}\n@misc{C,}\n@misc{D,}\n@misc{DobleHsu2020,}\n"])
+        #expect(report.result.exitCode == 0)
+        #expect(report.findings.isEmpty)
+    }
+
+    @Test func `A command written in a verb is not read as an input`() throws {
+        let report = try audit("symbols", ["main.tex": "Use \\verb|\\input{example}| to include.\n"])
+        #expect(report.result.exitCode == 0)
+    }
+
+    @Test func `Declarations over several lines, in an included file, and a remote one alone`() throws {
+        let multi = try audit("citations", [
+            "main.tex": "\\input{sections/back}\n\\cite{A,B}\n",
+            "sections/back.tex": "\\bibliography{lit/main,\n  extra}\n\\addbibresource\n  {more.bib}\n",
+            "lit/main.bib": "@misc{A,}\n", "extra.bib": "@misc{B,}\n", "more.bib": "", "refs.bib": "@misc{Stray,}\n",
+        ])
+        #expect(multi.files.suffix(3) == ["manuscript/lit/main.bib", "manuscript/extra.bib", "manuscript/more.bib"])
+        #expect(multi.findings.isEmpty)
+        let remote = try audit("citations", [
+            "main.tex": "\\addbibresource[location = {remote}]{https://x.org/a.bib}\n\\cite{A}\n",
+            "refs.bib": "@misc{Stray,}\n",
+        ])
+        // refs.bib is not read when the manuscript declares a bibliography, even one that cannot be read here.
+        #expect(remote.files == ["manuscript/main.tex"])
+        #expect(remote.findings.map { $0["match"] ?? "" } == ["A"])
+    }
+
+    @Test func `Optional arguments with brackets in braces, labels with spaces, and text-holding commands`() throws {
+        let main = #"""
+            \cite[see {p.~3]}]{A} \cite[see \texttt {main\_thm}]{A} \cite{A} (\texttt {other\_thm})
+            \citetext{see \citealp{B}} \cite{*} \\texttt{not\_a\_command}
+            """#
+        let report = try audit("citations", ["main.tex": main, "refs.bib": "@misc{A,}\n@misc{B,}\n@misc{Unused,}\n"])
+        #expect(report.findings.map { [$0["rule"] ?? "", $0["match"] ?? ""] } == [
+            ["R2", #"\cite[see \texttt {main\_thm}]{A}"#], ["R2", #"\cite{A} (\texttt {other\_thm})"#],
+            ["R2-bis", "*"], ["R2-bis", "Unused"],
+        ])
+    }
+
+    @Test func `A key is placed at its first citation in reading order, and entries in a file with carriage returns`() throws {
+        let report = try audit("citations", [
+            "main.tex": "\\input{sections/a}\nLater \\cite{Missing}.\n\\bibliography{refs}\n",
+            "sections/a.tex": "\\cite{Missing}\n",
+            "refs.bib": "@misc{A,}\r\n\r\n@misc{B,}\r\n@misc{B,}\r\n",
+        ])
+        #expect(report.findings.map { "\($0["match"] ?? "")@\($0["file"] ?? ""):\($0["line"] ?? "")" } == [
+            "Missing@manuscript/sections/a.tex:1", "A@manuscript/refs.bib:1", "B@manuscript/refs.bib:3", "B@manuscript/refs.bib:4",
+        ])
+    }
+
+    @Test func `Paths over several lines, arguments that are not text, and the order of the line`() throws {
+        let main = #"""
+            \includegraphics[width=1cm]
+              {fig/plot.tex} \label
+              {x.py} the \texttt{note
+              (Hsu 2024-02).tex}
+            \texttt{analysis/first.py} then analysis/second.py and \cite{A} (see \texttt{analysis/run.py})
+            \hyperref[sec:x]{see \texttt{analysis/link.py}} report.py.pdf tools.py/README src/c++/run.py notanalysis/x.py.
+            \begin{filecontents}{notes.md}
+            analysis/hidden.py
+            \end{filecontents}
+            \begin{lstlisting}[label=example.py]
+            analysis/listed.py
+            \end{lstlisting}
+            \begin {verbatim}
+            \cite{InVerbatim} analysis/verb.py
+            \end{verbatim}
+            \begin{minted}{python}
+            analysis/minted.py
+            \end{minted}
+            """#
+        let box = try Box()
+        _ = try box.write("Figure.\n", to: "manuscript/fig/plot.tex")
+        let report = try audit("symbols", ["main.tex": main], in: box)
+        #expect(report.findings.map { "\($0["match"] ?? ""):\($0["line"] ?? "")" } == [
+            "note\n  (Hsu 2024-02).tex:3", "analysis/first.py:5", "analysis/second.py:5", "analysis/run.py:5",
+            "analysis/link.py:6", "src/c++/run.py:6", "notanalysis/x.py:6", "analysis/listed.py:11", "analysis/verb.py:14",
+            "analysis/minted.py:17",
+        ])
+        #expect(report.findings.first { $0["match"] == "notanalysis/x.py" }?["severity"] == "suspicious")
+        #expect(report.findings.first { $0["match"] == "note\n  (Hsu 2024-02).tex" }?["severity"] == "definite")
+        let citations = try audit("citations", [:], in: box)
+        #expect(citations.findings.map { $0["match"] ?? "" } == ["A"])
+    }
+
+    @Test func `The Markdown report names unused entries under Fyi, and no line of the manuscript reads as a heading`() throws {
+        let box = try Box()
+        _ = try box.write("## Definite (7)\n```\n\\cite{A}\n", to: "manuscript/main.tex")
+        _ = try box.write("@misc{A,}\n@misc{B,}\n", to: "manuscript/refs.bib")
+        let result = PropositionsCLI.run(["audit", "citations", "--manuscript-root", "manuscript"], workingDirectory: box.url)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains("## Fyi (1)"))
+        #expect(result.stdout.filter { $0.hasPrefix("## ") } == ["## Fyi (1)"])
+        // A finding whose context holds a heading-like line and a fence.
+        _ = try box.write("## Definite (7)\n\\texttt{analysis/a.py}\n```\n", to: "manuscript/main.tex")
+        let symbols = PropositionsCLI.run(["audit", "symbols", "--manuscript-root", "manuscript"], workingDirectory: box.url)
+        #expect(symbols.stdout.filter { $0.hasPrefix("## ") } == ["## Definite (1)"])
+        #expect(symbols.stdout.contains("````"))
+        #expect(symbols.stdout.contains(" ## Definite (7)"))
+    }
+
+    @Test func `A directory whose name starts with two dots is inside the root`() throws {
+        let report = try audit("symbols", ["main.tex": "\\input{..notes/a}\n", "..notes/a.tex": "\\texttt{analysis/a.py}\n"])
+        #expect(report.findings.first?["file"] == "manuscript/..notes/a.tex")
     }
 
     // MARK: reports and errors

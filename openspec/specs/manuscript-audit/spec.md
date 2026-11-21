@@ -10,11 +10,11 @@ TBD - created by archiving change 'idd-69-audits'. Update Purpose after archive.
 
 The command-line tool SHALL have two subcommands, `propositions audit symbols` and `propositions audit citations`, each taking `--manuscript-root <directory>`, `--tex <main file>` (by default `main.tex` in that directory) and `--report-format md|json` (by default `md`). They write no file. They are the successors of `audit-symbols.py` and `audit-citations.py`, which they replace.
 
-Both SHALL read every file of the main file's input tree, by the rules of the capability `citation-order`, and no other `.tex` file. A file is read as UTF-8; a byte-order mark is kept as the character it is. In every file, a comment (`%` up to the end of the line, where the `%` is not escaped and not inside `\verb` or `\lstinline`) is not read, nor is the text of a `comment` environment.
+Both SHALL read every file of the main file's input tree, by the rules of the capability `citation-order`, and no other `.tex` file. A file is read as UTF-8; a byte-order mark is kept as the character it is. Each file is read as one stream, as TeX reads it, so that a command and its arguments may run over several lines; every finding keeps the file and line where it stands. A comment (`%` up to the end of the line, where the `%` is not escaped) is not read, and the line end it swallows does not end a word: `\cite{Doble%` followed by `Hsu2020}` cites `DobleHsu2020`. The text of `\verb` (any delimiter), of `\lstinline` (after its options, with a delimiter or braces) and of the environments `verbatim`, `Verbatim`, `BVerbatim`, `lstlisting` (after its options), `minted` (after its language), `comment` and `filecontents`, starred or not, is not read as source: a command written there is an example. A `%` in it, or in the braced argument of `\url`, `\path`, `\nolinkurl` and `\href`, is not a comment.
 
-A report names each file by the manuscript directory as it was given, followed by the path from it. Both formats SHALL list the files that were read: the JSON report under the key `files`, after `total`; the Markdown report in a line `Files read: ` after its title. Otherwise the reports keep the layout of the Python tools: in JSON the keys `rule`, `tool`, `version`, `severity_counts` (with `definite`, `likely`, `suspicious` and `FYI`), `total` and `findings`, each finding with `rule`, `severity`, `file`, `line`, `match`, `context` and `proposed_fix`; in Markdown one section `## <Severity> (<n>)` for each severity that has findings, which is what `run-audit.sh` reads.
+A report names each file by the manuscript directory as it was given, followed by the path from it; a file outside that directory is named by its full path. Both formats SHALL list the files that were read: the JSON report under the key `files`, after `total`; the Markdown report in a line `Files read: ` after its title. Otherwise the reports keep the layout of the Python tools: in JSON the keys `rule`, `tool`, `version`, `severity_counts` (with `definite`, `likely`, `suspicious` and `FYI`), `total` and `findings`, each finding with `rule`, `severity`, `file`, `line`, `match`, `context` and `proposed_fix`; in Markdown one section `## Definite (<n>)`, `## Likely (<n>)`, `## Suspicious (<n>)` or `## Fyi (<n>)` for each severity that has findings, which is what `run-audit.sh` reads. In the Markdown report a line of the manuscript's context that starts with `#` is written after a space, and the fence around the context is longer than any run of backticks in it, so that no line of the manuscript reads as a heading of the report or closes the fence.
 
-An audit exits with 0 when it finds nothing, with 1 when it finds at least one thing of any severity, and with 2, with one line on standard error that starts with `error: `, when the main file or a file of the tree cannot be read, the tree cannot be resolved, a declared bibliography file cannot be read, or an argument is wrong.
+An audit exits with 0 when it finds nothing, with 1 when it finds at least one thing of any severity, and with 2, with one line on standard error that starts with `error: ` (after the warnings the audit had printed before it), when the main file or a file of the tree cannot be read, the tree cannot be resolved, a declared bibliography file cannot be read, or an argument is wrong.
 
 #### Scenario: A manuscript of several files is audited
 
@@ -29,25 +29,24 @@ An audit exits with 0 when it finds nothing, with 1 when it finds at least one t
 
 
 <!-- @trace
-source: idd-69-audits
+source: idd-69-fix1
 updated: 2026-11-21
 code:
-  - Sources/PropositionsKit/AuditSource.swift
-  - CLAUDE.md
-  - propositions-projects.code-workspace
-  - tests/PropositionsKitTests/AuditTests.swift
-  - Sources/PropositionsKit/AuditCitations.swift
+  - Sources/PropositionsKit/ReadingOrder.swift
   - Sources/PropositionsKit/AuditRun.swift
+  - propositions-projects.code-workspace
+  - Sources/PropositionsKit/AuditSource.swift
   - Sources/PropositionsKit/AuditSymbols.swift
-  - Sources/PropositionsKit/CLI.swift
+  - Sources/PropositionsKit/AuditCitations.swift
+  - tests/PropositionsKitTests/AuditTests.swift
 -->
 
 ---
 ### Requirement: The symbols audit finds a working file wherever the manuscript shows a path
 
-`propositions audit symbols` (rule R1) SHALL report each path that ends in `.py`, `.md`, `.tex`, `.sh`, `.rs`, `.swift`, `.R` or `.jl` and that the manuscript shows to its reader: in `\texttt`, `\url`, `\path`, `\nolinkurl`, the address of `\href`, `\verb`, `\lstinline`, the text of a verbatim-like environment other than `comment`, and running text. The arguments of the commands that name a file, a package or a label for LaTeX (`\input`, `\include`, `\includegraphics`, `\bibliography`, `\addbibresource`, `\label`, `\ref` and its kin, `\usepackage`, `\documentclass` and the others the implementation lists), and the arguments of every citation command, are not shown text and are not read. In `\texttt` and running text, `\_` is read as `_` and `\ ` as a space. A path's body has no white space but one parenthesised group after a space (`note (Hsu 2024-02).tex`), and no colon, so the path of an address is read from its `//`.
+`propositions audit symbols` (rule R1) SHALL report each path that ends in `.py`, `.md`, `.tex`, `.sh`, `.rs`, `.swift`, `.R` or `.jl` and that the manuscript shows to its reader: in `\texttt`, `\url`, `\path`, `\nolinkurl`, the address of `\href`, `\verb`, `\lstinline`, the body of `verbatim`, `Verbatim`, `BVerbatim`, `lstlisting` and `minted`, and running text. The body of `comment` and `filecontents` is not printed and is not read. The arguments of the commands that name a file, a package or a label for LaTeX (`\input`, `\include`, `\includegraphics`, `\bibliography`, `\addbibresource`, `\label`, `\ref` and its kin, `\usepackage`, `\documentclass` and the others the implementation lists, each with the number of arguments it takes), and the keys of every citation command, are not shown text and are not read; the arguments after those, such as the text of `\hyperref[label]{text}`, and the notes of a citation, are. In `\texttt` and running text, `\_` is read as `_` and `\ ` as a space. A path's body has no white space but one parenthesised group after a space (`note (Hsu 2024-02).tex`, which may run over two lines), and no colon, so the path of an address is read from its `//`. The extension ends the path: `report.py.pdf` and `tools.py/README` are not reported. Findings are listed in the order they stand in each file.
 
-A file name that ends in `.bib`, and the names the manuscript declares as its bibliography, are not reported. The severity is as the Python tool had it: `definite` for a path under `analysis/` that ends in `.py`, under `manuscript/docs/` that ends in `.md` or `.tex`, and a working note `note (…).tex`; `likely` for another `.tex` or `.sh`; `suspicious` otherwise.
+A file name that ends in `.bib`, and the names the manuscript declares as its bibliography, are not reported. The severity is as the Python tool had it: `definite` for a path under a directory `analysis/` that ends in `.py`, under a directory `manuscript/docs/` that ends in `.md` or `.tex` (`notanalysis/` is not `analysis/`), and a working note `note (…).tex`; `likely` for another `.tex` or `.sh`; `suspicious` otherwise.
 
 #### Scenario: A working file named in the manuscript is reported
 
@@ -68,27 +67,26 @@ A file name that ends in `.bib`, and the names the manuscript declares as its bi
 
 
 <!-- @trace
-source: idd-69-audits
+source: idd-69-fix1
 updated: 2026-11-21
 code:
-  - Sources/PropositionsKit/AuditSource.swift
-  - CLAUDE.md
-  - propositions-projects.code-workspace
-  - tests/PropositionsKitTests/AuditTests.swift
-  - Sources/PropositionsKit/AuditCitations.swift
+  - Sources/PropositionsKit/ReadingOrder.swift
   - Sources/PropositionsKit/AuditRun.swift
+  - propositions-projects.code-workspace
+  - Sources/PropositionsKit/AuditSource.swift
   - Sources/PropositionsKit/AuditSymbols.swift
-  - Sources/PropositionsKit/CLI.swift
+  - Sources/PropositionsKit/AuditCitations.swift
+  - tests/PropositionsKitTests/AuditTests.swift
 -->
 
 ---
 ### Requirement: The citations audit reads the declared bibliography and every citation
 
-`propositions audit citations` (rules R2 and R2-bis) SHALL read as the bibliography the files the manuscript declares with `\bibliography` (names separated by commas; `.bib` added when it is not there), `\addbibresource`, `\bibresource`, `\addglobalbib` and `\addsectionbib`, each found from the directory of the main file. A resource with the option `location=remote` is not read, and a line on standard error says so. Only when the manuscript declares no file does the audit read `refs.bib` in the manuscript directory, if there is one. Every entry `@<type>{<key>,` or `@<type>(<key>,` counts, whatever its type, except `@string`, `@comment` and `@preamble`.
+`propositions audit citations` (rules R2 and R2-bis) SHALL read as the bibliography the files the manuscript declares with `\bibliography` (names separated by commas; `.bib` added when it is not there), `\addbibresource`, `\bibresource`, `\addglobalbib` and `\addsectionbib`, each found from the directory of the main file. A resource with the option `location=remote` (spaces and braces around `remote` allowed) is not read, and a line on standard error says so. Only when the manuscript declares no bibliography at all, local or remote, does the audit read `refs.bib` in the manuscript directory, if there is one. A file declared twice, or through a link to a file already read, is read once. Every entry `@<type>{<key>,` or `@<type>(<key>,` counts, whatever its type, except `@string`, `@comment` and `@preamble`; each is read as a whole, so that an entry written inside the body of `@comment` is not one. Lines of a bibliography file end at a line feed, a carriage return, or the two together.
 
-A citation command is a command whose name has `cite` in it, in any case (`\cite`, `\citet`, `\parencite`, `\Textcite`, `\nocite` …), except `\citestyle`, `\citeindextrue`, `\citeindexfalse`, `\citeindextype` and `\citesetup`. It may have up to two optional arguments in `[…]` before its keys in `{…}`, keys separated by commas. A command whose name ends in `s` (`\cites`, `\parencites` …) may have up to two notes in `(…)` and then several groups of optional arguments and keys. A citation may run over several lines. `\nocite{*}` cites every entry.
+A citation command is a command whose name has `cite` in it, in any case (`\cite`, `\citet`, `\parencite`, `\Textcite`, `\nocite` …), except `\citestyle`, `\citeindextrue`, `\citeindexfalse`, `\citeindextype`, `\citesetup` and `\citetext`, whose argument is text in which citations are read on their own. It may have up to two optional arguments in `[…]` before its keys in `{…}`, keys separated by commas; a `]` inside braces does not end an optional argument. A command whose name ends in `s` (`\cites`, `\parencites` …) may have up to two notes in `(…)` and then several groups of optional arguments and keys. A citation may run over several lines. `\nocite{*}` cites every entry; a `*` in another citation command is a key.
 
-The audit SHALL report: as `R2`, `likely`, each citation that has `\texttt{<label>}` in an optional argument or right after it in parentheses, where the label is a word with at least one underscore; as `R2-bis`, `definite`, each cited key with no entry, at the first citation of it; as `R2-bis`, `FYI`, each entry no citation cites, at its line of the bibliography file.
+The audit SHALL report: as `R2`, `likely`, each citation that has `\texttt{<label>}` in an optional argument, or right after it with nothing else in parentheses, where the label is a word with at least one underscore and white space may stand between `\texttt` and its brace; as `R2-bis`, `definite`, each cited key with no entry, at its first citation in the manuscript's reading order; as `R2-bis`, `FYI`, each entry no citation cites, at its line of the bibliography file, once for each time the entry is written.
 
 #### Scenario: Citations and entries are compared
 
@@ -109,7 +107,7 @@ The audit SHALL report: as `R2`, `likely`, each citation that has `\texttt{<labe
 
 ##### Example: every entry type counts but the three directives
 
-- **GIVEN** a bibliography with entries of the types `report`, `thesis`, `dataset`, `Software`, `MISC` written with parentheses, and `online` without fields, and a `@string`, a `@comment` and a `@preamble`, and a manuscript that cites the six entries
+- **GIVEN** a bibliography with entries of the types `report`, `thesis`, `dataset`, `Software`, `software-release`, `MISC` written with parentheses, and `online` without fields; a `@string`, two `@comment` and a `@preamble` written as entries would be, one `@comment` holding an entry-shaped example; and a manuscript that cites the seven entries
 - **WHEN** the citations audit runs
 - **THEN** it reports nothing and exits with 0
 
@@ -131,4 +129,17 @@ code:
   - Sources/PropositionsKit/AuditRun.swift
   - Sources/PropositionsKit/AuditSymbols.swift
   - Sources/PropositionsKit/CLI.swift
+-->
+
+<!-- @trace
+source: idd-69-fix1
+updated: 2026-11-21
+code:
+  - Sources/PropositionsKit/ReadingOrder.swift
+  - Sources/PropositionsKit/AuditRun.swift
+  - propositions-projects.code-workspace
+  - Sources/PropositionsKit/AuditSource.swift
+  - Sources/PropositionsKit/AuditSymbols.swift
+  - Sources/PropositionsKit/AuditCitations.swift
+  - tests/PropositionsKitTests/AuditTests.swift
 -->

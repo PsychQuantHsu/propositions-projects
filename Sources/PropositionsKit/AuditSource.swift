@@ -1,7 +1,7 @@
 import Foundation
 
-/// The manuscript as the two audits read it: every file of the main file's input tree, each with
-/// its lines as written and the lines with comments removed.
+/// The manuscript as the two audits read it: every file of the main file's input tree, each read
+/// as one stream of characters, as TeX reads it, with the place of every character kept.
 public enum Audit {
     public struct Failure: Error, Equatable {
         public let message: String
@@ -19,27 +19,62 @@ public enum Audit {
 
     public static let severities = ["definite", "likely", "suspicious", "FYI"]
 
+    /// Characters taken from a file, each with its offset in the file's text.
+    struct Piece {
+        var chars: [Character] = []
+        var offsets: [Int] = []
+
+        mutating func take(_ text: [Character], _ range: Range<Int>) {
+            for index in range where index < text.count {
+                chars.append(text[index])
+                offsets.append(index)
+            }
+        }
+    }
+
     /// One file of the manuscript.
     struct Source {
         /// The name a report gives it: the manuscript root as it was given, then the path from it.
         let shown: String
         let url: URL
-        /// The lines as written.
+        /// Its name in the input tree; `nil` for the main file.
+        let key: String?
+        /// The lines as written, for the context of a finding.
         let lines: [String]
-        /// The lines with comments and every verbatim-like environment removed.
-        let code: [String]
-        /// The text inside verbatim-like environments other than `comment`, line by line: it is
-        /// printed as it is written, so a path in it is read like a path in running text.
-        let verbatim: [String]
+        /// The text, its lines joined with line feeds.
+        let text: [Character]
+        let lineStarts: [Int]
+        /// What TeX reads as source: comments (with the line end they swallow), the text of
+        /// `\verb`, `\lstinline` and verbatim-like environments are not in it.
+        let code: Piece
+        /// The text TeX prints as it is written: `\verb`, `\lstinline`, and verbatim-like
+        /// environments that print their body.
+        let displayed: [Piece]
+
+        func line(of offset: Int) -> Int {
+            var low = 0, high = lineStarts.count - 1
+            while low < high {
+                let mid = (low + high + 1) / 2
+                if lineStarts[mid] <= offset { low = mid } else { high = mid - 1 }
+            }
+            return low + 1
+        }
     }
 
     struct Manuscript {
         let sources: [Source]
+        let order: ReadingOrder
         /// The directory of the main file: where LaTeX and BibTeX look for a file it names.
         let mainDirectory: URL
         let root: URL
         let rootShown: String
         let notes: [String]
+
+        /// Where an offset of a source comes in the manuscript's reading order.
+        func position(source: Int, offset: Int) -> [Int] {
+            let item = sources[source]
+            return (order.position(file: item.key, line: item.line(of: offset)) ?? [Int.max]) + [offset]
+        }
     }
 
     /// Strict UTF-8 that keeps a byte-order mark as the character it is.
@@ -60,11 +95,13 @@ public enum Audit {
         }
     }
 
-    /// How a report names a file: from the root as it was given, as Python's `Path` would join them.
+    /// How a report names a file: the root as it was given, then the path from it. A file outside
+    /// the root is named by its full path.
     static func shown(_ url: URL, root: URL, rootShown: String) -> String {
         let relative = ReadingOrder.relativePath(of: url.standardizedFileURL, from: root.standardizedFileURL)
-        if relative.hasPrefix("..") { return url.standardizedFileURL.path }
-        return rootShown == "." ? relative : rootShown + "/" + relative
+        if relative.split(separator: "/").first == ".." { return url.standardizedFileURL.path }
+        if rootShown == "." { return relative }
+        return rootShown.hasSuffix("/") ? rootShown + relative : rootShown + "/" + relative
     }
 
     static func read(root: URL, rootShown given: String, main: URL) throws -> Manuscript {
@@ -89,14 +126,18 @@ public enum Audit {
                 throw Failure(message: "cannot read \(CiteOrder.visible(key)) as UTF-8")
             }
             let lines = LatexLine.splitLines(content)
-            let (code, verbatim) = LatexText.split(lines)
-            sources.append(Source(shown: shown(url, root: root, rootShown: rootShown), url: url,
-                                  lines: lines, code: code, verbatim: verbatim))
+            let text = Array(lines.joined(separator: "\n"))
+            var starts = [0]
+            for (offset, ch) in text.enumerated() where ch == "\n" { starts.append(offset + 1) }
+            let (code, displayed) = LatexText.tokenize(text)
+            sources.append(Source(
+                shown: shown(url, root: root, rootShown: rootShown), url: url, key: index == 0 ? nil : key,
+                lines: lines, text: text, lineStarts: starts, code: code, displayed: displayed))
         }
         let notes = order.skippedImports.map {
             "[warn] non-standard import macro skipped at \(CiteOrder.visible($0)) (\\subimport/\\subfile/\\import unsupported)"
         }
-        return Manuscript(sources: sources, mainDirectory: directory, root: root, rootShown: rootShown, notes: notes)
+        return Manuscript(sources: sources, order: order, mainDirectory: directory, root: root, rootShown: rootShown, notes: notes)
     }
 
     /// The lines around a line, as the report shows them: the one before, the line, the one after.
@@ -107,86 +148,132 @@ public enum Audit {
     }
 }
 
-/// Reading LaTeX source a character at a time: comments, verbatim-like environments, groups.
+/// Reading LaTeX source a character at a time.
 enum LatexText {
-    /// For each line, the text outside comments and verbatim-like environments, and the text
-    /// inside verbatim-like environments other than `comment`.
-    static func split(_ lines: [String]) -> (code: [String], verbatim: [String]) {
-        var code: [String] = []
-        var verbatim: [String] = []
-        var environment: String?
-        for raw in lines {
-            var rest = raw[...]
-            var codeOut = ""
-            var verbatimOut = ""
-            while true {
-                if let inside = environment {
-                    let kept = !inside.hasPrefix("comment")
-                    guard let end = LatexLine.command("\\end{\(inside)}", in: rest) else {
-                        if kept { verbatimOut += rest }
-                        break
-                    }
-                    if kept { verbatimOut += rest[..<end.lowerBound] }
-                    environment = nil
-                    rest = rest[end.upperBound...]
-                    continue
-                }
-                let comment = commentStart(rest)
-                var begin: (range: Range<Substring.Index>, name: String)?
-                for name in LatexLine.verbatimEnvironments.flatMap({ [$0, $0 + "*"] }) {
-                    if let range = LatexLine.command("\\begin{\(name)}", in: rest),
-                       begin == nil || range.lowerBound < begin!.range.lowerBound {
-                        begin = (range, name)
-                    }
-                }
-                if let begin, comment == nil || begin.range.lowerBound < comment! {
-                    codeOut += rest[..<begin.range.lowerBound]
-                    environment = begin.name
-                    rest = rest[begin.range.upperBound...]
-                    continue
-                }
-                codeOut += comment.map { rest[..<$0] } ?? rest
-                break
-            }
-            code.append(codeOut)
-            verbatim.append(verbatimOut)
+    /// Verbatim-like environments, and whether they print their body.
+    static let literalEnvironments: [String: Bool] = [
+        "verbatim": true, "Verbatim": true, "BVerbatim": true, "lstlisting": true, "minted": true,
+        "comment": false, "filecontents": false,
+    ]
+
+    /// Commands whose braced argument TeX reads as it is written, `%` included.
+    static let literalArgument: Set<String> = ["url", "path", "nolinkurl", "href"]
+
+    /// Splits a file's text into what TeX reads as source and what it prints as it is written.
+    static func tokenize(_ text: [Character]) -> (code: Audit.Piece, displayed: [Audit.Piece]) {
+        var code = Audit.Piece()
+        var displayed: [Audit.Piece] = []
+        let count = text.count
+        func show(_ range: Range<Int>) {
+            var piece = Audit.Piece()
+            piece.take(text, range)
+            displayed.append(piece)
         }
-        return (code, verbatim)
+        /// The index of `ch` after `start` on the same line.
+        func onLine(_ ch: Character, after start: Int) -> Int? {
+            var index = start
+            while index < count, text[index] != "\n" {
+                if text[index] == ch { return index }
+                index += 1
+            }
+            return nil
+        }
+        var index = 0
+        while index < count {
+            let ch = text[index]
+            if ch == "%" {
+                // A comment, and the line end it swallows.
+                while index < count, text[index] != "\n" { index += 1 }
+                index += 1
+                continue
+            }
+            guard ch == "\\", index + 1 < count else { code.take(text, index..<(index + 1)); index += 1; continue }
+            guard text[index + 1].isLetter else { code.take(text, index..<(index + 2)); index += 2; continue }
+            var end = index + 1
+            while end < count, text[end].isLetter { end += 1 }
+            let name = String(text[(index + 1)..<end])
+            switch name {
+            case "begin":
+                guard let (environment, after) = environmentName(text, from: end),
+                      let printed = literalEnvironments[environment.hasSuffix("*") ? String(environment.dropLast()) : environment]
+                else { break }
+                var body = after
+                let base = environment.hasSuffix("*") ? String(environment.dropLast()) : environment
+                if base == "lstlisting" || base == "minted" || base == "Verbatim" || base == "BVerbatim" {
+                    if body < count, text[body] == "[", let group = group(text, at: body) { body = group.end }
+                }
+                if base == "minted" {
+                    let next = skipSpace(text, from: body)
+                    if next < count, text[next] == "{", let group = group(text, at: next) { body = group.end }
+                }
+                let (closeStart, closeEnd) = endOfEnvironment(text, environment, from: body) ?? (count, count)
+                if printed { show(body..<closeStart) }
+                index = closeEnd
+                continue
+            case "verb":
+                var at = end
+                if at < count, text[at] == "*" { at += 1 }
+                if at < count, !text[at].isLetter, !text[at].isWhitespace, let close = onLine(text[at], after: at + 1) {
+                    show((at + 1)..<close)
+                    index = close + 1
+                    continue
+                }
+            case "lstinline":
+                var at = end
+                if at < count, text[at] == "[", let group = group(text, at: at) { at = group.end }
+                if at < count, text[at] == "{", let group = group(text, at: at) {
+                    show(group.range)
+                    index = group.end
+                    continue
+                }
+                if at < count, !text[at].isLetter, !text[at].isWhitespace, let close = onLine(text[at], after: at + 1) {
+                    show((at + 1)..<close)
+                    index = close + 1
+                    continue
+                }
+            default:
+                if literalArgument.contains(name) {
+                    var at = end
+                    while at < count, text[at] == " " || text[at] == "\t" { at += 1 }
+                    if at < count, text[at] == "{", let group = group(text, at: at) {
+                        code.take(text, index..<group.end)
+                        index = group.end
+                        continue
+                    }
+                }
+            }
+            code.take(text, index..<end)
+            index = end
+        }
+        return (code, displayed)
     }
 
-    /// Where a `%` comment starts. `\%` is a percent sign, `\\%` a line break and a comment, and a
-    /// `%` inside `\verb|…|` or `\lstinline|…|` is text.
-    static func commentStart(_ text: Substring) -> Substring.Index? {
-        var index = text.startIndex
-        while index < text.endIndex {
-            let ch = text[index]
-            if ch == "%" { return index }
-            guard ch == "\\" else { index = text.index(after: index); continue }
-            let next = text.index(after: index)
-            guard next < text.endIndex else { return nil }
-            guard text[next].isLetter else { index = text.index(after: next); continue }
-            var end = next
-            while end < text.endIndex, text[end].isLetter { end = text.index(after: end) }
-            let name = text[next..<end]
-            if name == "verb" || name == "lstinline" {
-                var start = end
-                if name == "verb", start < text.endIndex, text[start] == "*" { start = text.index(after: start) }
-                if start < text.endIndex, !text[start].isLetter, !text[start].isWhitespace, text[start] != "{", text[start] != "[" {
-                    let delimiter = text[start]
-                    let body = text.index(after: start)
-                    guard let close = text[body...].firstIndex(of: delimiter) else { return nil }
-                    index = text.index(after: close)
-                    continue
-                }
+    /// The name in `{…}` after `\begin`, and the index after its closing brace.
+    static func environmentName(_ text: [Character], from start: Int) -> (String, Int)? {
+        let at = skipSpace(text, from: start)
+        guard at < text.count, text[at] == "{", let close = text[at...].firstIndex(of: "}") else { return nil }
+        return (String(text[(at + 1)..<close]).trimmingCharacters(in: .whitespaces), close + 1)
+    }
+
+    /// Where `\end{name}` starts and the index after it, from `start`. Inside the environment
+    /// nothing is a command but its own end.
+    static func endOfEnvironment(_ text: [Character], _ name: String, from start: Int) -> (Int, Int)? {
+        var index = start
+        let marker = Array("\\end")
+        while index + marker.count <= text.count {
+            if Array(text[index..<(index + marker.count)]) == marker,
+               let (found, after) = environmentName(text, from: index + marker.count), found == name {
+                return (index, after)
             }
-            index = end
+            index += 1
         }
         return nil
     }
 
-    /// The group that opens at `start` (`{`, `[` or `(`), as the content and the index after it.
-    /// Groups of the same kind nest; a backslash keeps the character after it from counting.
-    static func group(_ chars: [Character], at start: Int) -> (content: String, end: Int)? {
+    /// The group that opens at `start` (`{`, `[` or `(`): the range of its content, and the index
+    /// after it. Braces nest; `[…]` and `(…)` close at their own delimiter only outside braces. A
+    /// backslash keeps the character after it from counting.
+    static func group(_ chars: [Character], at start: Int) -> (range: Range<Int>, end: Int)? {
         guard start < chars.count else { return nil }
         let open = chars[start]
         let close: Character
@@ -196,20 +283,28 @@ enum LatexText {
         case "(": close = ")"
         default: return nil
         }
-        var depth = 0
-        var index = start
+        var braces = 0
+        var index = start + 1
         while index < chars.count {
             let ch = chars[index]
             if ch == "\\" { index += 2; continue }
-            if ch == open { depth += 1 }
-            if ch == close {
-                depth -= 1
-                if depth == 0 { return (String(chars[(start + 1)..<index]), index + 1) }
+            if open == "{" {
+                if ch == "{" { braces += 1 }
+                if ch == "}" {
+                    if braces == 0 { return ((start + 1)..<index, index + 1) }
+                    braces -= 1
+                }
+            } else {
+                if ch == "{" { braces += 1 }
+                if ch == "}" { braces = max(0, braces - 1) }
+                if ch == close, braces == 0 { return ((start + 1)..<index, index + 1) }
             }
             index += 1
         }
         return nil
     }
+
+    static func content(_ chars: [Character], _ range: Range<Int>) -> String { String(chars[range]) }
 
     /// The index of the first character at or after `index` that is not white space.
     static func skipSpace(_ chars: [Character], from index: Int) -> Int {

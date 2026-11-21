@@ -96,14 +96,21 @@ public enum AuditRun {
         for severity in Audit.severities {
             let items = findings.filter { $0.severity == severity }
             if items.isEmpty { continue }
-            out += ["", "## \(severity.prefix(1).uppercased() + severity.dropFirst()) (\(items.count))", ""]
+            // As Python's capitalize() wrote it: `## Fyi (n)`, which run-audit.sh looks for.
+            out += ["", "## \(severity.prefix(1).uppercased() + severity.dropFirst().lowercased()) (\(items.count))", ""]
             for (index, finding) in items.enumerated() {
                 let tag = String(severity.prefix(3)).uppercased()
                 let rule = kind == .citations ? " (\(finding.rule))" : ""
                 out.append("### F\(tag)-\(index + 1): `\(CiteOrder.visible(finding.match))`\(rule)")
                 out.append("- **Location**: `\(CiteOrder.visible(finding.file)):\(finding.line)`")
                 out.append("- **Proposed fix**: \(finding.proposedFix)")
-                out += ["- **Context**:", "```"] + finding.context.components(separatedBy: "\n") + ["```", ""]
+                // A fence longer than any run of backticks in the context, and a space before a line
+                // that starts with `#`, so that no line of the manuscript reads as a heading of the report.
+                let lines = finding.context.components(separatedBy: "\n").map { $0.hasPrefix("#") ? " " + $0 : $0 }
+                var run = 0, most = 0
+                for ch in finding.context { run = ch == "`" ? run + 1 : 0; most = max(most, run) }
+                let fence = String(repeating: "`", count: max(3, most + 1))
+                out += ["- **Context**:", fence] + lines + [fence, ""]
             }
         }
         return out

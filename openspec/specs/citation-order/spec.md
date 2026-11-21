@@ -40,7 +40,7 @@ What the check agrees with is the tool that writes `location` (`refresh-prop-loc
 
 The input tree is read by these rules: `\input` and `\include` written with braces, paths taken from the directory of the main file, `.tex` added when the name does not end in it, a file reached through a symbolic link counted as the file the link leads to. A line ends at a line feed, at a carriage return, or at the two together, and at no other character: a form feed does not end a line, as it does not for the tool that writes `location`. A command inside a `%` comment is ignored, and so is a command inside one of the environments `verbatim`, `Verbatim`, `lstlisting`, `comment` and `filecontents`, starred or not. Such an environment ends only at its own `\end`, and the starred form is another environment than the unstarred one; a marker of one that is itself inside a comment begins nothing; a `%` inside one starts no comment; and what stands before or after one on the same line is read like any other text. A command is read only where its backslash is not the second half of a `\\` before it: `\\input{x}` is a line break and the word "input", and includes nothing. The macros `\subimport`, `\subfile` and `\import`, starred or not, are not followed: the check goes on, and names each line that holds one on standard error with the line `[warn] non-standard import macro skipped at <file>:<line> (\subimport/\subfile/\import unsupported)`; an `\input` on the same line is still followed. An include of an absolute path, of a file that does not exist (an empty name included), a cyclic include and nesting deeper than three levels SHALL stop the check with an error.
 
-The check reads only what these rules state. An `\input` inside a macro definition, inside a conditional or inside `\verb` is read as an include; when the file it names does not exist the check stops, although LaTeX would compile the manuscript. This is a known limit that the Python tools share (issue 94). More limits are known, and the list is closed: an include of a file that is not a `.tex` file (`\input{figures/plot.pgf}`) is looked for with `.tex` added and stops the check when that file does not exist; text that follows an `\input` on the same line is placed at that line, before the included file; an include whose braced name stands on the line after the command is not followed; and a marker of an environment written with white space before its brace (`\begin {comment}`) is not recognised. The Python tools read the input tree in their own way, and for some manuscripts their tree and this one differ (issue 94 lists the cases known). For such a manuscript the order this check uses is the order of its own tree. A location in a file this tree lacks is reported as unreadable and a file this tree cannot find stops the check; but where both trees hold a file at different places, the check answers by its own tree and prints nothing about the difference.
+The check reads only what these rules state. An `\input` inside a macro definition or inside a conditional is read as an include; one inside `\verb|…|` or `\lstinline|…|` whose delimiter closes on the same line is not, nor is a `%` there a comment; when the file it names does not exist the check stops, although LaTeX would compile the manuscript. This is a known limit that the Python tools share (issue 94). More limits are known, and the list is closed: an include of a file that is not a `.tex` file (`\input{figures/plot.pgf}`) is looked for with `.tex` added and stops the check when that file does not exist; text that follows an `\input` on the same line is placed at that line, before the included file; an include whose braced name stands on the line after the command is not followed; and a marker of an environment written with white space before its brace (`\begin {comment}`) is not recognised. The Python tools read the input tree in their own way, and for some manuscripts their tree and this one differ (issue 94 lists the cases known). For such a manuscript the order this check uses is the order of its own tree. A location in a file this tree lacks is reported as unreadable and a file this tree cannot find stops the check; but where both trees hold a file at different places, the check answers by its own tree and prints nothing about the difference.
 
 #### Scenario: Ledger order is not reading order
 
@@ -121,10 +121,16 @@ The check reads only what these rules state. An `\input` inside a macro definiti
 
 
 <!-- @trace
-source: idd-46-fix4
-updated: 2026-11-19
+source: idd-69-fix1
+updated: 2026-11-21
 code:
+  - Sources/PropositionsKit/ReadingOrder.swift
+  - Sources/PropositionsKit/AuditRun.swift
   - propositions-projects.code-workspace
+  - Sources/PropositionsKit/AuditSource.swift
+  - Sources/PropositionsKit/AuditSymbols.swift
+  - Sources/PropositionsKit/AuditCitations.swift
+  - tests/PropositionsKitTests/AuditTests.swift
 -->
 
 ---

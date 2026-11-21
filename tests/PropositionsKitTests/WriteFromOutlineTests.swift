@@ -91,6 +91,66 @@ struct WriteFromOutlineTests {
         #expect(!FileManager.default.fileExists(atPath: box.url.appendingPathComponent("paper/outline/outline-trace.jsonl").path))
     }
 
+    // MARK: the first review
+
+    @Test(arguments: [
+        (true, "\\section{Outlook}Extra text.\n\nThe effect was large.", "begins a sectioning command that is not one heading line"),
+        (false, "\\section{Outlook}\nThe effect was large.", "prepare with --heading to write a heading"),
+        (true, "\\section{One}\n\n\\section{Two}\n\nThe effect was large.", "begins a sectioning command"),
+    ])
+    func `A heading has to be one whole line, set off, and asked for`(heading: Bool, text: String, message: String) throws {
+        let box = try base.setUp()
+        #expect(run(WriteParagraphTests.prepare + (heading ? ["--heading"] : []), in: box).exitCode == 0)
+        try base.draft(box, text: text)
+        let result = run(["check", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains { $0.contains(message) })
+    }
+
+    @Test func `Prepare refuses a trace that is one of the files the paragraph changes`() throws {
+        let box = try base.setUp()
+        try outline(in: box)
+        _ = try box.write("", to: "paper/outline/outline-trace.jsonl")
+        var arguments = WriteParagraphTests.prepare + ["--outline", "paper/outline", "--outline-paragraph", "p-1"]
+        arguments[arguments.firstIndex(of: "paper/propositions/discourse.jsonl")!] = "paper/outline/outline-trace.jsonl"
+        let result = run(arguments, in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.first?.contains("its trace, is one of the files") == true)
+    }
+
+    @Test func `Commit judges the outline record again and refuses an edited plan`() throws {
+        let box = try base.setUp()
+        try outline(in: box)
+        #expect(run(WriteParagraphTests.prepare + ["--outline", "paper/outline", "--outline-paragraph", "p-1"], in: box).exitCode == 0)
+        try base.draft(box)
+        let manifest = box.url.appendingPathComponent("stage/write.json")
+        let edited = try String(contentsOf: manifest, encoding: .utf8).replacingOccurrences(of: #""paragraph" : "p-1""#, with: #""paragraph" : "p-3""#)
+        #expect(edited.contains(#""paragraph" : "p-3""#))
+        try edited.write(to: manifest, atomically: true, encoding: .utf8)
+        let main = try Data(contentsOf: box.url.appendingPathComponent("paper/main.tex"))
+        let result = run(["commit", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(try Data(contentsOf: box.url.appendingPathComponent("paper/main.tex")) == main)
+    }
+
+    @Test func `The traced proposition has to start in the new lines, and a link at the trace path is refused`() throws {
+        let box = try base.setUp()
+        try outline(in: box)
+        #expect(run(WriteParagraphTests.prepare + ["--outline", "paper/outline", "--outline-paragraph", "p-1"], in: box).exitCode == 0)
+        try base.draft(box, rows: [("main.jsonl", WriteParagraphTests.newProposition.replacingOccurrences(of: "main.tex:L32", with: "main.tex:L2")),
+                                   ("discourse.jsonl", #"{"prop_id": "019a3c5e-7a00-7000-8000-00000000000d"}"#)])
+        #expect(run(["check", "--stage", "stage"], in: box).stdout.contains { $0.contains("does not start in the new lines") })
+        let other = try base.setUp()
+        try outline(in: other)
+        #expect(run(WriteParagraphTests.prepare + ["--outline", "paper/outline", "--outline-paragraph", "p-1"], in: other).exitCode == 0)
+        try base.draft(other)
+        try FileManager.default.createSymbolicLink(atPath: other.url.appendingPathComponent("paper/outline/outline-trace.jsonl").path,
+                                                   withDestinationPath: "nowhere")
+        let main = try Data(contentsOf: other.url.appendingPathComponent("paper/main.tex"))
+        #expect(run(["commit", "--stage", "stage"], in: other).exitCode == 2)
+        #expect(try Data(contentsOf: other.url.appendingPathComponent("paper/main.tex")) == main)
+    }
+
     @Test func `The trace check reports a record it cannot follow`() throws {
         let box = try base.setUp()
         try outline(in: box)

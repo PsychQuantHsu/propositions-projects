@@ -131,7 +131,8 @@ public enum WriteParagraph {
                 last = (position, location.file, location.start, id)
             }
         }
-        let plan = try outline.map { try WriteFromOutline.gate(directory: $0.directory, paragraph: $0.paragraph) }
+        let outlineBytes = try outline.map { try WriteFromOutline.read($0.directory) }
+        let plan = try outline.map { try WriteFromOutline.gate(directory: $0.directory, paragraph: $0.paragraph, bytes: outlineBytes!) }
         let key = last?.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
         let fileName = key ?? "main.tex"
         var tree: [(name: String, relative: String, url: URL)] = []
@@ -146,8 +147,16 @@ public enum WriteParagraph {
             throw Failure(message: "\(CiteOrder.visible(fileName)) is not in the input tree")
         }
         let originals = ["manuscript": target.url.path, "ledger": ledger.path, "structure": structure.path, "discourse": discourse.path]
-        guard Set(roles.map { canonical(URL(fileURLWithPath: originals[$0]!)) }).count == 4 else {
+        let written = roles.map { canonical(URL(fileURLWithPath: originals[$0]!)) }
+        guard Set(written).count == 4 else {
             throw Failure(message: "the manuscript file, the ledger and the two sidecars have to be four different files")
+        }
+        if let plan {
+            let directory = URL(fileURLWithPath: plan.directory)
+            let others = (WriteFromOutline.files + [WriteFromOutline.traceFile]).map { canonical(directory.appendingPathComponent($0)) }
+            guard Set(others).isDisjoint(with: written) else {
+                throw Failure(message: "a file of the outline, or its trace, is one of the files the paragraph changes")
+            }
         }
         read["manuscript"] = try snapshot(target.url.path)
         let fileLines = LatexLine.splitLines(String(decoding: read["manuscript"]!.data, as: UTF8.self))
@@ -209,9 +218,8 @@ public enum WriteParagraph {
             // The outline is read, not written: its three files have to stay as they are.
             let outlineDir = stage.appendingPathComponent("outline")
             try fm.createDirectory(at: outlineDir, withIntermediateDirectories: true)
-            for name in [Outline.sectionFile, Outline.paragraphFile, Outline.approvalFile] {
+            for (name, data) in zip(WriteFromOutline.files, outlineBytes!) {
                 let original = URL(fileURLWithPath: plan.directory).appendingPathComponent(name)
-                let data = try snapshot(original.path).data
                 let copy = outlineDir.appendingPathComponent(name)
                 try create(data, at: copy)
                 inputs.append(Input(original: original.path, staged: copy.path, hash: sha256(data)))
@@ -290,14 +298,22 @@ public enum WriteParagraph {
         var firstNew: String?
     }
 
-    /// A line that is one sectioning command: `\part`, `\chapter`, `\section`, `\subsection` or
-    /// `\subsubsection`, starred or not, followed by its argument.
+    /// A line that is one sectioning command and nothing else: `\part`, `\chapter`, `\section`,
+    /// `\subsection` or `\subsubsection`, starred or not, with an optional short title in brackets and
+    /// one braced argument (braces inside it balanced, one level), then optionally one `\label{…}`
+    /// and a comment.
+    static let headingPattern = try! NSRegularExpression(pattern:
+        #"^\\(part|chapter|section|subsection|subsubsection)\*?(\[[^\]]*\])?\{[^{}]*(\{[^{}]*\}[^{}]*)*\}\s*(\\label\{[^{}]*\})?\s*(%.*)?$"#)
+
     static func isHeading(_ line: String) -> Bool {
         let text = LedgerOrder.stripped(line)
-        return ["part", "chapter", "section", "subsection", "subsubsection"].contains { name in
-            for prefix in ["\\" + name + "{", "\\" + name + "*{", "\\" + name + "["] where text.hasPrefix(prefix) { return true }
-            return false
-        }
+        return headingPattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+
+    /// Whether a line begins a sectioning command, complete or not.
+    static func beginsHeading(_ line: String) -> Bool {
+        let text = LedgerOrder.stripped(line)
+        return ["part", "chapter", "section", "subsection", "subsubsection"].contains { text.hasPrefix("\\" + $0) }
     }
 
     /// The lines `new` adds at the end of `old`, when it is `old` with whole lines added and
@@ -355,6 +371,11 @@ public enum WriteParagraph {
                     report.heading = lines[first]
                     runs -= 1
                 }
+                let headings = lines.indices.filter { beginsHeading(lines[$0]) && lines[$0] != report.heading }
+                if !headings.isEmpty {
+                    report.problems.append("line \(manifest.after + headings[0] + 1) begins a sectioning command"
+                                           + (manifest.heading == true ? " that is not one heading line before the paragraph, set off by blank lines" : "; prepare with --heading to write a heading"))
+                }
                 if blank.first != true { report.problems.append("the new paragraph does not start with a blank line after line \(manifest.after)") }
                 if runs != 1 {
                     let what = manifest.heading == true ? "after a heading line, " : ""
@@ -391,8 +412,22 @@ public enum WriteParagraph {
             }
         }
         if report.newPropositions == 0 { report.problems.append("the staged ledger has no new proposition") }
-        if manifest.outline != nil, report.newPropositions > 0, report.firstNew == nil {
-            report.problems.append("the first proposition added to the staged ledger has no id")
+        if manifest.outline != nil, report.newPropositions > 0 {
+            if let first = report.firstNew {
+                // It has to be one live proposition that starts in the new lines.
+                let rows = (try? ReviseLedger.lines(payload.staged["ledger"]!)) ?? []
+                let live = rows.filter { WriteFromOutline.same($0.id, first) && !$0.isRetired }
+                let all = rows.filter { WriteFromOutline.same($0.id, first) }
+                let file = live.first?.location.map { ($0.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }) ?? "main.tex" }
+                let start = live.first?.location?.start ?? 0
+                if live.count != 1 || all.count != 1 {
+                    report.problems.append("the first proposition added, \(CiteOrder.visible(first)), is not exactly one live proposition of the staged ledger")
+                } else if file != manifest.file || start <= manifest.after || start > manifest.after + report.inserted {
+                    report.problems.append("the first proposition added, \(CiteOrder.visible(first)), does not start in the new lines")
+                }
+            } else {
+                report.problems.append("the first proposition added to the staged ledger has no id")
+            }
         }
         let oldStructure = try? JSONValue.parse(String(decoding: payload.originals["structure"]!.data, as: UTF8.self))
         let newStructure = try? JSONValue.parse(String(decoding: payload.staged["structure"]!, as: UTF8.self))
@@ -417,8 +452,12 @@ public enum WriteParagraph {
             throw Failure(message: "\(CiteOrder.visible(manifest.originals[role]!)) changed after prepare; nothing was written. Prepare again")
         }
         let trace = try manifest.outline.map { try WriteFromOutline.traceSnapshot($0) }
+        if let plan = manifest.outline { try WriteFromOutline.confirm(plan, inputs: manifest.inputs) }
         let report = check(manifest, payload)
         guard report.problems.isEmpty else { throw Failure(message: report.problems[0] + "; nothing was written") }
+        if let first = report.firstNew, manifest.outline != nil, WriteFromOutline.names(trace ?? nil, first) {
+            throw Failure(message: "the trace already names \(CiteOrder.visible(first)); nothing was written")
+        }
         let backup = stage.appendingPathComponent("backup")
         do { try FileManager.default.createDirectory(at: backup, withIntermediateDirectories: false) } catch {
             throw Failure(message: "\(CiteOrder.visible(backup.path)) exists already or cannot be made; nothing was written")

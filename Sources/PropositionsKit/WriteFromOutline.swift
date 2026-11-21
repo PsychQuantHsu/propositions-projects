@@ -23,13 +23,37 @@ public enum WriteFromOutline {
 
     static func same(_ a: String?, _ b: String) -> Bool { a.map { $0.unicodeScalars.elementsEqual(b.unicodeScalars) } ?? false }
 
-    /// Refuses unless the outline passes `outline check`, names `paragraph` in exactly one paragraph
-    /// record that is not dropped, and that record's section stands as approved.
-    static func gate(directory: URL, paragraph: String) throws -> Plan {
-        let outline: Outline
-        do { outline = try Outline(directory: directory) } catch {
-            throw fail("the outline in \(CiteOrder.visible(directory.path)): \(error)")
+    static let files = [Outline.sectionFile, Outline.paragraphFile, Outline.approvalFile]
+
+    /// Whether nothing is at `url` (not even a dangling link); throws when it cannot be looked at.
+    static func absent(_ url: URL) throws -> Bool {
+        var info = stat()
+        if lstat(url.path, &info) == 0 { return false }
+        guard errno == ENOENT else { throw fail("\(CiteOrder.visible(url.path)) cannot be looked at") }
+        return true
+    }
+
+    /// A regular file at `url`, read once; a link or anything else is refused.
+    static func regular(_ url: URL) throws -> LedgerOrder.Snapshot {
+        var info = stat()
+        guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, let snapshot = LedgerOrder.read(url) else {
+            throw fail("\(CiteOrder.visible(url.path)) is not a regular file that can be read")
         }
+        return snapshot
+    }
+
+    /// The three outline files, each read once, in the order of `files`.
+    static func read(_ directory: URL) throws -> [Data] {
+        try files.map { try regular(directory.appendingPathComponent($0)).data }
+    }
+
+    /// Refuses unless the outline passes `outline check`, names `paragraph` in exactly one paragraph
+    /// record that is not dropped, and that record's section stands as approved. The outline is
+    /// judged from `bytes`, the three files as they were read once, so that what is judged is what
+    /// is copied and hashed.
+    static func gate(directory: URL, paragraph: String, bytes: [Data]) throws -> Plan {
+        let text = bytes.map { String(decoding: $0, as: UTF8.self) }
+        let outline = Outline(sections: text[0], paragraphs: text[1], approvals: text[2])
         if let first = OutlineCheck.findings(outline).first {
             throw fail("the outline does not pass outline check: \(first)")
         }
@@ -51,16 +75,7 @@ public enum WriteFromOutline {
         }
         guard let approval else { throw fail("no approval record holds the section \(CiteOrder.visible(section))") }
         let trace = directory.appendingPathComponent(traceFile)
-        var hash: String?
-        var info = stat()
-        if lstat(trace.path, &info) == 0 {
-            guard let snapshot = LedgerOrder.read(trace), info.st_mode & S_IFMT == S_IFREG else {
-                throw fail("\(CiteOrder.visible(trace.path)) is not a regular file that can be read")
-            }
-            hash = WriteParagraph.sha256(snapshot.data)
-        } else if errno != ENOENT {
-            throw fail("\(CiteOrder.visible(trace.path)) cannot be looked at")
-        }
+        let hash = try absent(trace) ? nil : WriteParagraph.sha256(try regular(trace).data)
         return Plan(directory: directory.path, paragraph: paragraph, section: section, approvalLine: approval.number, traceHash: hash)
     }
 
@@ -75,13 +90,13 @@ public enum WriteFromOutline {
     /// The trace file as `prepare` found it; refuses when it changed.
     static func traceSnapshot(_ plan: Plan) throws -> LedgerOrder.Snapshot? {
         let url = traceURL(plan)
-        let current = LedgerOrder.read(url)
         if plan.traceHash == nil {
-            guard current == nil, !FileManager.default.fileExists(atPath: url.path) else {
+            guard try absent(url) else {
                 throw fail("\(CiteOrder.visible(url.path)) appeared after prepare; nothing was written. Prepare again")
             }
             return nil
         }
+        let current = try? regular(url)
         guard let current, WriteParagraph.sha256(current.data) == plan.traceHash else {
             throw fail("\(CiteOrder.visible(url.path)) changed after prepare; nothing was written. Prepare again")
         }
@@ -95,6 +110,26 @@ public enum WriteFromOutline {
         var data = snapshot.data
         if !data.isEmpty, !WriteParagraph.endsWithLineBreak(data) { data.append(0x0A) }
         _ = try LedgerOrder.write(data + line, to: traceURL(plan), replacing: snapshot)
+    }
+
+    /// The plan of a manifest, judged again at commit from the outline files: they have to be the
+    /// inputs `prepare` recorded, and the gate has to give the same section and approval line.
+    static func confirm(_ plan: Plan, inputs: [WriteParagraph.Input]) throws {
+        let directory = URL(fileURLWithPath: plan.directory)
+        let recorded = files.map { name in inputs.first { $0.original == directory.appendingPathComponent(name).path } }
+        guard recorded.allSatisfy({ $0 != nil }) else {
+            throw fail("write.json names an outline whose files prepare did not record; nothing was written")
+        }
+        let again = try gate(directory: directory, paragraph: plan.paragraph, bytes: try read(directory))
+        guard again.section == plan.section, again.approvalLine == plan.approvalLine else {
+            throw fail("the outline record no longer stands as prepare found it; nothing was written. Prepare again")
+        }
+    }
+
+    /// Whether the trace already names a proposition.
+    static func names(_ snapshot: LedgerOrder.Snapshot?, _ id: String) -> Bool {
+        guard let snapshot else { return false }
+        return Outline.lines(of: snapshot.data).contains { same($0.value?["first_prop"]?.string, id) }
     }
 
     // MARK: outline trace

@@ -535,7 +535,7 @@ OBL_PINNED_GAPS = {
     "index.profile-fits-manuscript": ("precondition", 70),
     "truth.cited-work-agrees": ("obligation", 50),
 }
-OBL_REQUIRED_OWNERS = (49, 50, 55, 62, 66, 70)
+OBL_REQUIRED_OWNERS = (50, 55, 62, 66, 70, 81)
 # The entries whose check has to consult a source outside the manuscript's
 # repository. The mark is a key of its own, not a value of verified_by: two of
 # the four are decided by a reading, and the mark has to outlive the gap.
@@ -1155,7 +1155,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (49, 50, 62, 66, 70):   # 55 is in the small table
+    for owner in (50, 62, 66, 70, 81):   # 55 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
     for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
         assert _names(problems, [entry_id, "external_source"]), problems

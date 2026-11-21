@@ -45,6 +45,17 @@ public enum PropositionsCLI {
                 return ReviseRun.redirect(jsonl: redirect.jsonl, tex: redirect.tex, write: redirect.write,
                                           workingDirectory: workingDirectory)
             }
+            if let prepare = command as? WritePrepareOptions {
+                return WriteParagraphRun.prepare(jsonl: prepare.jsonl, tex: prepare.tex, structure: prepare.structure,
+                                                 discourse: prepare.discourse, stage: prepare.stage,
+                                                 workingDirectory: workingDirectory)
+            }
+            if let check = command as? WriteCheckOptions {
+                return WriteParagraphRun.check(stage: check.stage, workingDirectory: workingDirectory)
+            }
+            if let commit = command as? WriteCommitOptions {
+                return WriteParagraphRun.commit(stage: commit.stage, workingDirectory: workingDirectory)
+            }
             if let relocate = command as? RelocateOptions {
                 return RelocateRun.run(jsonl: relocate.jsonl, tex: relocate.tex, write: relocate.write,
                                        workingDirectory: workingDirectory)
@@ -77,6 +88,14 @@ public enum PropositionsCLI {
         if words.first == "cite-order" { return Root.helpMessage(for: CiteOrderOptions.self) }
         if words.first == "ledger-order" { return Root.helpMessage(for: LedgerOrderOptions.self) }
         if words.first == "paragraphs" { return Root.helpMessage(for: ParagraphsOptions.self) }
+        if words.first == "write" {
+            switch words.dropFirst().first {
+            case "prepare": return Root.helpMessage(for: WritePrepareOptions.self)
+            case "check": return Root.helpMessage(for: WriteCheckOptions.self)
+            case "commit": return Root.helpMessage(for: WriteCommitOptions.self)
+            default: return Root.helpMessage(for: WriteOptions.self)
+            }
+        }
         if words.first == "revise" {
             switch words.dropFirst().first {
             case "relocate": return Root.helpMessage(for: RelocateOptions.self)
@@ -112,7 +131,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, WriteOptions.self, OutlineOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -186,6 +205,75 @@ struct ParagraphsOptions: ParsableCommand {
 
     @Option(help: "A structure sidecar whose sections the paragraphs must not cross.")
     var structure: String?
+}
+
+struct WriteOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "write",
+        abstract: "Write one new paragraph into a draft, with its propositions and records, behind one confirmation.",
+        subcommands: [WritePrepareOptions.self, WriteCheckOptions.self, WriteCommitOptions.self])
+}
+
+struct WritePrepareOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "prepare",
+        abstract: "Copy the manuscript, the ledger and its sidecars into a staging directory, and say where the paragraph goes.",
+        discussion: """
+            The paragraph goes after the paragraph that holds the start of the last live \
+            proposition in reading order. The staging directory has to be empty or new; it gets \
+            the input tree under manuscript/, the ledger, _meta.json and the sidecars under \
+            ledger/, and write.json, which records the originals and their hashes.
+            Exit codes: 0 staged; 2 a file cannot be read, the staging directory is not empty, \
+            or the ledger has no live proposition.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+
+    @Option(help: "The manuscript's main file.")
+    var tex: String
+
+    @Option(help: "The structure sidecar, structure.json.")
+    var structure: String
+
+    @Option(help: "The discourse sidecar, discourse.jsonl.")
+    var discourse: String
+
+    @Option(help: "The staging directory, empty or new.")
+    var stage: String
+}
+
+struct WriteCheckOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "check",
+        abstract: "Say whether the staged copies differ from the files only as one new paragraph does.",
+        discussion: """
+            The staged manuscript file has to be the file with a paragraph added where prepare \
+            said, set off by blank lines, and nothing else changed; the staged ledger and discourse \
+            sidecar the files with lines added at their ends. Counts the lines that hold \
+            {PENDING: …}. The validators are run on the copies by the skill, not by this command.
+            Exit codes: 0 the copies are a new paragraph; 1 they are not; 2 the staging directory \
+            cannot be read.
+            """)
+
+    @Option(help: "The staging directory prepare made.")
+    var stage: String
+}
+
+struct WriteCommitOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "commit",
+        abstract: "Write the staged manuscript file, ledger and sidecars.",
+        discussion: """
+            Writes only when check passes and every original is as prepare found it, after keeping \
+            a copy of each under backup/ in the staging directory. Writes the manuscript file, the \
+            ledger, the discourse sidecar and the structure sidecar, in that order; a failure stops \
+            and names the files already written.
+            Exit codes: 0 written; 2 refused or failed.
+            """)
+
+    @Option(help: "The staging directory prepare made.")
+    var stage: String
 }
 
 struct ReviseOptions: ParsableCommand {

@@ -716,7 +716,7 @@ entries:
     unit: article
     criterion: "The manuscript contains no placeholder left to be filled in."
     check: gap
-    owner: 49
+    owner: 81
     verified_by: [mechanical]
     on_warning: judge
 

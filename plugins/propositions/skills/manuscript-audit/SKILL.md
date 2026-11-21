@@ -62,6 +62,8 @@ If dirty, ask whether to commit/stash before running.
 ### Step 2: Run the orchestrator
 
 ```bash
+# R1 and R2 run on the plugin's pinned propositions binary (fetched at session start, macOS).
+export PROPOSITIONS_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}"
 bash "$RUNNER" "$MANUSCRIPT_ROOT"                  # R3 defaults --code-root to analysis/
 # If code lives elsewhere:   bash "$RUNNER" "$MANUSCRIPT_ROOT" --code-root path/to/code
 ```

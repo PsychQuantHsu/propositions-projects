@@ -54,7 +54,7 @@ code:
 
 Without `--tex`, the place of an anchor SHALL be the first line of its `location`, read as a line of the one file of the manuscript: a location that names no file, or names exactly `main.tex`. A location that names any other file SHALL be refused with exit 2 and a message that says to pass `--tex`. The places that hold several propositions are printed as the Python tool `reorder-ledger.py` prints them, `<n> TeX line(s) hold several propositions on the same line, check their order: [<line>, <line>]`.
 
-For such a manuscript, called with `--jsonl` and `--write` written in full, the command SHALL print on standard output what `reorder-ledger.py` prints, exit as it exits, and write the file it writes. These are the differences, all of them on input the Python tool mishandles or refuses:
+For such a manuscript, called with `--jsonl` and `--write` written in full, the command SHALL print on standard output what `reorder-ledger.py` printed, exit as it exited, and write the file it wrote, as recorded from it on 2026-11-21 (`tests/fixtures/retired-python/reorder-ledger/`). These are the differences, all of them on input the Python tool mishandles or refuses:
 
 - Line endings. The Python tool reads the ledger as text: it turns a carriage return, alone or before a line feed, into a line feed, and it splits a line at a form feed, a vertical tab, the three separator controls, the next-line control and the Unicode line and paragraph separators when one stands unescaped. For a ledger that holds any of these, where its lines end, the count it prints, its exit status and the file it writes can all differ. The command splits at a line feed only and keeps every byte of a line.
 - A ledger named through a symbolic link, with `--write`: the Python tool replaces the link with a file. The command refuses.
@@ -70,7 +70,7 @@ For such a manuscript, called with `--jsonl` and `--write` written in full, the 
 - A location whose line number is written with more digits than Python converts (several thousand, leading zeroes included) ends the Python tool with a traceback; the command reads the number.
 - What the two write on standard error, when they refuse, differs in wording.
 
-The Python tool stays in the plugin, unchanged, until a released binary has this command and the skill that calls the tool is changed to call the command; that change removes the Python tool.
+The Python tool was retired on 2026-11-21, when the skill that called it was changed to call this command: `reorder-ledger.py` now only says that it was retired and what to run instead, and exits with 2.
 
 #### Scenario: A manuscript of one file gets the answer the Python tool gives
 
@@ -100,17 +100,106 @@ The Python tool stays in the plugin, unchanged, until a released binary has this
 | a comment whose two slashes are followed by a combining mark |
 | lines with white space outside ASCII before and after |
 
-- **WHEN** the command and `reorder-ledger.py` run on a copy each
-- **THEN** standard output, the exit status and the bytes of the ledger afterwards are the same for both, and the command leaves no other file
+- **WHEN** the command runs on it
+- **THEN** standard output, the exit status and the bytes of the ledger afterwards are what `reorder-ledger.py` gave for it, as recorded, and the command leaves no other file
 
 
 <!-- @trace
-source: idd-59-fix4
+source: retire-python-ports
 updated: 2026-11-21
 code:
-  - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - plugins/propositions/scripts/audit-citations.py
+  - plugins/propositions/skills/construct/references/vocabulary.md
+  - plugins/propositions/.claude-plugin/plugin.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
+  - tests/fixtures/retired-python/derive-paragraphs/no-proposition.json
+  - tests/fixtures/retired-python/derive-paragraphs/ids-that-need-escaping.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-write.json
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-write.json
+  - plugins/propositions/scripts/derive-paragraphs.py
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-with-white-space-outside-json-s-before-the-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-sidecar-that-starts-with-a-byte-order-mark.json
+  - tests/PropositionsKitTests/RetiredPython.swift
   - propositions-projects.code-workspace
-  - Sources/PropositionsKit/LedgerOrder.swift
+  - tests/fixtures/retired-python/derive-paragraphs/no-location.json
+  - docs/SCHEMA.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-splits-a-paragraph.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-from-the-root-of-the-file-system.json
+  - tests/fixtures/retired-python/derive-paragraphs/retired-propositions-and-empty-lines-are-passed-over.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
+  - tests/fixtures/structure/README.md
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
+  - plugins/propositions/skills/construct-batch/SKILL.md
+  - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
+  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
+  - plugins/propositions/scripts/reorder-ledger.py
+  - .claude-plugin/marketplace.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-main-file-written-with-a-dot-before-it.json
+  - plugins/propositions/rules/manuscript-consistency-audit.md
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-dry-run.json
+  - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - plugins/propositions/docs/PLAYBOOK.md
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-in-another-file.json
+  - tests/PropositionsKitTests/ParagraphsTests.swift
+  - plugins/propositions/scripts/run-audit.sh
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-in-another-spelling-of-the-same-letters.json
+  - tests/conftest.py
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-write.json
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
+  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/scripts/migrate-structure-v2.py
+  - plugins/propositions/scripts/audit-symbols.py
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-dry-run.json
+  - plugins/propositions/README.md
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-write.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-write.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-write.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-ledger-s-order-is-kept--not-the-reading-order.json
+  - tests/fixtures/retired-python/derive-paragraphs/sections-that-is-an-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-without-sections.json
+  - plugins/propositions/docs/STRUCTURE.md
+  - tests/fixtures/retired-python/derive-paragraphs/carriage-returns-in-the-manuscript.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-dry-run.json
+  - README.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-ledger-that-starts-with-a-byte-order-mark.json
+  - tests/fixtures/retired-python/reorder-ledger/no-location-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-write.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-write.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-dry-run.json
+  - CLAUDE.md
+  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/derive-paragraphs/a-line-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/blank-lines-separate-paragraphs.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-that-is-white-space-outside-json-s-only.json
+  - tests/fixtures/retired-python/derive-paragraphs/paragraphs-without-a-proposition-are-skipped.json
+tests:
+  - tests/test_plugin_payload_tracked.py
+  - tests/test_structure_tools.py
+  - tests/test_run_audit.sh
+  - tests/test_audit_citations.py
+  - tests/test_audit_symbols.py
+  - tests/test_root_shims.py
+  - tests/test_derive_paragraphs.py
 -->
 
 ---

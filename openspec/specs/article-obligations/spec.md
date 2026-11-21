@@ -221,9 +221,9 @@ code:
 - `structure:S1` to `structure:S9`, reported by the structure validator;
 - `records:V1` to `records:V6`, reported by the verification records validator;
 - `coverage:text`, the extraction coverage check;
-- `order:ledger`, the dry run of the ledger reordering tool, which reports whether the ledger's line order is the reading order;
+- `order:ledger`, the dry run of `propositions ledger-order`, which reports whether the ledger's line order is the reading order;
 - `order:cites`, the `cite-order` command of the `propositions` command-line tool, which warns about every citation of a proposition that comes later in reading order;
-- `audit:R1`, `audit:R2`, `audit:R3`, the three scripts of the cross-artifact audit;
+- `audit:R1`, `audit:R2`, `audit:R3`, the three passes of the cross-artifact audit (`propositions audit symbols`, `propositions audit citations` and `audit-code-manuscript.py`);
 - `proofread:L1` to `proofread:L5` and `proofread:E1` to `proofread:E7`, the layers listed in the per-proposition walk of the proofread skill.
 
 The following SHALL NOT be inventory ids: the fourth pass of the cross-artifact audit (it runs the ledger validator); the theorem-boundary audit (it compares what `ledger:R9` compares; what it reports beyond R9, the environments it could not close and the propositions whose block it could not resolve, belongs to issue 68); the dry run of the location refresh (it has no rule id of its own; it searches the manuscript for each proposition's text and reports every `location` that differs from where it finds the text, which is more than `ledger:R13`, the check on that field, reports; what R13 passes over in silence belongs to issue 68); the link catalog's currency check (its subject is a file of the plugin, not a manuscript); the checks of the `tschema-check` plugin; the stumble categories of the clarity audit, the counts in the construct skill's summary and the states of the analyze skill (none of them leaves a finding or a record for a unit under an id); the `location` layer of the proofread walk (a spot-check of the field that `ledger:R13` checks; the skill's layer table names R13 as its mechanical form); the verification records validator's warning that two methods disagree on a proposition (it has no rule id of its own; it reports part of what `truth.not-refuted` states, and where it counts is left to the outcome rules of issue 71); and the proofread layers E8, E9 and E10 (defined in the layer table but absent from the walk, so a verdict does not show that they were read).
@@ -255,24 +255,101 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected 
 
 
 <!-- @trace
-source: idd-46-plugin-binary
-updated: 2026-11-20
+source: retire-python-ports
+updated: 2026-11-21
 code:
+  - plugins/propositions/scripts/audit-citations.py
+  - plugins/propositions/skills/construct/references/vocabulary.md
   - plugins/propositions/.claude-plugin/plugin.json
-  - docs/RELEASE-FLOW.md
-  - plugins/propositions/docs/OBLIGATIONS.md
-  - plugins/propositions/hooks/hooks.json
-  - .claude-plugin/marketplace.json
-  - scripts/release-signed.sh
-  - CLAUDE.md
-  - plugins/propositions/hooks/fetch-cli.sh
-  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
+  - tests/fixtures/retired-python/derive-paragraphs/no-proposition.json
+  - tests/fixtures/retired-python/derive-paragraphs/ids-that-need-escaping.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-write.json
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-write.json
+  - plugins/propositions/scripts/derive-paragraphs.py
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-with-white-space-outside-json-s-before-the-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-sidecar-that-starts-with-a-byte-order-mark.json
+  - tests/PropositionsKitTests/RetiredPython.swift
   - propositions-projects.code-workspace
-  - tests/PropositionsKitTests/FetchHookTests.swift
-  - plugins/propositions/skills/propositions/SKILL.md
-  - plugins/propositions/catalog/obligations.yaml
+  - tests/fixtures/retired-python/derive-paragraphs/no-location.json
+  - docs/SCHEMA.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-splits-a-paragraph.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-from-the-root-of-the-file-system.json
+  - tests/fixtures/retired-python/derive-paragraphs/retired-propositions-and-empty-lines-are-passed-over.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
+  - tests/fixtures/structure/README.md
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
+  - plugins/propositions/skills/construct-batch/SKILL.md
+  - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
+  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
+  - plugins/propositions/scripts/reorder-ledger.py
+  - .claude-plugin/marketplace.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-main-file-written-with-a-dot-before-it.json
+  - plugins/propositions/rules/manuscript-consistency-audit.md
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-dry-run.json
+  - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - plugins/propositions/docs/PLAYBOOK.md
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-in-another-file.json
+  - tests/PropositionsKitTests/ParagraphsTests.swift
+  - plugins/propositions/scripts/run-audit.sh
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-in-another-spelling-of-the-same-letters.json
+  - tests/conftest.py
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-write.json
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
+  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/scripts/migrate-structure-v2.py
+  - plugins/propositions/scripts/audit-symbols.py
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-dry-run.json
+  - plugins/propositions/README.md
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-write.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-write.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-write.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-ledger-s-order-is-kept--not-the-reading-order.json
+  - tests/fixtures/retired-python/derive-paragraphs/sections-that-is-an-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-without-sections.json
+  - plugins/propositions/docs/STRUCTURE.md
+  - tests/fixtures/retired-python/derive-paragraphs/carriage-returns-in-the-manuscript.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-dry-run.json
+  - README.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-ledger-that-starts-with-a-byte-order-mark.json
+  - tests/fixtures/retired-python/reorder-ledger/no-location-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-write.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-write.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-dry-run.json
+  - CLAUDE.md
+  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/derive-paragraphs/a-line-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/blank-lines-separate-paragraphs.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-that-is-white-space-outside-json-s-only.json
+  - tests/fixtures/retired-python/derive-paragraphs/paragraphs-without-a-proposition-are-skipped.json
 tests:
   - tests/test_plugin_payload_tracked.py
+  - tests/test_structure_tools.py
+  - tests/test_run_audit.sh
+  - tests/test_audit_citations.py
+  - tests/test_audit_symbols.py
+  - tests/test_root_shims.py
+  - tests/test_derive_paragraphs.py
 -->
 
 ---
@@ -478,7 +555,7 @@ code:
 
 The document SHALL state that no article is sound yet and SHALL list the four reasons with the issue that owns each: entries whose `check` is `gap`, each owned by the issue in its `owner`; checks that do not report which units they examined (issue 68, which takes in issue 63); verification records that cannot say what they cover (issue 62), which also leaves a warning under `on_warning: judge` with no place where a judgment is recorded; and `cross_model` records, which no tool produces yet (issue 21). It SHALL state that the rules that compute an outcome from what the checks report are not written yet (issue 71).
 
-It SHALL also state the limits that remain for some manuscripts once checks report what they examine: the reading-order check runs on single-file manuscripts only (issue 59); the symbol audit and the citation audit read the main file only, and the citation audit reads one bibliography file of a fixed name (issue 69); and the audit's code pass needs a directory of analysis code (issue 64).
+It SHALL also state the limit that remains for some manuscripts once checks report what they examine: the audit's code pass needs a directory of analysis code (issue 64). The commands of the `propositions` command-line tool are released for macOS only; where the pinned binary is not there, the checks that need it do not run, and the entries they verify are unverified.
 
 It SHALL state one limit of what the table reaches. Numbers are compared with artifacts only in a ledger with the empirical profile. No entry compares the numbers of a manuscript whose ledger has the default profile with an artifact; that is the scope the maintainer accepted on 2026-11-13. Whether a ledger's profile fits its manuscript is a precondition that has no check yet (issue 70).
 
@@ -506,24 +583,101 @@ No executable check: soundness is a definition that the document states for read
 
 
 <!-- @trace
-source: idd-46-plugin-binary
-updated: 2026-11-20
+source: retire-python-ports
+updated: 2026-11-21
 code:
+  - plugins/propositions/scripts/audit-citations.py
+  - plugins/propositions/skills/construct/references/vocabulary.md
   - plugins/propositions/.claude-plugin/plugin.json
-  - docs/RELEASE-FLOW.md
-  - plugins/propositions/docs/OBLIGATIONS.md
-  - plugins/propositions/hooks/hooks.json
-  - .claude-plugin/marketplace.json
-  - scripts/release-signed.sh
-  - CLAUDE.md
-  - plugins/propositions/hooks/fetch-cli.sh
-  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
+  - tests/fixtures/retired-python/derive-paragraphs/no-proposition.json
+  - tests/fixtures/retired-python/derive-paragraphs/ids-that-need-escaping.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-write.json
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-write.json
+  - plugins/propositions/scripts/derive-paragraphs.py
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-with-white-space-outside-json-s-before-the-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-sidecar-that-starts-with-a-byte-order-mark.json
+  - tests/PropositionsKitTests/RetiredPython.swift
   - propositions-projects.code-workspace
-  - tests/PropositionsKitTests/FetchHookTests.swift
-  - plugins/propositions/skills/propositions/SKILL.md
-  - plugins/propositions/catalog/obligations.yaml
+  - tests/fixtures/retired-python/derive-paragraphs/no-location.json
+  - docs/SCHEMA.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-splits-a-paragraph.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-from-the-root-of-the-file-system.json
+  - tests/fixtures/retired-python/derive-paragraphs/retired-propositions-and-empty-lines-are-passed-over.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
+  - tests/fixtures/structure/README.md
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
+  - plugins/propositions/skills/construct-batch/SKILL.md
+  - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
+  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
+  - plugins/propositions/scripts/reorder-ledger.py
+  - .claude-plugin/marketplace.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-main-file-written-with-a-dot-before-it.json
+  - plugins/propositions/rules/manuscript-consistency-audit.md
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-dry-run.json
+  - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - plugins/propositions/docs/PLAYBOOK.md
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-in-another-file.json
+  - tests/PropositionsKitTests/ParagraphsTests.swift
+  - plugins/propositions/scripts/run-audit.sh
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-in-another-spelling-of-the-same-letters.json
+  - tests/conftest.py
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-write.json
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
+  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/scripts/migrate-structure-v2.py
+  - plugins/propositions/scripts/audit-symbols.py
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-dry-run.json
+  - plugins/propositions/README.md
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-write.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-write.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-write.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-ledger-s-order-is-kept--not-the-reading-order.json
+  - tests/fixtures/retired-python/derive-paragraphs/sections-that-is-an-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-without-sections.json
+  - plugins/propositions/docs/STRUCTURE.md
+  - tests/fixtures/retired-python/derive-paragraphs/carriage-returns-in-the-manuscript.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-dry-run.json
+  - README.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-ledger-that-starts-with-a-byte-order-mark.json
+  - tests/fixtures/retired-python/reorder-ledger/no-location-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-write.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-write.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-dry-run.json
+  - CLAUDE.md
+  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/derive-paragraphs/a-line-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/blank-lines-separate-paragraphs.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-that-is-white-space-outside-json-s-only.json
+  - tests/fixtures/retired-python/derive-paragraphs/paragraphs-without-a-proposition-are-skipped.json
 tests:
   - tests/test_plugin_payload_tracked.py
+  - tests/test_structure_tools.py
+  - tests/test_run_audit.sh
+  - tests/test_audit_citations.py
+  - tests/test_audit_symbols.py
+  - tests/test_root_shims.py
+  - tests/test_derive_paragraphs.py
 -->
 
 ---

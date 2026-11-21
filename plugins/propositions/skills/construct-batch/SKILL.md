@@ -36,13 +36,18 @@ SCRIPTS="$PLUGIN_ROOT/scripts"
 ## 1. Put the ledger in reading order
 
 ```bash
-python3 "$SCRIPTS/reorder-ledger.py" --jsonl "$LEDGER/main.jsonl"
+bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" ledger-order --jsonl="$LEDGER/main.jsonl" --tex="$MAIN"
 ```
 
-Exit 0: go on. Exit 1: lines would move. This is the one step here that changes the ledger, so
+`MAIN` is the manuscript's main file, as in construct. The command is `ledger-order` of the
+plugin's `propositions` tool, run through the launcher, which runs only the pinned binary; with
+`--tex` it puts the ledger in the reading order of the whole `\input` tree. Exit 0: go on. Exit 1:
+lines would move. This is the one step here that changes the ledger, so
 show the count and ask (AskUserQuestion) before running it again with `--write`. Line contents and ids do
 not change. Then rerun `validate-propositions.py`; its results must not change. If the tool reports several propositions on one TeX line,
-read those lines and check their order by hand.
+read those lines and check their order by hand. Exit 2: show what it printed and stop. Exit 3
+(`propositions: NOT RUN`, the tool is not installed): say so, and do not go on until the ledger
+has been put in reading order another way.
 
 ## 2. Stage a skeleton
 

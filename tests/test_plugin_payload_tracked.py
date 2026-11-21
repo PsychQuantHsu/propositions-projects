@@ -551,7 +551,7 @@ OBL_EVERY_PROPOSITION_ENTRIES = ("truth.cited-work-agrees",)
 # stays "every entry passes" with no condition outside the table.
 OBL_UNLISTED_VERDICT_ENTRY = "truth.not-refuted"
 OBL_OUTCOMES = ("`not_applicable`", "`unverified`", "`failed`", "`passed`")
-OBL_DOC_ISSUES = ("#21", "#50", "#59", "#62", "#63", "#64", "#66", "#68", "#69", "#70", "#71")
+OBL_DOC_ISSUES = ("#21", "#50", "#62", "#63", "#64", "#66", "#68", "#70", "#71")
 # The key the document has to explain besides the ones its own table lists.
 OBL_DOC_WORDS = ("`external_source`",)
 # Two statements the document has to make, each by the phrases that carry it.

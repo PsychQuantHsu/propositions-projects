@@ -8,7 +8,7 @@ same values in the same order as the validator, and a test keeps them identical.
 Moves and paragraph types are the exception: their values and definitions live in
 `plugins/propositions/catalog/vocabulary.yaml`.
 
-Start from the paragraph plan that `derive-paragraphs.py` proposes, and change it
+Start from the paragraph plan that `propositions paragraphs` proposes, and change it
 only where a TeX paragraph makes two arguments or two TeX paragraphs make one.
 Then work paragraph by paragraph in reading order.
 

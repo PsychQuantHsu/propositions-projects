@@ -76,11 +76,10 @@ COVERAGE="$SCRIPTS/check-extraction-coverage.py"
 VSTRUCT="$SCRIPTS/validate-structure.py"
 STATE="$SCRIPTS/structure-state.py"
 METRICS="$SCRIPTS/structure-metrics.py"
-DERIVE="$SCRIPTS/derive-paragraphs.py"
 MIGRATE="$SCRIPTS/migrate-structure-v2.py"
 EXPLAIN="$SCRIPTS/structure-explain.py"
 LINKS="$SCRIPTS/structure-links.py"
-for f in "$VALIDATOR" "$COVERAGE" "$VSTRUCT" "$STATE" "$METRICS" "$DERIVE" "$MIGRATE" "$EXPLAIN" "$LINKS"; do [ -f "$f" ] || { echo "missing $f"; exit 2; }; done
+for f in "$VALIDATOR" "$COVERAGE" "$VSTRUCT" "$STATE" "$METRICS" "$MIGRATE" "$EXPLAIN" "$LINKS"; do [ -f "$f" ] || { echo "missing $f"; exit 2; }; done
 ```
 
 Establish, from the request or by asking once (AskUserQuestion, all at once):
@@ -138,14 +137,17 @@ which sections sit under which.
 
 ```bash
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/construct-XXXXXX")
-python3 "$DERIVE" --jsonl "$LEDGER/main.jsonl" --tex "$MAIN" > "$STAGE/paragraphs.json"
+bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}" paragraphs --jsonl="$LEDGER/main.jsonl" --tex="$MAIN" > "$STAGE/paragraphs.json"
 ```
 
-`paragraphs.json` is the default paragraph plan (one entry per run of non-blank TeX lines).
-Rerun it with `--structure "$STAGE/structure.json"` once the section list is drafted, so that
+`paragraphs.json` is the default paragraph plan (one entry per run of non-blank TeX lines; a
+location may be in any file of the main file's `\input` tree). It is the `paragraphs` command of
+the plugin's `propositions` tool, run through the launcher, which runs only the pinned binary.
+Rerun it with `--structure="$STAGE/structure.json"` once the section list is drafted, so that
 no paragraph crosses a section start. Merge or split entries only where a TeX paragraph makes
-two arguments or two make one, and say so in the summary. For a multi-file manuscript the
-tool exits 2: list the paragraphs by hand.
+two arguments or two make one, and say so in the summary. Exit 2: show what it printed and stop.
+Exit 3 (`propositions: NOT RUN`, the tool is not installed, for one on a system other than
+macOS): list the paragraphs by hand, and say in the summary that no plan was derived.
 
 If `LEDGER` holds **version 1.0** sidecars (`structure_version` `"1.0"`), convert them first
 and start from the result; its review report lists what the mechanical conversion could not

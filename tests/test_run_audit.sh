@@ -9,6 +9,17 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# R1 and R2 need the propositions command-line tool: PROPOSITIONS_CLI, the binary `swift build`
+# leaves in .build/debug, or `propositions` on PATH. Without one the test is skipped and says so.
+if [[ -z "${PROPOSITIONS_CLI:-}" ]]; then
+  if [[ -x "$REPO_ROOT/.build/debug/propositions" ]]; then
+    export PROPOSITIONS_CLI="$REPO_ROOT/.build/debug/propositions"
+  elif ! command -v propositions >/dev/null 2>&1; then
+    echo "SKIP: run-audit.sh needs the propositions command-line tool (swift build, or PROPOSITIONS_CLI)"
+    exit 0
+  fi
+fi
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 

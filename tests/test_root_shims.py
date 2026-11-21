@@ -7,11 +7,14 @@ codes and equivalent output for the same fixture input, whichever entry is
 invoked (spec: umbrella-marketplace-layout, "Root-level CI entry shims").
 """
 
+import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CORE_SCRIPTS = REPO_ROOT / "plugins" / "propositions" / "scripts"
@@ -19,8 +22,8 @@ ROOT_SCRIPTS = REPO_ROOT / "scripts"
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "_smoke_tests"
 
 
-def _run(cmd, cwd):
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def _run(cmd, cwd, env=None):
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, env=env)
 
 
 def _make_manuscript(tmp_path: Path) -> Path:
@@ -74,15 +77,21 @@ def _exit_codes_line(manuscript_root: Path) -> str:
 def test_run_audit_shim_transparent(tmp_path):
     """Root run-audit.sh shim and core implementation produce the same
     audit-chain verdict (exit code + report Exit-codes line) for one fixture."""
+    from conftest import propositions_cli
+
+    cli = propositions_cli()
+    if cli is None:
+        pytest.skip("run-audit.sh needs the propositions command-line tool (swift build, or PROPOSITIONS_CLI)")
     ms_root = _make_manuscript(tmp_path / "via_root")
     ms_core = _make_manuscript(tmp_path / "via_core")
+    env = {**os.environ, "PROPOSITIONS_CLI": cli}
 
     root = _run(
         [str(ROOT_SCRIPTS / "run-audit.sh"), str(ms_root),
-         "--code-root", str(ms_root.parent / "analysis")], REPO_ROOT)
+         "--code-root", str(ms_root.parent / "analysis")], REPO_ROOT, env)
     core = _run(
         [str(CORE_SCRIPTS / "run-audit.sh"), str(ms_core),
-         "--code-root", str(ms_core.parent / "analysis")], REPO_ROOT)
+         "--code-root", str(ms_core.parent / "analysis")], REPO_ROOT, env)
 
     assert root.returncode == core.returncode, (
         f"exit codes differ: root={root.returncode} core={core.returncode}\n"

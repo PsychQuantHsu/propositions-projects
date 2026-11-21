@@ -192,6 +192,37 @@ public enum WriteRewrite {
         return problems
     }
 
+    /// What each written paragraph opens and discharges, against what its outline record plans
+    /// (issue 116). The propositions of a paragraph are the live ones from the proposition the
+    /// map names up to the one the map names next, in reading order.
+    static func commitments(records: [(String, String)], outline: Outline, stagedMain: URL, ledger: Data, discourse: Data) -> [String] {
+        guard OutlineCommitments.plansAny(outline.paragraphs.compactMap(\.value)),
+              let order = try? ReadingOrder(mainFile: stagedMain), let rows = try? ReviseLedger.lines(ledger) else { return [] }
+        var placed: [(position: [Int], id: String)] = []
+        for row in rows where !row.isRetired {
+            guard let id = row.id, let location = row.location, let position = order.position(file: location.file, line: location.start) else { continue }
+            placed.append((position, id))
+        }
+        // A stable order: reading order, and the ledger's order among propositions of one line.
+        let sorted = placed.enumerated().sorted { a, b in
+            if ReadingOrder.precedes(a.element.position, b.element.position) { return true }
+            if ReadingOrder.precedes(b.element.position, a.element.position) { return false }
+            return a.offset < b.offset
+        }.map(\.element.id)
+        let starts = records.compactMap { record in sorted.firstIndex { WriteFromOutline.same($0, record.1) } }
+        let rowsOfDiscourse = OutlineCommitments.objects(discourse)
+        let planned = outline.paragraphs.compactMap(\.value)
+        var problems: [String] = []
+        for (outlineID, first) in records {
+            guard let start = sorted.firstIndex(where: { WriteFromOutline.same($0, first) }),
+                  let record = planned.first(where: { WriteFromOutline.same($0["id"]?.string, outlineID) }) else { continue }
+            let end = starts.filter { $0 > start }.min() ?? sorted.count
+            let written = OutlineCommitments.written(discourse: rowsOfDiscourse, propositions: Array(sorted[start..<end]))
+            problems += OutlineCommitments.differences(record: record, written: written)
+        }
+        return problems
+    }
+
     static func outline(_ directory: URL) throws -> Outline {
         let text = try WriteFromOutline.read(directory).map { String(decoding: $0, as: UTF8.self) }
         return Outline(sections: text[0], paragraphs: text[1], approvals: text[2])

@@ -514,6 +514,24 @@ public enum WriteParagraph {
                 report.problems.append("the first proposition added to the staged ledger has no id")
             }
         }
+        if let plan = manifest.outline {
+            // What the paragraph opens and discharges has to be what its outline record plans (issue 116).
+            let source = URL(fileURLWithPath: plan.directory).appendingPathComponent(Outline.paragraphFile).path
+            let copy = manifest.inputs.first { $0.original == source }.flatMap { LedgerOrder.read(URL(fileURLWithPath: $0.staged))?.data }
+            let records = copy.map(OutlineCommitments.objects) ?? []
+            let record = records.first { WriteFromOutline.same($0["id"]?.string, plan.paragraph) }
+            let added = ["ledger", "discourse"].map { role in
+                (addedLines(payload.originals[role]!.data, payload.staged[role]!) ?? []).compactMap { try? JSONValue.parse($0) }
+            }
+            if let record, !OutlineCommitments.plansAny(records) {
+                _ = record   // an outline that plans no commitment is not compared
+            } else if let record {
+                let written = OutlineCommitments.written(discourse: added[1], propositions: added[0].compactMap { $0["id"]?.string })
+                report.problems += OutlineCommitments.differences(record: record, written: written)
+            } else {
+                report.problems.append("the copy of the outline's paragraph file does not hold the record \(CiteOrder.visible(plan.paragraph))")
+            }
+        }
         let oldStructure = try? JSONValue.parse(String(decoding: payload.originals["structure"]!.data, as: UTF8.self))
         let newStructure = try? JSONValue.parse(String(decoding: payload.staged["structure"]!, as: UTF8.self))
         if let oldStructure, let newStructure {
@@ -563,6 +581,8 @@ public enum WriteParagraph {
             report.problems += map.problems
             report.newRecords = map.records.count
             mapped = map.records.map(\.1)
+            report.problems += WriteRewrite.commitments(records: map.records, outline: outline, stagedMain: URL(fileURLWithPath: manifest.stagedMain),
+                                                         ledger: payload.staged["ledger"]!, discourse: payload.staged["discourse"]!)
         } else {
             report.problems.append(payload.outlineProblem ?? "the outline cannot be read")
         }

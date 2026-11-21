@@ -275,6 +275,8 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
 | `moved_to` | no | A non-empty string naming where a paragraph that is left out goes. Only on a record that carries `dropped` |
 | `note` | no | A string for the author |
+| `opens` | no | A list of one or more commitments the paragraph is planned to open, each `{"id": <commitment id>, "kind": <kind>}` (see "Planned commitments") |
+| `discharges` | no | A list of one or more ids of commitments the paragraph is planned to discharge |
 
 A point is an object.
 
@@ -317,6 +319,30 @@ record's points. A record can carry both `from` and `replaces`, for a
 paragraph that draws on one passage and takes the place of another; the same
 locator is not in both, and the write check reports one that is.
 
+
+**Planned commitments.** The structure sidecars record which proposition opens a commitment
+(a question, an aim, a hypothesis, a plan item, an announcement, a setup, future work) and which
+discharges it (`docs/STRUCTURE.md`). A paragraph record can plan both before the text exists
+(issue #116): `opens` lists the commitments its paragraph will open, with the `kind` of each,
+and `discharges` lists the ids of the ones it will discharge. The ids and kinds are written as
+in the sidecars, so that the plan and the written text can be compared by id. A commitment is
+opened once in the outline; a discharge names a commitment that the same record or a record on
+an earlier line opens; a record that carries `dropped` carries neither key; and a record of a
+section whose role is `abstract` opens none, as in the sidecars. `propositions outline check`
+reports each of these. An outline plans commitments when a record that is not dropped carries
+either key; a record of such an outline that carries neither plans that its paragraph opens and
+discharges none. When a paragraph is written from such an outline, `write check` compares what
+the paragraph opens and discharges in the staged discourse sidecar with its record, and each
+difference is a problem that stops `write commit`: the author changes the text, or changes the
+plan and approves the section again. An outline with neither key on any record (one derived
+from a finished manuscript: derive does not write them) is not compared. The comparison is by
+id and kind only; whether a sentence really opens a commitment is the judgment of whoever
+annotates the paragraph.
+
+```json
+{"id": "p-1", "section": "s-intro", "points": [{"id": "p-1.1", "text": "It is not known whether spacing helps delayed recall."}], "opens": [{"id": "c-q-spacing", "kind": "question"}]}
+{"id": "p-9", "section": "s-results", "points": [{"id": "p-9.1", "text": "Spacing improved delayed recall."}], "discharges": ["c-q-spacing"]}
+```
 
 **Order.** The paragraph records are grouped by section. The records naming one
 section are on consecutive lines, and the groups come in the order of the
@@ -1281,17 +1307,13 @@ claim: the same thing said in other words is not found.
 
 ## What this version leaves open
 
-Five questions about the design were raised with this format and are not
+Four questions about the design were raised with this format and are not
 answered by it.
 
 - **How an outline paragraph is tied to a paragraph of the structure sidecar.**
   Answered for text written from the outline: `outline-trace.jsonl` names the
   first proposition of each written paragraph (see "Writing text from the
   outline"). Text that was not written from the outline has no tie.
-- **Whether commitments can be planned on the outline.** The structure
-  sidecars record which sentence opens a commitment and which discharges it.
-  The outline has no key for either: it cannot say that a paragraph will open
-  or discharge a commitment (issue #116).
 - **Whether the points of one paragraph are related to each other.** A
   paragraph's points are an ordered list and nothing more. `uses` says that a
   record relies on an earlier record or point; it does not say how.

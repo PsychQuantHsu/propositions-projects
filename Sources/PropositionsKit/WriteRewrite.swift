@@ -151,14 +151,14 @@ public enum WriteRewrite {
     }
 
     /// The section of each paragraph record, and the line of the last approval that holds it.
-    static func approvals(_ outline: Outline) -> [String: (section: String, line: Int)] {
-        var out: [String: (String, Int)] = [:]
+    static func approvals(_ outline: Outline) -> [JSONKey: (section: String, line: Int)] {
+        var out: [JSONKey: (String, Int)] = [:]
         for record in outline.paragraphs.compactMap(\.value) {
             guard let id = record["id"]?.string, let section = record["section"]?.string else { continue }
             let line = (outline.approvals ?? []).last { line in
                 (line.value?["sections"]?.array ?? []).contains { WriteFromOutline.same($0["section"]?["id"]?.string, section) }
             }?.number ?? 0
-            out[id] = (section, line)
+            out[JSONKey(id)] = (section, line)
         }
         return out
     }
@@ -171,16 +171,17 @@ public enum WriteRewrite {
         let where_ = approvals(outline)
         var data = Data()
         if let parts, let kept {
-            for line in LatexLine.splitLines(String(decoding: kept, as: UTF8.self)) where !LedgerOrder.stripped(line).isEmpty {
-                let value = try? JSONValue.parse(line)
-                if value?.isObject != true || !parts.contains(WriteFromOutline.part(of: value)) { data += Data((line + "\n").utf8) }
+            // A kept record is copied byte for byte, with the line ending it had.
+            for raw in kept.split(separator: 0x0A, omittingEmptySubsequences: false) where !(raw.isEmpty || Array(raw) == [0x0D]) {
+                let value = String(data: Data(raw), encoding: .utf8).flatMap { try? JSONValue.parse($0) }
+                if value?.isObject != true || !parts.contains(WriteFromOutline.part(of: value)) { data += Data(raw) + Data([0x0A]) }
             }
         }
-        let partOf = Dictionary(OutlineLength.sections(outline).map { ($0.id, $0.part) }, uniquingKeysWith: { a, _ in a })
+        let partOf = Dictionary(OutlineLength.sections(outline).map { (JSONKey($0.id), $0.part) }, uniquingKeysWith: { a, _ in a })
         for (outlineID, first) in records {
-            let (section, line) = where_[outlineID] ?? ("", 0)
+            let (section, line) = where_[JSONKey(outlineID)] ?? ("", 0)
             let plan = WriteFromOutline.Plan(directory: "", paragraph: outlineID, section: section, approvalLine: line, traceHash: nil,
-                                             part: parts == nil ? nil : (partOf[section] ?? "main"))
+                                             part: parts == nil ? nil : (partOf[JSONKey(section)] ?? "main"))
             data += WriteFromOutline.record(plan, firstProposition: first)
         }
         return data

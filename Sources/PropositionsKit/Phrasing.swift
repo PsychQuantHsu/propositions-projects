@@ -9,27 +9,39 @@ enum Phrasing {
     /// Stands between two paragraphs in the folded text; no phrase holds it.
     static let paragraphBreak: UInt32 = 0
 
-    /// A phrase as it is compared: lower case, form C, each run of white space one space, none
-    /// at either end.
+    /// A text without the difference of letter case, in form C: upper case and then lower case,
+    /// so that `ß` and `SS`, and the two lower-case sigmas, compare equal.
+    static func caseless(_ text: String) -> String {
+        text.precomposedStringWithCanonicalMapping.uppercased().lowercased().precomposedStringWithCanonicalMapping
+    }
+
+    /// A phrase as it is compared: without letter case, in form C, each run of white space one
+    /// space. White space at an end of the phrase is one space there too: `" cat "` is not `cat`.
+    /// Empty when the phrase holds nothing but white space.
     static func fold(_ phrase: String) -> [UInt32] {
         var out: [UInt32] = []
         var space = false
-        for scalar in phrase.precomposedStringWithCanonicalMapping.lowercased().unicodeScalars {
+        var any = false
+        for scalar in caseless(phrase).unicodeScalars {
             if scalar.properties.isWhitespace { space = true; continue }
-            if space, !out.isEmpty { out.append(0x20) }
+            if space { out.append(0x20) }
             space = false
+            any = true
             out.append(scalar.value)
         }
-        return out
+        if space, any { out.append(0x20) }
+        return any ? out : []
     }
 
     /// The line without its comment: the text before the first `%` that an odd number of
     /// backslashes does not come before.
+    /// It looks at scalars, not characters: a `%` with a combining mark after it is still a `%`.
     static func withoutComment(_ line: String) -> Substring {
         var backslashes = 0
-        for index in line.indices {
-            if line[index] == "\\" { backslashes += 1; continue }
-            if line[index] == "%", backslashes % 2 == 0 { return line[..<index] }
+        let scalars = line.unicodeScalars
+        for index in scalars.indices {
+            if scalars[index] == "\\" { backslashes += 1; continue }
+            if scalars[index] == "%", backslashes % 2 == 0 { return Substring(scalars[..<index]) }
             backslashes = 0
         }
         return line[...]
@@ -47,7 +59,7 @@ enum Phrasing {
                 space = false
                 continue
             }
-            for scalar in String(withoutComment(line)).precomposedStringWithCanonicalMapping.lowercased().unicodeScalars {
+            for scalar in caseless(String(withoutComment(line))).unicodeScalars {
                 if scalar.properties.isWhitespace { space = true; continue }
                 if space, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(first + offset) }
                 space = false
@@ -62,11 +74,11 @@ enum Phrasing {
             var start = 0
             while start + phrase.count <= text.count {
                 if text[start] == phrase[0], text[start..<(start + phrase.count)].elementsEqual(phrase) {
-                    found.append((start, order, "\(CiteOrder.visible(file)):L\(lineOf[start]): the banned phrasing \(JSONValue.quoted(entry.phrase)) (\(CiteOrder.visible(entry.reason)))"))
-                    start += phrase.count
-                } else {
-                    start += 1
+                    // The line of the first character that is not the space a phrase can begin with.
+                    let at = phrase[0] == 0x20 && start + 1 < text.count ? start + 1 : start
+                    found.append((start, order, "\(CiteOrder.visible(file)):L\(lineOf[at]): the banned phrasing \(JSONValue.quoted(entry.phrase)) (\(CiteOrder.visible(entry.reason)))"))
                 }
+                start += 1   // every start is tried: occurrences can overlap
             }
         }
         return found.sorted { ($0.at, $0.order) < ($1.at, $1.order) }.map(\.line)

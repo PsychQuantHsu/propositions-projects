@@ -19,6 +19,8 @@ public enum WriteFromOutline {
         var traceHash: String?
         /// The part the section goes to, when `article.json` names destinations (issue 120).
         var part: String? = nil
+        /// The parts whose destination is the document the paragraph is written into.
+        var documentParts: [String]? = nil
     }
 
     static func fail(_ message: String) -> WriteParagraph.Failure { WriteParagraph.Failure(message: message) }
@@ -88,7 +90,9 @@ public enum WriteFromOutline {
         var wanted: [String]? = nil
         if var at = section {
             var chain = [at]
-            while let parent = records.first(where: { same($0["id"]?.string, at) })?["parent"]?.string, !chain.contains(parent) {
+            // Ids are compared scalar by scalar, as the outline check compares them.
+            while let parent = records.first(where: { same($0["id"]?.string, at) })?["parent"]?.string,
+                  !chain.contains(where: { same($0, parent) }) {
                 chain.append(parent); at = parent
             }
             wanted = chain
@@ -153,9 +157,13 @@ public enum WriteFromOutline {
     }
 
     /// Whether the trace already names a proposition.
-    static func names(_ snapshot: LedgerOrder.Snapshot?, _ id: String) -> Bool {
+    /// With `parts` (the parts of the document written into, when `article.json` names
+    /// destinations), only the records of those parts count: another document has its own ledger.
+    static func names(_ snapshot: LedgerOrder.Snapshot?, _ id: String, parts: [String]? = nil) -> Bool {
         guard let snapshot else { return false }
-        return Outline.lines(of: snapshot.data).contains { same($0.value?["first_prop"]?.string, id) }
+        return Outline.lines(of: snapshot.data).contains {
+            same($0.value?["first_prop"]?.string, id) && (parts?.contains(part(of: $0.value)) ?? true)
+        }
     }
 
     // MARK: outline trace
@@ -229,7 +237,7 @@ public enum OutlineTraceRun {
                 // Which document the ledger is: the parts whose destination names it.
                 let url = WriteParagraphRun.resolve(jsonl, workingDirectory)
                 parts = ["main", "appendix", "supplement"].filter { part in
-                    article.destinations?[part].map { WriteParagraph.canonical(Article.resolve($0.jsonl, dir)) == WriteParagraph.canonical(url) } ?? false
+                    article.destinations?[part].map { Article.real(Article.resolve($0.jsonl, dir)) == Article.real(url) } ?? false
                 }
                 if parts!.isEmpty {
                     return CommandResult(stderr: ["error: \(Article.fileName) names destinations, and \(CiteOrder.visible(jsonl)) is the ledger of none of them"], exitCode: 2)

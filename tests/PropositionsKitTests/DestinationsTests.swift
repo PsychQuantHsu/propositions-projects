@@ -158,4 +158,69 @@ struct DestinationsTests {
         // A trace record's part is one of the three.
         #expect(!WriteFromOutline.hasTraceKeys((try! JSONValue.parse(#"{"outline":"p","first_prop":"x","section":"s","approval_line":1,"part":"online"}"#)).members!))
     }
+
+    // MARK: fix round 1
+
+    // spec-example: write / a write.json that names another part
+    @Test func `A write json that names another part is refused`() throws {
+        let rewrite = WriteRewriteTests()
+        let box = try setUp()
+        #expect(write(Self.prepare("main", stage: "stage", ["--rewrite"]), in: box).exitCode == 0)
+        try rewrite.rewrite(box)
+        let url = box.url.appendingPathComponent("stage/write.json")
+        var object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+        var plan = object["rewrite"] as! [String: Any]
+        #expect(plan["parts"] as? [String] == ["main"])
+        plan["parts"] = ["main", "supplement"]
+        object["rewrite"] = plan
+        try JSONSerialization.data(withJSONObject: object).write(to: url)
+        let check = write(["check", "--stage", "stage"], in: box)
+        #expect(check.exitCode == 1)
+        #expect(check.stdout.contains { $0.contains("write.json does not name the parts article.json gives") })
+        #expect(write(["commit", "--stage", "stage"], in: box).exitCode == 2)
+        #expect(!FileManager.default.fileExists(atPath: box.url.appendingPathComponent("paper/outline/outline-trace.jsonl").path))
+    }
+
+    // spec-example: write / the same id in another document, and kept records as they were
+    @Test func `The same id in another document, and kept records as they were`() throws {
+        let kept = #"{"outline": "p-s", "first_prop": "019a3c5e-7a00-7000-8000-00000000000d", "section": "s-sup", "approval_line": 1, "part": "supplement"}"# + "\r\n"
+        let box = try setUp()
+        _ = try box.write(kept, to: "paper/outline/outline-trace.jsonl")
+        #expect(write(Self.prepare("main", stage: "stage", ["--outline-paragraph", "p-1"]), in: box).exitCode == 0)
+        try base.draft(box)
+        let committed = write(["commit", "--stage", "stage"], in: box)
+        #expect(committed.exitCode == 0, "\(committed.stderr)")
+        // The same id in a record of this document still stops it.
+        let same = try setUp()
+        _ = try same.write(kept.replacingOccurrences(of: "supplement", with: "main").replacingOccurrences(of: "s-sup", with: "s-a"), to: "paper/outline/outline-trace.jsonl")
+        #expect(write(Self.prepare("main", stage: "stage", ["--outline-paragraph", "p-1"]), in: same).exitCode == 0)
+        try base.draft(same)
+        #expect(write(["commit", "--stage", "stage"], in: same).exitCode == 2)
+
+        let rewrite = WriteRewriteTests()
+        let other = try setUp()
+        _ = try other.write(kept, to: "paper/outline/outline-trace.jsonl")
+        #expect(write(Self.prepare("main", stage: "stage", ["--rewrite"]), in: other).exitCode == 0)
+        try rewrite.rewrite(other)
+        #expect(write(["commit", "--stage", "stage"], in: other).exitCode == 0)
+        let bytes = try Data(contentsOf: other.url.appendingPathComponent("paper/outline/outline-trace.jsonl"))
+        #expect(bytes.prefix(kept.utf8.count) == Data(kept.utf8))
+    }
+
+    // spec-example: article-outline / two parts, one main file, two ledgers
+    @Test func `Two parts, one main file, two ledgers`() throws {
+        let box = try setUp(sections: [Self.section("s-a"), Self.section("s-x", #","part":"appendix""#)], paragraphs: [("p-1", "s-a"), ("p-x", "s-x")])
+        _ = try box.write(#"{"id": "019a3c5e-7a00-7000-8000-0000000000a1", "text": "In addition, future studies could test whether the advantage lasts beyond one week.", "location": "main.tex:L30"}"# + "\n",
+                          to: "paper/propositions/appendix.jsonl")
+        _ = try box.write(#"{"destinations": {"main": {"tex": "../main.tex", "jsonl": "../propositions/main.jsonl"}, "appendix": {"tex": "../main.tex", "jsonl": "../propositions/appendix.jsonl"}}}"#,
+                          to: "paper/outline/article.json")
+        _ = try box.write(#"{"outline": "p-x", "first_prop": "019a3c5e-7a00-7000-8000-0000000000a1", "section": "s-x", "approval_line": 1, "part": "appendix"}"# + "\n",
+                          to: "paper/outline/outline-trace.jsonl")
+        let result = PropositionsCLI.run(["outline", "length", "paper/outline", "--written"], workingDirectory: box.url)
+        #expect(result.exitCode == 0, "\(result.stderr)")
+        #expect(result.stdout.contains("\"s-x\"\tappendix\ttarget -\twritten 13\t1 of 1 record(s)"))
+        #expect(!result.stdout.contains { $0.contains("name no live proposition") })
+        // A path that holds a control character is not in the format.
+        #expect(throws: Article.Failure.self) { try Article.parse(Data(#"{"destinations": {"main": {"tex": "a\tb.tex", "jsonl": "m.jsonl"}}}"#.utf8)) }
+    }
 }

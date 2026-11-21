@@ -95,4 +95,31 @@ struct OutlineLengthTests {
         _ = try box.write("", to: "o/outline-paragraphs.jsonl")
         #expect(run(["o"], in: box).exitCode == 2)
     }
+
+    // MARK: fix round 1
+
+    // spec-example: article-outline / names with spaces, groups after a name, and a spaced end
+    @Test func `Names with spaces, groups after a name, and a spaced end`() {
+        #expect(OutlineLength.words(in: ["See \\cite {smith2020} and \\label{eq:r}{visible words} here."]) == 5)
+        #expect(OutlineLength.words(in: ["\\begin{equation}", "x = y", "\\end {equation}", "After it."]) == 2)
+        #expect(OutlineLength.words(in: ["カ・ナ ｶﾅ ¼ cup"]) == 5)
+        #expect(OutlineLength.words(in: ["a \\[ x \\\\ y \\] b"]) == 2)
+        #expect(OutlineLength.words(in: ["\\includegraphics [width=1cm] {fig/a} shown"]) == 1)
+    }
+
+    // spec-example: article-outline / a stale record, a repeated record and an unreadable file
+    @Test func `A stale record, a repeated record and an unreadable file`() throws {
+        let box = try WriteParagraphTests().setUp()
+        _ = try box.write(Self.section("s-a") + "\n", to: "paper/outline/outline-sections.jsonl")
+        _ = try box.write(#"{"id":"p-old","section":"s-a","points":[{"id":"p-old.1","text":"A point."}],"dropped":"cut"}"# + "\n" + Self.paragraph("p-1", "s-a") + "\n",
+                          to: "paper/outline/outline-paragraphs.jsonl")
+        func record(_ id: String) -> String { #"{"outline": "\#(id)", "first_prop": "019a3c5e-7a00-7000-8000-00000000000c", "section": "s-a", "approval_line": 1}"# }
+        _ = try box.write([record("p-old"), record("p-1"), record("p-1")].joined(separator: "\n") + "\n", to: "paper/outline/outline-trace.jsonl")
+        let arguments = ["paper/outline", "--jsonl", "paper/propositions/main.jsonl", "--tex", "paper/main.tex"]
+        #expect(run(arguments, in: box).stdout.first == "\"s-a\"\tmain\ttarget -\twritten 13\t1 of 1 record(s)")
+        try Data([0xFF, 0xFE, 0x0A]).write(to: box.url.appendingPathComponent("paper/main.tex"))
+        let unreadable = run(arguments, in: box)
+        #expect(unreadable.exitCode == 2)
+        #expect(unreadable.stdout.isEmpty)
+    }
 }

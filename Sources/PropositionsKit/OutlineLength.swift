@@ -23,8 +23,10 @@ public enum OutlineLength {
     ]
 
     static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
+        // Han, kana (full and half width) and hangul syllables; the punctuation of those blocks is not a word.
         switch scalar.value {
-        case 0x3040...0x30FF, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xAC00...0xD7AF, 0xF900...0xFAFF, 0x20000...0x2FFFF: return true
+        case 0x3041...0x3096, 0x30A1...0x30FA, 0xFF66...0xFF6F, 0xFF71...0xFF9D, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xAC00...0xD7A3,
+             0xF900...0xFAFF, 0x20000...0x2FFFF: return true
         default: return false
         }
     }
@@ -39,11 +41,31 @@ public enum OutlineLength {
             let target = Array(closing)
             var at = start
             while at + target.count <= chars.count {
-                if chars[at] == "\\", target.first != "\\", at + 1 < chars.count { at += 2; continue }
+                // A backslash takes the character after it, unless the two are the closing delimiter.
+                if chars[at] == "\\", at + 1 < chars.count, !(target.first == "\\" && Array(chars[at..<(at + target.count)]) == target) { at += 2; continue }
                 if Array(chars[at..<(at + target.count)]) == target { return at + target.count }
                 at += 1
             }
             return chars.count
+        }
+        /// The index after `\end{name}` of the environment, white space allowed before the brace.
+        func skipEnvironment(_ name: String, from start: Int) -> Int {
+            var at = start
+            let end = Array("\\end")
+            while at + end.count <= chars.count {
+                if Array(chars[at..<(at + end.count)]) == end {
+                    var brace = at + end.count
+                    while brace < chars.count, chars[brace].isWhitespace { brace += 1 }
+                    if let close = group(at: brace), String(chars[(brace + 1)..<(close - 1)]) == name { return close }
+                }
+                at += chars[at] == "\\" && at + 1 < chars.count && chars[at + 1] == "\\" ? 2 : 1
+            }
+            return chars.count
+        }
+        func spaces(_ start: Int) -> Int {
+            var at = start
+            while at < chars.count, chars[at] == " " || chars[at] == "\t" { at += 1 }
+            return at
         }
         func group(at start: Int) -> Int? {
             guard start < chars.count, chars[start] == "{" || chars[start] == "[" else { return nil }
@@ -74,12 +96,15 @@ public enum OutlineLength {
                 if end < chars.count, chars[end] == "*" { end += 1 }
                 index = end
                 out.append(" ")
-                if name == "begin", let close = group(at: index) {
-                    let raw = String(chars[min(index + 1, close - 1)..<(close - 1)])
+                if name == "begin", let close = group(at: spaces(index)) {
+                    let raw = String(chars[min(spaces(index) + 1, close - 1)..<(close - 1)])
                     index = close
-                    if mathEnvironments.contains(raw.replacingOccurrences(of: "*", with: "")) { index = skip(to: "\\end{" + raw + "}", from: index) }
+                    if mathEnvironments.contains(raw.replacingOccurrences(of: "*", with: "")) { index = skipEnvironment(raw, from: index) }
                 } else if nameCommands.contains(name) {
-                    while let close = group(at: index) { index = close }
+                    // Any optional arguments, then the one argument that holds the name.
+                    var at = spaces(index)
+                    while at < chars.count, chars[at] == "[", let close = group(at: at) { at = spaces(close) }
+                    if at < chars.count, chars[at] == "{", let close = group(at: at) { index = close }
                 }
             } else {
                 out.append(char)
@@ -98,13 +123,13 @@ public enum OutlineLength {
         var inWord = false
         for (index, scalar) in scalars.enumerated() {
             if isCJK(scalar) { count += 1; inWord = false; continue }
-            if scalar.properties.isAlphabetic || scalar.properties.numericType != nil {
+            if scalar.properties.isAlphabetic || scalar.properties.numericType == .decimal {
                 if !inWord { count += 1; inWord = true }
                 continue
             }
             let joins = ["'", "\u{2019}", "-", "."].contains(String(scalar))
             let between = inWord && index + 1 < scalars.count && !isCJK(scalars[index + 1])
-                && (scalars[index + 1].properties.isAlphabetic || scalars[index + 1].properties.numericType != nil)
+                && (scalars[index + 1].properties.isAlphabetic || scalars[index + 1].properties.numericType == .decimal)
             if !(joins && between) { inWord = false }
         }
         return count
@@ -145,12 +170,11 @@ public enum OutlineLength {
     static func report(outline: Outline, article: Article?, trace: Data?, written: (ledger: Data, main: URL)?,
                        documents: [String: (ledger: Data, main: URL)]? = nil) throws -> [String] {
         if let documents {
-            // One pass per document, over the trace records of its parts; the lines are then added up.
-            let groups = Dictionary(grouping: documents.keys.sorted()) { WriteParagraph.canonical(documents[$0]!.main) }
+            // One pass per part, over its trace records and against its own ledger and main file.
             var tables: [(words: [JSONKey: Int], done: [JSONKey: Int], unplaced: Int)] = []
-            for parts in groups.values.sorted(by: { $0[0] < $1[0] }) {
-                let lines = Outline.lines(of: trace ?? Data()).filter { parts.contains(WriteFromOutline.part(of: $0.value)) }
-                tables.append(try count(outline: outline, trace: lines, written: documents[parts[0]]!))
+            for part in documents.keys.sorted() {
+                let lines = Outline.lines(of: trace ?? Data()).filter { WriteFromOutline.part(of: $0.value) == part }
+                tables.append(try count(outline: outline, trace: lines, written: documents[part]!))
             }
             let known = Set(documents.keys)
             let strays = Outline.lines(of: trace ?? Data()).filter { !known.contains(WriteFromOutline.part(of: $0.value)) }.count
@@ -176,24 +200,31 @@ public enum OutlineLength {
             let rows = try ReviseLedger.lines(written.ledger)
             let mainURL = written.main.resolvingSymlinksInPath().standardizedFileURL
             var files: [String: [String]] = [:]
-            func lines(_ name: String?) -> [String]? {
+            /// A file of the manuscript that cannot be read is not a missing proposition: it stops the report.
+            func lines(_ name: String?) throws -> [String] {
                 let key = name.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
                 let url = key.map { mainURL.deletingLastPathComponent().appendingPathComponent($0) } ?? mainURL
                 if let known = files[url.path] { return known }
-                guard let data = LedgerOrder.read(url)?.data, let text = String(data: data, encoding: .utf8) else { return nil }
-                files[url.path] = LatexLine.splitLines(text)
-                return files[url.path]
+                guard let data = LedgerOrder.read(url)?.data, let text = String(data: data, encoding: .utf8) else {
+                    throw WriteParagraph.Failure(message: "cannot read \(CiteOrder.visible(url.path)) as UTF-8")
+                }
+                let split = LatexLine.splitLines(text)
+                files[url.path] = split
+                return split
             }
+            _ = try lines(nil)
             let records = outline.paragraphs.compactMap(\.value)
             var seen = Set<[UInt32]>()
             for line in trace {
-                guard let outlineID = line.value?["outline"]?.string, let first = line.value?["first_prop"]?.string,
-                      seen.insert(ReviseLedger.key(first)).inserted else { continue }
+                guard let outlineID = line.value?["outline"]?.string, let first = line.value?["first_prop"]?.string else { continue }
                 guard let record = records.first(where: { WriteFromOutline.same($0["id"]?.string, outlineID) }), !record.has("dropped"),
                       let section = record["section"]?.string else { continue }
                 let live = rows.filter { WriteFromOutline.same($0.id, first) && !$0.isRetired }
-                guard live.count == 1, let location = live[0].location, let text = lines(location.file), location.start >= 1, location.start <= text.count,
-                      let run = Paragraphs.runs(text)[location.start - 1] else { unplaced += 1; continue }
+                guard live.count == 1, let location = live[0].location else { unplaced += 1; continue }
+                let text = try lines(location.file)
+                guard location.start >= 1, location.start <= text.count, let run = Paragraphs.runs(text)[location.start - 1] else { unplaced += 1; continue }
+                // A paragraph is counted once, however many records name its proposition.
+                guard seen.insert(ReviseLedger.key(first)).inserted else { continue }
                 let runs = Paragraphs.runs(text)
                 let own = text.indices.filter { runs[$0] == run && !WriteParagraph.beginsHeading(text[$0]) }.map { text[$0] }
                 words[JSONKey(section), default: 0] += OutlineLength.words(in: own)

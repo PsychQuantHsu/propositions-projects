@@ -158,6 +158,7 @@ public enum WriteParagraph {
                     throw Failure(message: "the section \(CiteOrder.visible(current.section)) goes to the part \(part): give --tex \(CiteOrder.visible(Article.resolve(destination.tex, directory).path)) and --jsonl \(CiteOrder.visible(Article.resolve(destination.jsonl, directory).path))")
                 }
                 plan?.part = part
+                plan?.documentParts = given
             } else {
                 guard !given.isEmpty else {
                     throw Failure(message: "\(Article.fileName) names destinations, and the main file and ledger given are the destination of no part")
@@ -308,6 +309,12 @@ public enum WriteParagraph {
         return (manifest, notes)
     }
 
+    /// The file the paragraph goes into, as a report names it: the main file by its own name,
+    /// not by the name `main.tex` a location gives it.
+    static func fileName(_ manifest: Manifest) -> String {
+        manifest.file == "main.tex" ? URL(fileURLWithPath: manifest.stagedMain).lastPathComponent : manifest.file
+    }
+
     static func manifest(_ stage: URL) throws -> Manifest {
         guard let data = LedgerOrder.read(stage.appendingPathComponent("write.json"))?.data,
               let manifest = try? JSONDecoder().decode(Manifest.self, from: data)
@@ -317,6 +324,12 @@ public enum WriteParagraph {
               (manifest.rewrite == nil) == (manifest.rewriteFiles == nil),
               manifest.rewrite == nil || (manifest.outline == nil && manifest.heading == nil)
         else { throw Failure(message: "the write.json in \(CiteOrder.visible(stage.path)) is not one prepare wrote") }
+        // What prepare copied says what the run is: a write.json that no longer names the outline or
+        // article.json it was prepared with would pass over their checks.
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: stage.appendingPathComponent("outline").path) == (manifest.outline != nil || manifest.rewrite != nil),
+              fm.fileExists(atPath: stage.appendingPathComponent("article").path) == (manifest.article != nil)
+        else { throw Failure(message: "the write.json in \(CiteOrder.visible(stage.path)) does not name the outline or the \(Article.fileName) that prepare copied; prepare again") }
         return manifest
     }
 
@@ -338,6 +351,7 @@ public enum WriteParagraph {
         /// The banned phrasings of the staged `article.json`, or why it cannot be read.
         var banned: [Article.Banned] = []
         var articleProblem: String?
+        var article: Article?
     }
 
     static func load(_ manifest: Manifest) throws -> Payload {
@@ -373,7 +387,9 @@ public enum WriteParagraph {
                 guard let data = LedgerOrder.read(URL(fileURLWithPath: article.staged))?.data else {
                     throw Article.Failure(message: "the staged \(Article.fileName) cannot be read")
                 }
-                payload.banned = try Article.parse(data).banned
+                let parsed = try Article.parse(data)
+                payload.banned = parsed.banned
+                payload.article = parsed
             } catch {
                 payload.articleProblem = (error as? Article.Failure)?.message ?? "the staged \(Article.fileName) cannot be read"
             }
@@ -388,6 +404,13 @@ public enum WriteParagraph {
                     guard recorded?.hash == sha256(data) else { throw Failure(message: "\(name) is not as prepare recorded it") }
                 }
                 _ = try WriteRewrite.gate(directory: directory, bytes: bytes)
+                // The parts of the document rewritten are those the destinations give for its files, as at prepare.
+                let parts = payload.article?.destinations == nil ? nil
+                    : payload.article?.parts(tex: URL(fileURLWithPath: manifest.originals["manuscript"]!),
+                                             jsonl: URL(fileURLWithPath: manifest.originals["ledger"]!), directory: directory)
+                guard parts == plan.parts, parts?.isEmpty != true else {
+                    throw Failure(message: "write.json does not name the parts \(Article.fileName) gives for the files of this rewrite; prepare again")
+                }
                 let text = bytes.map { String(decoding: $0, as: UTF8.self) }
                 payload.outline = Outline(sections: text[0], paragraphs: text[1], approvals: text[2])
             } catch {
@@ -502,7 +525,7 @@ public enum WriteParagraph {
                 if let next, !LedgerOrder.stripped(next).isEmpty, blank.last != true {
                     report.problems.append("the new paragraph does not end with a blank line before the text that follows it")
                 }
-                report.problems += Phrasing.occurrences(in: lines, first: manifest.after + 1, file: manifest.file, banned: payload.banned)
+                report.problems += Phrasing.occurrences(in: lines, first: manifest.after + 1, file: fileName(manifest), banned: payload.banned)
                 report.placeholders = lines.enumerated().filter { $0.element.contains(placeholder) }.map { manifest.after + $0.offset + 1 }
             } else {
                 report.problems.append("the lines added after line \(manifest.after) are not UTF-8")
@@ -587,7 +610,17 @@ public enum WriteParagraph {
         }
         // The banned phrasings, over every staged file of the tree, in the order prepare read them.
         let stagedRoot = URL(fileURLWithPath: manifest.stagedMain).deletingLastPathComponent().path + "/"
-        let tree = [(manifest.file, payload.staged["manuscript"]!)]
+        // A rewrite cannot add a file: commit writes the files prepare copied, and no other.
+        let prepared = Set([URL(fileURLWithPath: manifest.stagedMain).lastPathComponent]
+            + (manifest.rewriteFiles ?? []).map { $0.staged.hasPrefix(stagedRoot) ? String($0.staged.dropFirst(stagedRoot.count)) : $0.staged })
+        if let order = try? ReadingOrder(mainFile: URL(fileURLWithPath: manifest.stagedMain)) {
+            for name in order.files where !prepared.contains(name) {
+                report.problems.append("the staged manuscript includes \(CiteOrder.visible(name)), which prepare did not copy: a rewrite cannot add a file to the input tree")
+            }
+        } else {
+            report.problems.append("the input tree of the staged manuscript cannot be read")
+        }
+        let tree = [(fileName(manifest), payload.staged["manuscript"]!)]
             + (manifest.rewriteFiles ?? []).compactMap { file in
                 payload.rewriteStaged[file.original].map { (file.staged.hasPrefix(stagedRoot) ? String(file.staged.dropFirst(stagedRoot.count)) : file.staged, $0) }
             }
@@ -655,7 +688,7 @@ public enum WriteParagraph {
         }
         let report = check(manifest, payload)
         guard report.problems.isEmpty else { throw Failure(message: report.problems[0] + "; nothing was written") }
-        if let first = report.firstNew, manifest.outline != nil, WriteFromOutline.names(trace ?? nil, first) {
+        if let first = report.firstNew, let plan = manifest.outline, WriteFromOutline.names(trace ?? nil, first, parts: plan.documentParts) {
             throw Failure(message: "the trace already names \(CiteOrder.visible(first)); nothing was written")
         }
         let backup = stage.appendingPathComponent("backup")

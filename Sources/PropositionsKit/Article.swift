@@ -38,12 +38,21 @@ public struct Article: Equatable, Sendable {
     func parts(tex: URL, jsonl: URL, directory: URL) -> [String] {
         ["main", "appendix", "supplement"].filter { part in
             guard let destination = destinations?[part] else { return false }
-            return WriteParagraph.canonical(Article.resolve(destination.tex, directory)) == WriteParagraph.canonical(tex)
-                && WriteParagraph.canonical(Article.resolve(destination.jsonl, directory)) == WriteParagraph.canonical(jsonl)
+            return Article.real(Article.resolve(destination.tex, directory)) == Article.real(tex)
+                && Article.real(Article.resolve(destination.jsonl, directory)) == Article.real(jsonl)
         }
     }
 
-    static func resolve(_ path: String, _ directory: URL) -> URL { directory.appendingPathComponent(path).standardizedFileURL }
+    /// The path is not tidied: `link/../x` is left for the file system, which follows the link first.
+    static func resolve(_ path: String, _ directory: URL) -> URL { URL(fileURLWithPath: directory.path + "/" + path) }
+
+    /// The name the file system gives the file (links followed in the order of the path); the
+    /// tidied path when the file is not there.
+    static func real(_ url: URL) -> String {
+        guard let pointer = realpath(url.path, nil) else { return WriteParagraph.canonical(url) }
+        defer { free(pointer) }
+        return String(cString: pointer)
+    }
 
     /// Reads the file's bytes; throws with what is wrong, named from `article.json`.
     public static func parse(_ data: Data) throws -> Article {

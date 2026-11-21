@@ -149,4 +149,18 @@ struct WriteRewriteTests {
         try JSONSerialization.data(withJSONObject: object).write(to: url)
         #expect(run(["commit", "--stage", "stage"], in: box).exitCode == 2)
     }
+
+    @Test func `A proposition the map names needs a location`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        try edit(box, "stage/ledger/main.jsonl") { text in
+            text.components(separatedBy: "\n").map { line in
+                line.contains(#""id": "019a3c5e-7a00-7000-8000-000000000001""#) ? line.replacingOccurrences(of: #""location": "main.tex:L"#, with: #""location": "nowhere:X"#) : line
+            }.joined(separator: "\n")
+        }
+        let check = run(["check", "--stage", "stage"], in: box)
+        #expect(check.exitCode == 1)
+        #expect(check.stdout.contains { $0.contains("019a3c5e-7a00-7000-8000-000000000001, listed in outline-map.jsonl, has no location that can be read") }, "\(check.stdout)")
+    }
 }

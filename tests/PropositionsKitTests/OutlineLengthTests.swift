@@ -131,5 +131,28 @@ struct OutlineLengthTests {
         #expect(OutlineLength.words(in: ["Text \\cite{"]) == 1)
         #expect(OutlineLength.words(in: ["See \\cite", "[see also]", "{smith2020} here."]) == 2)
         #expect(OutlineLength.words(in: ["See \\cite", "", "{smith2020} here."]) == 3)
+        #expect(OutlineLength.words(in: ["See \\cite[see {A] B}]{smith2020} here."]) == 2)
+    }
+
+    @Test func `Two propositions of one paragraph count the paragraph once`() throws {
+        let box = try WriteParagraphTests().setUp()
+        _ = try box.write(Self.section("s-a") + "\n", to: "paper/outline/outline-sections.jsonl")
+        _ = try box.write(Self.paragraph("p-1", "s-a") + "\n" + Self.paragraph("p-2", "s-a") + "\n", to: "paper/outline/outline-paragraphs.jsonl")
+        // Propositions 1 and 2 of the fixture stand in the same paragraph.
+        let ledger = try String(contentsOf: box.url.appendingPathComponent("paper/propositions/main.jsonl"), encoding: .utf8).components(separatedBy: "\n")
+        func location(_ line: String) throws -> Location {
+            let text = try JSONValue.parse(line)["location"]?.string
+            return try #require(text.flatMap(Location.parse))
+        }
+        let first = try location(ledger[0]), second = try location(ledger[1])
+        let text = LatexLine.splitLines(try String(contentsOf: box.url.appendingPathComponent("paper/main.tex"), encoding: .utf8))
+        let runs = Paragraphs.runs(text)
+        try #require(runs[first.start - 1] == runs[second.start - 1])
+        func record(_ id: String, _ prop: String) -> String { #"{"outline": "\#(id)", "first_prop": "019a3c5e-7a00-7000-8000-00000000000\#(prop)", "section": "s-a", "approval_line": 1}"# }
+        _ = try box.write(record("p-1", "1") + "\n", to: "paper/outline/outline-trace.jsonl")
+        let arguments = ["paper/outline", "--jsonl", "paper/propositions/main.jsonl", "--tex", "paper/main.tex"]
+        let one = run(arguments, in: box).stdout[0]
+        _ = try box.write(record("p-1", "1") + "\n" + record("p-2", "2") + "\n", to: "paper/outline/outline-trace.jsonl")
+        #expect(run(arguments, in: box).stdout[0] == one)
     }
 }

@@ -200,7 +200,14 @@ public enum WriteRewrite {
         let directory = stagedMain.deletingLastPathComponent()
         var problems: [String] = []
         for row in rows where !row.isRetired {
-            guard let id = row.id, let location = row.location else { continue }
+            guard let id = row.id else { continue }
+            guard let location = row.location else {
+                // A proposition the map names has to say where its paragraph starts.
+                if mapped.contains(where: { WriteFromOutline.same($0, id) }) {
+                    problems.append("\(CiteOrder.visible(id)), listed in \(mapFile), has no location that can be read")
+                }
+                continue
+            }
             guard order.position(file: location.file, line: location.start) != nil else {
                 problems.append("\(CiteOrder.visible(id)) is located outside the staged manuscript"); continue
             }

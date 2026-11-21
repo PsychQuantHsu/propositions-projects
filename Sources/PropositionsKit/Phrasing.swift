@@ -9,11 +9,11 @@ enum Phrasing {
     /// Stands between two paragraphs in the folded text; no phrase holds it.
     static let paragraphBreak: UInt32 = 0
 
-    /// A text without the difference of letter case, in form C: upper case and then lower case,
-    /// so that `ß` and `SS`, and the two lower-case sigmas, compare equal.
+    /// A text without the difference of letter case, in form C: Unicode case folding, under which
+    /// `ß`, `ẞ` and `SS` are the same and so are the two lower-case sigmas, while a dotless `ı` is
+    /// not an `i`. No locale is used.
     static func caseless(_ text: String) -> String {
-        // Lower case first: the capital sharp s has no upper-case mapping of its own.
-        text.precomposedStringWithCanonicalMapping.lowercased().uppercased().lowercased().precomposedStringWithCanonicalMapping
+        text.precomposedStringWithCanonicalMapping.folding(options: .caseInsensitive, locale: nil).precomposedStringWithCanonicalMapping
     }
 
     /// A phrase as it is compared: without letter case, in form C, each run of white space one
@@ -71,7 +71,7 @@ enum Phrasing {
             }
             space = true
         }
-        if space, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(lineOf[lineOf.count - 1]) }
+        // Nothing is added after the last line: whether a line break follows it is not known here.
         var found: [(at: Int, order: Int, line: String)] = []
         for (order, entry) in banned.enumerated() {
             let phrase = fold(entry.phrase)

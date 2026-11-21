@@ -78,6 +78,8 @@ public enum OutlineLength {
             var depth = 0, at = start
             while at < chars.count {
                 if chars[at] == "\\" { at += 2; continue }
+                // A `]` inside braces does not close a bracket group.
+                if open == "[", chars[at] == "{", let inner = group(at: at) { at = inner; continue }
                 if chars[at] == open { depth += 1 } else if chars[at] == close { depth -= 1; if depth == 0 { return at + 1 } }
                 at += 1
             }
@@ -179,7 +181,7 @@ public enum OutlineLength {
             // order, so that a paragraph two parts of one document name is counted once.
             var tables: [(words: [JSONKey: Int], done: [JSONKey: Int], unplaced: Int)] = []
             let groups = Dictionary(grouping: documents.keys.sorted()) {
-                (Article.real(documents[$0]!.main) ?? documents[$0]!.main.path) + "\n" + WriteParagraph.sha256(documents[$0]!.ledger)
+                Data(((Article.real(documents[$0]!.main) ?? documents[$0]!.main.path) + "\n" + WriteParagraph.sha256(documents[$0]!.ledger)).utf8)
             }
             for parts in groups.values.sorted(by: { $0[0] < $1[0] }) {
                 let lines = Outline.lines(of: trace ?? Data()).filter { parts.contains(WriteFromOutline.part(of: $0.value)) }
@@ -223,7 +225,8 @@ public enum OutlineLength {
             }
             _ = try lines(nil)
             let records = outline.paragraphs.compactMap(\.value)
-            var seen = Set<[UInt32]>()
+            // A paragraph: a file and a run of lines in it.
+            var seen = Set<Data>()
             for line in trace {
                 guard let outlineID = line.value?["outline"]?.string, let first = line.value?["first_prop"]?.string else { continue }
                 guard let record = records.first(where: { WriteFromOutline.same($0["id"]?.string, outlineID) }), !record.has("dropped"),
@@ -232,8 +235,9 @@ public enum OutlineLength {
                 guard live.count == 1, let location = live[0].location else { unplaced += 1; continue }
                 let text = try lines(location.file)
                 guard location.start >= 1, location.start <= text.count, let run = Paragraphs.runs(text)[location.start - 1] else { unplaced += 1; continue }
-                // A paragraph is counted once, however many records name its proposition.
-                guard seen.insert(ReviseLedger.key(first)).inserted else { continue }
+                // A paragraph is counted once, for the first record that names a proposition in it.
+                let file = location.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) } ?? ""
+                guard seen.insert(Data("\(file)\n\(run)".utf8)).inserted else { continue }
                 let runs = Paragraphs.runs(text)
                 let own = text.indices.filter { runs[$0] == run && !WriteParagraph.beginsHeading(text[$0]) }.map { text[$0] }
                 words[JSONKey(section), default: 0] += OutlineLength.words(in: own)

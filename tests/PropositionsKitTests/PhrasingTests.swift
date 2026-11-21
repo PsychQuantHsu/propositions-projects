@@ -199,7 +199,12 @@ struct PhrasingTests {
         #expect(found(["Die Strasse ist lang."]) == 1)
         #expect(found([" cat sat."]) == 1)
         #expect(found(["A cat", "", "sat."]) == 1)
-        #expect(found(["A cat"]) == 1)
+        #expect(found(["A cat"]) == 0)   // whether a line break follows the last line is not known
+        #expect(found(["A cat", ""]) == 1)
+        // Case folding, not a round trip through upper case: a dotless i is not an i.
+        let plain = [Article.Banned(phrase: "in", reason: "r")]
+        #expect(Phrasing.occurrences(in: ["\u{131}n"], file: "f.tex", banned: plain).isEmpty)
+        #expect(Phrasing.occurrences(in: ["IN"], file: "f.tex", banned: plain).count == 1)
         #expect(found(["cat sat."]) == 0)
         #expect(found(["Acat sat."]) == 0)
     }

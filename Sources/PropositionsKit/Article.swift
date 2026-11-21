@@ -58,7 +58,7 @@ public struct Article: Equatable, Sendable {
     /// Whether two paths are one file: both resolve, to the same name.
     static func same(_ a: URL, _ b: URL) -> Bool {
         guard let x = real(a), let y = real(b) else { return false }
-        return x == y
+        return Array(x.utf8) == Array(y.utf8)   // byte for byte: two spellings of an accented letter are two names
     }
 
     /// Reads the file's bytes; throws with what is wrong, named from `article.json`.

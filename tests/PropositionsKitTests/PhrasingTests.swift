@@ -201,6 +201,8 @@ struct PhrasingTests {
         #expect(found(["A cat", "", "sat."]) == 1)
         #expect(found(["A cat"]) == 0)   // whether a line break follows the last line is not known
         #expect(found(["A cat", ""]) == 1)
+        #expect(found(["A cat "]) == 1)           // white space written in the last line counts
+        #expect(found(["A cat % note"]) == 1)
         // Case folding, not a round trip through upper case: a dotless i is not an i.
         let plain = [Article.Banned(phrase: "in", reason: "r")]
         #expect(Phrasing.occurrences(in: ["\u{131}n"], file: "f.tex", banned: plain).isEmpty)

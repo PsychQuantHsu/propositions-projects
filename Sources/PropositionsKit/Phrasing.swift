@@ -54,7 +54,9 @@ enum Phrasing {
         var text: [UInt32] = []
         var lineOf: [Int] = []
         var space = false
+        var literal = false   // the last line ended in white space that is written in it
         for (offset, line) in lines.enumerated() {
+            literal = false
             if LedgerOrder.stripped(line).isEmpty {
                 // The line break that ends a paragraph is white space after its last word.
                 if space, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(lineOf[lineOf.count - 1]) }
@@ -69,9 +71,12 @@ enum Phrasing {
                 space = false
                 text.append(scalar.value); lineOf.append(first + offset)
             }
+            literal = space
             space = true
         }
-        // Nothing is added after the last line: whether a line break follows it is not known here.
+        // After the last line only white space that is written in it counts: whether a line break
+        // follows it is not known here.
+        if literal, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(lineOf[lineOf.count - 1]) }
         var found: [(at: Int, order: Int, line: String)] = []
         for (order, entry) in banned.enumerated() {
             let phrase = fold(entry.phrase)

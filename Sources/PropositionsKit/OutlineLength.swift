@@ -210,17 +210,23 @@ public enum OutlineLength {
         do {
             let rows = try ReviseLedger.lines(written.ledger)
             let mainURL = written.main.resolvingSymlinksInPath().standardizedFileURL
-            var files: [String: [String]] = [:]
+            // Files are told apart by the bytes of their paths: two spellings of an accented letter are two files.
+            var files: [Data: [String]] = [:]
+            func url(_ name: String?) -> URL {
+                let key = name.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
+                let found = key.map { mainURL.deletingLastPathComponent().appendingPathComponent($0) } ?? mainURL
+                // The main file under its own name is the main file.
+                return found.standardizedFileURL.path == mainURL.path ? mainURL : found
+            }
             /// A file of the manuscript that cannot be read is not a missing proposition: it stops the report.
             func lines(_ name: String?) throws -> [String] {
-                let key = name.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
-                let url = key.map { mainURL.deletingLastPathComponent().appendingPathComponent($0) } ?? mainURL
-                if let known = files[url.path] { return known }
+                let url = url(name)
+                if let known = files[Data(url.path.utf8)] { return known }
                 guard let data = LedgerOrder.read(url)?.data, let text = String(data: data, encoding: .utf8) else {
                     throw WriteParagraph.Failure(message: "cannot read \(CiteOrder.visible(url.path)) as UTF-8")
                 }
                 let split = LatexLine.splitLines(text)
-                files[url.path] = split
+                files[Data(url.path.utf8)] = split
                 return split
             }
             _ = try lines(nil)
@@ -236,8 +242,7 @@ public enum OutlineLength {
                 let text = try lines(location.file)
                 guard location.start >= 1, location.start <= text.count, let run = Paragraphs.runs(text)[location.start - 1] else { unplaced += 1; continue }
                 // A paragraph is counted once, for the first record that names a proposition in it.
-                let file = location.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) } ?? ""
-                guard seen.insert(Data("\(file)\n\(run)".utf8)).inserted else { continue }
+                guard seen.insert(Data("\(url(location.file).path)\n\(run)".utf8)).inserted else { continue }
                 let runs = Paragraphs.runs(text)
                 let own = text.indices.filter { runs[$0] == run && !WriteParagraph.beginsHeading(text[$0]) }.map { text[$0] }
                 words[JSONKey(section), default: 0] += OutlineLength.words(in: own)

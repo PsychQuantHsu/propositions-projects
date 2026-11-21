@@ -33,6 +33,11 @@ public enum WriteRewrite {
         do { status = try OutlineStatus.lines(outline) } catch { throw fail("\(error)") }
         let summary = ["order of sections", "sections removed since their approval", "paragraph records that name no section",
                        "points that carry pending", "records that carry dropped", "ok status"]
+        let names = status.map { $0.components(separatedBy: "\t").first ?? "" }
+        guard names.last == "ok status", ["order of sections", "sections removed since their approval",
+                                          "paragraph records that name no section"].allSatisfy(names.contains),
+              names.contains(where: { !summary.contains($0) })
+        else { throw fail("outline status did not report every section and the order of sections") }
         for line in status {
             let name = line.components(separatedBy: "\t").first ?? ""
             if name == "order of sections" {
@@ -68,11 +73,20 @@ public enum WriteRewrite {
         var byID: [[UInt32]: [ReviseLedger.Line]] = [:]
         for line in after { if let id = line.id { byID[ReviseLedger.key(id), default: []].append(line) } }
         if after.contains(where: { $0.id == nil }) { problems.append("a line of the staged ledger has no id") }
+        for (name, lines) in [("ledger", before), ("staged ledger", after)] {
+            if lines.contains(where: { ($0.members.map { Revise.deduplicated($0).count != $0.count }) ?? false }) {
+                problems.append("a line of the \(name) writes a key twice")
+            }
+        }
+        if before.contains(where: { $0.id == nil }) { problems.append("a line of the ledger has no id: a rewrite needs every proposition named") }
         var oldIDs = Set<[UInt32]>()
         for line in before {
             guard let id = line.id, let members = line.members else { continue }
             let key = ReviseLedger.key(id)
-            oldIDs.insert(key)
+            guard oldIDs.insert(key).inserted else {
+                problems.append("\(CiteOrder.visible(id)) is the id of several lines of the ledger")
+                continue
+            }
             guard let matches = byID[key], matches.count == 1, let now = matches.first, let nowMembers = now.members else {
                 problems.append("\(CiteOrder.visible(id)) is not one line of the staged ledger: a rewrite retires a proposition, it does not remove it")
                 continue
@@ -137,7 +151,8 @@ public enum WriteRewrite {
         return out
     }
 
-    /// The trace lines `commit` appends for the map.
+    /// The trace `commit` writes for the map: a rewrite writes it anew, since the old records name
+    /// paragraphs of the text it replaces (the old trace is kept in `backup/`).
     static func traceLines(_ records: [(String, String)], outline: Outline) -> Data {
         let where_ = approvals(outline)
         var data = Data()
@@ -147,6 +162,34 @@ public enum WriteRewrite {
             data += WriteFromOutline.record(plan, firstProposition: first)
         }
         return data
+    }
+
+    /// Every live proposition of the staged ledger has to be located in the staged tree, and each
+    /// mapped proposition has to start a paragraph: its line follows a blank line or a sectioning line.
+    static func locations(stagedMain: URL, ledger: Data, mapped: [String]) -> [String] {
+        guard let order = try? ReadingOrder(mainFile: stagedMain), let rows = try? ReviseLedger.lines(ledger) else {
+            return ["the staged manuscript or ledger cannot be read to check locations"]
+        }
+        let directory = stagedMain.deletingLastPathComponent()
+        var problems: [String] = []
+        for row in rows where !row.isRetired {
+            guard let id = row.id, let location = row.location else { continue }
+            guard order.position(file: location.file, line: location.start) != nil else {
+                problems.append("\(CiteOrder.visible(id)) is located outside the staged manuscript"); continue
+            }
+            guard mapped.contains(where: { WriteFromOutline.same($0, id) }) else { continue }
+            let name = location.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
+            let url = name.map { directory.appendingPathComponent($0) } ?? stagedMain
+            let lines = LatexLine.splitLines(String(decoding: (LedgerOrder.read(url)?.data ?? Data()), as: UTF8.self))
+            // A paragraph starts after a blank line, or right after a sectioning line.
+            let i = location.start - 1
+            let starts = i < lines.count && !LedgerOrder.stripped(lines[i]).isEmpty
+                && (i == 0 || LedgerOrder.stripped(lines[i - 1]).isEmpty || WriteParagraph.beginsHeading(lines[i - 1]))
+            if !starts {
+                problems.append("\(CiteOrder.visible(id)), listed in \(mapFile), does not start a paragraph")
+            }
+        }
+        return problems
     }
 
     static func outline(_ directory: URL) throws -> Outline {

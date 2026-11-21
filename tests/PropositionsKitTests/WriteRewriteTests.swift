@@ -97,4 +97,56 @@ struct WriteRewriteTests {
         #expect(run(Self.prepare + ["--outline-paragraph", "p-1"], in: other).exitCode == 2)
         #expect(run(Self.prepare + ["--heading"], in: other).exitCode == 2)
     }
+
+    // MARK: the first review
+
+    @Test func `Prepare refuses a file the run writes named twice, an included file as a sidecar`() throws {
+        let box = try setUp()
+        try edit(box, "paper/main.tex") { $0.replacingOccurrences(of: "\\end{document}", with: "\\input{part}\n\\end{document}") }
+        _ = try box.write("Part.\n", to: "paper/part.tex")
+        var arguments = Self.prepare
+        arguments[arguments.firstIndex(of: "paper/propositions/structure.json")!] = "paper/part.tex"
+        let result = run(arguments, in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.first?.contains("named twice") == true)
+    }
+
+    @Test func `The check reads the ledger strictly and the map against the text`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box, map: [#"{"outline": "p-1", "first_prop": "019a3c5e-7a00-7000-8000-000000000002"}"#,
+                               #"{"outline": "p-2", "first_prop": "\#(Self.new)"}"#])
+        try edit(box, "stage/ledger/main.jsonl") {
+            $0.replacingOccurrences(of: #"{"id": "\#(Self.new)", "text": "Future studies could test a longer interval.""#,
+                                    with: #"{"id": "\#(Self.new)", "text": "Future studies could test a longer interval.", "text": "Other.""#)
+        }
+        let result = run(["check", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains { $0.contains("000000000002, listed in outline-map.jsonl, does not start a paragraph") })
+        #expect(result.stdout.contains { $0.contains("writes a key twice") })
+    }
+
+    @Test func `A rewrite writes the trace anew and keeps the old one with a restore list`() throws {
+        let box = try setUp()
+        _ = try box.write(#"{"outline": "p-9", "first_prop": "x", "section": "s-z", "approval_line": 1}"# + "\n", to: "paper/outline/outline-trace.jsonl")
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        #expect(run(["commit", "--stage", "stage"], in: box).exitCode == 0)
+        let trace = try String(contentsOf: box.url.appendingPathComponent("paper/outline/outline-trace.jsonl"), encoding: .utf8)
+        #expect(!trace.contains("p-9"))
+        #expect(try String(contentsOf: box.url.appendingPathComponent("stage/backup/trace"), encoding: .utf8).contains("p-9"))
+        let restore = try String(contentsOf: box.url.appendingPathComponent("stage/backup/restore.jsonl"), encoding: .utf8)
+        #expect(restore.contains(#""backup": "ledger""#) && restore.contains(#""backup": "trace""#))
+    }
+
+    @Test func `A write json that mixes the two modes is refused`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let url = box.url.appendingPathComponent("stage/write.json")
+        var object = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        #expect(object.removeValue(forKey: "rewriteFiles") != nil)
+        try JSONSerialization.data(withJSONObject: object).write(to: url)
+        #expect(run(["commit", "--stage", "stage"], in: box).exitCode == 2)
+    }
 }

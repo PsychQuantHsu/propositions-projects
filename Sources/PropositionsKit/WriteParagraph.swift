@@ -158,10 +158,13 @@ public enum WriteParagraph {
         guard Set(written).count == 4 else {
             throw Failure(message: "the manuscript file, the ledger and the two sidecars have to be four different files")
         }
+        let treeTargets = rewrite != nil ? tree.filter { $0.name != "main.tex" }.map { canonical($0.url) } : []
+        guard Set(written + treeTargets).count == written.count + treeTargets.count,
+              !(written + treeTargets).contains(canonical(ledger.deletingLastPathComponent().appendingPathComponent("_meta.json")))
+        else { throw Failure(message: "a file the run writes is named twice, or is _meta.json") }
         if let directory = outlineDirectory {
             let others = (WriteFromOutline.files + [WriteFromOutline.traceFile]).map { canonical(directory.appendingPathComponent($0)) }
-            let tree = rewrite != nil ? tree.map { canonical($0.url) } : []
-            guard Set(others).isDisjoint(with: written + tree) else {
+            guard Set(others).isDisjoint(with: written + treeTargets) else {
                 throw Failure(message: "a file of the outline, or its trace, is one of the files the paragraph changes")
             }
         }
@@ -264,7 +267,9 @@ public enum WriteParagraph {
               let manifest = try? JSONDecoder().decode(Manifest.self, from: data)
         else { throw Failure(message: "\(CiteOrder.visible(stage.path)) holds no write.json from prepare") }
         guard roles.allSatisfy({ manifest.originals[$0] != nil && manifest.staged[$0] != nil && manifest.hashes[$0] != nil }),
-              manifest.after > 0
+              manifest.after > 0,
+              (manifest.rewrite == nil) == (manifest.rewriteFiles == nil),
+              manifest.rewrite == nil || (manifest.outline == nil && manifest.heading == nil)
         else { throw Failure(message: "the write.json in \(CiteOrder.visible(stage.path)) is not one prepare wrote") }
         return manifest
     }
@@ -280,6 +285,10 @@ public enum WriteParagraph {
         /// For a rewrite: the other files of the input tree, by original path.
         var rewriteOriginals: [String: LedgerOrder.Snapshot] = [:]
         var rewriteStaged: [String: Data] = [:]
+        /// For a rewrite: the outline files and outline-map.jsonl, each read once.
+        var outline: Outline?
+        var outlineProblem: String?
+        var map: Data?
     }
 
     static func load(_ manifest: Manifest) throws -> Payload {
@@ -306,6 +315,24 @@ public enum WriteParagraph {
                 throw Failure(message: "the staged \(CiteOrder.visible(file.staged)) cannot be read; nothing was written")
             }
             payload.rewriteStaged[file.original] = data
+        }
+        if let plan = manifest.rewrite {
+            let directory = URL(fileURLWithPath: plan.directory)
+            do {
+                let bytes = try WriteFromOutline.read(directory)
+                // The bytes judged are the bytes recorded at prepare.
+                for (name, data) in zip(WriteFromOutline.files, bytes) {
+                    let recorded = manifest.inputs.first { $0.original == directory.appendingPathComponent(name).path }
+                    guard recorded?.hash == sha256(data) else { throw Failure(message: "\(name) is not as prepare recorded it") }
+                }
+                _ = try WriteRewrite.gate(directory: directory, bytes: bytes)
+                let text = bytes.map { String(decoding: $0, as: UTF8.self) }
+                payload.outline = Outline(sections: text[0], paragraphs: text[1], approvals: text[2])
+            } catch {
+                payload.outlineProblem = (error as? Failure)?.message ?? "the outline cannot be read"
+            }
+            let stage = URL(fileURLWithPath: manifest.staged["ledger"]!).deletingLastPathComponent().deletingLastPathComponent()
+            payload.map = LedgerOrder.read(stage.appendingPathComponent(WriteRewrite.mapFile))?.data
         }
         return payload
     }
@@ -479,21 +506,23 @@ public enum WriteParagraph {
         report.problems += ledger.problems
         report.newPropositions = ledger.added.count
         report.firstNew = ledger.added.first
-        if (try? ReviseLedger.lines(payload.staged["discourse"]!)) == nil {
+        if String(data: payload.staged["discourse"]!, encoding: .utf8) == nil || (try? ReviseLedger.lines(payload.staged["discourse"]!)) == nil {
             report.problems.append("the staged discourse sidecar is not one JSON object per line")
         }
-        if (try? JSONValue.parse(String(decoding: payload.staged["structure"]!, as: UTF8.self))) == nil {
+        if (String(data: payload.staged["structure"]!, encoding: .utf8).flatMap { try? JSONValue.parse($0) }) == nil {
             report.problems.append("the staged structure is not JSON")
         }
-        if let plan = manifest.rewrite, let outline = try? WriteRewrite.outline(URL(fileURLWithPath: plan.directory)) {
-            let stage = URL(fileURLWithPath: manifest.staged["ledger"]!).deletingLastPathComponent().deletingLastPathComponent()
-            let map = WriteRewrite.map(LedgerOrder.read(stage.appendingPathComponent(WriteRewrite.mapFile))?.data,
-                                       outline: outline, ledger: payload.staged["ledger"]!)
+        var mapped: [String] = []
+        if let outline = payload.outline {
+            let map = WriteRewrite.map(payload.map, outline: outline, ledger: payload.staged["ledger"]!)
             report.problems += map.problems
             report.newRecords = map.records.count
-        } else if manifest.rewrite != nil {
-            report.problems.append("the outline cannot be read")
+            mapped = map.records.map(\.1)
+        } else {
+            report.problems.append(payload.outlineProblem ?? "the outline cannot be read")
         }
+        report.problems += WriteRewrite.locations(stagedMain: URL(fileURLWithPath: manifest.stagedMain),
+                                                   ledger: payload.staged["ledger"]!, mapped: mapped)
         let changed = (payload.staged["manuscript"]! != payload.originals["manuscript"]!.data ? 1 : 0)
             + payload.rewriteStaged.filter { payload.rewriteOriginals[$0.key]?.data != $0.value }.count
         report.inserted = changed
@@ -516,13 +545,17 @@ public enum WriteParagraph {
         let trace = try manifest.outline.map { try WriteFromOutline.traceSnapshot($0) }
         if let plan = manifest.outline { try WriteFromOutline.confirm(plan, inputs: manifest.inputs) }
         let rewriteTrace = try manifest.rewrite.map { plan -> LedgerOrder.Snapshot? in
-            let directory = URL(fileURLWithPath: plan.directory)
-            guard WriteFromOutline.files.allSatisfy({ name in manifest.inputs.contains { $0.original == directory.appendingPathComponent(name).path } }) else {
-                throw Failure(message: "write.json names an outline whose files prepare did not record; nothing was written")
+            guard payload.outline != nil else {
+                throw Failure(message: (payload.outlineProblem ?? "the outline cannot be read") + "; nothing was written")
             }
-            _ = try WriteRewrite.gate(directory: directory, bytes: try WriteFromOutline.read(directory))
             return try WriteFromOutline.traceSnapshot(WriteFromOutline.Plan(directory: plan.directory, paragraph: "", section: "",
                                                                              approvalLine: 0, traceHash: plan.traceHash))
+        }
+        // The trace a rewrite writes, settled before anything is written.
+        var rewriteTraceLines: Data?
+        if manifest.rewrite != nil, let outline = payload.outline {
+            let map = WriteRewrite.map(payload.map, outline: outline, ledger: payload.staged["ledger"]!)
+            rewriteTraceLines = WriteRewrite.traceLines(map.records, outline: outline)
         }
         let report = check(manifest, payload)
         guard report.problems.isEmpty else { throw Failure(message: report.problems[0] + "; nothing was written") }
@@ -534,9 +567,21 @@ public enum WriteParagraph {
             throw Failure(message: "\(CiteOrder.visible(backup.path)) exists already or cannot be made; nothing was written")
         }
         for role in roles { try create(payload.originals[role]!.data, at: backup.appendingPathComponent(role)) }
+        var restore: [String] = roles.map { #"{"backup": "\#($0)", "destination": \#(Revise.quoted(manifest.originals[$0]!))}"# }
         for (index, file) in (manifest.rewriteFiles ?? []).enumerated() {
             try create(payload.rewriteOriginals[file.original]!.data, at: backup.appendingPathComponent("file-\(index + 1)"))
+            restore.append(#"{"backup": "file-\#(index + 1)", "destination": \#(Revise.quoted(file.original))}"#)
         }
+        if let plan = manifest.rewrite {
+            let trace = Revise.quoted(URL(fileURLWithPath: plan.directory).appendingPathComponent(WriteFromOutline.traceFile).path)
+            if let snapshot = rewriteTrace ?? nil {
+                try create(snapshot.data, at: backup.appendingPathComponent("trace"))
+                restore.append(#"{"backup": "trace", "destination": \#(trace)}"#)
+            } else {
+                restore.append(#"{"backup": null, "destination": \#(trace), "absent": true}"#)
+            }
+        }
+        if manifest.rewrite != nil { try create(Data((restore.joined(separator: "\n") + "\n").utf8), at: backup.appendingPathComponent("restore.jsonl")) }
         var written: [String] = []
         // A rewrite writes the other files of the tree that changed, after the main file.
         let changedFiles = (manifest.rewriteFiles ?? []).filter { payload.rewriteStaged[$0.original] != payload.rewriteOriginals[$0.original]!.data }
@@ -546,7 +591,7 @@ public enum WriteParagraph {
             let path = role.map { manifest.originals[$0]! } ?? item
             let content = role.map { payload.staged[$0]! } ?? payload.rewriteStaged[item]!
             let original = role.map { payload.originals[$0]! } ?? payload.rewriteOriginals[item]!
-            if role == "manuscript", manifest.rewrite != nil, content == original.data { continue }
+            if manifest.rewrite != nil, content == original.data { continue }   // a rewrite leaves unchanged files alone
             do {
                 _ = try LedgerOrder.write(content, to: URL(fileURLWithPath: path), replacing: original)
             } catch {
@@ -564,16 +609,11 @@ public enum WriteParagraph {
             }
             written.append(WriteFromOutline.traceURL(plan).path)
         }
-        if let plan = manifest.rewrite, let outline = try? WriteRewrite.outline(URL(fileURLWithPath: plan.directory)) {
-            let map = WriteRewrite.map(LedgerOrder.read(stage.appendingPathComponent(WriteRewrite.mapFile))?.data,
-                                       outline: outline, ledger: payload.staged["ledger"]!)
-            let lines = WriteRewrite.traceLines(map.records, outline: outline)
+        if let plan = manifest.rewrite, let lines = rewriteTraceLines {
             let url = URL(fileURLWithPath: plan.directory).appendingPathComponent(WriteFromOutline.traceFile)
             do {
                 if let snapshot = rewriteTrace ?? nil {
-                    var data = snapshot.data
-                    if !data.isEmpty, !endsWithLineBreak(data) { data.append(0x0A) }
-                    _ = try LedgerOrder.write(data + lines, to: url, replacing: snapshot)
+                    _ = try LedgerOrder.write(lines, to: url, replacing: snapshot)
                 } else {
                     try create(lines, at: url)
                 }
@@ -615,8 +655,11 @@ public enum WriteParagraphRun {
                 stage: resolve(stage, workingDirectory), heading: heading,
                 outline: rewrite ? nil : outline.map { (resolve($0, workingDirectory), outlineParagraph!) },
                 rewrite: rewrite ? outline.map { resolve($0, workingDirectory) } : nil)
+            let first = manifest.rewrite != nil
+                ? "rewrite: every file of the input tree may change; list the outline records in \(CiteOrder.visible(resolve(stage, workingDirectory).appendingPathComponent(WriteRewrite.mapFile).path))"
+                : "the new paragraph goes after line \(manifest.after) of \(CiteOrder.visible(manifest.file))"
             return CommandResult(stdout: [
-                "the new paragraph goes after line \(manifest.after) of \(CiteOrder.visible(manifest.file))",
+                first,
                 "staged manuscript file: \(CiteOrder.visible(manifest.staged["manuscript"]!))",
                 "staged main file: \(CiteOrder.visible(manifest.stagedMain))",
                 "staged ledger: \(CiteOrder.visible(manifest.staged["ledger"]!))",

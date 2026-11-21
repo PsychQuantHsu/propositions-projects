@@ -1240,8 +1240,12 @@ and no removal waiting. Every file of the input tree may change; the ledger keep
 proposition, and a passage that is not carried unchanged has its propositions retired with
 `replaced_by` naming the new ones (the `from` of a record says which passages it comes from).
 The staging directory holds `outline-map.jsonl`, one line per paragraph record that is not
-dropped, `{"outline": <id>, "first_prop": <id>}`; `write commit` copies it into
-`outline-trace.jsonl` in the same format as above.
+dropped, `{"outline": <id>, "first_prop": <id>}`, each naming the proposition that starts the
+paragraph. `write commit` writes `outline-trace.jsonl` anew from it, in the same format as above:
+the old records name paragraphs of the text the rewrite replaces, and the old file is kept in the
+backup with a list of where each copy came from. That a paragraph says what its record plans is the
+author's to confirm; the commands check only that the map is complete and points at live
+propositions that start paragraphs.
 
 A trace outlives the outline it was written from when the three files are moved and a new
 outline is started in the same directory: its records then name ids of the new outline. Move

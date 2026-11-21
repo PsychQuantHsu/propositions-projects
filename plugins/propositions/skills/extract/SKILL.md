@@ -107,6 +107,8 @@ PY
 If anything is listed, stop and show the list. Re-extracting a passage means marking those
 props `retired` first (see the PLAYBOOK and the ledger's `SCHEMA.md` §retired) — retired props
 are skipped here and by the coverage check — and retiring is the user's call, not this skill's.
+When the whole manuscript was revised, use [Revision mode](#revision-mode--a-manuscript-revised-after-extraction)
+instead of extracting range by range.
 
 ## Step 3 — Pick the granularity
 
@@ -263,3 +265,38 @@ uncovered run was accepted by the user. Report:
 
 Updating `_meta.json` `coverage.sections_extracted` is a separate write; offer it, do not do it
 silently.
+
+## Revision mode — a manuscript revised after extraction
+
+Use this when the manuscript was revised after its ledger was extracted ("改版了", "重抽",
+"the paper was rewritten"): some sentences stayed word for word, some were rewrapped, some were
+deleted or rewritten, and new text was added. The steps run the `revise` commands of the
+plugin's `propositions` tool through the launcher, which runs only the pinned binary; when it
+prints `propositions: NOT RUN` (exit 3), stop and say that this mode needs the tool (macOS).
+
+```bash
+CLI=(bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}")
+```
+
+Each step that writes the ledger is shown as a dry run first, and written only after the user
+confirms it (AskUserQuestion), as everywhere in this plugin.
+
+| Step | Command | Kind |
+|------|---------|------|
+| R1. Find every text again | `"${CLI[@]}" revise relocate --jsonl="$LEDGER/main.jsonl" --tex="$MAIN"`, then with `--write` | mechanical |
+| R2. Look at what is missing | run the validator on the ledger; a missing proposition that R1 still matches after its normalisation (math, macros) stands in the paper and is not retired | judgment |
+| R3. Extract the new text | for each range that the coverage check reports as uncovered, Steps 3–9 of this skill on that range, the coverage check run on the ledger with the new propositions | judgment |
+| R4. Retire what is gone | `"${CLI[@]}" revise retire --jsonl="$LEDGER/main.jsonl" --retire <old>=<new>,<new> … --since=<date> --reason=<text>`, then with `--write`: for each missing proposition, the new propositions that say what it said, or none when it was deleted | judgment, then mechanical |
+| R5. Follow the citations | `"${CLI[@]}" revise redirect --jsonl="$LEDGER/main.jsonl" --tex="$MAIN"`, then with `--write` | mechanical |
+| R6. Put the ledger in reading order | `"${CLI[@]}" ledger-order --jsonl="$LEDGER/main.jsonl" --tex="$MAIN"`, then with `--write` | mechanical |
+| R7. Gates | the validator, the coverage check over every revised range, and `"${CLI[@]}" revise check --jsonl="$LEDGER/main.jsonl"` | mechanical |
+| R8. A second reading of the claim types | give the new propositions, without their `claim_type`, and a sample of earlier propositions with theirs, to a subagent; list where its `claim_type` differs from the first one, and let the user decide each | judgment |
+
+Done means: the validator passes, the coverage check reports no uncovered text in the revised
+ranges, `revise check` reports no problem, and every retirement made in R4 has a `replaced_by`
+(empty for a deletion). Report the counts of `relocate` (in place, moved, rewrapped, ambiguous,
+missing), the retirements, the redirected and dropped citations, and the claim types that the
+second reading changed.
+
+An ambiguous proposition (its text stands in several places outside the file its location names)
+is not moved by R1: ask the user which place it is, and set its `location` by hand before R4.

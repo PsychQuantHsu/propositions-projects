@@ -470,7 +470,7 @@ On a rewrite, `propositions write check` and `write commit` SHALL work out again
 
 When a paragraph is written from an outline with destinations, a proposition id that `outline-trace.jsonl` already names in a record of a part of another document SHALL NOT stop the commit; one that it names in a record of a part of the same document does, as before.
 
-The trace records a rewrite keeps SHALL be written byte for byte as they were, each with the line ending it had.
+The trace records a rewrite keeps SHALL be written byte for byte as they were, each with the line ending it had. The one exception: a kept record that had no line ending (the last line of the old file) gets one line feed when a record follows it, so that the file stays one record per line.
 
 A destination is the document given when its `tex` and `jsonl` name the same files as the main file and ledger given, by the names the file system gives them, links followed in the order of the path. A `tex` or `jsonl` that holds a control character is not in the format of `article.json`.
 
@@ -493,6 +493,13 @@ A destination is the document given when its `tex` and `jsonl` name the same fil
 
 <!-- @trace
 source: idd-120-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+<!-- @trace
+source: idd-120-fix3
 updated: 2026-11-22
 code:
   - propositions-projects.code-workspace

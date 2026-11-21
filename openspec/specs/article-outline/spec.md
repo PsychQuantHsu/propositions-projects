@@ -1299,9 +1299,9 @@ tests:
 ---
 ### Requirement: outline-trace.jsonl records which outline record each written paragraph came from
 
-The outline directory MAY hold a fourth file, `outline-trace.jsonl`, written only by `propositions write commit` (the capability `write`). Each line is one paragraph written from the outline: `outline`, the id of the paragraph record; `first_prop`, the id of the first proposition of the written paragraph; `section`, the id of the record's section; and `approval_line`, the line of `outline-approvals.jsonl` that held the approval the section stood on. It is the only tie between a paragraph record and written text: the ids of paragraph records and the ids of paragraphs in `structure.json` have the same shape and are unrelated. The ledger and the structure sidecars do not change format for it.
+The outline directory MAY hold a fourth file, `outline-trace.jsonl`, written only by `propositions write commit` (the capability `write`). Each line is one paragraph written from the outline: `outline`, the id of the paragraph record; `first_prop`, the id of the first proposition of the written paragraph; `section`, the id of the record's section; and `approval_line`, the line of `outline-approvals.jsonl` that held the approval the section stood on. When `article.json` names destinations, a line also holds `part`, the part its section went to; a line without it belongs to `main`. It is the only tie between a paragraph record and written text: the ids of paragraph records and the ids of paragraphs in `structure.json` have the same shape and are unrelated. The ledger and the structure sidecars do not change format for it.
 
-`propositions outline trace <directory> --jsonl <ledger>` SHALL print, for each record, the paragraph record's id, the proposition's id and its location, tab-separated, then the problems and a count, and exit with 1 when any record is not an object with exactly those four keys (`outline`, `first_prop`, `section` strings, `approval_line` a number), names no paragraph record of the outline, names a proposition that is not exactly one live proposition of the ledger, or names a proposition an earlier record names; with 0 otherwise; and with 2 when a file cannot be read.
+`propositions outline trace <directory> --jsonl <ledger>` SHALL print, for each record, the paragraph record's id, the proposition's id and its location, tab-separated, then the problems and a count, and exit with 1 when any record is not an object with exactly those four keys (`outline`, `first_prop`, `section` strings, `approval_line` a number) and optionally `part` (one of `main`, `appendix`, `supplement`), names no paragraph record of the outline, names a proposition that is not exactly one live proposition of the ledger, or names a proposition an earlier record names; with 0 otherwise; and with 2 when a file cannot be read. When `article.json` names destinations, only the records of the parts whose destination names the ledger are checked this way; the others are listed as belonging to another document, as the requirement on destinations says.
 
 #### Scenario: The trace is checked
 
@@ -1326,6 +1326,14 @@ code:
   - Sources/PropositionsKit/Version.swift
   - Sources/PropositionsKit/WriteParagraph.swift
   - tests/PropositionsKitTests/WriteFromOutlineTests.swift
+-->
+
+
+<!-- @trace
+source: idd-120-fix2
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
 -->
 
 ---

@@ -47,7 +47,8 @@ public enum PropositionsCLI {
             }
             if let prepare = command as? WritePrepareOptions {
                 return WriteParagraphRun.prepare(jsonl: prepare.jsonl, tex: prepare.tex, structure: prepare.structure,
-                                                 discourse: prepare.discourse, stage: prepare.stage,
+                                                 discourse: prepare.discourse, stage: prepare.stage, heading: prepare.heading,
+                                                 outline: prepare.outline, outlineParagraph: prepare.outlineParagraph,
                                                  workingDirectory: workingDirectory)
             }
             if let check = command as? WriteCheckOptions {
@@ -62,6 +63,9 @@ public enum PropositionsCLI {
             }
             if let check = command as? OutlineCheckOptions {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
+            }
+            if let trace = command as? OutlineTraceOptions {
+                return OutlineTraceRun.run(directory: trace.directory, jsonl: trace.jsonl, workingDirectory: workingDirectory)
             }
             if let status = command as? OutlineStatusOptions {
                 return OutlineRun.status(directory: status.directory, workingDirectory: workingDirectory)
@@ -117,6 +121,7 @@ public enum PropositionsCLI {
         case "check": return Root.helpMessage(for: OutlineCheckOptions.self)
         case "status": return Root.helpMessage(for: OutlineStatusOptions.self)
         case "locators": return Root.helpMessage(for: OutlineLocatorsOptions.self)
+        case "trace": return Root.helpMessage(for: OutlineTraceOptions.self)
         default: return Root.helpMessage(for: OutlineOptions.self)
         }
     }
@@ -220,11 +225,16 @@ struct WritePrepareOptions: ParsableCommand {
         abstract: "Copy the manuscript, the ledger and its sidecars into a staging directory, and say where the paragraph goes.",
         discussion: """
             The paragraph goes after the paragraph that holds the start of the last live \
-            proposition in reading order. The staging directory has to be empty or new; it gets \
-            the input tree under manuscript/, the ledger, _meta.json and the sidecars under \
+            proposition in reading order; when the ledger has none, after the last line of text \
+            before \\end{document} in the main file. The staging directory has to be empty or new; \
+            it gets the input tree under manuscript/, the ledger, _meta.json and the sidecars under \
             ledger/, and write.json, which records the originals and their hashes.
+            With --outline and --outline-paragraph, the outline has to pass outline check and the \
+            paragraph record's section has to stand as approved; the outline's files are copied \
+            under outline/ and may not change, and commit appends a record to \
+            outline-trace.jsonl in the outline directory.
             Exit codes: 0 staged; 2 a file cannot be read, the staging directory is not empty, \
-            or the ledger has no live proposition.
+            the paragraph has nowhere to go, or the outline record cannot be written from.
             """)
 
     @Option(help: "The ledger.")
@@ -241,6 +251,33 @@ struct WritePrepareOptions: ParsableCommand {
 
     @Option(help: "The staging directory, empty or new.")
     var stage: String
+
+    @Flag(help: "Allow one line of a section heading before the paragraph.")
+    var heading = false
+
+    @Option(help: "The outline directory, when the paragraph is written from an outline record.")
+    var outline: String?
+
+    @Option(name: .customLong("outline-paragraph"), help: "The id of the outline's paragraph record the paragraph is written from.")
+    var outlineParagraph: String?
+}
+
+struct OutlineTraceOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "trace",
+        abstract: "List which outline record each written paragraph came from, and check the records.",
+        discussion: """
+            Reads outline-trace.jsonl in the outline directory, which write commit appends to. Each \
+            record has to name a paragraph record of the outline and a live proposition of the ledger, \
+            and no proposition may be recorded twice.
+            Exit codes: 0 every record holds; 1 a record does not; 2 a file cannot be read.
+            """)
+
+    @Argument(help: "The directory that holds the outline files.")
+    var directory: String
+
+    @Option(help: "The ledger.")
+    var jsonl: String
 }
 
 struct WriteCheckOptions: ParsableCommand {
@@ -437,7 +474,7 @@ struct OutlineOptions: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "outline",
         abstract: "Mechanical checks for the three files of an article outline.",
-        subcommands: [OutlineCheckOptions.self, OutlineStatusOptions.self, OutlineLocatorsOptions.self])
+        subcommands: [OutlineCheckOptions.self, OutlineStatusOptions.self, OutlineLocatorsOptions.self, OutlineTraceOptions.self])
 }
 
 struct OutlineCheckOptions: ParsableCommand {

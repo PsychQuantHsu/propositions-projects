@@ -1233,6 +1233,16 @@ records with the location of each proposition and reports a record that names no
 record, a proposition that is not exactly one live proposition of the ledger, or a proposition
 recorded twice.
 
+A finished manuscript is reorganised by rewriting it from its revised outline (issue #115):
+derive the outline, revise it and approve it as a whole, then `write prepare --rewrite --outline
+<directory>`. The whole outline has to stand as approved: every section, the order of sections,
+and no removal waiting. Every file of the input tree may change; the ledger keeps every
+proposition, and a passage that is not carried unchanged has its propositions retired with
+`replaced_by` naming the new ones (the `from` of a record says which passages it comes from).
+The staging directory holds `outline-map.jsonl`, one line per paragraph record that is not
+dropped, `{"outline": <id>, "first_prop": <id>}`; `write commit` copies it into
+`outline-trace.jsonl` in the same format as above.
+
 A trace outlives the outline it was written from when the three files are moved and a new
 outline is started in the same directory: its records then name ids of the new outline. Move
 `outline-trace.jsonl` with the three files.

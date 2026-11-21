@@ -229,7 +229,7 @@ code:
 
 The following SHALL NOT be inventory ids: the fourth pass of the cross-artifact audit (it runs the ledger validator); the theorem-boundary audit (it compares what `ledger:R9` compares; what it reports beyond R9, the environments it could not close and the propositions whose block it could not resolve, belongs to issue 68); the dry run of the location refresh (it has no rule id of its own; it searches the manuscript for each proposition's text and reports every `location` that differs from where it finds the text, which is more than `ledger:R13`, the check on that field, reports; what R13 passes over in silence belongs to issue 68); the link catalog's currency check (its subject is a file of the plugin, not a manuscript); the checks of the `tschema-check` plugin; the stumble categories of the clarity audit, the counts in the construct skill's summary and the states of the analyze skill (none of them leaves a finding or a record for a unit under an id); the `location` layer of the proofread walk (a spot-check of the field that `ledger:R13` checks; the skill's layer table names R13 as its mechanical form); the verification records validator's warning that two methods disagree on a proposition (it has no rule id of its own; it reports part of what `truth.not-refuted` states, and where it counts is left to the outcome rules of issue 71); and the proofread layers E8, E9 and E10 (defined in the layer table but absent from the walk, so a verdict does not show that they were read).
 
-A change that implements a new check SHALL add its id to this inventory and to the guard in the same change. When `check` is `gap`, the entry SHALL have `owner`, the number of the issue in this repository that will supply the check. When `check` is an inventory id, the entry SHALL NOT have `owner`. Exactly three entries SHALL have `owner: 57`: `consistency.variable-roles` for the layer E8, `truth.composite-holds-per-component` for E9 and `support.exposures-separable` for E10. At least one entry SHALL have each of the owners 49, 50, 55, 62, 66 and 70.
+A change that implements a new check SHALL add its id to this inventory and to the guard in the same change. When `check` is `gap`, the entry SHALL have `owner`, the number of the issue in this repository that will supply the check. When `check` is an inventory id, the entry SHALL NOT have `owner`. Exactly three entries SHALL have `owner: 57`: `consistency.variable-roles` for the layer E8, `truth.composite-holds-per-component` for E9 and `support.exposures-separable` for E10. At least one entry SHALL have each of the owners 50, 55, 62, 66, 70 and 81 (issue 81 supplies the check of placeholders, whose written form issue 49 decided).
 
 For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected to be verified. They are provisional: the change that supplies the check SHALL set them to what the check does.
 
@@ -256,24 +256,16 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected 
 
 
 <!-- @trace
-source: idd-56-retire
+source: idd-49-write
 updated: 2026-11-21
 code:
-  - plugins/propositions/docs/OBLIGATIONS.md
-  - Sources/PropositionsKit/Relocate.swift
-  - Sources/PropositionsKit/ReviseRun.swift
-  - tests/PropositionsKitTests/RelocateTests.swift
-  - tests/PropositionsKitTests/ReviseLedgerTests.swift
   - plugins/propositions/catalog/obligations.yaml
-  - plugins/propositions/skills/propositions/SKILL.md
-  - Sources/PropositionsKit/JSONValue.swift
   - propositions-projects.code-workspace
-  - Sources/PropositionsKit/ReviseLedger.swift
-  - plugins/propositions/templates/ledger/_meta.template.json
-  - Sources/PropositionsKit/CLI.swift
-  - Sources/PropositionsKit/Revise.swift
+  - Sources/PropositionsKit/Version.swift
+  - tests/PropositionsKitTests/WriteParagraphTests.swift
   - CLAUDE.md
-  - docs/SCHEMA.md
+  - Sources/PropositionsKit/WriteParagraph.swift
+  - Sources/PropositionsKit/CLI.swift
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

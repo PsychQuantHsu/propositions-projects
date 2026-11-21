@@ -1,0 +1,440 @@
+import Foundation
+import CryptoKit
+
+/// `propositions write prepare|check|commit`: write one new paragraph into a draft, with its
+/// propositions and its structure records, behind one confirmation (issue 49).
+///
+/// `prepare` copies the manuscript's input tree, the ledger and its two structure sidecars into a
+/// staging directory and records where the paragraph goes. The paragraph, its propositions and
+/// its records are made in the copies. `check` says whether the copies differ from the files only
+/// as a new paragraph may make them differ. `commit` reads every file once, checks those bytes,
+/// keeps a copy of each original, and writes the same bytes it checked.
+public enum WriteParagraph {
+    public struct Failure: Error, Equatable {
+        public let message: String
+    }
+
+    /// The written form of a placeholder: what is still to be supplied, which the paragraph does
+    /// not invent (a result, a number, a citation).
+    public static let placeholder = "{PENDING:"
+
+    /// A file that is copied but not written back: a file of the input tree other than the one
+    /// that gets the paragraph, and `_meta.json`. Its original and its copy have to stay as
+    /// `prepare` found them, because the skill validates against the copies.
+    struct Input: Codable, Equatable {
+        var original: String
+        var staged: String
+        var hash: String
+    }
+
+    /// What `prepare` records in the staging directory.
+    struct Manifest: Codable, Equatable {
+        /// The four files a paragraph changes, by role: `manuscript`, `ledger`, `structure`, `discourse`.
+        var originals: [String: String]
+        /// Their copies, by the same roles.
+        var staged: [String: String]
+        var hashes: [String: String]
+        var inputs: [Input]
+        /// The file of the input tree that gets the paragraph, as a location names it, and the line
+        /// after which the paragraph goes.
+        var file: String
+        var after: Int
+        /// The staged main file and `_meta.json`, for the checks the skill runs.
+        var stagedMain: String
+        var stagedMeta: String?
+    }
+
+    static let roles = ["manuscript", "ledger", "discourse", "structure"]
+
+    static func sha256(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func snapshot(_ path: String) throws -> LedgerOrder.Snapshot {
+        guard let snapshot = LedgerOrder.read(URL(fileURLWithPath: path)) else {
+            throw Failure(message: "cannot read \(CiteOrder.visible(path))")
+        }
+        return snapshot
+    }
+
+    /// Writes a new file, refusing one that is already there (a link included).
+    static func create(_ data: Data, at url: URL) throws {
+        do { try data.write(to: url, options: .withoutOverwriting) } catch {
+            throw Failure(message: "cannot create \(CiteOrder.visible(url.path)); it may exist already")
+        }
+    }
+
+    static func canonical(_ url: URL) -> String { url.resolvingSymlinksInPath().standardizedFileURL.path }
+
+    // MARK: lines as bytes
+
+    /// For each line, the offset just past its line ending (LF, CR or CRLF; the last line may
+    /// have none), numbered as `LatexLine.splitLines` numbers them.
+    static func lineEnds(_ data: Data) -> [Int] {
+        let bytes = [UInt8](data)
+        var ends: [Int] = []
+        var index = 0
+        var start = 0
+        while index < bytes.count {
+            if bytes[index] == 0x0A || bytes[index] == 0x0D {
+                if bytes[index] == 0x0D, index + 1 < bytes.count, bytes[index + 1] == 0x0A { index += 1 }
+                ends.append(index + 1)
+                start = index + 1
+            }
+            index += 1
+        }
+        if start < bytes.count { ends.append(bytes.count) }
+        return ends
+    }
+
+    static func endsWithLineBreak(_ data: Data) -> Bool { data.last == 0x0A || data.last == 0x0D }
+
+    // MARK: prepare
+
+    static func prepare(ledger: URL, main: URL, structure: URL, discourse: URL, stage: URL) throws -> (Manifest, [String]) {
+        let fm = FileManager.default
+        var isDirectory: ObjCBool = false
+        if fm.fileExists(atPath: stage.path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue, let items = try? fm.contentsOfDirectory(atPath: stage.path) else {
+                throw Failure(message: "the staging directory \(CiteOrder.visible(stage.path)) cannot be listed")
+            }
+            guard items.isEmpty else { throw Failure(message: "the staging directory \(CiteOrder.visible(stage.path)) is not empty") }
+        }
+        // The three files beside the ledger keep their names in the copy; they have to be three files.
+        let side = [("ledger", ledger), ("structure", structure), ("discourse", discourse)]
+        let names = side.map { $0.1.lastPathComponent }
+        guard Set(names).count == 3, !names.contains("_meta.json") else {
+            throw Failure(message: "the ledger and the two sidecars need three different file names, none of them _meta.json")
+        }
+        let order: ReadingOrder
+        do { order = try ReadingOrder(mainFile: main) } catch { throw Failure(message: CiteOrder.visible("\(error)")) }
+        let mainURL = main.resolvingSymlinksInPath()
+        let mainDirectory = mainURL.standardizedFileURL.deletingLastPathComponent()
+        // Every file is read once; placement, the copies and the hashes come from these bytes.
+        var read: [String: LedgerOrder.Snapshot] = [:]
+        for (role, url) in side { read[role] = try snapshot(url.path) }
+        let ledgerLines = try ReviseLedger.lines(read["ledger"]!.data)
+        var last: (position: [Int], file: String?, line: Int, id: String)?
+        var retired: [(file: String?, line: Int)] = []
+        for line in ledgerLines {
+            guard let id = line.id, let location = line.location else { continue }
+            if line.isRetired { retired.append((location.file, location.start)); continue }
+            guard let position = order.position(file: location.file, line: location.start) else {
+                throw Failure(message: "the location of \(CiteOrder.visible(id)) is not in the input tree")
+            }
+            if last == nil || ReadingOrder.precedes(last!.position, position) {
+                last = (position, location.file, location.start, id)
+            }
+        }
+        guard let last else { throw Failure(message: "the ledger has no live proposition to write after") }
+        let key = last.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
+        let fileName = key ?? "main.tex"
+        var tree: [(name: String, relative: String, url: URL)] = []
+        for (index, name) in order.files.enumerated() {
+            let relative = index == 0 ? mainURL.lastPathComponent : name
+            guard !relative.split(separator: "/").contains("..") else {
+                throw Failure(message: "\(CiteOrder.visible(name)) is outside the main file's directory; it cannot be staged")
+            }
+            tree.append((index == 0 ? "main.tex" : name, relative, index == 0 ? mainURL : mainDirectory.appendingPathComponent(name)))
+        }
+        guard let target = tree.first(where: { $0.name == fileName }) else {
+            throw Failure(message: "\(CiteOrder.visible(fileName)) is not in the input tree")
+        }
+        let originals = ["manuscript": target.url.path, "ledger": ledger.path, "structure": structure.path, "discourse": discourse.path]
+        guard Set(roles.map { canonical(URL(fileURLWithPath: originals[$0]!)) }).count == 4 else {
+            throw Failure(message: "the manuscript file, the ledger and the two sidecars have to be four different files")
+        }
+        read["manuscript"] = try snapshot(target.url.path)
+        let fileLines = LatexLine.splitLines(String(decoding: read["manuscript"]!.data, as: UTF8.self))
+        let runs = Paragraphs.runs(fileLines)
+        guard last.line <= runs.count, let run = runs[last.line - 1] else {
+            throw Failure(message: "the last proposition, \(CiteOrder.visible(last.id)), does not start inside a paragraph")
+        }
+        var end = last.line
+        while end < runs.count, runs[end] == run { end += 1 }
+        if end == fileLines.count, !endsWithLineBreak(read["manuscript"]!.data) {
+            throw Failure(message: "line \(end) of \(CiteOrder.visible(fileName)) has no line ending; add one and prepare again")
+        }
+        let notes = retired.compactMap { item -> String? in
+            let name = item.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) } ?? "main.tex"
+            guard name == fileName, item.line > end else { return nil }
+            return "[warn] a retired proposition is located at \(CiteOrder.visible(name)):L\(item.line), after the new paragraph: its location will no longer name its old lines"
+        }
+        // Copy the tree, the ledger, _meta.json and the sidecars, each into a new file.
+        let manuscriptDir = stage.appendingPathComponent("manuscript")
+        let ledgerDir = stage.appendingPathComponent("ledger")
+        try fm.createDirectory(at: manuscriptDir, withIntermediateDirectories: true)
+        try fm.createDirectory(at: ledgerDir, withIntermediateDirectories: true)
+        var staged: [String: String] = [:]
+        var inputs: [Input] = []
+        for file in tree {
+            let copy = manuscriptDir.appendingPathComponent(file.relative)
+            try fm.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if file.name == fileName {
+                try create(read["manuscript"]!.data, at: copy)
+                staged["manuscript"] = copy.path
+            } else {
+                let data = try snapshot(file.url.path).data
+                try create(data, at: copy)
+                inputs.append(Input(original: file.url.path, staged: copy.path, hash: sha256(data)))
+            }
+        }
+        let meta = ledger.deletingLastPathComponent().appendingPathComponent("_meta.json")
+        var stagedMeta: String?
+        if fm.fileExists(atPath: meta.path) {
+            let data = try snapshot(meta.path).data
+            let copy = ledgerDir.appendingPathComponent("_meta.json")
+            try create(data, at: copy)
+            inputs.append(Input(original: meta.path, staged: copy.path, hash: sha256(data)))
+            stagedMeta = copy.path
+        }
+        for (role, url) in side {
+            let copy = ledgerDir.appendingPathComponent(url.lastPathComponent)
+            try create(read[role]!.data, at: copy)
+            staged[role] = copy.path
+        }
+        // A save made while this ran would pair the placement with other bytes.
+        var hashes: [String: String] = [:]
+        for role in roles {
+            hashes[role] = sha256(read[role]!.data)
+            guard try snapshot(originals[role]!).data == read[role]!.data else {
+                throw Failure(message: "\(CiteOrder.visible(originals[role]!)) changed while it was being staged; prepare again in a new directory")
+            }
+        }
+        let manifest = Manifest(originals: originals, staged: staged, hashes: hashes, inputs: inputs, file: fileName,
+                                after: end, stagedMain: manuscriptDir.appendingPathComponent(mainURL.lastPathComponent).path,
+                                stagedMeta: stagedMeta)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try create(try encoder.encode(manifest) + Data("\n".utf8), at: stage.appendingPathComponent("write.json"))
+        return (manifest, notes)
+    }
+
+    static func manifest(_ stage: URL) throws -> Manifest {
+        guard let data = LedgerOrder.read(stage.appendingPathComponent("write.json"))?.data,
+              let manifest = try? JSONDecoder().decode(Manifest.self, from: data)
+        else { throw Failure(message: "\(CiteOrder.visible(stage.path)) holds no write.json from prepare") }
+        guard roles.allSatisfy({ manifest.originals[$0] != nil && manifest.staged[$0] != nil && manifest.hashes[$0] != nil }),
+              manifest.after > 0
+        else { throw Failure(message: "the write.json in \(CiteOrder.visible(stage.path)) is not one prepare wrote") }
+        return manifest
+    }
+
+    // MARK: check
+
+    /// The bytes of every file `check` and `commit` look at, read once.
+    struct Payload {
+        var originals: [String: LedgerOrder.Snapshot]
+        var staged: [String: Data]
+        /// Inputs whose original or copy is not as `prepare` found it.
+        var changedInputs: [String]
+    }
+
+    static func load(_ manifest: Manifest) throws -> Payload {
+        var originals: [String: LedgerOrder.Snapshot] = [:]
+        var staged: [String: Data] = [:]
+        for role in roles {
+            originals[role] = try snapshot(manifest.originals[role]!)
+            guard let data = LedgerOrder.read(URL(fileURLWithPath: manifest.staged[role]!))?.data else {
+                throw Failure(message: "the staged \(role), \(CiteOrder.visible(manifest.staged[role]!)), cannot be read; nothing was written")
+            }
+            staged[role] = data
+        }
+        var changed: [String] = []
+        for input in manifest.inputs {
+            let original = LedgerOrder.read(URL(fileURLWithPath: input.original)).map { sha256($0.data) }
+            let copy = LedgerOrder.read(URL(fileURLWithPath: input.staged)).map { sha256($0.data) }
+            if original != input.hash { changed.append("\(CiteOrder.visible(input.original)) changed after prepare") }
+            if copy != input.hash { changed.append("its copy \(CiteOrder.visible(input.staged)) was changed; only the four files are written") }
+        }
+        return Payload(originals: originals, staged: staged, changedInputs: changed)
+    }
+
+    struct Report {
+        var problems: [String] = []
+        var inserted = 0
+        var placeholders: [Int] = []
+        var newPropositions = 0
+        var newRecords = 0
+    }
+
+    /// The lines `new` adds at the end of `old`, when it is `old` with whole lines added and
+    /// nothing else changed; `nil` otherwise. A last line of `old` without a line ending may get one.
+    static func addedLines(_ old: Data, _ new: Data) -> [String]? {
+        guard new.count > old.count, new.prefix(old.count) == old else { return nil }
+        var tail = Data(new.suffix(from: new.startIndex + old.count))
+        if !old.isEmpty, !endsWithLineBreak(old) {
+            guard tail.first == 0x0A || tail.first == 0x0D else { return nil }
+            tail = Data(tail.drop(while: { $0 == 0x0A || $0 == 0x0D }))
+        }
+        guard let text = String(data: tail, encoding: .utf8) else { return nil }
+        return LatexLine.splitLines(text)
+    }
+
+    /// Whether `new` keeps everything `old` has: equal values, an object with every key of
+    /// `old` kept (and possibly more), an array with every element of `old` kept in its place
+    /// (and possibly more after them).
+    static func extends(_ old: JSONValue, _ new: JSONValue) -> Bool {
+        switch (old, new) {
+        case let (.array(a), .array(b)):
+            return b.count >= a.count && zip(a, b).allSatisfy { extends($0, $1) }
+        case (.object, .object):
+            let b = new.dictionary
+            return old.dictionary.allSatisfy { key, value in b[key].map { extends(value, $0) } ?? false }
+        default:
+            return old == new
+        }
+    }
+
+    static func check(_ manifest: Manifest, _ payload: Payload) -> Report {
+        var report = Report()
+        report.problems += payload.changedInputs
+        let original = payload.originals["manuscript"]!.data, staged = payload.staged["manuscript"]!
+        let ends = lineEnds(original)
+        let name = CiteOrder.visible(manifest.file)
+        if manifest.after > ends.count {
+            report.problems.append("\(name) has fewer than \(manifest.after) lines")
+        } else {
+            let cut = ends[manifest.after - 1]
+            let added = staged.count - original.count
+            let keeps = added > 0 && staged.prefix(cut) == original.prefix(cut)
+                && staged.suffix(original.count - cut) == original.suffix(original.count - cut)
+            let block = keeps ? Data(staged[(staged.startIndex + cut)..<(staged.startIndex + cut + added)]) : Data()
+            if !keeps {
+                report.problems.append("the staged \(name) is not the file with lines added after line \(manifest.after), every other byte as it was")
+            } else if let text = String(data: block, encoding: .utf8) {
+                let lines = LatexLine.splitLines(text)
+                report.inserted = lines.count
+                let blank = lines.map { LedgerOrder.stripped($0).isEmpty }
+                let runs = zip(blank, [true] + blank).filter { !$0.0 && $0.1 }.count
+                if blank.first != true { report.problems.append("the new paragraph does not start with a blank line after line \(manifest.after)") }
+                if runs != 1 { report.problems.append("the lines added after line \(manifest.after) hold \(runs) paragraphs, not one") }
+                if cut < original.count, !endsWithLineBreak(block) {
+                    report.problems.append("the lines added after line \(manifest.after) do not end with a line ending")
+                }
+                let next = LatexLine.splitLines(String(decoding: original.suffix(original.count - cut), as: UTF8.self)).first
+                if let next, !LedgerOrder.stripped(next).isEmpty, blank.last != true {
+                    report.problems.append("the new paragraph does not end with a blank line before the text that follows it")
+                }
+                report.placeholders = lines.enumerated().filter { $0.element.contains(placeholder) }.map { manifest.after + $0.offset + 1 }
+            } else {
+                report.problems.append("the lines added after line \(manifest.after) are not UTF-8")
+            }
+        }
+        for role in ["ledger", "discourse"] {
+            guard let lines = addedLines(payload.originals[role]!.data, payload.staged[role]!) else {
+                report.problems.append("the staged \(role) is not the \(role) with lines added at its end")
+                continue
+            }
+            let rows = lines.filter { !LedgerOrder.stripped($0).isEmpty }
+            for row in rows {
+                guard let value = try? JSONValue.parse(row), case .object = value else {
+                    report.problems.append("a line added to the staged \(role) is not a JSON object"); break
+                }
+            }
+            if role == "ledger" { report.newPropositions = rows.count } else { report.newRecords = rows.count }
+        }
+        if report.newPropositions == 0 { report.problems.append("the staged ledger has no new proposition") }
+        let oldStructure = try? JSONValue.parse(String(decoding: payload.originals["structure"]!.data, as: UTF8.self))
+        let newStructure = try? JSONValue.parse(String(decoding: payload.staged["structure"]!, as: UTF8.self))
+        if let oldStructure, let newStructure {
+            if !extends(oldStructure, newStructure) {
+                report.problems.append("the staged structure drops or changes something the structure has; it may only add")
+            }
+        } else {
+            report.problems.append("the structure or its copy is not JSON")
+        }
+        return report
+    }
+
+    // MARK: commit
+
+    /// Reads every file once, refuses when an original changed after `prepare` or the check
+    /// reports a problem, keeps a copy of each original in a new `backup/`, then writes the
+    /// checked bytes in the order manuscript, ledger, discourse, structure.
+    static func commit(_ manifest: Manifest, stage: URL) throws -> [String] {
+        let payload = try load(manifest)
+        for role in roles where sha256(payload.originals[role]!.data) != manifest.hashes[role] {
+            throw Failure(message: "\(CiteOrder.visible(manifest.originals[role]!)) changed after prepare; nothing was written. Prepare again")
+        }
+        let report = check(manifest, payload)
+        guard report.problems.isEmpty else { throw Failure(message: report.problems[0] + "; nothing was written") }
+        let backup = stage.appendingPathComponent("backup")
+        do { try FileManager.default.createDirectory(at: backup, withIntermediateDirectories: false) } catch {
+            throw Failure(message: "\(CiteOrder.visible(backup.path)) exists already or cannot be made; nothing was written")
+        }
+        for role in roles { try create(payload.originals[role]!.data, at: backup.appendingPathComponent(role)) }
+        var written: [String] = []
+        for role in roles {
+            let path = manifest.originals[role]!
+            do {
+                _ = try LedgerOrder.write(payload.staged[role]!, to: URL(fileURLWithPath: path), replacing: payload.originals[role]!)
+            } catch {
+                let reason = (error as? LedgerOrder.Failure)?.message ?? "it could not be written"
+                let done = written.isEmpty ? "nothing was written" : "already written: \(written.map(CiteOrder.visible).joined(separator: ", "))"
+                throw Failure(message: "\(CiteOrder.visible(path)): \(reason); \(done). The originals are in \(CiteOrder.visible(backup.path))")
+            }
+            written.append(path)
+        }
+        return written
+    }
+}
+
+/// The commands. Exit codes: prepare 0 staged, 2 refused; check 0 the copies are a new paragraph,
+/// 1 they are not, 2 the staging directory cannot be read; commit 0 written, 2 refused or failed.
+public enum WriteParagraphRun {
+    static func resolve(_ path: String, _ directory: URL) -> URL {
+        (path.hasPrefix("/") ? URL(fileURLWithPath: path) : directory.appendingPathComponent(path)).standardizedFileURL
+    }
+
+    static func refuse(_ error: Error, _ fallback: String) -> CommandResult {
+        let message = (error as? WriteParagraph.Failure)?.message ?? (error as? Revise.Failure)?.message ?? fallback
+        return CommandResult(stderr: ["error: \(message)"], exitCode: 2)
+    }
+
+    public static func prepare(jsonl: String, tex: String, structure: String, discourse: String, stage: String,
+                               workingDirectory: URL) -> CommandResult {
+        do {
+            let (manifest, notes) = try WriteParagraph.prepare(
+                ledger: resolve(jsonl, workingDirectory), main: resolve(tex, workingDirectory),
+                structure: resolve(structure, workingDirectory), discourse: resolve(discourse, workingDirectory),
+                stage: resolve(stage, workingDirectory))
+            return CommandResult(stdout: [
+                "the new paragraph goes after line \(manifest.after) of \(CiteOrder.visible(manifest.file))",
+                "staged manuscript file: \(CiteOrder.visible(manifest.staged["manuscript"]!))",
+                "staged main file: \(CiteOrder.visible(manifest.stagedMain))",
+                "staged ledger: \(CiteOrder.visible(manifest.staged["ledger"]!))",
+                "staged structure: \(CiteOrder.visible(manifest.staged["structure"]!))",
+                "staged discourse: \(CiteOrder.visible(manifest.staged["discourse"]!))",
+            ], stderr: notes, exitCode: 0)
+        } catch {
+            return refuse(error, "the files could not be staged")
+        }
+    }
+
+    public static func check(stage: String, workingDirectory: URL) -> CommandResult {
+        do {
+            let manifest = try WriteParagraph.manifest(resolve(stage, workingDirectory))
+            let report = WriteParagraph.check(manifest, try WriteParagraph.load(manifest))
+            var out = report.problems
+            out.append("\(report.inserted) line(s) added, \(report.newPropositions) new proposition(s), "
+                       + "\(report.newRecords) new record(s), \(report.placeholders.count) placeholder line(s)"
+                       + (report.placeholders.isEmpty ? "" : ": \(report.placeholders.map(String.init).joined(separator: ", "))"))
+            return CommandResult(stdout: out, exitCode: report.problems.isEmpty ? 0 : 1)
+        } catch {
+            return refuse(error, "the staging directory could not be read")
+        }
+    }
+
+    public static func commit(stage: String, workingDirectory: URL) -> CommandResult {
+        let directory = resolve(stage, workingDirectory)
+        do {
+            let written = try WriteParagraph.commit(try WriteParagraph.manifest(directory), stage: directory)
+            return CommandResult(stdout: written.map { "written: \(CiteOrder.visible($0))" }
+                                 + ["the originals are kept in \(CiteOrder.visible(directory.appendingPathComponent("backup").path))"],
+                                 exitCode: 0)
+        } catch {
+            return refuse(error, "the paragraph could not be written")
+        }
+    }
+}

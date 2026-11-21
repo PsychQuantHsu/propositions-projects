@@ -1,6 +1,6 @@
 # Propositions ledger（本 manuscript 的 author-claim 帳本）
 
-> 由 `/propositions:propositions` Operation D scaffold 於 `{{SCAFFOLD_DATE}}`，
+> 由 `/propositions:prop-ledger` Operation D scaffold 於 `{{SCAFFOLD_DATE}}`，
 > 錨定 manuscript repo commit `{{ANCHOR_COMMIT}}`。
 
 這個目錄是**本篇稿件**的 proposition-iso 資料層（Layer 1）：`main.tex` 的每一個
@@ -13,21 +13,21 @@ declarative claim 提煉成一行 JSONL，配 R1–R13 validator 保持稿件與
 | 檔案 | 角色 |
 |------|------|
 | `SCHEMA.md` | schema 契約的**釘版副本**（scaffold 時從 plugin canonical 拷入；升版時隨 migration 更新） |
-| `EXTRACTION-PROMPT.md` | 抽取紀律的釘版副本（`/propositions:extract` 餵給 LLM 用） |
+| `EXTRACTION-PROMPT.md` | 抽取紀律的釘版副本（`/propositions:prop-extract` 餵給 LLM 用） |
 | `_meta.json` | `schema_version` + `profile`（`default` 或 `empirical`，決定 validator 接受哪些 `claim_type`／`evidence_class`）+ `source`（主檔路徑、錨定 commit、`parts` 快照）+ `coverage` |
-| `main.jsonl` | 一行一個 proposition，依稿件閱讀序（Operation D 建空檔、`/propositions:extract` 寫入、A 閘門把關） |
+| `main.jsonl` | 一行一個 proposition，依稿件閱讀序（Operation D 建空檔、`/propositions:prop-extract` 寫入、A 閘門把關） |
 | `_smoke_tests/` | 本稿專屬的最小 fixture（見其 README） |
 
 ## 生命週期（短版）
 
-1. **首次抽取**：`/propositions:extract`，可以一節一節來。它在帳冊外暫存、檢查範圍內
+1. **首次抽取**：`/propositions:prop-extract`，可以一節一節來。它在帳冊外暫存、檢查範圍內
    沒有漏掉的文字、對合併後的副本跑 validator，你確認 diff 之後才寫入帳冊，最後以
    Operation A 收尾，通過才算抽完。
 2. **日常**：改了 tex → Operation A 看 R13 漂移 → Operation B（dry-run 確認後）修位。
-3. **送審前**：`/propositions:proofread`（語意）+ `/propositions:manuscript-audit`
-   （跨檔案）+ `/propositions:clarity-audit`（可讀性）。
+3. **送審前**：`/propositions:prop-proofread`（語意）+ `/propositions:prop-manuscript-audit`
+   （跨檔案）+ `/propositions:prop-clarity-audit`（可讀性）。
 4. **大改版**（新 base / 章節重排）：Operation B 大範圍 re-anchor + 需要時先把舊 prop 標 `retired`、
-   再用 `/propositions:extract` 重抽該節；`retired` 欄位記錄停用的段落（見 SCHEMA.md §retired）。
+   再用 `/propositions:prop-extract` 重抽該節；`retired` 欄位記錄停用的段落（見 SCHEMA.md §retired）。
 
 完整生命週期（含 worked examples：Hsu case 的 re-anchor 與 line-anchored 通信慣例）
 見 plugin 的 `docs/PLAYBOOK.md`。

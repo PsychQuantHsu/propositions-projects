@@ -30,7 +30,7 @@ propositions 帳冊只負責把稿件拆成命題索引，本身不驗證任何�
 - Affected specs: verification-records（新）
 - Affected code:
   - New: plugins/propositions/scripts/validate-verification.py, plugins/propositions/scripts/proofread-to-verification.py, plugins/propositions/docs/VERIFICATION.md, tests/test_verification_records.py
-  - Modified: plugins/propositions/skills/proofread/SKILL.md, plugins/propositions/README.md
+  - Modified: plugins/propositions/skills/prop-proofread/SKILL.md, plugins/propositions/README.md
   - Removed: (none)
 
 ## 使用者裁決（2026-09-25，#12 Clarity Surface）

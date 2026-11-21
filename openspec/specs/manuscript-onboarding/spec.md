@@ -23,7 +23,7 @@ The propositions skill SHALL provide an onboarding operation (Operation D) that,
 #### Scenario: refuse to overwrite an existing ledger
 
 - **WHEN** Operation D runs against a placement layer that already contains a `main.jsonl` or `_meta.json`
-- **THEN** the operation aborts with a message identifying the existing ledger and suggesting Operation A, Operation B or `propositions:extract` instead, and no file is written
+- **THEN** the operation aborts with a message identifying the existing ledger and suggesting Operation A, Operation B or `propositions:prop-extract` instead, and no file is written
 
 #### Scenario: an empty ledger is ready for extraction
 
@@ -51,12 +51,12 @@ Operation D SHALL present a dry-run listing of every file it would create (with 
 ---
 ### Requirement: Onboarding hands off to extraction and validation
 
-After scaffolding, Operation D SHALL instruct the user to proceed with the `propositions:extract` skill, which ends with the Operation A validator gate, and SHALL NOT itself perform extraction.
+After scaffolding, Operation D SHALL instruct the user to proceed with the `propositions:prop-extract` skill, which ends with the Operation A validator gate, and SHALL NOT itself perform extraction.
 
 #### Scenario: post-scaffold guidance
 
 - **WHEN** scaffolding completes successfully
-- **THEN** the completion report names `propositions:extract` as the next step, states that it ends with the Operation A validator gate, and gives the resolved `--jsonl` and `--tex` paths for this repo
+- **THEN** the completion report names `propositions:prop-extract` as the next step, states that it ends with the Operation A validator gate, and gives the resolved `--jsonl` and `--tex` paths for this repo
 
 ---
 ### Requirement: Onboarding surfaces the lifecycle playbook

@@ -7,8 +7,8 @@
 與測試 target，共 44 個 Swift 檔。`propositions` 的子命令：引用方向（`cite-order`，#46）、綱要三個檔的格式、狀態與
 來源指標（`outline check`、`status`、`locators`，#78）、帳冊的行序（`ledger-order`，#59）、段落清單（`paragraphs`，#77）
 與兩支稽核（`audit symbols`、`citations`，#69）；binary 0.2.0（2026-11-21 發布）有以上這些子命令。改版重抽的四個子命令（`revise relocate`、
-`retire`、`check`、`redirect`，#56）在 binary 0.3.0 裡（2026-11-21 發布），由 `/propositions:extract` 的「改版重抽」模式呼叫。寫入一段的
-`write prepare`、`check`、`commit`（#49）在 binary 0.4.0 裡（2026-11-21 發布），由 `/propositions:construct` 的寫入模式呼叫。照綱要寫的部分（#51：`write prepare --outline`、
+`retire`、`check`、`redirect`，#56）在 binary 0.3.0 裡（2026-11-21 發布），由 `/propositions:prop-extract` 的「改版重抽」模式呼叫。寫入一段的
+`write prepare`、`check`、`commit`（#49）在 binary 0.4.0 裡（2026-11-21 發布），由 `/propositions:prop-construct` 的寫入模式呼叫。照綱要寫的部分（#51：`write prepare --outline`、
 `outline trace`）在 binary 0.5.0 裡（2026-11-21 發布），也由 `construct` 的寫入模式呼叫。整份重寫的 `write prepare --rewrite`（#115）在 binary 0.6.0 裡，由 `construct` 的重組模式呼叫。propositions plugin 在
 session 開始時用 hook 取得 `hooks/cli.lock` 鎖定的版本（現在是 0.6.0）（只有 macOS；`hooks/fetch-cli.sh`），skill 經由
 `hooks/run-cli.sh` 呼叫：`propositions` 的 Operation A 呼叫 `cite-order`，`construct` 呼叫 `paragraphs`，
@@ -94,7 +94,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
    是守衛直接從 Python 的驗證器讀詞彙（`PROFILE_VOCABULARIES`、`KINDS`、`ROLES`、`METHODS`）；驗證器移植之前，
    Swift 版只能另抄一份，抄的那一份不會跟著驗證器更新。
 4. **指名的 skill 的指令區塊，在命令列工具涵蓋它們的工作之前。** 這是封閉清單，目前只有一份：
-   - `plugins/propositions/skills/outline/SKILL.md` 的指令區塊（#75），整個區塊都算：交給 `jq` 執行的程式，
+   - `plugins/propositions/skills/prop-outline/SKILL.md` 的指令區塊（#75），整個區塊都算：交給 `jq` 執行的程式，
      以及同一個區塊裡把 `jq`、`git`、`realpath`、`find` 這些現成工具接起來的 shell 指令。它們做這些事：
      找出 repo 的根目錄並建立暫存目錄、檢查主稿件、每次呼叫開頭的守門、列出帳冊並比對帳冊指到哪一份稿件、
      確認還沒有綱要檔、三個綱要檔的寫入檢查、來源指標的列舉與計數、指向另一份綱要的參照的列舉與確認（#92）、列出可讀的 `.tex` 檔、
@@ -203,9 +203,9 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 `structure_io.py`、`structure_tree.py`
 
 **SKILL.md 裡的 Python 程式區塊（3 段）**，以所在步驟指名，不用行號：
-- `plugins/propositions/skills/extract/SKILL.md` 的 Step 2「Stop if the range is already extracted」
-- `plugins/propositions/skills/extract/SKILL.md` 的 Step 9「Validate a merged copy」
-- `plugins/propositions/skills/construct/SKILL.md` 的 A5「Summary for the user」
+- `plugins/propositions/skills/prop-extract/SKILL.md` 的 Step 2「Stop if the range is already extracted」
+- `plugins/propositions/skills/prop-extract/SKILL.md` 的 Step 9「Validate a merged copy」
+- `plugins/propositions/skills/prop-construct/SKILL.md` 的 A5「Summary for the user」
 
 **tschema-check plugin（1 個）**：`plugins/tschema-check/scripts/validate-tschema.py`
 

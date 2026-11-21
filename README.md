@@ -46,7 +46,7 @@ The repository and marketplace were renamed from `propositions` to `propositions
   claude plugin install propositions@propositions-projects
   ```
 
-  After migrating, invoke the skills as `propositions:<skill>` — e.g. `/propositions:proofread`, `/propositions:manuscript-audit`. **This marketplace does not publish a `math-tools` plugin**; the name is reserved for genuinely math-only content (sympy substitution verification, Lean bridging) and will only appear here once such content exists.
+  After migrating, invoke the skills as `propositions:<skill>` — e.g. `/propositions:prop-proofread`, `/propositions:prop-manuscript-audit`. **This marketplace does not publish a `math-tools` plugin**; the name is reserved for genuinely math-only content (sympy substitution verification, Lean bridging) and will only appear here once such content exists.
 
 ### Coordinated changes tracked elsewhere (#2)
 
@@ -60,19 +60,19 @@ The repository and marketplace were renamed from `propositions` to `propositions
 ```bash
 # Inside your manuscript repo (with manuscript/main.tex + manuscript/propositions/main.jsonl)
 
-/propositions:analyze            # the whole article: works out how far it has got, runs the next
+/propositions:prop-analyze            # the whole article: works out how far it has got, runs the next
                                  # unfinished step, and reports. Stops at every write. proofread,
                                  # manuscript-audit and clarity-audit run only when asked.
 
 # Or run any one step directly:
-/propositions:propositions       # the mechanical axis — three operations in one skill:
+/propositions:prop-ledger       # the mechanical axis — three operations in one skill:
                                  #   A validate      R1-R13 gates
                                  #   B refresh       fix location drift (dry-run gated)
                                  #   C extract       build a new / re-extracted JSONL
-/propositions:proofread          # per-prop L1-L5 semantic walk (is each claim true & faithful?)
-/propositions:manuscript-audit   # cross-artifact drift across tex / jsonl / code / bib
-/propositions:clarity-audit      # prose readability — can a human reader follow it?
-/propositions:outline            # plan before writing: one sentence per section
+/propositions:prop-proofread          # per-prop L1-L5 semantic walk (is each claim true & faithful?)
+/propositions:prop-manuscript-audit   # cross-artifact drift across tex / jsonl / code / bib
+/propositions:prop-clarity-audit      # prose readability — can a human reader follow it?
+/propositions:prop-outline            # plan before writing: one sentence per section
                                  # (outline-sections.jsonl), at least one per paragraph
                                  # (outline-paragraphs.jsonl), approved by the author
                                  # (outline-approvals.jsonl). Needs no ledger.
@@ -182,7 +182,7 @@ schema contract travels with each manuscript's ledger, so the plugin vendors no 
 
 - Python 3.10+
 - pytest 7+
-- `jq` and `realpath`, for `/propositions:outline` only, which also needs `git`, as `/propositions:manuscript-audit` and Operation D already do (its commands were run with jq 1.7.1 and 1.8.2 and git 2.54 and 2.55; the skill tests for the three tools before anything else, and stops when its `jq` cannot tell two long numbers apart, as versions before 1.7 cannot, when its `git` is older than 2.38, or when the system's `pwd` is in neither `/usr/bin` nor `/bin`)
+- `jq` and `realpath`, for `/propositions:prop-outline` only, which also needs `git`, as `/propositions:prop-manuscript-audit` and Operation D already do (its commands were run with jq 1.7.1 and 1.8.2 and git 2.54 and 2.55; the skill tests for the three tools before anything else, and stops when its `jq` cannot tell two long numbers apart, as versions before 1.7 cannot, when its `git` is older than 2.38, or when the system's `pwd` is in neither `/usr/bin` nor `/bin`)
 - LaTeX manuscript with `manuscript/main.tex` + `manuscript/propositions/main.jsonl` layout (paths configurable via skill args)
 - Schema versions v1.0 / v1.1 / v1.2 / v1.3
 

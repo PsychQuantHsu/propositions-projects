@@ -1,5 +1,5 @@
 ---
-name: outline
+name: prop-outline
 description: >-
   Builds and maintains the outline of an article before its text is written: one sentence for each
   section and at least one sentence for each paragraph, kept in three JSONL files beside the ledger,
@@ -12,8 +12,8 @@ description: >-
   (five of the six kinds by an agent that can only read), and records an approval only when the
   author gives one. It writes only the
   three outline files. Not for writing manuscript text from an outline (no skill does that yet),
-  the next sentence of a draft (/propositions:construct), splitting text into propositions
-  (/propositions:extract), or annotating the structure of text that exists (/propositions:construct).
+  the next sentence of a draft (/propositions:prop-construct), splitting text into propositions
+  (/propositions:prop-extract), or annotating the structure of text that exists (/propositions:prop-construct).
 allowed-tools:
   - Read
   - Write

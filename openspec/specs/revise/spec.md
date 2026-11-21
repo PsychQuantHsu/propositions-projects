@@ -157,7 +157,7 @@ code:
   - tests/PropositionsKitTests/RelocateTests.swift
   - tests/PropositionsKitTests/ReviseLedgerTests.swift
   - plugins/propositions/catalog/obligations.yaml
-  - plugins/propositions/skills/propositions/SKILL.md
+  - plugins/propositions/skills/prop-ledger/SKILL.md
   - Sources/PropositionsKit/JSONValue.swift
   - propositions-projects.code-workspace
   - Sources/PropositionsKit/ReviseLedger.swift

@@ -1,6 +1,6 @@
 ---
 name: outline-point-reader
-description: Reader for the write mode of /propositions:construct when a paragraph is written from an outline record. Dispatch only from that step, with the task message it builds - two paths and nothing else - a file holding the outline's paragraph record as one JSON object, and a file holding the written paragraph. Never give it the conversation, the author's messages, the manuscript, the ledger or any other file.
+description: Reader for the write mode of /propositions:prop-construct when a paragraph is written from an outline record. Dispatch only from that step, with the task message it builds - two paths and nothing else - a file holding the outline's paragraph record as one JSON object, and a file holding the written paragraph. Never give it the conversation, the author's messages, the manuscript, the ledger or any other file.
 tools: Read
 model: sonnet
 effort: high

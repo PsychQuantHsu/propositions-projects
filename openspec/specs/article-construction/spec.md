@@ -2,18 +2,18 @@
 
 ## Purpose
 
-Article construction is the `propositions:construct` skill. It annotates an existing manuscript with its article structure, and for a draft in progress it reports what the article still owes the reader and proposes what the next proposition could do. It exists so that the ledger can support writing a whole article, not only checking finished sentences.
+Article construction is the `propositions:prop-construct` skill. It annotates an existing manuscript with its article structure, and for a draft in progress it reports what the article still owes the reader and proposes what the next proposition could do. It exists so that the ledger can support writing a whole article, not only checking finished sentences.
 
 ## Requirements
 
 ### Requirement: Annotation starts from a validated, fully covered ledger
 
-In annotation mode the skill SHALL first run `validate-propositions.py` on the ledger and `check-extraction-coverage.py` on every range it will annotate. If the validator exits non-zero or any range has uncovered text, the skill SHALL stop, report the failures, and direct the user to `propositions:extract`, without writing any sidecar.
+In annotation mode the skill SHALL first run `validate-propositions.py` on the ledger and `check-extraction-coverage.py` on every range it will annotate. If the validator exits non-zero or any range has uncovered text, the skill SHALL stop, report the failures, and direct the user to `propositions:prop-extract`, without writing any sidecar.
 
 #### Scenario: Uncovered text stops annotation
 
 - **WHEN** the coverage check reports an uncovered run in the introduction
-- **THEN** the skill stops before drafting sidecars and names `propositions:extract` as the next step
+- **THEN** the skill stops before drafting sidecars and names `propositions:prop-extract` as the next step
 
 ---
 ### Requirement: Annotation writes sidecars only after validation and confirmation
@@ -46,7 +46,7 @@ source: retire-python-ports
 updated: 2026-11-21
 code:
   - plugins/propositions/scripts/audit-citations.py
-  - plugins/propositions/skills/construct/references/vocabulary.md
+  - plugins/propositions/skills/prop-construct/references/vocabulary.md
   - plugins/propositions/.claude-plugin/plugin.json
   - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
   - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
@@ -68,11 +68,11 @@ code:
   - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
   - tests/fixtures/structure/README.md
   - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
-  - plugins/propositions/skills/construct-batch/SKILL.md
+  - plugins/propositions/skills/prop-construct-batch/SKILL.md
   - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
   - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
   - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
-  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - plugins/propositions/skills/prop-manuscript-audit/SKILL.md
   - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
   - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
   - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
@@ -97,7 +97,7 @@ code:
   - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
   - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
   - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
-  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
   - plugins/propositions/scripts/migrate-structure-v2.py
   - plugins/propositions/scripts/audit-symbols.py
   - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
@@ -180,17 +180,17 @@ code:
 ---
 ### Requirement: Construction requests route to the construct skill
 
-The skill's description SHALL claim requests about an article's overall structure, its commitments to the reader, the relation between consecutive propositions, how the sentences of a paragraph relate to each other, and what to write next, and SHALL direct requests to split text into propositions to `propositions:extract`. The `propositions:extract` and `propositions:propositions` descriptions SHALL NOT claim construction requests.
+The skill's description SHALL claim requests about an article's overall structure, its commitments to the reader, the relation between consecutive propositions, how the sentences of a paragraph relate to each other, and what to write next, and SHALL direct requests to split text into propositions to `propositions:prop-extract`. The `propositions:prop-extract` and `propositions:prop-ledger` descriptions SHALL NOT claim construction requests.
 
 #### Scenario: A next-sentence request
 
 - **WHEN** a user asks what the next sentence of a draft section should do
-- **THEN** the request matches `propositions:construct` and not `propositions:extract`
+- **THEN** the request matches `propositions:prop-construct` and not `propositions:prop-extract`
 
 #### Scenario: A request about how sentences relate
 
 - **WHEN** a user asks how the sentences of a paragraph relate to each other
-- **THEN** the request matches `propositions:construct`
+- **THEN** the request matches `propositions:prop-construct`
 
 ---
 ### Requirement: Explain mode reads out how sentences relate
@@ -306,7 +306,7 @@ code:
   - .claude-plugin/marketplace.json
   - CLAUDE.md
   - plugins/propositions/.claude-plugin/plugin.json
-  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
   - plugins/propositions/hooks/cli.lock
 -->
 
@@ -333,7 +333,7 @@ code:
   - .claude-plugin/marketplace.json
   - plugins/propositions/agents/outline-point-reader.md
   - plugins/propositions/.claude-plugin/plugin.json
-  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
   - CLAUDE.md
 -->
 
@@ -356,7 +356,7 @@ code:
   - .claude-plugin/marketplace.json
   - propositions-projects.code-workspace
   - plugins/propositions/hooks/cli.lock
-  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
   - CLAUDE.md
   - plugins/propositions/.claude-plugin/plugin.json
 -->

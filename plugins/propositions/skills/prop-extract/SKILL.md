@@ -1,5 +1,5 @@
 ---
-name: extract
+name: prop-extract
 description: >-
   Split a paragraph, section, or theorem of a LaTeX manuscript into propositions — verbatim,
   line-addressed ledger entries — and merge them into the manuscript's propositions ledger
@@ -9,8 +9,8 @@ description: >-
   "extract propositions", "decompose this paragraph", "add this section to the ledger", or a
   rewritten passage that needs re-extraction — even if they never name this skill. Works for
   mathematical manuscripts and for empirical (e.g. psychology) manuscripts via the ledger's
-  profile. Not for validating an existing ledger (/propositions:propositions), the semantic
-  walk (/propositions:proofread), or prose clarity (/propositions:clarity-audit).
+  profile. Not for validating an existing ledger (/propositions:prop-ledger), the semantic
+  walk (/propositions:prop-proofread), or prose clarity (/propositions:prop-clarity-audit).
 allowed-tools:
   - Read
   - Write
@@ -60,7 +60,7 @@ Then establish, from the user's request or by asking once (AskUserQuestion, all 
   lines, find the lines with `grep -n` and state the range you will use.
 
 If `LEDGER` has no `_meta.json`, the manuscript has not been onboarded: stop and point to
-Operation D in `/propositions:propositions`, which scaffolds the ledger.
+Operation D in `/propositions:prop-ledger`, which scaffolds the ledger.
 
 ## Step 1 — Read the profile, load exactly one reference
 
@@ -261,7 +261,7 @@ uncovered run was accepted by the user. Report:
 - props added, by `claim_type`, and where they were inserted;
 - the coverage result, with every accepted uncovered run and its lines;
 - excluded floats in the range;
-- next step: `/propositions:proofread` walks whether each prop's claim and cites hold.
+- next step: `/propositions:prop-proofread` walks whether each prop's claim and cites hold.
 
 Updating `_meta.json` `coverage.sections_extracted` is a separate write; offer it, do not do it
 silently.

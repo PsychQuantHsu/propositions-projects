@@ -69,7 +69,7 @@ public enum PropositionsCLI {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
             }
             if let length = command as? OutlineLengthOptions {
-                return OutlineLengthRun.run(directory: length.directory, jsonl: length.jsonl, tex: length.tex, workingDirectory: workingDirectory)
+                return OutlineLengthRun.run(directory: length.directory, jsonl: length.jsonl, tex: length.tex, written: length.written, workingDirectory: workingDirectory)
             }
             if let trace = command as? OutlineTraceOptions {
                 return OutlineTraceRun.run(directory: trace.directory, jsonl: trace.jsonl, workingDirectory: workingDirectory)
@@ -553,6 +553,9 @@ struct OutlineLengthOptions: ParsableCommand {
 
     @Option(help: "The manuscript's main file, to count what was written.")
     var tex: String?
+
+    @Flag(help: "Count what was written from the documents article.json names as destinations.")
+    var written = false
 }
 
 struct OutlineStatusOptions: ParsableCommand {

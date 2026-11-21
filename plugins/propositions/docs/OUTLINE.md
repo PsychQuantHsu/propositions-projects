@@ -1266,6 +1266,7 @@ directory, `outline-trace.jsonl`:
 | `first_prop` | The id of the first proposition of the written paragraph |
 | `section` | The id of the record's section |
 | `approval_line` | The line of `outline-approvals.jsonl` that holds the approval the section stood on |
+| `part` | Only when `article.json` names destinations: the part the section goes to, one of `main`, `appendix`, `supplement` (see "article.json"). A record without it belongs to `main` |
 
 ```json
 {"outline": "p-1", "first_prop": "019a3c5e-7a00-7000-8000-00000000000d", "section": "s-a", "approval_line": 1}
@@ -1310,6 +1311,7 @@ key that is not defined here is left alone.
 | Key | Value |
 |---|---|
 | `banned` | A list of phrasings that are not to appear in the article: objects with a `phrase` and a `reason`, both non-empty strings (issue #118) |
+| `destinations` | The document each part is written into: an object whose keys are parts and whose values are `{"tex": <main file>, "jsonl": <ledger>}`, paths from the directory of `article.json` (issue #120) |
 | `length` | The limit on the article's length: an object with `limit`, a whole number of words from 1 to 999999999, and optionally `parts`, the parts the limit counts, a list of one or more of `main`, `appendix`, `supplement`; without `parts` it counts `main` (issue #119) |
 
 ```json
@@ -1326,6 +1328,28 @@ manuscript, for a list that changed after text was written. The comparison is li
 case does not count, a run of white space with its line breaks is one space, a LaTeX comment is
 not compared, and a phrasing does not run across an empty line. It finds the words, not the
 claim: the same thing said in other words is not found.
+
+**Destinations.** The parts of an article can be different documents: the main text, an
+appendix, an online supplement, each with its own main file, ledger and structure sidecars.
+`destinations` says, for a part, which document it is written into (issue #120): the main file
+(`tex`) and the ledger (`jsonl`), as paths from the directory of `article.json`. Two parts can
+name the same document, as an appendix in the main text's input tree does. A section goes to
+its own `part`, else to the part of the section it is under, else to `main`. With
+`destinations`, `write prepare --outline` refuses a paragraph unless the main file and ledger it
+is given are the destination of its section's part, and says which two files to give; `write
+commit` records the part in `outline-trace.jsonl`. A rewrite (`write prepare --rewrite`) is of
+one document: `outline-map.jsonl` lists the records whose sections go to that document, and the
+trace records of the other documents are kept as they were. The whole outline still has to
+stand as approved. `propositions outline trace` checks the records of the document whose ledger
+it is given and lists the others, and `propositions outline length <directory> --written`
+counts each part from its own document. What is not done: a rewrite cannot move content from
+one document to another (a proposition of one ledger replaced by a proposition of another), and
+no check follows a reference from one document into another. Without `destinations`
+everything is one document, as before.
+
+```json
+{"destinations": {"main": {"tex": "../main.tex", "jsonl": "main.jsonl"}, "supplement": {"tex": "../supplement/supplement.tex", "jsonl": "../supplement/propositions/main.jsonl"}}}
+```
 
 **Lengths.** A section record can carry `length`, its target in words, and `article.json` the
 limit of the article. `propositions outline length <directory>` prints, for each section that

@@ -140,8 +140,34 @@ public enum WriteParagraph {
         }
         let outlineDirectory = outline?.directory ?? rewrite
         let outlineBytes = try outlineDirectory.map { try WriteFromOutline.read($0) }
-        let plan = try outline.map { try WriteFromOutline.gate(directory: $0.directory, paragraph: $0.paragraph, bytes: outlineBytes!) }
-        let rewritePlan = try rewrite.map { try WriteRewrite.gate(directory: $0, bytes: outlineBytes!) }
+        var plan = try outline.map { try WriteFromOutline.gate(directory: $0.directory, paragraph: $0.paragraph, bytes: outlineBytes!) }
+        var rewritePlan = try rewrite.map { try WriteRewrite.gate(directory: $0, bytes: outlineBytes!) }
+        // When article.json names destinations, the files given have to be the document the text goes to (issue 120).
+        // What is true of the whole article: beside the outline when the run has one, else beside the ledger. Read once.
+        let articleFound = try Article.read(in: outlineDirectory ?? ledger.deletingLastPathComponent())
+        if let directory = outlineDirectory, let article = articleFound?.article, let destinations = article.destinations {
+            let text = outlineBytes!.map { String(decoding: $0, as: UTF8.self) }
+            let sections = OutlineLength.sections(Outline(sections: text[0], paragraphs: text[1], approvals: text[2]))
+            let given = article.parts(tex: main, jsonl: ledger, directory: directory)
+            if let current = plan {
+                let part = sections.first { WriteFromOutline.same($0.id, current.section) }?.part ?? "main"
+                guard let destination = destinations[part] else {
+                    throw Failure(message: "the section \(CiteOrder.visible(current.section)) goes to the part \(part), for which \(Article.fileName) names no destination")
+                }
+                guard given.contains(part) else {
+                    throw Failure(message: "the section \(CiteOrder.visible(current.section)) goes to the part \(part): give --tex \(CiteOrder.visible(Article.resolve(destination.tex, directory).path)) and --jsonl \(CiteOrder.visible(Article.resolve(destination.jsonl, directory).path))")
+                }
+                plan?.part = part
+            } else {
+                guard !given.isEmpty else {
+                    throw Failure(message: "\(Article.fileName) names destinations, and the main file and ledger given are the destination of no part")
+                }
+                if let missing = sections.first(where: { destinations[$0.part] == nil }) {
+                    throw Failure(message: "the section \(CiteOrder.visible(missing.id)) goes to the part \(missing.part), for which \(Article.fileName) names no destination")
+                }
+                rewritePlan?.parts = given
+            }
+        }
         let key = rewrite != nil ? nil : last?.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
         let fileName = key ?? "main.tex"
         var tree: [(name: String, relative: String, url: URL)] = []
@@ -235,9 +261,8 @@ public enum WriteParagraph {
             inputs.append(Input(original: meta.path, staged: copy.path, hash: sha256(data)))
             stagedMeta = copy.path
         }
-        // What is true of the whole article: beside the outline when the run has one, else beside the ledger.
         var articleInput: Input?
-        if let found = try Article.read(in: outlineDirectory ?? ledger.deletingLastPathComponent()) {
+        if let found = articleFound {
             guard !(written + treeTargets).contains(canonical(found.url)) else {
                 throw Failure(message: "\(Article.fileName) is one of the files the run writes")
             }
@@ -582,7 +607,7 @@ public enum WriteParagraph {
         }
         var mapped: [String] = []
         if let outline = payload.outline {
-            let map = WriteRewrite.map(payload.map, outline: outline, ledger: payload.staged["ledger"]!)
+            let map = WriteRewrite.map(payload.map, outline: outline, ledger: payload.staged["ledger"]!, parts: manifest.rewrite?.parts)
             report.problems += map.problems
             report.newRecords = map.records.count
             mapped = map.records.map(\.1)
@@ -624,8 +649,9 @@ public enum WriteParagraph {
         // The trace a rewrite writes, settled before anything is written.
         var rewriteTraceLines: Data?
         if manifest.rewrite != nil, let outline = payload.outline {
-            let map = WriteRewrite.map(payload.map, outline: outline, ledger: payload.staged["ledger"]!)
-            rewriteTraceLines = WriteRewrite.traceLines(map.records, outline: outline)
+            let parts = manifest.rewrite?.parts
+            let map = WriteRewrite.map(payload.map, outline: outline, ledger: payload.staged["ledger"]!, parts: parts)
+            rewriteTraceLines = WriteRewrite.traceLines(map.records, outline: outline, parts: parts, kept: (rewriteTrace ?? nil)?.data)
         }
         let report = check(manifest, payload)
         guard report.problems.isEmpty else { throw Failure(message: report.problems[0] + "; nothing was written") }

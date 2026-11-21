@@ -140,11 +140,39 @@ public enum OutlineLength {
 
     /// The report. `written` gives the ledger and the main file when what was written is to be
     /// counted; without it only the targets are reported.
-    static func report(outline: Outline, article: Article?, trace: Data?, written: (ledger: Data, main: URL)?) throws -> [String] {
-        let all = sections(outline)
-        var words: [JSONKey: Int] = [:], done: [JSONKey: Int] = [:], planned: [JSONKey: Int] = [:]
+    /// With `documents`, each trace record is looked up in the ledger and main file of its part
+    /// (issue 120); a record of a part without a document is not counted.
+    static func report(outline: Outline, article: Article?, trace: Data?, written: (ledger: Data, main: URL)?,
+                       documents: [String: (ledger: Data, main: URL)]? = nil) throws -> [String] {
+        if let documents {
+            // One pass per document, over the trace records of its parts; the lines are then added up.
+            let groups = Dictionary(grouping: documents.keys.sorted()) { WriteParagraph.canonical(documents[$0]!.main) }
+            var tables: [(words: [JSONKey: Int], done: [JSONKey: Int], unplaced: Int)] = []
+            for parts in groups.values.sorted(by: { $0[0] < $1[0] }) {
+                let lines = Outline.lines(of: trace ?? Data()).filter { parts.contains(WriteFromOutline.part(of: $0.value)) }
+                tables.append(try count(outline: outline, trace: lines, written: documents[parts[0]]!))
+            }
+            let known = Set(documents.keys)
+            let strays = Outline.lines(of: trace ?? Data()).filter { !known.contains(WriteFromOutline.part(of: $0.value)) }.count
+            let words = tables.reduce(into: [JSONKey: Int]()) { $0.merge($1.words, uniquingKeysWith: +) }
+            let done = tables.reduce(into: [JSONKey: Int]()) { $0.merge($1.done, uniquingKeysWith: +) }
+            return render(outline: outline, article: article, words: words, done: done, counted: true,
+                          unplaced: tables.reduce(strays) { $0 + $1.unplaced })
+        }
+        guard let written else {
+            return render(outline: outline, article: article, words: [:], done: [:], counted: false, unplaced: 0)
+        }
+        let table = try count(outline: outline, trace: Outline.lines(of: trace ?? Data()), written: written)
+        return render(outline: outline, article: article, words: table.words, done: table.done, counted: true, unplaced: table.unplaced)
+    }
+
+    /// The words and the number of written records of each section, from the records `trace`.
+    static func count(outline: Outline, trace: [OutlineLine], written: (ledger: Data, main: URL)) throws
+        -> (words: [JSONKey: Int], done: [JSONKey: Int], unplaced: Int)
+    {
+        var words: [JSONKey: Int] = [:], done: [JSONKey: Int] = [:]
         var unplaced = 0
-        if let written {
+        do {
             let rows = try ReviseLedger.lines(written.ledger)
             let mainURL = written.main.resolvingSymlinksInPath().standardizedFileURL
             var files: [String: [String]] = [:]
@@ -158,7 +186,7 @@ public enum OutlineLength {
             }
             let records = outline.paragraphs.compactMap(\.value)
             var seen = Set<[UInt32]>()
-            for line in Outline.lines(of: trace ?? Data()) {
+            for line in trace {
                 guard let outlineID = line.value?["outline"]?.string, let first = line.value?["first_prop"]?.string,
                       seen.insert(ReviseLedger.key(first)).inserted else { continue }
                 guard let record = records.first(where: { WriteFromOutline.same($0["id"]?.string, outlineID) }), !record.has("dropped"),
@@ -172,6 +200,12 @@ public enum OutlineLength {
                 done[JSONKey(section), default: 0] += 1
             }
         }
+        return (words, done, unplaced)
+    }
+
+    static func render(outline: Outline, article: Article?, words: [JSONKey: Int], done: [JSONKey: Int], counted: Bool, unplaced: Int) -> [String] {
+        let all = sections(outline)
+        var planned: [JSONKey: Int] = [:]
         for record in outline.paragraphs.compactMap(\.value) where !record.has("dropped") {
             if let section = record["section"]?.string { planned[JSONKey(section), default: 0] += 1 }
         }
@@ -186,7 +220,7 @@ public enum OutlineLength {
         for section in all {
             let below = under(section.id).filter { $0.parent.map { WriteFromOutline.same($0, section.id) } ?? false }.compactMap(\.length).reduce(0, +)
             var line = "\(JSONValue.quoted(section.id))\t\(section.part)\ttarget \(section.length.map(String.init) ?? "-")"
-            if written != nil {
+            if counted {
                 let count = total(words, section)
                 line += "\twritten \(count)\t\(total(done, section)) of \(total(planned, section)) record(s)"
                 if let target = section.length, count > target { line += "\tover its target by \(count - target)" }
@@ -198,12 +232,12 @@ public enum OutlineLength {
         func targets(_ part: String) -> Int { all.filter { $0.part == part && !ancestors($0).contains { $0.length != nil } }.compactMap(\.length).reduce(0, +) }
         func count(_ part: String) -> Int { all.filter { $0.part == part }.reduce(0) { $0 + (words[JSONKey($1.id)] ?? 0) } }
         for part in parts {
-            out.append("part \(part)\ttargets \(targets(part))" + (written != nil ? "\twritten \(count(part))" : ""))
+            out.append("part \(part)\ttargets \(targets(part))" + (counted ? "\twritten \(count(part))" : ""))
         }
         if let limit = article?.length {
             let sum = limit.parts.reduce(0) { $0 + targets($1) }
             var line = "limit \(limit.limit)\t\(limit.parts.joined(separator: ","))\ttargets \(sum)" + (sum > limit.limit ? " (over by \(sum - limit.limit))" : "")
-            if written != nil {
+            if counted {
                 let total = limit.parts.reduce(0) { $0 + count($1) }
                 line += "\twritten \(total)" + (total > limit.limit ? " (over by \(total - limit.limit))" : "")
             }
@@ -217,9 +251,10 @@ public enum OutlineLength {
 
 /// `propositions outline length`. Exit codes: 0 the report was printed; 2 a file cannot be read.
 public enum OutlineLengthRun {
-    public static func run(directory: String, jsonl: String?, tex: String?, workingDirectory: URL) -> CommandResult {
+    public static func run(directory: String, jsonl: String?, tex: String?, written fromDestinations: Bool = false, workingDirectory: URL) -> CommandResult {
         func refuse(_ message: String) -> CommandResult { CommandResult(stderr: ["outline length: \(message)"], exitCode: 2) }
         guard (jsonl == nil) == (tex == nil) else { return refuse("--jsonl and --tex go together") }
+        guard !(fromDestinations && jsonl != nil) else { return refuse("--written reads the destinations of article.json; it does not go with --jsonl and --tex") }
         let dir = WriteParagraphRun.resolve(directory, workingDirectory)
         do {
             let outline = try Outline(directory: dir)
@@ -227,6 +262,23 @@ public enum OutlineLengthRun {
             let article = try Article.read(in: dir)?.article
             var written: (Data, URL)?
             var trace: Data?
+            var documents: [String: (ledger: Data, main: URL)]?
+            let traceURL = dir.appendingPathComponent(WriteFromOutline.traceFile)
+            if fromDestinations {
+                guard let destinations = article?.destinations else { return refuse("--written needs the destinations of \(Article.fileName); give --jsonl and --tex for one manuscript") }
+                var table: [String: (ledger: Data, main: URL)] = [:]
+                for (part, destination) in destinations {
+                    let main = Article.resolve(destination.tex, dir)
+                    guard let ledger = LedgerOrder.read(Article.resolve(destination.jsonl, dir))?.data, LedgerOrder.read(main) != nil else {
+                        return refuse("cannot read the main file or the ledger of the part \(part)")
+                    }
+                    table[part] = (ledger, main)
+                }
+                documents = table
+                if try !WriteFromOutline.absent(traceURL) { trace = try WriteFromOutline.regular(traceURL).data }
+            } else if jsonl != nil, article?.destinations != nil {
+                return refuse("\(Article.fileName) names destinations; use --written, which reads each part from its own document")
+            }
             if let jsonl, let tex {
                 guard let ledger = LedgerOrder.read(WriteParagraphRun.resolve(jsonl, workingDirectory))?.data else {
                     return refuse("cannot read the ledger \(CiteOrder.visible(jsonl))")
@@ -237,7 +289,7 @@ public enum OutlineLengthRun {
                 let url = dir.appendingPathComponent(WriteFromOutline.traceFile)
                 if try !WriteFromOutline.absent(url) { trace = try WriteFromOutline.regular(url).data }
             }
-            return CommandResult(stdout: try OutlineLength.report(outline: outline, article: article, trace: trace, written: written), exitCode: 0)
+            return CommandResult(stdout: try OutlineLength.report(outline: outline, article: article, trace: trace, written: written, documents: documents), exitCode: 0)
         } catch {
             return refuse((error as? WriteParagraph.Failure)?.message ?? (error as? Revise.Failure)?.message ?? "\(error)")
         }

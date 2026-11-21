@@ -21,8 +21,29 @@ public struct Article: Equatable, Sendable {
         public let parts: [String]
     }
 
+    /// The document a part of the article is written into (issue 120): its main file and its
+    /// ledger, as paths from the directory of `article.json`.
+    public struct Destination: Equatable, Sendable {
+        public let tex: String
+        public let jsonl: String
+    }
+
     public var banned: [Banned] = []
     public var length: Length?
+    /// By part; nil when the file has no `destinations`.
+    public var destinations: [String: Destination]?
+
+    /// The parts whose destination is the main file `tex` with the ledger `jsonl`, in the order
+    /// main, appendix, supplement. Paths are compared after links are resolved.
+    func parts(tex: URL, jsonl: URL, directory: URL) -> [String] {
+        ["main", "appendix", "supplement"].filter { part in
+            guard let destination = destinations?[part] else { return false }
+            return WriteParagraph.canonical(Article.resolve(destination.tex, directory)) == WriteParagraph.canonical(tex)
+                && WriteParagraph.canonical(Article.resolve(destination.jsonl, directory)) == WriteParagraph.canonical(jsonl)
+        }
+    }
+
+    static func resolve(_ path: String, _ directory: URL) -> URL { directory.appendingPathComponent(path).standardizedFileURL }
 
     /// Reads the file's bytes; throws with what is wrong, named from `article.json`.
     public static func parse(_ data: Data) throws -> Article {
@@ -42,6 +63,23 @@ public struct Article: Equatable, Sendable {
                 }
                 article.banned.append(Banned(phrase: phrase, reason: reason))
             }
+        }
+        if let destinations = value["destinations"] {
+            guard destinations.isObject else { throw fail("destinations is not an object") }
+            var table: [String: Destination] = [:]
+            for member in destinations.members ?? [] {
+                let key = member.key, item = member.value
+                func path(_ name: String) -> String? {
+                    guard let text = item[name]?.nonEmptyString, !text.hasPrefix("/"), OutlineText.isClean(text) else { return nil }
+                    return text
+                }
+                guard OutlineCheck.parts.contains(key), table[key] == nil, item.isObject, let tex = path("tex"), let jsonl = path("jsonl") else {
+                    throw fail("destinations is not an object whose keys are main, appendix or supplement, each once and with a tex and a jsonl that are paths from the directory of \(fileName)")
+                }
+                table[key] = Destination(tex: tex, jsonl: jsonl)
+            }
+            guard !table.isEmpty else { throw fail("destinations names no part") }
+            article.destinations = table
         }
         if let length = value["length"] {
             guard length.isObject, let limit = OutlineLength.count(length["limit"]) else {

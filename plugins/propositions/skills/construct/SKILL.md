@@ -10,8 +10,9 @@ description: >-
   ("organized as follows" followed, "we now examine" carried out: "研究問題有沒有回答到", "論證的走向有沒有斷掉",
   "承諾有沒有兌現"), or wants the article structure annotated ("標註文章結構", "annotate the article structure",
   section roles), or wants the next paragraph written into the draft ("幫我把下一段寫進稿件", "write the next
-  paragraph into the draft"), also from an approved outline ("照綱要寫", "write from the outline") — even if
-  they never name this skill. Invoke it before opening the manuscript or
+  paragraph into the draft"), also from an approved outline ("照綱要寫", "write from the outline"), or to
+  reorganize a finished draft from its revised outline ("重組草稿", "reorganize the draft") — even if they
+  never name this skill. Invoke it before opening the manuscript or
   the sidecars: it finds them itself and has the tool that reads them out, so do not parse
   structure.json or discourse.jsonl by hand. It records commitments, section roles, what each
   sentence does and a dependency tree (S1–S9), and reports what the article owes the reader and
@@ -548,6 +549,102 @@ After a change to the copies, run W7 and the reader again.
 **O5 — After W9.** `write commit` appends the record to `outline-trace.jsonl` itself; do not
 write that file. Run `outline trace` once more and report its count.
 
+## Reorganize mode
+
+Reorganize mode rewrites a finished manuscript from its revised outline (`docs/OUTLINE.md` of this
+plugin, "Writing text from the outline"): every paragraph of the new text comes from one paragraph
+record, sections in the outline's order. It is one write of the whole manuscript behind one
+confirmation, through `propositions write prepare --rewrite`. "重組草稿", "照改過的綱要重寫",
+"reorganize the draft" mean this mode.
+
+**G1 — The outline first.** The plan is made with `/propositions:outline`, not here: derive the
+outline from the manuscript, revise it as the author says, and record the author's approval of the
+whole outline. Then establish `OUTDIR` and check:
+
+```bash
+"${CLI[@]}" outline status "$OUTDIR"
+```
+
+Every section has to stand as approved, and so does the order of sections; otherwise stop and say
+that the outline has to be approved as a whole first. The preconditions of W1 hold as well.
+
+**G2 — Prepare.**
+
+```bash
+STAGE=$(mktemp -d)/write
+"${CLI[@]}" write prepare --jsonl "$LEDGER/main.jsonl" --tex "$MAIN" \
+  --structure "$LEDGER/structure.json" --discourse "$LEDGER/discourse.jsonl" --stage "$STAGE" \
+  --outline "$OUTDIR" --rewrite
+```
+
+It prints the path of `outline-map.jsonl` and of each copy. Edit only the copies from here on.
+
+**G3 — Rewrite the copies.** Follow the outline: its sections in order, each with its heading
+line, and in each section its paragraph records in order. A record that carries `carry` is the
+block its `from` names, copied character for character with only the changes its `edits` lists. Any
+other record says its points, in order: where a sentence of the passages its `from` names still
+says a point, keep that sentence as it is written, so that its proposition is found again in G4.
+A point with `pending` gets `{PENDING: <the pending text>}`; results, numbers and citations follow
+the rules of O2. Keep what is not a paragraph as it was: the preamble, `\begin{document}`, the
+title, the bibliography, `\end{document}`. Change an included file only when the outline moves
+text into or out of it.
+
+**G4 — Bring the ledger up, in the copies.** Run the revision mode of `/propositions:extract` (R1
+to R6 there, and R8 for the new propositions) on the staged ledger and the staged main file, with these two choices:
+
+- In its retire step, the replacements of a proposition that is not found again are the new
+  propositions of the paragraph whose record names, in `from`, the passage the proposition stood
+  in. A proposition in a passage no record names is retired with no replacement: its text was
+  dropped. Say which propositions are retired and with what.
+- Run its commands on the staged paths (`--jsonl <staged ledger> --tex <staged main file>`), never
+  on the ledger.
+
+**G5 — Rebuild the sidecars, in the copies.** The paragraphs changed, so `discourse.jsonl` and
+`structure.json` are annotated again for the new text, as annotate mode does (A2 to A4), in the
+staged copies.
+
+**G6 — The map.** Write `$STAGE/outline-map.jsonl`: one line `{"outline": <record id>,
+"first_prop": <id>}` per paragraph record that is not dropped, in the order of the paragraph file,
+naming the proposition that starts the paragraph written from it.
+
+**G7 — The gates, on the copies.**
+
+```bash
+"${CLI[@]}" write check --stage "$STAGE"
+python3 "$VALIDATOR" --jsonl "<staged ledger>" --meta "$STAGE/ledger/_meta.json" --tex "<staged main file>"
+python3 "$VSTRUCT" --jsonl "<staged ledger>" --structure "<staged structure.json>" --discourse "<staged discourse.jsonl>"
+"${CLI[@]}" revise check --jsonl "<staged ledger>"
+"${CLI[@]}" cite-order --jsonl "<staged ledger>" --tex "<staged main file>"
+```
+
+Run the structure validator with `--partial` only when the manuscript was unfinished before the
+rewrite. All five have to pass (`cite-order` as in W7). When one fails, fix the copies and run them
+all again.
+
+**G8 — The readers, then show it and ask once.** For each paragraph written from a record (not a
+record that carries `carry`), dispatch `propositions:outline-point-reader` as in O4, the record and
+that paragraph in two files of the staging directory; dispatch them together. Then show the author:
+
+- `diff -u` of every file that changed against its copy (the main file, any included file, the
+  ledger, the two sidecars);
+- how many propositions were found again, retired (and with which replacements), and added;
+- the placeholders and their lines;
+- the readers' findings, record by record.
+
+Ask once (AskUserQuestion): write it, change something, or stop. A change to the copies runs G7
+and the readers again, then asks again.
+
+**G9 — Write on confirmation.**
+
+```bash
+"${CLI[@]}" write commit --stage "$STAGE"
+```
+
+It writes the files that changed and writes `outline-trace.jsonl` anew from the map. The originals
+are in `$STAGE/backup/`, and `backup/restore.jsonl` says where each came from (the old trace
+included). When a write fails part way, report what was written and that list, and stop: putting
+the originals back is the author's decision. Then run `outline trace` and report its count.
+
 ## Explain mode
 
 ### E1 — Preconditions: sidecars for this text
@@ -643,4 +740,7 @@ Explain mode writes nothing: not the manuscript, not the ledger, not the sidecar
   line: the paragraph is not finished while one remains. Say that the paragraph was checked
   mechanically and not proofread; `/propositions:proofread` and `/propositions:clarity-audit`
   run when the author asks.
+- **Reorganize**: the outline's status, the counts of G8, the gates (G7), the readers' findings and
+  what the author decided, what was written and where the originals are (`backup/restore.jsonl`),
+  or that the author stopped and where the copies are; every placeholder with its line.
 - **Explain**: the tool's output, the plain-language reading, and the fingerprint check.

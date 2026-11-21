@@ -336,3 +336,27 @@ code:
   - plugins/propositions/skills/construct/SKILL.md
   - CLAUDE.md
 -->
+
+---
+### Requirement: Reorganize mode rewrites a finished manuscript from its revised outline
+
+The construct skill SHALL have a reorganize mode that rewrites a finished manuscript from an outline revised and approved as a whole with the outline skill, through `propositions write prepare --rewrite`, behind one confirmation. It stops unless `propositions outline status` shows every section and the order of sections standing as approved. In the staged copies it writes the sections in the outline's order, each paragraph from one record: a record that carries `carry` is its `from` block copied with only its `edits`; any other says its points, keeping as written each sentence of its `from` passages that still says a point; `pending` points get placeholders; what is not a paragraph (preamble, title, bibliography) stays. It brings the staged ledger up with the extraction skill's revision mode, retiring a proposition that is not found again with the new propositions of the record whose `from` names its passage as replacements (none when no record names it); rebuilds the two structure sidecars by annotate mode; writes `outline-map.jsonl`; runs `write check`, the ledger validator, the structure validator, `revise check` and `cite-order` on the copies; dispatches `propositions:outline-point-reader` for each paragraph written from a record that does not carry `carry`; shows the author the diff of every changed file, the counts of propositions found again, retired and added, the placeholders and the readers' findings; asks once; and runs `write commit` on confirmation, reporting where the originals are (`backup/restore.jsonl`) and running `outline trace` after it. A change to the copies after the question runs the gates and the readers again and asks again.
+
+No executable check: the mode is instructions that a model follows; the commands it runs are tested under the capabilities `write`, `revise` and `article-outline`. The core of the mode (prepare with `--rewrite`, `revise relocate --write` and `ledger-order --tex` on the staged copies, rebuilt sidecars, the map, the gates and the commit) was run by hand on the structure fixture with binary 0.6.0.
+
+#### Scenario: A finished draft is reorganized
+
+- **WHEN** the author asks to reorganize a finished draft whose revised outline stands as approved as a whole, and confirms what is shown
+- **THEN** the skill writes the rewritten manuscript, the ledger and the sidecars through `write commit`, and `outline trace` lists one record per paragraph record
+
+<!-- @trace
+source: idd-115-skill-mode
+updated: 2026-11-21
+code:
+  - .claude-plugin/marketplace.json
+  - propositions-projects.code-workspace
+  - plugins/propositions/hooks/cli.lock
+  - plugins/propositions/skills/construct/SKILL.md
+  - CLAUDE.md
+  - plugins/propositions/.claude-plugin/plugin.json
+-->

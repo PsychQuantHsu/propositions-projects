@@ -26,56 +26,19 @@ def ledger(tmp: Path, rows: list[dict]) -> Path:
     return path
 
 
-# ---------- reorder-ledger.py ----------
+# ---------- reorder-ledger.py (retired) ----------
+# Retired on 2026-11-21; `propositions ledger-order` replaces it and is tested in
+# tests/PropositionsKitTests/LedgerOrderTests.swift.
 
 
-def test_reorder_dry_run(tmp_path: Path) -> None:
+def test_reorder_ledger_is_retired_and_points_to_the_swift_command(tmp_path: Path) -> None:
     path = ledger(tmp_path, [{"id": "b", "location": "main.tex:L9"}, {"id": "a", "location": "main.tex:L2"}])
     before = path.read_bytes()
-    result = run(REORDER, "--jsonl", path)
-    assert result.returncode == 1
-    assert "2 line(s) move" in result.stdout
+    result = run(REORDER, "--jsonl", path, "--write")
+    assert result.returncode == 2
+    assert "reorder-ledger.py was retired on 2026-11-21" in result.stderr
+    assert "propositions ledger-order" in result.stderr
     assert path.read_bytes() == before
-
-
-def test_reorder_write_keeps_lines_byte_identical(tmp_path: Path) -> None:
-    path = ledger(tmp_path, [{"id": "b", "location": "main.tex:L9"}, {"id": "a", "location": "main.tex:L2-L3"}])
-    lines = set(path.read_text().splitlines())
-    assert run(REORDER, "--jsonl", path, "--write").returncode == 0
-    assert [json.loads(l)["id"] for l in path.read_text().splitlines()] == ["a", "b"]
-    assert set(path.read_text().splitlines()) == lines
-
-
-def test_reorder_write_keeps_mode_and_leaves_no_temp_file(tmp_path: Path) -> None:
-    path = ledger(tmp_path, [{"id": "b", "location": "main.tex:L9"}, {"id": "a", "location": "main.tex:L2"}])
-    path.chmod(0o640)
-    assert run(REORDER, "--jsonl", path, "--write").returncode == 0
-    assert path.stat().st_mode & 0o777 == 0o640
-    assert [p.name for p in tmp_path.iterdir()] == ["main.jsonl"]
-
-
-def test_reorder_in_order_exits_zero(tmp_path: Path) -> None:
-    path = ledger(tmp_path, [{"id": "a", "location": "main.tex:L2"}, {"id": "b", "location": "main.tex:L2"}])
-    result = run(REORDER, "--jsonl", path)
-    assert result.returncode == 0
-    assert "same line" in result.stdout  # ties are reported for a human look
-
-
-def test_reorder_retired_line_follows_its_predecessor(tmp_path: Path) -> None:
-    path = ledger(tmp_path, [
-        {"id": "b", "location": "main.tex:L9"},
-        {"id": "r", "retired": {"reason": "x"}},
-        {"id": "a", "location": "main.tex:L2"},
-    ])
-    assert run(REORDER, "--jsonl", path, "--write").returncode == 0
-    assert [json.loads(l)["id"] for l in path.read_text().splitlines()] == ["a", "b", "r"]
-
-
-def test_reorder_refuses_other_files_and_bad_locations(tmp_path: Path) -> None:
-    path = ledger(tmp_path, [{"id": "a", "location": "sections/a.tex:L2"}])
-    assert run(REORDER, "--jsonl", path).returncode == 2
-    path = ledger(tmp_path, [{"id": "a", "location": "nowhere"}])
-    assert run(REORDER, "--jsonl", path).returncode == 2
 
 
 # ---------- structure-batch.py ----------

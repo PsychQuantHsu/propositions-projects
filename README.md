@@ -141,7 +141,7 @@ propositions-projects/
 │   │   │   ├── run-audit.sh
 │   │   │   ├── validate-structure.py      # S1-S9
 │   │   │   ├── structure-{state,explain,links,metrics,batch}.py
-│   │   │   ├── build-link-catalog.py, derive-paragraphs.py, reorder-ledger.py
+│   │   │   ├── build-link-catalog.py; derive-paragraphs.py, reorder-ledger.py, audit-{symbols,citations}.py (retired)
 │   │   │   ├── validate-verification.py, proofread-to-verification.py
 │   │   │   ├── migrate-{prop-id-to-uuid,json-to-jsonl,structure-v2}.py
 │   │   │   └── _lib/          # shared parsers and helpers

@@ -73,3 +73,18 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if item.name in integration_test_names:
             item.add_marker(needs_manuscript)
+
+
+def propositions_cli() -> str | None:
+    """The propositions command-line tool for tests that run run-audit.sh: $PROPOSITIONS_CLI, the
+    binary `swift build` leaves in .build/debug, or `propositions` on PATH. None when there is none;
+    such a test is skipped and says why."""
+    import shutil
+
+    given = os.environ.get("PROPOSITIONS_CLI")
+    if given and Path(given).is_file():
+        return given
+    built = PLUGIN_ROOT / ".build" / "debug" / "propositions"
+    if built.is_file():
+        return str(built)
+    return shutil.which("propositions")

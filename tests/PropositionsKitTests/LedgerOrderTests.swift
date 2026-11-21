@@ -61,29 +61,16 @@ struct LedgerOrderTests {
     ]
 
     // spec-example: ledger-order / a manuscript of one file is ordered as the Python tool orders it
-    @Test(.enabled(if: ParityTests.interpreter != nil), arguments: parityLedgers.map(\.name), [false, true])
-    func `Prints, exits and writes as the Python tool does`(name: String, write: Bool) throws {
+    @Test(arguments: parityLedgers.map(\.name), [false, true])
+    func `Prints, exits and writes as the Python tool did`(name: String, write: Bool) throws {
         let text = try #require(Self.parityLedgers.first { $0.name == name }).text
-        let python = try Box(), ours = try Box()
-        let theirs = try python.write(text, to: "main.jsonl")
+        let recorded = try RetiredPython.load(tool: "reorder-ledger", case: name + (write ? " write" : " dry run"))
+        let ours = try Box()
         let mine = try ours.write(text, to: "main.jsonl")
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: try #require(ParityTests.interpreter))
-        process.arguments = [repositoryRoot.appendingPathComponent("plugins/propositions/scripts/reorder-ledger.py").path,
-                             "--jsonl", "main.jsonl"] + (write ? ["--write"] : [])
-        process.currentDirectoryURL = python.url
-        let stdout = Pipe()
-        process.standardOutput = stdout
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        let printed = String(decoding: stdout.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        process.waitUntilExit()
-
         let result = swift(["--jsonl", "main.jsonl"] + (write ? ["--write"] : []), in: ours)
-        #expect(result.exitCode == process.terminationStatus)
-        #expect(result.stdout == printed.split(separator: "\n").map(String.init))
-        #expect(try Data(contentsOf: mine) == Data(contentsOf: theirs))
+        #expect(result.exitCode == recorded.exit)
+        #expect(result.stdout == String(decoding: recorded.output, as: UTF8.self).split(separator: "\n").map(String.init))
+        #expect(try Data(contentsOf: mine) == recorded.written)
         #expect(try FileManager.default.contentsOfDirectory(atPath: ours.url.path) == ["main.jsonl"])
         if result.exitCode == 2 { #expect(result.stderr.count == 1 && result.stderr[0].hasPrefix("error: ")) }
     }

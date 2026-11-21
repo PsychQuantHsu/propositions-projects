@@ -2,7 +2,7 @@
 
 A valid 12-proposition ledger with both structure sidecars in format 2.0 (Spectra change
 `add-discourse-dependency-tree`), for the `validate-structure.py` (S1–S8), `structure-state.py`,
-`derive-paragraphs.py` and `structure-metrics.py` tests. The article in `main.tex` is invented
+`migrate-structure-v2.py` and `structure-metrics.py` tests. The article in `main.tex` is invented
 (spaced vs massed review and one-week recall) and contains no text from any real manuscript.
 `_meta.json` declares schema 1.7, profile `empirical`; `validate-propositions.py` exits 0 on it
 with no warnings. The format 1.0 version of the same article, kept byte-for-byte for the migration

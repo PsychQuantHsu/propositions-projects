@@ -304,7 +304,7 @@ For every edge with relation `basis`, whether a record's relation to its head or
 ---
 ### Requirement: Paragraph plans are derived from the TeX source
 
-`derive-paragraphs.py` SHALL accept `--jsonl` and `--tex`, and optionally `--structure` to read the section list. It SHALL treat each maximal run of non-blank lines of the TeX file as one paragraph, assign each non-retired proposition to the paragraph containing the starting line of its `location`, skip paragraphs that hold no proposition, split a paragraph wherever a section's `first_prop` falls inside it, number the result `p-1`, `p-2` and so on in reading order, and print the `paragraphs` list as JSON on standard output. It SHALL exit 0 on success, and 2 when an input is missing or unreadable, when a `location` cannot be parsed or lies outside every paragraph, or when a `location` names a file other than the main file (a prefix other than `main.tex`).
+The default paragraph plan SHALL be derived by `propositions paragraphs` (the capability `paragraph-plan`), which replaced `derive-paragraphs.py` on 2026-11-21. It treats each maximal run of non-blank lines of a file of the manuscript as one paragraph, assigns each non-retired proposition to the paragraph containing the starting line of its `location`, skips paragraphs that hold no proposition, splits a paragraph wherever a section's `first_prop` falls inside it, numbers the result `p-1`, `p-2` and so on, and prints the `paragraphs` list as JSON on standard output. A location may name any file of the main file's input tree; one that names a file outside it is refused with exit 2. `derive-paragraphs.py` itself only says that it was retired and what to run instead, and exits with 2.
 
 #### Scenario: Blank lines separate paragraphs
 
@@ -316,10 +316,114 @@ For every edge with relation `basis`, whether a record's relation to its head or
 - **WHEN** `--structure` names a section whose `first_prop` is the second proposition of a TeX paragraph
 - **THEN** that paragraph is split so that a new paragraph starts at the section's `first_prop`
 
-#### Scenario: Multi-file locations are refused
+#### Scenario: A location in another file of the manuscript is placed in that file
 
-- **WHEN** a proposition's `location` is `sections/intro.tex:L5`
+- **WHEN** a proposition's `location` is `sections/intro.tex:L5` and the main file reads `sections/intro`
+- **THEN** the proposition is placed in the paragraph of `sections/intro.tex` that holds line 5
+
+#### Scenario: A location outside the input tree is refused
+
+- **WHEN** a proposition's `location` names a file the main file does not read
 - **THEN** the exit status is 2 and the message names that location
+
+
+<!-- @trace
+source: retire-python-ports
+updated: 2026-11-21
+code:
+  - plugins/propositions/scripts/audit-citations.py
+  - plugins/propositions/skills/construct/references/vocabulary.md
+  - plugins/propositions/.claude-plugin/plugin.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
+  - tests/fixtures/retired-python/derive-paragraphs/no-proposition.json
+  - tests/fixtures/retired-python/derive-paragraphs/ids-that-need-escaping.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-write.json
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-write.json
+  - plugins/propositions/scripts/derive-paragraphs.py
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-with-white-space-outside-json-s-before-the-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-sidecar-that-starts-with-a-byte-order-mark.json
+  - tests/PropositionsKitTests/RetiredPython.swift
+  - propositions-projects.code-workspace
+  - tests/fixtures/retired-python/derive-paragraphs/no-location.json
+  - docs/SCHEMA.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-splits-a-paragraph.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-from-the-root-of-the-file-system.json
+  - tests/fixtures/retired-python/derive-paragraphs/retired-propositions-and-empty-lines-are-passed-over.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
+  - tests/fixtures/structure/README.md
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
+  - plugins/propositions/skills/construct-batch/SKILL.md
+  - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
+  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
+  - plugins/propositions/scripts/reorder-ledger.py
+  - .claude-plugin/marketplace.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-main-file-written-with-a-dot-before-it.json
+  - plugins/propositions/rules/manuscript-consistency-audit.md
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-dry-run.json
+  - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - plugins/propositions/docs/PLAYBOOK.md
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-in-another-file.json
+  - tests/PropositionsKitTests/ParagraphsTests.swift
+  - plugins/propositions/scripts/run-audit.sh
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-in-another-spelling-of-the-same-letters.json
+  - tests/conftest.py
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-write.json
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
+  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/scripts/migrate-structure-v2.py
+  - plugins/propositions/scripts/audit-symbols.py
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-dry-run.json
+  - plugins/propositions/README.md
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-write.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-write.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-write.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-ledger-s-order-is-kept--not-the-reading-order.json
+  - tests/fixtures/retired-python/derive-paragraphs/sections-that-is-an-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-without-sections.json
+  - plugins/propositions/docs/STRUCTURE.md
+  - tests/fixtures/retired-python/derive-paragraphs/carriage-returns-in-the-manuscript.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-dry-run.json
+  - README.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-ledger-that-starts-with-a-byte-order-mark.json
+  - tests/fixtures/retired-python/reorder-ledger/no-location-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-write.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-write.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-dry-run.json
+  - CLAUDE.md
+  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/derive-paragraphs/a-line-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/blank-lines-separate-paragraphs.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-that-is-white-space-outside-json-s-only.json
+  - tests/fixtures/retired-python/derive-paragraphs/paragraphs-without-a-proposition-are-skipped.json
+tests:
+  - tests/test_plugin_payload_tracked.py
+  - tests/test_structure_tools.py
+  - tests/test_run_audit.sh
+  - tests/test_audit_citations.py
+  - tests/test_audit_symbols.py
+  - tests/test_root_shims.py
+  - tests/test_derive_paragraphs.py
+-->
 
 ---
 ### Requirement: Version 1.0 sidecars are migrated, not read

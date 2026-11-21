@@ -327,9 +327,9 @@ findings, or leaves records, about units under an id of its own.
 | `structure:S1` to `S9` | `validate-structure.py` | `docs/STRUCTURE.md` |
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
-| `order:ledger` | The dry run of `reorder-ledger.py` | The construct-batch skill |
+| `order:ledger` | The dry run of `propositions ledger-order` | The construct-batch skill |
 | `order:cites` | `propositions cite-order`, a command of the Swift package at the root of the repository. A plugin session fetches the binary on macOS; where the pinned binary is not there the check does not run, and the entry is unverified | The spec `citation-order` |
-| `audit:R1`, `R2`, `R3` | `audit-symbols.py`, `audit-citations.py` and `audit-code-manuscript.py`, in that order. `audit:R2` stands for both rules of the citation script, which it labels R2 and R2-bis | `rules/manuscript-consistency-audit.md` |
+| `audit:R1`, `R2`, `R3` | `propositions audit symbols`, `propositions audit citations` and `audit-code-manuscript.py`, in that order. `audit:R2` stands for both rules of the citation audit, which it labels R2 and R2-bis | `rules/manuscript-consistency-audit.md` |
 | `proofread:L1` to `L5`, `proofread:E1` to `E7` | The per-proposition walk of the proofread skill | The proofread skill |
 
 ### What is not in the inventory
@@ -600,13 +600,11 @@ Four things keep every article from being sound today, and each has an owner.
 The rules that turn what the checks report into outcomes, the pass condition
 among them, are not written either. Issue #71.
 
-Three limits will remain for some manuscripts once checks report what they
-examine.
-
-- The reordering dry run supports single-file manuscripts only. Issue #59.
-- The symbol audit and the citation audit read the main file only, and the
-  citation audit reads one bibliography file of a fixed name. Issue #69.
-- The audit's code pass needs a directory of analysis code. Issue #64.
+One limit will remain for some manuscripts once checks report what they
+examine: the audit's code pass needs a directory of analysis code. Issue #64.
+The commands of the `propositions` command-line tool are released for macOS
+only; where the pinned binary is not there, the checks that need it do not run,
+and the entries they verify are unverified.
 
 One limit is about what the table reaches. Numbers are compared with artifacts
 only in a ledger with the empirical profile: no entry compares the numbers of

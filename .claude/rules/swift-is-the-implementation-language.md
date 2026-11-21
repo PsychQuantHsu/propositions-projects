@@ -3,14 +3,15 @@
 使用者 2026-11-04（+08:00）定調：「我的這些工具想要完全用swift做，跟akashic lib一樣， 可以家入.claude/rules」。
 當時 #33 剛合併，又多了三支 Python 工具和第一個外部依賴 PyYAML。
 
-**現況（2026-11-20 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
-與測試 target，共 31 個 Swift 檔。裡面有五組：引用方向（`propositions cite-order`，#46）、綱要三個檔的格式、狀態、
-來源指標（`propositions outline check`、`status`、`locators`，#78），以及帳冊的行序（`propositions ledger-order`，#59，
-`reorder-ledger.py` 的移植）、段落清單（`propositions paragraphs`，#77，`derive-paragraphs.py` 的移植）與兩支稽核（`propositions audit symbols`、
-`citations`，#69，`audit-symbols.py`、`audit-citations.py` 的後繼）。維護者 2026-11-21 決定這幾支的 Python 版退役、
-改成引導使用者改用 Swift 版；退役與 skill 的切換在帶這些子命令的 binary 發布之後一起做。發布過的 binary（`propositions-cli-v0.1.0`）只有前者；
-propositions plugin 在 session 開始時用 hook 取得鎖定版本的 binary（只有 macOS；`hooks/fetch-cli.sh`，#46），
-`/propositions:propositions` 的 Operation A 經由 `hooks/run-cli.sh` 呼叫 `cite-order`；綱要的三個子命令還沒有 skill 呼叫（#102）。
+**現況（2026-11-21 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
+與測試 target，共 32 個 Swift 檔。`propositions` 的子命令：引用方向（`cite-order`，#46）、綱要三個檔的格式、狀態與
+來源指標（`outline check`、`status`、`locators`，#78）、帳冊的行序（`ledger-order`，#59）、段落清單（`paragraphs`，#77）
+與兩支稽核（`audit symbols`、`citations`，#69）。binary 0.2.0（2026-11-21 發布）有這些子命令，propositions plugin 在
+session 開始時用 hook 取得 `hooks/cli.lock` 鎖定的這一版（只有 macOS；`hooks/fetch-cli.sh`），skill 經由
+`hooks/run-cli.sh` 呼叫：`propositions` 的 Operation A 呼叫 `cite-order`，`construct` 呼叫 `paragraphs`，
+`construct-batch` 呼叫 `ledger-order`，`manuscript-audit` 讓 `run-audit.sh` 呼叫兩支稽核。綱要的子命令還沒有 skill 呼叫（#102）。
+被取代的四支 Python 版（`reorder-ledger.py`、`derive-paragraphs.py`、`audit-symbols.py`、`audit-citations.py`）
+2026-11-21 退役，見〈例外〉第 5 類。
 其餘受追蹤的可執行程式碼是 72 個 Python 檔、6 個 shell 檔，
 另外有 3 段寫在 SKILL.md 裡的 Python 程式（見〈既有檔〉）。skill 用 `python3 "$VALIDATOR"` 這類寫法呼叫
 plugin 內的腳本，所以使用者端要有 Python 3.10 以上；帳冊附檔用到 `move`／`type` 時還要裝 PyYAML。
@@ -48,7 +49,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 ## 例外：可以不是 Swift 的程式碼
 
-這是封閉列舉，只有四類，不得依性質相似類推出第五類。
+這是封閉列舉，只有五類，不得依性質相似類推出第六類。
 
 1. **Swift binary 還不存在、或使用端沒有 binary 時才需要的殼層。** 這一類只有三種：
    - plugin 取得並啟動 binary 的殼層：propositions plugin 的 `hooks/fetch-cli.sh`（SessionStart hook）與
@@ -105,8 +106,19 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
    **退場條件**：`propositions` CLI 的子命令涵蓋上面列的每一項工作之後，把這份 SKILL.md 的指令區塊換成
    呼叫子命令，然後刪掉這一條例外。#78 做的是寫入檢查、來源指標與狀態三項；其餘幾項還沒有子命令時，
-   那幾項照這一條留著，這一條也留著。現在 skill 還不呼叫子命令的原因有兩個：plugin 鎖定的 binary（0.1.0）沒有
-   綱要的子命令，而且 16 項裡只有 3 項有子命令（#102）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
+   那幾項照這一條留著，這一條也留著。plugin 鎖定的 binary（0.2.0）已有綱要的三個子命令，但 16 項裡只有 3 項
+   有子命令（#102）；在那之前，skill 的確定性檢查只能交給使用者機器上已有的工具。
+5. **已退役的 Python 工具留下的退役提示。** 這是封閉清單，目前只有這幾個檔：
+   - `plugins/propositions/scripts/` 的 `reorder-ledger.py`、`derive-paragraphs.py`、`audit-symbols.py`、
+     `audit-citations.py`；
+   - 根目錄 `scripts/` 的 `audit-symbols.py`、`audit-citations.py`，原樣轉給上面兩支的轉接層。
+
+   每一支只做一件事：印出它已在哪天退役、改用哪個 `propositions` 子命令、去哪裡取得，然後以 2 結束。不得在裡面
+   加回任何功能，也不得在別處比照新增：再有 Python 工具被 Swift 取代時，先在這裡加一列。維護者 2026-11-21 決定：
+   「我想要python版本的直接退役，如果看到python版本的就引導升級到swift版本」。
+
+   **退場條件**：維護者決定不再需要這些提示時（例如釘著舊 tag 的稿件 repo 都已更新），刪掉它們與這一條。
+   `migrate-structure-v2.py` 原本載入 `derive-paragraphs.py`，它用到的段落函式已原樣搬進它自己的檔，不再載入退役的檔。
 
 ## 不適用
 
@@ -175,11 +187,11 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 ## 既有檔（grandfathered，2026-11-04 用 `git ls-files` 量，只計受追蹤的檔）
 
-**propositions plugin 的腳本（23 個）**，都在 `plugins/propositions/scripts/`：
-`assign-prop-ids.py`、`audit-{citations,code-manuscript,symbols,theorem-boundaries}.py`、
-`build-link-catalog.py`、`check-extraction-coverage.py`、`derive-paragraphs.py`、
+**propositions plugin 的腳本（19 個）**，都在 `plugins/propositions/scripts/`：
+`assign-prop-ids.py`、`audit-{code-manuscript,theorem-boundaries}.py`、
+`build-link-catalog.py`、`check-extraction-coverage.py`、
 `migrate-{json-to-jsonl,prop-id-to-uuid,structure-v2}.py`、`proofread-to-verification.py`、
-`refresh-prop-locations.py`、`reorder-ledger.py`、`run-audit.sh`、
+`refresh-prop-locations.py`、`run-audit.sh`、
 `structure-{batch,explain,links,metrics,state}.py`、
 `validate-{propositions,structure,verification}.py`
 
@@ -194,8 +206,8 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 **tschema-check plugin（1 個）**：`plugins/tschema-check/scripts/validate-tschema.py`
 
-**根目錄轉接層（9 個）**，都在 `scripts/`：
-`audit-{citations,code-manuscript,symbols,theorem-boundaries}.py`、`migrate-{json-to-jsonl,prop-id-to-uuid}.py`、
+**根目錄轉接層（7 個）**，都在 `scripts/`：
+`audit-{code-manuscript,theorem-boundaries}.py`、`migrate-{json-to-jsonl,prop-id-to-uuid}.py`、
 `refresh-prop-locations.py`、`run-audit.sh`、`validate-propositions.py`
 
 **測試（35 個）**，都在 `tests/`：
@@ -233,8 +245,9 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 | 2026-11-19 | 本檔原本要 plugin 的 wrapper 照 Akashic-Library 的 `plugin/bin/akashic-mcp-wrapper.sh` 寫。#46 照做之後，驗證查到 Claude Code 的 plugin 文件：plugin 目錄有 `bin/` 時 claude.ai 與 Cowork 不安裝這個 plugin，裡面的檔還會出現在 Bash 工具的 PATH 上 | 〈例外〉第 1 類、〈移植〉第 3 步、〈寫 Swift 之前〉三處改成「還沒有定、不放進 `bin/`」。這是實作時取的做法，維護者尚未確認，第一次發布時決定。Akashic-Library 的 wrapper 由 `.mcp.json` 呼叫、後面有已發布的 binary，情形不同 |
 | 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：判斷 `retired` 區塊是否格式正確、讀 `location`、數稿件檔的行。#46 的驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **三件事各有一個對齊的對象**：`retired` 照驗證器的 `retired_problem`，`location` 照 `parse_location_v16`，數行照寫 `location` 的工具 `refresh-prop-locations.py` 的 `read_tex_lines`（行在 LF、CR、CRLF 結束）。`tests/PropositionsKitTests/ParityTests.swift` 直接載入這三個 Python 函式、拿同一組輸入餵兩邊比對，改其中一邊而另一邊沒跟上時會失敗；改這三個 Python 函式時同一個變更要改 `Sources/PropositionsKit/`。`\input` 樹 Swift 版用自己的規則讀（寫在規格 `citation-order`），不是 `resolve_input_tree` 的副本（#94） |
 | 2026-11-20 | #46 的 binary 發布之後，維護者決定 plugin 用 SessionStart hook 取得它（「照你的建議，先做第 1 題」）。實作時的試跑把 binary 寫進了另一個 plugin 的資料目錄：shell 環境裡留著那個 plugin 的 `CLAUDE_PLUGIN_DATA` | 〈例外〉第 1 類改成現在的寫法。hook 只寫進名稱是 `propositions` 或以 `propositions-` 開頭的資料目錄，有測試。**skill 裡不要直接信任 shell 環境的 `CLAUDE_PLUGIN_DATA`**：Bash 工具的環境沒有這個 plugin 的值，有的話是別的 plugin 的；路徑要寫在 SKILL.md 的內文裡，由 Claude Code 載入時代換 |
+| 2026-11-21 | binary 0.2.0 發布後，維護者決定被 Swift 取代的四支 Python 版直接退役，看到 Python 版就引導改用 Swift 版（#69 的決定） | 加〈例外〉第 5 類「退役提示」，四支換成提示並以 2 結束，`cli.lock`、skill 與 `run-audit.sh` 換到 0.2.0；Swift 的比對測試改讀退役前錄下的輸出（`tests/fixtures/retired-python/`）。**不要把退役提示改回會做事的 Python**：要的是引導，不是兩份實作 |
 
-## 語言組成（2026-11-20 量，只計受追蹤的檔）
+## 語言組成（2026-11-21 量，只計受追蹤的檔）
 
-Swift 31、Python 72、shell 6（其中 3 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 32、Python 72（其中 6 個是〈例外〉第 5 類的退役提示）、shell 6（其中 3 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

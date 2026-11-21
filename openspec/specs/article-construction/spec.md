@@ -18,7 +18,7 @@ In annotation mode the skill SHALL first run `validate-propositions.py` on the l
 ---
 ### Requirement: Annotation writes sidecars only after validation and confirmation
 
-The skill SHALL start the paragraph plan from the output of `derive-paragraphs.py`, then draft `structure.json` and `discourse.jsonl` in a staging location outside the ledger directory: a head and relation for every record that is not a paragraph root, a move for every record, a head and relation for every paragraph that is not its section's root paragraph, a type for every paragraph, and a `parent` for every section that sits under another section. It SHALL run `validate-structure.py` on the staged files until it exits 0, then show the user a summary containing the count of each relation, the count of each move and each paragraph type, the number of records whose head comes before them and after them, the number of paragraphs, every commitment with the positions that open and discharge it, the section list with roles and parents, every S7 and S8 warning, and the median length of the sentence part of the right frontier reported by `structure-metrics.py`. The skill SHALL write the sidecars into the ledger directory only after the user confirms, and SHALL NOT modify `main.jsonl` at any point.
+The skill SHALL start the paragraph plan from the output of `propositions paragraphs`, run through the plugin's launcher (when the pinned binary is not there, the skill lists the paragraphs by hand and says so), then draft `structure.json` and `discourse.jsonl` in a staging location outside the ledger directory: a head and relation for every record that is not a paragraph root, a move for every record, a head and relation for every paragraph that is not its section's root paragraph, a type for every paragraph, and a `parent` for every section that sits under another section. It SHALL run `validate-structure.py` on the staged files until it exits 0, then show the user a summary containing the count of each relation, the count of each move and each paragraph type, the number of records whose head comes before them and after them, the number of paragraphs, every commitment with the positions that open and discharge it, the section list with roles and parents, every S7 and S8 warning, and the median length of the sentence part of the right frontier reported by `structure-metrics.py`. The skill SHALL write the sidecars into the ledger directory only after the user confirms, and SHALL NOT modify `main.jsonl` at any point.
 
 #### Scenario: The user declines
 
@@ -39,6 +39,105 @@ The skill SHALL start the paragraph plan from the output of `derive-paragraphs.p
 
 - **WHEN** no move in the vocabulary fits a sentence
 - **THEN** the skill stops and reports the sentence's position instead of choosing a near value
+
+
+<!-- @trace
+source: retire-python-ports
+updated: 2026-11-21
+code:
+  - plugins/propositions/scripts/audit-citations.py
+  - plugins/propositions/skills/construct/references/vocabulary.md
+  - plugins/propositions/.claude-plugin/plugin.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
+  - tests/fixtures/retired-python/derive-paragraphs/no-proposition.json
+  - tests/fixtures/retired-python/derive-paragraphs/ids-that-need-escaping.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-write.json
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-write.json
+  - plugins/propositions/scripts/derive-paragraphs.py
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-with-white-space-outside-json-s-before-the-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-sidecar-that-starts-with-a-byte-order-mark.json
+  - tests/PropositionsKitTests/RetiredPython.swift
+  - propositions-projects.code-workspace
+  - tests/fixtures/retired-python/derive-paragraphs/no-location.json
+  - docs/SCHEMA.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-splits-a-paragraph.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-from-the-root-of-the-file-system.json
+  - tests/fixtures/retired-python/derive-paragraphs/retired-propositions-and-empty-lines-are-passed-over.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
+  - tests/fixtures/structure/README.md
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
+  - plugins/propositions/skills/construct-batch/SKILL.md
+  - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
+  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
+  - plugins/propositions/scripts/reorder-ledger.py
+  - .claude-plugin/marketplace.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-main-file-written-with-a-dot-before-it.json
+  - plugins/propositions/rules/manuscript-consistency-audit.md
+  - tests/fixtures/retired-python/reorder-ledger/indented-lines-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-write.json
+  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-dry-run.json
+  - tests/PropositionsKitTests/LedgerOrderTests.swift
+  - plugins/propositions/docs/PLAYBOOK.md
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-in-another-file.json
+  - tests/PropositionsKitTests/ParagraphsTests.swift
+  - plugins/propositions/scripts/run-audit.sh
+  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-in-another-spelling-of-the-same-letters.json
+  - tests/conftest.py
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-write.json
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
+  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/scripts/migrate-structure-v2.py
+  - plugins/propositions/scripts/audit-symbols.py
+  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
+  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-dry-run.json
+  - plugins/propositions/README.md
+  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-write.json
+  - tests/fixtures/retired-python/reorder-ledger/another-file-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-write.json
+  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-write.json
+  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-write.json
+  - tests/fixtures/retired-python/derive-paragraphs/the-ledger-s-order-is-kept--not-the-reading-order.json
+  - tests/fixtures/retired-python/derive-paragraphs/sections-that-is-an-object.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-structure-without-sections.json
+  - plugins/propositions/docs/STRUCTURE.md
+  - tests/fixtures/retired-python/derive-paragraphs/carriage-returns-in-the-manuscript.json
+  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-dry-run.json
+  - README.md
+  - tests/fixtures/retired-python/derive-paragraphs/a-ledger-that-starts-with-a-byte-order-mark.json
+  - tests/fixtures/retired-python/reorder-ledger/no-location-dry-run.json
+  - tests/fixtures/retired-python/reorder-ledger/only-comments-write.json
+  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-write.json
+  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-dry-run.json
+  - CLAUDE.md
+  - plugins/propositions/hooks/cli.lock
+  - tests/fixtures/retired-python/derive-paragraphs/a-line-that-is-not-json.json
+  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-dry-run.json
+  - tests/fixtures/retired-python/derive-paragraphs/blank-lines-separate-paragraphs.json
+  - tests/fixtures/retired-python/derive-paragraphs/a-row-that-is-white-space-outside-json-s-only.json
+  - tests/fixtures/retired-python/derive-paragraphs/paragraphs-without-a-proposition-are-skipped.json
+tests:
+  - tests/test_plugin_payload_tracked.py
+  - tests/test_structure_tools.py
+  - tests/test_run_audit.sh
+  - tests/test_audit_citations.py
+  - tests/test_audit_symbols.py
+  - tests/test_root_shims.py
+  - tests/test_derive_paragraphs.py
+-->
 
 ---
 ### Requirement: Next mode proposes at most three candidates without writing

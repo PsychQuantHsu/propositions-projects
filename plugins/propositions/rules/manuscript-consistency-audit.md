@@ -106,7 +106,7 @@ Variable N(典型 5-30)。Pass 跑完後,**每個 definite + likely finding 開�
 # Manuscript Consistency Audit — YYYY-MM-DD
 
 **Manuscript snapshot**: <git rev-parse HEAD of manuscript repo>
-**Audit tool versions**: audit-symbols.py vX.Y / audit-citations.py vX.Y / audit-code-manuscript.py vX.Y
+**Audit tool versions**: propositions audit symbols / citations vX.Y / audit-code-manuscript.py vX.Y
 
 ## Summary
 
@@ -156,9 +156,14 @@ cd manuscript && git pull --rebase && cd ..
 ### Run
 
 ```bash
-# Phase 1 only (Rule R1 + R2):
-python3 scripts/audit-symbols.py --manuscript-root manuscript/ --report-format md
-python3 scripts/audit-citations.py --manuscript-root manuscript/ --report-format md
+# Phase 1 only (Rule R1 + R2). The commands of the propositions command-line tool replaced
+# audit-symbols.py and audit-citations.py, which were retired on 2026-11-21. In a plugin session
+# the tool is in the plugin's data directory, not on PATH: run it as
+#   bash <plugin root>/hooks/run-cli.sh <plugin data directory> audit symbols …
+# and give run-audit.sh the same directory in PROPOSITIONS_PLUGIN_DATA. Outside a session, put the
+# binary of a release on PATH or name it in PROPOSITIONS_CLI.
+propositions audit symbols --manuscript-root manuscript/ --report-format md
+propositions audit citations --manuscript-root manuscript/ --report-format md
 
 # Phase 2 full audit (adds R3 + R4 + orchestration):
 ./scripts/run-audit.sh manuscript/

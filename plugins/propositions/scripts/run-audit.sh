@@ -84,10 +84,27 @@ R3_RC=0
 R4_RC=0
 R4_SKIPPED=0
 
-"$PYTHON" "$REPO_ROOT/scripts/audit-symbols.py" \
+# R1 and R2 are commands of the propositions command-line tool; their Python scripts were retired on
+# 2026-11-21. In this order: PROPOSITIONS_CLI, the path of the binary; PROPOSITIONS_PLUGIN_DATA, the
+# plugin's data directory, run through the plugin's launcher, which runs only the pinned binary;
+# `propositions` on PATH. Without any of them the audit stops, as for any other tool error.
+if [[ -n "${PROPOSITIONS_CLI:-}" ]]; then
+  CLI=("$PROPOSITIONS_CLI")
+elif [[ -n "${PROPOSITIONS_PLUGIN_DATA:-}" ]] && [[ -f "$REPO_ROOT/hooks/run-cli.sh" ]]; then
+  CLI=(bash "$REPO_ROOT/hooks/run-cli.sh" "$PROPOSITIONS_PLUGIN_DATA")
+elif command -v propositions >/dev/null 2>&1; then
+  CLI=(propositions)
+else
+  echo "error: the propositions command-line tool was not found; R1 and R2 need it." >&2
+  echo "  Set PROPOSITIONS_CLI to its path, or put it on PATH. It is at" >&2
+  echo "  https://github.com/PsychQuantHsu/propositions-projects/releases (macOS)" >&2
+  exit 2
+fi
+"${CLI[@]}" audit symbols \
   --manuscript-root "$MANUSCRIPT_ROOT" --report-format md > "$R1_OUT" || R1_RC=$?
-"$PYTHON" "$REPO_ROOT/scripts/audit-citations.py" \
+"${CLI[@]}" audit citations \
   --manuscript-root "$MANUSCRIPT_ROOT" --report-format md > "$R2_OUT" || R2_RC=$?
+CLI_VERSION="$("${CLI[@]}" --version 2>/dev/null || echo unknown)"
 "$PYTHON" "$REPO_ROOT/scripts/audit-code-manuscript.py" \
   --manuscript-root "$MANUSCRIPT_ROOT" --code-root "$CODE_ROOT" --report-format md > "$R3_OUT" || R3_RC=$?
 
@@ -101,7 +118,7 @@ if [[ -f "$PROPS_JSONL" ]] && [[ -f "$MAIN_TEX" ]]; then
   META_FLAG=()
   [[ -f "$PROPS_META" ]] && META_FLAG=(--meta "$PROPS_META")
   "$PYTHON" "$REPO_ROOT/scripts/validate-propositions.py" \
-    --jsonl "$PROPS_JSONL" "${META_FLAG[@]}" --tex "$MAIN_TEX" > "$R4_OUT" 2>&1 || R4_RC=$?
+    --jsonl "$PROPS_JSONL" ${META_FLAG[@]+"${META_FLAG[@]}"} --tex "$MAIN_TEX" > "$R4_OUT" 2>&1 || R4_RC=$?
 elif [[ -f "$PROPS_JSON_LEGACY" ]] && [[ -f "$MAIN_TEX" ]]; then
   "$PYTHON" "$REPO_ROOT/scripts/validate-propositions.py" \
     --json "$PROPS_JSON_LEGACY" --tex "$MAIN_TEX" > "$R4_OUT" 2>&1 || R4_RC=$?
@@ -112,7 +129,14 @@ fi
 
 # Bail on tool error (rc=2) from any pass
 if [[ "$R1_RC" -ge 2 ]] || [[ "$R2_RC" -ge 2 ]] || [[ "$R3_RC" -ge 2 ]] || [[ "$R4_RC" -ge 2 ]]; then
-  echo "error: at least one audit pass failed with rc=2" >&2
+  # Exit 3 is the launcher's: the pinned binary is not there, and the pass did not run.
+  for pass in R1 R2; do
+    rc_var="${pass}_RC"; out_var="${pass}_OUT"
+    if [[ "${!rc_var}" -eq 3 ]]; then
+      echo "error: ${pass} did not run: $(head -1 "${!out_var}")" >&2
+    fi
+  done
+  echo "error: at least one audit pass did not run or failed with rc>=2 (R1=${R1_RC} R2=${R2_RC} R3=${R3_RC} R4=${R4_RC})" >&2
   exit 2
 fi
 
@@ -155,7 +179,7 @@ TOTAL_FYI=$R3_FYI
   echo "# Manuscript Consistency Audit — ${DATE_TAG}"
   echo
   echo "**Manuscript snapshot**: \`${SNAPSHOT}\`"
-  echo "**Tool versions**: audit-symbols.py 0.1.0 / audit-citations.py 0.1.0 / audit-code-manuscript.py 0.1.0 / validate-propositions.py 0.1.0"
+  echo "**Tool versions**: propositions audit symbols / citations ${CLI_VERSION} / audit-code-manuscript.py 0.1.0 / validate-propositions.py 0.1.0"
   echo "**Exit codes**: R1=${R1_RC} / R2=${R2_RC} / R3=${R3_RC} / R4=${R4_RC}$([[ $R4_SKIPPED -eq 1 ]] && echo ' (skipped)')"
   echo
   echo "## Summary"

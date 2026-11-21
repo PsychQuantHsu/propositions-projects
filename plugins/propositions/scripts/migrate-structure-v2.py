@@ -8,7 +8,7 @@ The validator refuses 1.0, so existing sidecars go through this tool once.
 
 The migration is mechanical and gives a starting point, not a finished
 annotation:
-  - paragraphs are derived from the TeX source as derive-paragraphs.py does;
+  - paragraphs are derived from the TeX source as the retired derive-paragraphs.py did;
   - the first record of each paragraph becomes its root; every other record gets
     the previous record as its head, keeping its 1.0 relation when that is one of
     the ten 2.0 relations and `continue` otherwise; `refers_to` is dropped;
@@ -35,7 +35,6 @@ Exit code:
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import re
 import sys
@@ -58,11 +57,73 @@ class InputError(Exception):
     """Exit 2."""
 
 
-def _derive_module():
-    spec = importlib.util.spec_from_file_location("derive_paragraphs", Path(__file__).parent / "derive-paragraphs.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+# The paragraph derivation of the retired derive-paragraphs.py, moved here unchanged on 2026-11-21
+# so that this migration keeps working; the command that replaces it is `propositions paragraphs`.
+class _DeriveError(Exception):
+    """An input error of the paragraph derivation."""
+
+
+def _tex_paragraph_ids(lines: list[str]) -> list[int | None]:
+    """For each TeX line (0-based), the index of its run of non-blank lines, or None for a blank line."""
+    ids: list[int | None] = []
+    current, previous_blank = -1, True
+    for line in lines:
+        blank = not line.strip()
+        if not blank and previous_blank:
+            current += 1
+        ids.append(None if blank else current)
+        previous_blank = blank
+    return ids
+
+
+def _derive_read_ledger(path: Path) -> list[dict]:
+    if not path.is_file():
+        raise _DeriveError(f"ledger not found: {path}")
+    props = []
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not raw.strip():
+            continue
+        try:
+            props.append(json.loads(raw))
+        except json.JSONDecodeError as exc:
+            raise _DeriveError(f"{path.name} line {lineno}: invalid JSON ({exc.msg})") from exc
+    return [p for p in props if isinstance(p, dict) and "retired" not in p]
+
+
+def _section_starts(path: Path | None) -> set[str]:
+    if path is None:
+        return set()
+    if not path.is_file():
+        raise _DeriveError(f"structure sidecar not found: {path}")
+    try:
+        structure = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise _DeriveError(f"{path.name}: invalid JSON ({exc.msg})") from exc
+    return {s.get("first_prop") for s in structure.get("sections", []) if isinstance(s, dict)}
+
+
+def _derive_paragraphs(ledger: Path, tex: Path, structure: Path | None) -> list[dict]:
+    if not tex.is_file():
+        raise _DeriveError(f"TeX file not found: {tex}")
+    line_ids = _tex_paragraph_ids(tex.read_text(encoding="utf-8").splitlines())
+    starts = _section_starts(structure)
+    firsts: list[str] = []
+    previous = None
+    for prop in _derive_read_ledger(ledger):
+        loc = prop.get("location", "")
+        parsed = parse_location_v16(loc) if isinstance(loc, str) else None
+        if parsed is None:
+            raise _DeriveError(f"cannot parse location {loc!r} of {prop.get('id')}")
+        relpath, start, _ = parsed
+        if relpath is not None:
+            raise _DeriveError(f"location {loc} names another file; multi-file manuscripts are not supported, list paragraphs by hand")
+        if start > len(line_ids) or line_ids[start - 1] is None:
+            raise _DeriveError(f"location {loc} of {prop.get('id')} is not inside a TeX paragraph")
+        here = line_ids[start - 1]
+        if here != previous or prop.get("id") in starts:
+            firsts.append(prop["id"])
+        previous = here
+    return [{"id": f"p-{i}", "first_prop": first} for i, first in enumerate(firsts, 1)]
 
 
 def _read_json(path: Path) -> dict:
@@ -147,8 +208,8 @@ def migrate(ledger: Path, tex: Path, out_dir: Path) -> list[dict]:
         if parsed:
             starts[p["id"]] = parsed[1]
     try:
-        paragraphs = _derive_module().derive(ledger, tex, source_dir / "structure.json")
-    except Exception as exc:  # derive-paragraphs' own InputError
+        paragraphs = _derive_paragraphs(ledger, tex, source_dir / "structure.json")
+    except Exception as exc:  # the derivation's own _DeriveError
         raise InputError(str(exc)) from exc
     paragraph_firsts = {p["first_prop"]: p["id"] for p in paragraphs}
     sections = structure.get("sections", [])

@@ -18,8 +18,8 @@ Adding, changing or removing the sidecars never changes `main.jsonl`, and
 nothing in `validate-propositions.py` reads them. A ledger without sidecars
 validates exactly as before. The sidecars have their own validator,
 `validate-structure.py` (rules S1–S9), a state query, `structure-state.py`, and
-a metrics report, `structure-metrics.py`. `derive-paragraphs.py` proposes the
-paragraph plan from the TeX source, and `migrate-structure-v2.py` turns version
+a metrics report, `structure-metrics.py`. `propositions paragraphs` (a command of the
+plugin's command-line tool) proposes the paragraph plan from the TeX source, and `migrate-structure-v2.py` turns version
 1.0 sidecars into the current version 2.0. The `propositions:construct` skill
 writes the sidecars for an existing manuscript and reads them to propose the
 next sentence of a draft. (Version 1.0 came with Spectra change
@@ -137,7 +137,7 @@ One JSON object for the whole article.
   `method` and "2. Method" itself is not; 2.1 and 2.2 then have no `parent`.
   An appendix that was not extracted has no entry either.
 - **The default paragraph plan comes from the TeX source.**
-  `derive-paragraphs.py` treats each run of non-blank lines as a paragraph and
+  `propositions paragraphs` treats each run of non-blank lines as a paragraph and
   splits it where a section starts. The plan in `structure.json` is what counts:
   merge two TeX paragraphs that make one argument, or split one that makes two,
   by editing the list.
@@ -651,10 +651,11 @@ model fits the article. Same inputs and exit codes as the state query. Reported:
 
 ## Tools for getting there
 
-- `derive-paragraphs.py --jsonl main.jsonl --tex main.tex [--structure structure.json]`
-  prints the default `paragraphs` list. A location must lie in the main file
-  (`main.tex:` or no prefix); multi-file manuscripts are refused with exit `2`,
-  and their paragraphs are listed by hand.
+- `propositions paragraphs --jsonl main.jsonl --tex main.tex [--structure structure.json]`
+  prints the default `paragraphs` list. A location may lie in any file of the main
+  file's `\input` tree. It replaced `derive-paragraphs.py`, retired on 2026-11-21;
+  where the tool is not installed (it is released for macOS only), the paragraphs
+  are listed by hand.
 - `migrate-structure-v2.py --jsonl main.jsonl --tex main.tex --out-dir DIR`
   reads version 1.0 sidecars beside the ledger and writes version 2.0 sidecars
   and `migration-review.json` into `DIR`. It never writes the ledger or the 1.0

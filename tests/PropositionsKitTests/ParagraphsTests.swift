@@ -78,8 +78,21 @@ struct ParagraphsTests {
     ]
 
     // spec-example: paragraph-plan / a manuscript of one file gets the plan the Python tool gives
-    @Test(.enabled(if: ParityTests.interpreter != nil), arguments: cases.map(\.name))
-    func `Prints and exits as the Python tool does`(name: String) throws {
+    @Test(arguments: cases.map(\.name))
+    func `Prints and exits as the Python tool did`(name: String) throws {
+        let (box, arguments) = try setUp(name)
+        let recorded = try RetiredPython.load(tool: "derive-paragraphs", case: name)
+        let result = swift(arguments, in: box)
+        #expect(result.exitCode == recorded.exit)
+        // Byte for byte, the final newline included: the executable prints each line with one.
+        #expect(Data(result.stdout.map { $0 + "\n" }.joined().utf8) == recorded.output)
+        if result.exitCode == 2 {
+            #expect(result.stdout.isEmpty)
+            #expect(result.stderr.count == 1 && result.stderr[0].hasPrefix("error: "))
+        }
+    }
+
+    func setUp(_ name: String) throws -> (Box, [String]) {
         let item = try #require(Self.cases.first { $0.name == name })
         let box = try Box()
         _ = try box.write(item.tex, to: "main.tex")
@@ -89,25 +102,7 @@ struct ParagraphsTests {
             _ = try box.write(structure, to: "structure.json")
             arguments += ["--structure", "structure.json"]
         }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: try #require(ParityTests.interpreter))
-        process.arguments = [repositoryRoot.appendingPathComponent("plugins/propositions/scripts/derive-paragraphs.py").path] + arguments
-        process.currentDirectoryURL = box.url
-        let stdout = Pipe()
-        process.standardOutput = stdout
-        process.standardError = FileHandle.nullDevice
-        try process.run()
-        let printed = stdout.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        let result = swift(arguments, in: box)
-        #expect(result.exitCode == process.terminationStatus)
-        // Byte for byte, the final newline included: the executable prints each line with one.
-        #expect(Data(result.stdout.map { $0 + "\n" }.joined().utf8) == printed)
-        if result.exitCode == 2 {
-            #expect(result.stdout.isEmpty)
-            #expect(result.stderr.count == 1 && result.stderr[0].hasPrefix("error: "))
-        }
+        return (box, arguments)
     }
 
     // spec-example: paragraph-plan / blank lines separate paragraphs

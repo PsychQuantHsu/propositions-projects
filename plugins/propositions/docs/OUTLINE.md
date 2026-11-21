@@ -9,9 +9,9 @@ An outline can be built from a finished manuscript, so that a large
 restructuring is decided on sentences instead of on pages, or from a title and
 ideas. It is written by the skill `/propositions:prop-outline`.
 
-Two things are outside this document. Writing manuscript text from an outline
-belongs to a later step (issue #51); nothing described here writes to the
-manuscript. No validator of the outline files exists yet (issue #78): apart
+Two things are outside this document. Manuscript text is written from an outline
+by `/propositions:prop-construct` (see "Writing text from the outline"); the outline
+skill writes nothing to the manuscript. No validator of the outline files exists yet (issue #78): apart
 from the few checks listed under "What is checked today", the rules below are
 kept by the skill and by the reader.
 
@@ -929,9 +929,10 @@ character, or a missing file. An include whose name does not end in `.tex` in an
 file with `.tex` added (`\input{fig.tikz}` names `fig.tikz.tex`): that file is read when it exists and is a file the skill reads, and is a missing file when it does not exist, the usual case for a figure, a table or a style file kept under its own name. A
 table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
-file that was not read gets nothing in the outline (no record, no locator, no
-point, no `note`); derive names it to the author, and the outline itself does
-not show the gap (whether it should is open, issue #117). An include command
+file that was not read is recorded in `unread` on the record of the section
+its include command stands in, one entry for each include command (issue
+#117), and gets nothing else (no paragraph record, no locator, no point, no
+`note`); derive names it to the author. An include command
 `\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex` in any letter case, and
 `x.tex` otherwise, taken from the directory of the main file; it is read only
 when it is a file the skill reads, and the skill does not look for it
@@ -941,10 +942,12 @@ derive read hold no paragraph and no block at all (a paragraph counts when
 derive read any of its text; a block, which is a theorem-like statement, a
 proof, a figure, a table or a displayed formula, counts when derive read the
 environment or the delimiters that hold it, even when its content is in a file
-that was not read), derive stops, says which files were not read, and writes nothing; it
-stops before it asks for any section's `says`, and for a manuscript of
-headings only it says that draft builds an outline from headings. When derive
-does not stop for this reason and all the text of a section is in included
+that was not read) and no included file was left unread, derive stops and writes nothing; it
+stops before it asks for any section's `says`, and says that draft builds an
+outline from the headings of such a manuscript. When they hold none because
+the text is in included files that were not read, derive goes on: the section
+records carry those files in `unread` and the paragraph file is empty. When
+all the text of a section is in included
 files that were not read, derive asks the author for the `says` of each of those sections, since
 it has nothing to state it from, and stops when the author gives none. When such a
 section ends with no paragraph record, of its own or of a section under it,

@@ -25,6 +25,14 @@ public enum PropositionsCLI {
                     jsonl: paragraphs.jsonl, tex: paragraphs.tex, structure: paragraphs.structure,
                     workingDirectory: workingDirectory)
             }
+            if let audit = command as? AuditSymbolsOptions {
+                return AuditRun.run(.symbols, manuscriptRoot: audit.common.manuscriptRoot, tex: audit.common.tex,
+                                    format: audit.common.reportFormat, workingDirectory: workingDirectory)
+            }
+            if let audit = command as? AuditCitationsOptions {
+                return AuditRun.run(.citations, manuscriptRoot: audit.common.manuscriptRoot, tex: audit.common.tex,
+                                    format: audit.common.reportFormat, workingDirectory: workingDirectory)
+            }
             if let check = command as? OutlineCheckOptions {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
             }
@@ -53,6 +61,13 @@ public enum PropositionsCLI {
         if words.first == "cite-order" { return Root.helpMessage(for: CiteOrderOptions.self) }
         if words.first == "ledger-order" { return Root.helpMessage(for: LedgerOrderOptions.self) }
         if words.first == "paragraphs" { return Root.helpMessage(for: ParagraphsOptions.self) }
+        if words.first == "audit" {
+            switch words.dropFirst().first {
+            case "symbols": return Root.helpMessage(for: AuditSymbolsOptions.self)
+            case "citations": return Root.helpMessage(for: AuditCitationsOptions.self)
+            default: return Root.helpMessage(for: AuditOptions.self)
+            }
+        }
         guard words.first == "outline" else { return Root.helpMessage() }
         switch words.dropFirst().first {
         case "check": return Root.helpMessage(for: OutlineCheckOptions.self)
@@ -72,7 +87,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, OutlineOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -146,6 +161,56 @@ struct ParagraphsOptions: ParsableCommand {
 
     @Option(help: "A structure sidecar whose sections the paragraphs must not cross.")
     var structure: String?
+}
+
+struct AuditOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "audit",
+        abstract: "Cross-artifact audits of a manuscript: paths of working files, and citations.",
+        subcommands: [AuditSymbolsOptions.self, AuditCitationsOptions.self])
+}
+
+struct AuditCommonOptions: ParsableArguments {
+    @Option(help: "The directory of the manuscript. Reports name files from it.")
+    var manuscriptRoot: String
+
+    @Option(help: "The manuscript's main file (default: main.tex in the manuscript directory).")
+    var tex: String?
+
+    @Option(help: "md or json.")
+    var reportFormat = "md"
+}
+
+struct AuditSymbolsOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "symbols",
+        abstract: "Rule R1: a path to a working file written in the manuscript.",
+        discussion: """
+            Reads every file of the main file's \\input tree, and looks for a path with a code \
+            or note extension in \\texttt, \\url, \\path, \\href, \\verb, \\lstinline, \
+            verbatim-like environments and running text. Comments are not read.
+            Exit codes: 0 no finding; 1 at least one finding; 2 a file cannot be read, or an \
+            argument is wrong.
+            """)
+
+    @OptionGroup var common: AuditCommonOptions
+}
+
+struct AuditCitationsOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "citations",
+        abstract: "Rules R2 and R2-bis: leaked labels in citations, and cited keys against the bibliography.",
+        discussion: """
+            Reads every file of the main file's \\input tree and the bibliography files it \
+            declares (\\bibliography, \\addbibresource and the like); when it declares none, \
+            refs.bib in the manuscript directory. Every entry type counts but @string, @comment \
+            and @preamble. A citation command may have two optional arguments and, for \\cites \
+            and its kin, several groups of keys.
+            Exit codes: 0 no finding; 1 at least one finding; 2 a file cannot be read, or an \
+            argument is wrong.
+            """)
+
+    @OptionGroup var common: AuditCommonOptions
 }
 
 struct OutlineOptions: ParsableCommand {

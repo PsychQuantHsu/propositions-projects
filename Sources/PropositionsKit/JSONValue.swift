@@ -27,8 +27,22 @@ public struct JSONNumber: Hashable, Sendable {
     public let negative: Bool
     public let digits: String
     public let exponent: Int
+    /// The number as it was written, so that a line written again keeps it. It does not take
+    /// part in comparing two numbers.
+    public let literal: String
 
-    init(negative: Bool, integer: Substring, fraction: Substring, exponent written: Int) {
+    public static func == (a: JSONNumber, b: JSONNumber) -> Bool {
+        a.negative == b.negative && a.digits == b.digits && a.exponent == b.exponent
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(negative)
+        hasher.combine(digits)
+        hasher.combine(exponent)
+    }
+
+    init(negative: Bool, integer: Substring, fraction: Substring, exponent written: Int, literal: String = "") {
+        self.literal = literal
         var all = Array(integer + fraction)
         var power = written - fraction.count
         while all.last == "0" { all.removeLast(); power += 1 }
@@ -302,6 +316,7 @@ private struct Parser {
 
     mutating func number() throws -> JSONNumber {
         let failure = JSONError(description: "a value is not written as JSON")
+        let start = index
         var negative = false
         if peek == UInt8(ascii: "-") { negative = true; index += 1 }
         let integer = digits()
@@ -328,6 +343,7 @@ private struct Parser {
             }
             exponent = sign * size
         }
-        return JSONNumber(negative: negative, integer: integer, fraction: fraction, exponent: exponent)
+        let literal = String(decoding: bytes[start..<index], as: UTF8.self)
+        return JSONNumber(negative: negative, integer: integer, fraction: fraction, exponent: exponent, literal: literal)
     }
 }

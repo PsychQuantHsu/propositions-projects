@@ -1102,8 +1102,11 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   with the text. A record that is given `dropped` loses both keys: ask the author first which
   record opens or discharges those commitments instead, and tell the author about every record
   that still discharges a commitment nothing opens any more. In a merge the record that
-  replaces the merged records carries the `opens` and the `discharges` of all of them; in a
-  split, ask which of the new records carries each.
+  replaces the merged records carries the `opens` and the `discharges` of all of them, each
+  commitment once; in a split, ask which of the new records carries each. After any change to
+  these keys, read the paragraph file once more for the two rules the write check does not
+  test: no commitment is opened by two records that are not dropped, and every discharge is on
+  the line of its opening or after it. Correct what breaks them before showing the outline.
 - **Length targets.** When the author gives a target for a section, write it as `length`, a
   whole number of words, on the section record. The limit of the whole article is not in the
   outline files: it is the `length` of `article.json`, which the author writes
@@ -1115,7 +1118,9 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   that section again from the manuscript, if the author asks, and add its paragraph records.
 - **Which part of the article a section is in.** When the author says a section is in the
   appendix or in the supplementary material, give its section record `part`: `appendix` or
-  `supplement`. `main`, or no `part`, is the main text. No other value is written.
+  `supplement`. A section without `part` is in the part of the section it is under, and in the
+  main text when it is under none; write `main` on a subsection only to take it out of the part
+  of the section above it. No other value is written.
 - **Something another article establishes.** Each article has its own outline directory. When
   a paragraph of this article relies on a record of another article's outline in the same
   repository, name it in `uses`, or in the `basis` of the point, as

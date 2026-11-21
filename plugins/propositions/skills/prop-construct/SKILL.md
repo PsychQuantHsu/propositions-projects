@@ -425,10 +425,12 @@ those paths. Exit 2 names what it refused; a warning names a retired proposition
 will shift. Edit nothing outside the staging directory from here on, and in the staging
 directory only these four copies.
 
-When the directory of the ledger holds `article.json` (`docs/OUTLINE.md` of this plugin,
-"article.json"), `prepare` copies it too, as a file that may not change. Its `banned` list names
-phrasings that are not to appear in the article, each with a reason: read the staged copy
-(`$STAGE/article/article.json`) before W4 and do not write them. Exit 2 that names `article.json`
+`prepare` copies `article.json` too (`docs/OUTLINE.md` of this plugin, "article.json"), as a file
+that may not change, when there is one: the one beside the ledger, or, in a run with an outline
+(O3, G2), the one in the outline directory. After every `prepare` that succeeds, look whether
+`$STAGE/article/article.json` is there, and read it before any manuscript text is written or
+changed: its `banned` list names phrasings that are not to appear in the article, each with a
+reason. Do not write them. Exit 2 that names `article.json`
 means the file is not in its format; say what was printed and stop, the author corrects it.
 
 ### W4 — Write the paragraph in the copy
@@ -476,7 +478,13 @@ prints the lines that hold a placeholder; they are allowed, and the report lists
 `<file>:L<n>: the banned phrasing "…" (<reason>)` is a phrasing of `article.json` in the new
 paragraph: reword the paragraph and run the gates again. Do not change `article.json` to make
 the check pass; when the author says the phrasing is wanted here, the author changes the list,
-and write mode starts again from W3. A launcher
+and write mode starts again from W3.
+
+Two reports are not about the draft and are not fixed in the copies: an input that changed
+after prepare (`article.json`, `_meta.json`, an outline file, or one of its copies), and a
+`write.json` that no longer names what prepare copied (`prepare again`). The staging directory
+can no longer be used: start again from W3 (O3 or G2 in those modes) in a new one. Never edit
+`write.json`, and never edit a staged copy of an input to make a check pass. A launcher
 exit of 3 counts as not run, and write mode then stops: nothing is written without the check.
 
 ### W8 — Show it and ask once
@@ -514,10 +522,12 @@ outline's format: `docs/OUTLINE.md` of this plugin, "Writing text from the outli
 are W1 to W9, with these differences.
 
 **O1 — Which record.** Establish `OUTDIR`, the directory that holds the outline files, from the
-request or by asking once. When `$OUTDIR/article.json` has `destinations`, the article is written
-into more than one document (see O3), and the `--jsonl` of the two commands below is the ledger of
-the document being written: `outline trace` checks the records of that document and lists the
-others as `in the document of the part <part>`. Then:
+request or by asking once. When `$OUTDIR/article.json` has `destinations`, a part of the article
+can be another document (two parts can also name the same one). `outline trace` then checks the
+records of the document whose ledger it is given and lists the others as `in the document of the
+part <part>`: run it once for the ledger of each document the destinations name, so that a
+record written into any of them counts as written. `outline status` takes the directory alone.
+Then:
 
 ```bash
 "${CLI[@]}" outline status "$OUTDIR"
@@ -565,8 +575,9 @@ part and name the `--tex` and `--jsonl` to give: that part is another document. 
 again with those two files and with the `structure.json` and `discourse.jsonl` beside that ledger
 (ask the author where they are when they are not there; a document with no ledger yet is set up
 first, with Operation D of `/propositions:prop-ledger`), and use that document's files in every
-later step. When it says that `article.json` names no destination for the part, stop: the author
-adds one. A run with an outline reads `article.json` from `OUTDIR`, not from the directory of the
+later step. Before going on, run the preconditions of W1 (the validator and the structure
+validator) on that document's ledger and sidecars: they were run on another document. When it
+says that `article.json` names no destination for the part, stop: the author adds one. A run with an outline reads `article.json` from `OUTDIR`, not from the directory of the
 ledger.
 
 `prepare` prints a line that begins with `[unread]` for each included file of the record's
@@ -633,7 +644,9 @@ derived, for every section; tell the author before rewriting, as in O3. With `de
 that document, and rewrite only the sections that go to it (a section goes to its own `part`,
 else to the part of the section it is under, else to `main`). The sections of another document
 are rewritten in a run of their own. Content cannot be moved from one document to another this
-way: say so and stop when the revised outline asks for it.
+way: say so and stop when the revised outline asks for it. `prepare` also refuses when any
+section that is not dropped goes to a part for which `article.json` names no destination, even a
+section of another document: stop and tell the author which part needs one.
 
 **G3 — Rewrite the copies.** Follow the outline: its sections in order, each with its heading
 line, and in each section its paragraph records in order. A record that carries `carry` is the
@@ -700,15 +713,19 @@ and the readers again, then asks again.
 "${CLI[@]}" write commit --stage "$STAGE"
 ```
 
-It writes the files that changed and writes `outline-trace.jsonl` anew from the map. The originals
+It writes the files that changed and writes `outline-trace.jsonl` anew from the map. With
+`destinations`, the records of the other documents are kept as they were, before the records of
+the map, which then carry their `part`: those kept records are not stale. The originals
 are in `$STAGE/backup/`, and `backup/restore.jsonl` says where each came from (the old trace
 included). When a write fails part way, report what was written and that list, and stop: putting
 the originals back is the author's decision. Then run `outline trace` and report its count, and
 the lengths as in O5 when the outline or `article.json` has a `length`.
 
-When the author changes the `banned` list of `article.json` after text was written, the whole
-manuscript is compared with `"${CLI[@]}" phrasing --tex "$MAIN" --article <the article file>`:
-exit 1 lists each occurrence with its line. Report them; rewording them is a revision the author
+When the author changes the `banned` list of `article.json` after text was written, a document
+is compared with `"${CLI[@]}" phrasing --tex "$MAIN" --article <the article file>`: it reads the
+input tree of that main file and no other, so with `destinations` run it once for each main
+file they name, and say which document could not be compared. Exit 1 lists each occurrence
+with its line. Report them; rewording them is a revision the author
 asks for.
 
 ## Explain mode

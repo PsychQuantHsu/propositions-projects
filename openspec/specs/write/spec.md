@@ -401,3 +401,83 @@ updated: 2026-11-22
 code:
   - propositions-projects.code-workspace
 -->
+
+---
+### Requirement: The comparison with banned phrasings is not passed over
+
+The comparison of a text with a banned phrasing SHALL treat two spellings that differ only in letter case as the same, also where a language writes the cases with different letters (`ß` and `SS`, the two lower-case sigmas). White space at the beginning or the end of a phrase is one space there: the phrase ` cat ` occurs where `cat` stands between two spaces, a line break counting as one, and not inside `concatenate`. Every occurrence is reported, also one that overlaps another. A `%` begins a comment whatever follows it, a combining mark included. A report names the main file by its own file name.
+
+`propositions write check` and `write commit` SHALL refuse (exit 2) a staging directory in which prepare copied an `article.json` or an outline and whose `write.json` no longer names it.
+
+On a rewrite, `write check` SHALL report as a problem a staged manuscript whose input tree holds a file that prepare did not copy, or whose input tree cannot be read: a rewrite cannot add a file to the input tree.
+
+#### Scenario: A list cannot be switched off by editing write.json
+
+- **WHEN** the entry for `article.json` is removed from `write.json` after prepare
+- **THEN** check and commit exit with 2
+
+##### Example: how the comparison folds case, ends and overlaps
+
+- **GIVEN** the banned phrasings `Straße`, ` cat ` and `ana`
+- **WHEN** the lines `Die STRASSE ist lang.`, `We concatenate lists.`, `A cat` / `sat.`, `banana` and `Unrelated %` followed by a combining acute accent and ` strasse` are compared
+- **THEN** the first holds `Straße`; the second holds nothing; the third holds ` cat `, reported on its first line; the fourth holds `ana` twice; the fifth holds nothing
+
+##### Example: write.json that no longer names what prepare copied
+
+- **GIVEN** a run prepared with an `article.json` beside the ledger, and another prepared from an outline record
+- **WHEN** the key `article` is removed from the first `write.json`, the key `outline` from the second, and `write check` and `write commit` run
+- **THEN** all four exit with 2 and say to prepare again
+
+##### Example: a rewrite that adds an included file
+
+- **GIVEN** the rewrite of the example "a manuscript is rewritten from an outline approved as a whole"
+- **WHEN** the staged `main.tex` gets a line `\input{extra}`, a file `extra.tex` is put beside it in the staging directory, and `write check` runs
+- **THEN** it exits with 1 and reports that the staged manuscript includes `extra.tex`, which prepare did not copy
+
+##### Example: the main file is reported under its own name
+
+- **GIVEN** a manuscript whose main file is `supp.tex`, with an empty ledger, and `article.json` beside the ledger banning `extra analysis`
+- **WHEN** a paragraph that holds the phrasing is drafted and `write check` runs
+- **THEN** the report begins with `supp.tex:L`
+
+<!-- @trace
+source: idd-118-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The parts of a run are taken from article.json, not from write.json
+
+On a rewrite, `propositions write check` and `write commit` SHALL work out again, from the staged copy of `article.json` and the main file and ledger of the run, the parts whose destination the document is, and report as a problem (commit: write nothing) a `write.json` that names other parts, or parts when `article.json` names no destinations.
+
+When a paragraph is written from an outline with destinations, a proposition id that `outline-trace.jsonl` already names in a record of a part of another document SHALL NOT stop the commit; one that it names in a record of a part of the same document does, as before.
+
+The trace records a rewrite keeps SHALL be written byte for byte as they were, each with the line ending it had.
+
+A destination is the document given when its `tex` and `jsonl` name the same files as the main file and ledger given, by the names the file system gives them, links followed in the order of the path. A `tex` or `jsonl` that holds a control character is not in the format of `article.json`.
+
+#### Scenario: write.json cannot widen a rewrite to another document
+
+- **WHEN** `write.json` of a rewrite of the main text is edited to name the part `supplement` too
+- **THEN** check reports it and commit writes nothing
+
+##### Example: a write.json that names another part
+
+- **GIVEN** the rewrite of the main text of the example "a rewrite of one document keeps the trace of the other", prepared and drafted
+- **WHEN** the `parts` of `rewrite` in `write.json` are changed to `["main", "supplement"]`, and `write check` and `write commit` run
+- **THEN** check exits with 1 and says that `write.json` does not name the parts `article.json` gives; commit exits with 2 and the trace is unchanged
+
+##### Example: the same id in another document, and kept records as they were
+
+- **GIVEN** the two documents, with a trace that holds one record of the supplement, ending in CR LF, whose `first_prop` is the id the main text's new paragraph will use
+- **WHEN** the paragraph `p-1` is written into the main text and committed; and, in another run, the main text is rewritten and committed
+- **THEN** the first commit exits with 0; after the rewrite the first bytes of the trace are the supplement's record with its CR LF
+
+<!-- @trace
+source: idd-120-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->

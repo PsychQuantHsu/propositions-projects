@@ -265,6 +265,9 @@ struct WritePrepareOptions: ParsableCommand {
             may change, and retired may be added), and the staging directory has to hold \
             outline-map.jsonl, one line per paragraph record written, which commit copies into \
             outline-trace.jsonl.
+            An article.json in the outline directory (else beside the ledger) is copied as an input: \
+            its banned phrasings are compared with the new text, and with destinations the main \
+            file and ledger given have to be the document of the section's part.
             Exit codes: 0 staged; 2 a file cannot be read, the staging directory is not empty, \
             the paragraph has nowhere to go, or the outline record cannot be written from.
             """)
@@ -565,7 +568,8 @@ struct OutlineStatusOptions: ParsableCommand {
         discussion: """
             Prints one line for each section, one for the order of sections, one for the sections \
             removed since their approval, one for the paragraph records that name no section, \
-            two counts, and `ok status`. Records are compared as JSON values.
+            two counts, one for the sections that carry unread (included files that were not read), \
+            and `ok status`. Records are compared as JSON values.
             Exit codes: 0 the status was printed; 2 a file is missing, a line is not a record, or \
             an argument is wrong.
             """)

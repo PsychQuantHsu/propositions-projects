@@ -15,6 +15,11 @@ public enum PropositionsCLI {
                     jsonl: citeOrder.jsonl, tex: citeOrder.tex, json: citeOrder.json,
                     workingDirectory: workingDirectory)
             }
+            if let ledgerOrder = command as? LedgerOrderOptions {
+                return LedgerOrderRun.run(
+                    jsonl: ledgerOrder.jsonl, tex: ledgerOrder.tex, write: ledgerOrder.write,
+                    workingDirectory: workingDirectory)
+            }
             if let check = command as? OutlineCheckOptions {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
             }
@@ -41,6 +46,7 @@ public enum PropositionsCLI {
         // like one: a directory can be called `status`.
         let words = Array((arguments.first == "help" ? Array(arguments.dropFirst()) : arguments).prefix { !$0.hasPrefix("-") })
         if words.first == "cite-order" { return Root.helpMessage(for: CiteOrderOptions.self) }
+        if words.first == "ledger-order" { return Root.helpMessage(for: LedgerOrderOptions.self) }
         guard words.first == "outline" else { return Root.helpMessage() }
         switch words.dropFirst().first {
         case "check": return Root.helpMessage(for: OutlineCheckOptions.self)
@@ -60,7 +66,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, OutlineOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -83,6 +89,32 @@ struct CiteOrderOptions: ParsableCommand {
 
     @Flag(help: "Print one JSON object instead of lines.")
     var json = false
+}
+
+struct LedgerOrderOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "ledger-order",
+        abstract: "Say whether a ledger's lines are in reading order, and put them in it.",
+        discussion: """
+            A dry run unless --write is given. Lines are moved, never edited. A retired \
+            proposition, a comment and an empty line stay behind the proposition they followed. \
+            Propositions that start on the same line keep their order and are reported.
+            Without --tex the order is that of the first line of each location, and a location \
+            that names another file is refused. With --tex the order is the manuscript's reading \
+            order through its \\input tree, so a manuscript of several files can be ordered.
+            Exit codes: 0 in reading order, or written; 1 a dry run in which lines would move; \
+            2 a file cannot be read, a line is not JSON, a location cannot be used, or an \
+            argument is wrong.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+
+    @Option(help: "The manuscript's main file. Needed for a manuscript of several files.")
+    var tex: String?
+
+    @Flag(help: "Rewrite the ledger.")
+    var write = false
 }
 
 struct OutlineOptions: ParsableCommand {

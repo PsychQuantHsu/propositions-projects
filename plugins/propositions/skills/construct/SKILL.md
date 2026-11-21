@@ -9,7 +9,8 @@ description: >-
   prop_t，prop_{t+1} 該寫什麼", "what should the next sentence do"), whether its promises are kept
   ("organized as follows" followed, "we now examine" carried out: "研究問題有沒有回答到", "論證的走向有沒有斷掉",
   "承諾有沒有兌現"), or wants the article structure annotated ("標註文章結構", "annotate the article structure",
-  section roles) — even if they never name this skill. Invoke it before opening the manuscript or
+  section roles), or wants the next paragraph written into the draft ("幫我把下一段寫進稿件", "write the next
+  paragraph into the draft") — even if they never name this skill. Invoke it before opening the manuscript or
   the sidecars: it finds them itself and has the tool that reads them out, so do not parse
   structure.json or discourse.jsonl by hand. It records commitments, section roles, what each
   sentence does and a dependency tree (S1–S9), and reports what the article owes the reader and
@@ -64,7 +65,7 @@ mechanical:
 | A `move` or paragraph `type` outside `catalog/vocabulary.yaml` | S9 rejects it; no order of moves is ever reported |
 | A record with no `move`, or a paragraph with no `type` | S9 allows it because both fields are optional, so the A5 summary counts them; annotate mode must bring both counts to 0 |
 | A half-finished annotation lands in the ledger directory | all drafting happens in a staging directory; the ledger directory changes only after the validator passes and the user confirms |
-| The skill alters the ledger | it never writes `main.jsonl`; its sha256 is compared before and after |
+| The skill alters the ledger | outside write mode it never writes `main.jsonl`, and its sha256 is compared before and after; write mode writes the manuscript, the ledger and the sidecars only through `propositions write commit`, after the author confirms |
 
 ## Resolve scripts and paths
 
@@ -87,10 +88,13 @@ Establish, from the request or by asking once (AskUserQuestion, all at once):
 - `LEDGER` — the ledger directory (holds `main.jsonl` and `_meta.json`).
 - `MAIN` — the manuscript's main `.tex` file.
 - The mode: **annotate** (the manuscript is written; label its structure), **next** (the user is
-  writing; say what comes next) or **explain** (the sidecars exist; say how the sentences of a
-  paragraph or section relate). "下一句" / "what next" means next; "標註" / "check the
+  writing; say what comes next), **write** (the user is writing; write the next paragraph into
+  the draft, with its propositions and records, behind one confirmation) or **explain** (the
+  sidecars exist; say how the sentences of a paragraph or section relate). "下一句" / "what
+  next" means next; "寫進稿件" / "write the next paragraph" means write; "標註" / "check the
   structure" means annotate; "這段句子之間是什麼關係" / "explain how these sentences relate"
-  means explain.
+  means explain. When it is unclear whether the user wants a suggestion or a written paragraph,
+  it is next mode: only write mode changes files.
 
 If `LEDGER/_meta.json` is missing, the manuscript has no ledger: point to Operation D of
 `/propositions:propositions`, then `/propositions:extract`.
@@ -371,6 +375,125 @@ Next mode writes nothing: not the manuscript, not the ledger, not the sidecars. 
 chosen sentence to the manuscript is the author's act; afterwards `/propositions:extract`
 and annotate mode bring the ledger and sidecars up to date.
 
+## Write mode
+
+Write mode adds one paragraph at the end of the draft: after the paragraph that holds the last
+live proposition in reading order. It writes four files, the manuscript file that gets the
+paragraph, the ledger, `discourse.jsonl` and `structure.json`, and only through
+`propositions write commit`, which writes nothing unless the files are as they were when the
+copies were made and the copies differ from them only by a new paragraph. Everything is drafted
+in those copies.
+
+### W1 — Preconditions
+
+The same as N1: the ledger passes the validator and the sidecars pass `--partial`. Then check
+that the tool is there:
+
+```bash
+CLI=(bash "$PLUGIN_ROOT/hooks/run-cli.sh" "${CLAUDE_PLUGIN_DATA}")
+"${CLI[@]}" write prepare --help > /dev/null
+```
+
+Exit 3 means the pinned tool is not installed (it is a macOS binary): say that write mode needs
+it, offer next mode instead, and stop.
+
+### W2 — Decide what the paragraph does
+
+Run N2 to N5 for the first sentence of a new paragraph, or take the plan the author gives. Agree
+with the author, in one question (AskUserQuestion), what the paragraph does: what it attaches
+to, which commitments it advances, and its claims. A claim that changes what the paper argues is
+the author's to make; when the author has not made it, write a placeholder for it.
+
+Never invent a result, a number or a citation. Write each as a placeholder
+`{PENDING: <what is to be supplied>}`. It needs no macro, compiles as it is and shows in the PDF.
+A citation key may be used only when it is in the manuscript's bibliography file; any other
+citation is a placeholder.
+
+### W3 — Prepare the copies
+
+```bash
+STAGE=$(mktemp -d)/write
+"${CLI[@]}" write prepare --jsonl "$LEDGER/main.jsonl" --tex "$MAIN" \
+  --structure "$LEDGER/structure.json" --discourse "$LEDGER/discourse.jsonl" --stage "$STAGE"
+```
+
+It prints the line after which the paragraph goes and the path of each copy: the manuscript
+file, the main file, the ledger, `structure.json` and `discourse.jsonl`. Every later step uses
+those paths. Exit 2 names what it refused; a warning names a retired proposition whose location
+will shift. Edit nothing outside the staging directory from here on, and in the staging
+directory only these four copies.
+
+### W4 — Write the paragraph in the copy
+
+In the staged manuscript file, after the line `prepare` named, add one blank line and the
+paragraph: one run of non-blank lines, ending with a line ending. When text follows, the line
+after the paragraph has to be blank; add one. Write no other line.
+
+### W5 — Its propositions
+
+Follow steps 1 and 5 to 7 of `/propositions:extract` on the staged manuscript file, over the
+lines of the new paragraph. Locations use the staged file's line numbers, which are the numbers
+the lines will have after the commit. Then add the lines with the new ids at the end of the staged
+ledger:
+
+```bash
+cat "$EXTRACT_STAGE/new.ids.jsonl" >> "<staged ledger>"
+```
+
+The coverage check runs with `--tex <staged manuscript file> --main <staged main file>`. Any text
+it reports uncovered is extracted, or the author accepts leaving it out.
+
+### W6 — Its records
+
+Add one record per new proposition at the end of the staged `discourse.jsonl`, chosen as in
+annotate mode (A3): `head` and `relation` inside the new paragraph, `move`, and `opens` or
+`discharges` for the commitments W2 agreed. Add the new paragraph to the staged `structure.json`
+as annotate mode records a paragraph. Only add to it: `write check` refuses a structure that
+loses or changes anything it had.
+
+### W7 — Run the gates on the copies
+
+```bash
+"${CLI[@]}" write check --stage "$STAGE"
+python3 "$VALIDATOR" --jsonl "<staged ledger>" --meta "$STAGE/ledger/_meta.json" --tex "<staged main file>"
+python3 "$VSTRUCT" --jsonl "<staged ledger>" --structure "<staged structure.json>" \
+  --discourse "<staged discourse.jsonl>" --partial
+"${CLI[@]}" cite-order --jsonl "<staged ledger>" --tex "<staged main file>"
+```
+
+All four have to pass: the first three exit 0, and `cite-order` reports no forward citation
+that involves a new proposition. A forward citation the draft already had is reported, not fixed
+here. When one fails, fix the copies and run all four again. `write check`
+prints the lines that hold a placeholder; they are allowed, and the report lists them. A launcher
+exit of 3 counts as not run, and write mode then stops: nothing is written without the check.
+
+### W8 — Show it and ask once
+
+Show the author:
+
+- the new paragraph as it will stand in the manuscript, with its line numbers;
+- the new propositions as a table (location, claim_type, evidence_class, first words);
+- the new records (head, relation, move, commitments);
+- the placeholders and their lines;
+- `diff -u` of each of the four files against its copy.
+
+Then ask once (AskUserQuestion): write it, change something, or stop. The answer covers only what
+was shown. If anything in the copies changes afterwards, run W7 again and ask again.
+
+### W9 — Write on confirmation
+
+```bash
+"${CLI[@]}" write commit --stage "$STAGE"
+```
+
+Exit 0 lists the files written and where the originals are kept (`$STAGE/backup/`). Exit 2
+writes nothing when the files changed after W3 or the check fails: say why, and start again from
+W3 if the author wants to. When the message names files already written, a write failed part
+way: report which files were written and where the originals are, and stop. Putting the
+originals back is the author's decision; do not do it unasked.
+
+After a commit, the draft has a new end: next mode and write mode start again from it.
+
 ## Explain mode
 
 ### E1 — Preconditions: sidecars for this text
@@ -460,4 +583,9 @@ Explain mode writes nothing: not the manuscript, not the ledger, not the sidecar
   staged files are), and the `main.jsonl` fingerprint check.
 - **Next**: the state (section, role, open commitments), the move hint or why it was skipped,
   the candidates, and the fingerprint check.
+- **Write**: what the paragraph does, the gates (W7), what was written and where the originals
+  are, or that the author stopped and where the copies are. List every placeholder with its
+  line: the paragraph is not finished while one remains. Say that the paragraph was checked
+  mechanically and not proofread; `/propositions:proofread` and `/propositions:clarity-audit`
+  run when the author asks.
 - **Explain**: the tool's output, the plain-language reading, and the fingerprint check.

@@ -429,7 +429,7 @@ applies to `axiom`, `definition`, `commentary`.
 | `not_computable` (profile `empirical` only, v1.7+) | The quantity cannot be produced from the dataset as collected |
 | `external` (profile `empirical` only, v1.7+) | Support lies outside this paper: the works cited in the sentence, or, when nothing is cited, the field's common knowledge. Whether a citation is present is read from the text (`\cite` commands), not recorded separately |
 
-The five `empirical` values are defined together with proofread Mode B (`plugins/propositions/skills/proofread/SKILL.md`, §Schema extension for Mode B); the two tables must change together.
+The five `empirical` values are defined together with proofread Mode B (`plugins/propositions/skills/prop-proofread/SKILL.md`, §Schema extension for Mode B); the two tables must change together.
 
 ## Profiles (v1.7+)
 

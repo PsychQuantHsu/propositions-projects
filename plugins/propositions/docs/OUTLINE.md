@@ -7,7 +7,7 @@ outline, changes it, and approves it; only then is text written from it.
 
 An outline can be built from a finished manuscript, so that a large
 restructuring is decided on sentences instead of on pages, or from a title and
-ideas. It is written by the skill `/propositions:outline`.
+ideas. It is written by the skill `/propositions:prop-outline`.
 
 Two things are outside this document. Writing manuscript text from an outline
 belongs to a later step (issue #51); nothing described here writes to the
@@ -1203,7 +1203,7 @@ line is one of the five kinds the premise check's agent judges.
 ## Writing text from the outline
 
 Text is written from the outline one paragraph record at a time, by the write mode of
-`/propositions:construct`, through `propositions write prepare --outline <directory>
+`/propositions:prop-construct`, through `propositions write prepare --outline <directory>
 --outline-paragraph <id>`, `write check` and `write commit` (issue #51). Prepare stages nothing
 unless the outline passes `propositions outline check`, the id names exactly one paragraph record,
 that record does not carry `dropped`, and its section stands as approved (see "When a section

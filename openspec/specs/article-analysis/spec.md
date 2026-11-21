@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Article analysis is the `propositions:analyze` skill, a single entry point for analyzing a whole LaTeX manuscript. It determines how far the manuscript has got, runs the next unfinished step through the existing skills, and reports the result, so that a user does not have to remember their order and preconditions.
+Article analysis is the `propositions:prop-analyze` skill, a single entry point for analyzing a whole LaTeX manuscript. It determines how far the manuscript has got, runs the next unfinished step through the existing skills, and reports the result, so that a user does not have to remember their order and preconditions.
 
 ## Requirements
 
@@ -46,22 +46,22 @@ code:
 ---
 ### Requirement: Each state has one action
 
-The skill SHALL act on the state as follows and in no other way: `no-ledger` invokes Operation D of `propositions:propositions`; `ledger-invalid` stops and points to `propositions:propositions`; `ledger-incomplete` invokes `propositions:extract` on one section at a time; `no-structure` invokes `propositions:construct-batch` when the ledger holds 100 or more propositions and `propositions:construct` otherwise; `structure-invalid` stops and points to `propositions:construct`; `no-moves` invokes the moves-only path of `propositions:construct-batch` at any length; `ready` produces the read-out and the report. After an invoked skill finishes, the skill SHALL determine the state again. The skill SHALL NOT restate the procedure of an invoked skill.
+The skill SHALL act on the state as follows and in no other way: `no-ledger` invokes Operation D of `propositions:prop-ledger`; `ledger-invalid` stops and points to `propositions:prop-ledger`; `ledger-incomplete` invokes `propositions:prop-extract` on one section at a time; `no-structure` invokes `propositions:prop-construct-batch` when the ledger holds 100 or more propositions and `propositions:prop-construct` otherwise; `structure-invalid` stops and points to `propositions:prop-construct`; `no-moves` invokes the moves-only path of `propositions:prop-construct-batch` at any length; `ready` produces the read-out and the report. After an invoked skill finishes, the skill SHALL determine the state again. The skill SHALL NOT restate the procedure of an invoked skill.
 
 #### Scenario: A long manuscript without sidecars
 
 - **WHEN** the state is `no-structure` and the ledger holds 300 propositions
-- **THEN** the skill invokes `propositions:construct-batch`
+- **THEN** the skill invokes `propositions:prop-construct-batch`
 
 #### Scenario: A short manuscript without sidecars
 
 - **WHEN** the state is `no-structure` and the ledger holds 40 propositions
-- **THEN** the skill invokes `propositions:construct`
+- **THEN** the skill invokes `propositions:prop-construct`
 
 #### Scenario: A short manuscript without moves
 
 - **WHEN** the state is `no-moves` and the ledger holds 40 propositions
-- **THEN** the skill invokes the moves-only path of `propositions:construct-batch`, which leaves the dependency tree alone
+- **THEN** the skill invokes the moves-only path of `propositions:prop-construct-batch`, which leaves the dependency tree alone
 
 #### Scenario: An invalid ledger is not repaired
 
@@ -79,7 +79,7 @@ code:
 ---
 ### Requirement: Coverage is judged from the uncovered text
 
-The skill SHALL run `check-extraction-coverage.py` on the lines between `\begin{document}` and `\end{document}`, on each file of a multi-file manuscript, and SHALL NOT use its exit code as the result. Only uncovered sentences of the body SHALL count as `ledger-incomplete`. LaTeX commands with no sentence, headings, front matter, author statements after the body, appendix instruments and bibliography SHALL NOT count. The skill SHALL list the location of every uncovered run it did not count, and SHALL pass those runs to `propositions:construct` or `propositions:construct-batch` when it invokes them.
+The skill SHALL run `check-extraction-coverage.py` on the lines between `\begin{document}` and `\end{document}`, on each file of a multi-file manuscript, and SHALL NOT use its exit code as the result. Only uncovered sentences of the body SHALL count as `ledger-incomplete`. LaTeX commands with no sentence, headings, front matter, author statements after the body, appendix instruments and bibliography SHALL NOT count. The skill SHALL list the location of every uncovered run it did not count, and SHALL pass those runs to `propositions:prop-construct` or `propositions:prop-construct-batch` when it invokes them.
 
 #### Scenario: A complete ledger with uncovered commands
 
@@ -89,7 +89,7 @@ The skill SHALL run `check-extraction-coverage.py` on the lines between `\begin{
 #### Scenario: An unextracted section
 
 - **WHEN** the coverage check reports the sentences of one section as uncovered
-- **THEN** the state is `ledger-incomplete` and `propositions:extract` runs on that section
+- **THEN** the state is `ledger-incomplete` and `propositions:prop-extract` runs on that section
 
 
 <!-- @trace
@@ -174,7 +174,7 @@ code:
 ---
 ### Requirement: Three steps run only on request
 
-The default depth SHALL end at the `ready` read-out. `propositions:proofread`, `propositions:manuscript-audit` and `propositions:clarity-audit` SHALL run only when the user asks for them. `proofread` and `manuscript-audit` SHALL require a ledger that passes `validate-propositions.py`; `clarity-audit` SHALL run in any state. The report SHALL say what each step not run would answer.
+The default depth SHALL end at the `ready` read-out. `propositions:prop-proofread`, `propositions:prop-manuscript-audit` and `propositions:prop-clarity-audit` SHALL run only when the user asks for them. `proofread` and `manuscript-audit` SHALL require a ledger that passes `validate-propositions.py`; `clarity-audit` SHALL run in any state. The report SHALL say what each step not run would answer.
 
 #### Scenario: Default depth
 
@@ -184,7 +184,7 @@ The default depth SHALL end at the `ready` read-out. `propositions:proofread`, `
 #### Scenario: Readability only on a manuscript with no ledger
 
 - **WHEN** the state is `no-ledger` and the user asks only for a readability pass
-- **THEN** `propositions:clarity-audit` runs and no ledger is created
+- **THEN** `propositions:prop-clarity-audit` runs and no ledger is created
 
 
 <!-- @trace
@@ -215,17 +215,17 @@ code:
 ---
 ### Requirement: Whole-article requests route to the entry point
 
-The skill's description SHALL claim requests to analyze or go through a whole article, and SHALL direct requests about one passage, the next sentence, one sentence's readability or validating a ledger to `propositions:extract`, `propositions:construct`, `propositions:clarity-audit` and `propositions:propositions`. The existing seven skills SHALL stay directly invocable, and apart from the scaffold list of Operation D their content SHALL NOT change.
+The skill's description SHALL claim requests to analyze or go through a whole article, and SHALL direct requests about one passage, the next sentence, one sentence's readability or validating a ledger to `propositions:prop-extract`, `propositions:prop-construct`, `propositions:prop-clarity-audit` and `propositions:prop-ledger`. The existing seven skills SHALL stay directly invocable, and apart from the scaffold list of Operation D their content SHALL NOT change.
 
 #### Scenario: A whole-article request
 
 - **WHEN** a user asks to analyze this paper
-- **THEN** the request matches `propositions:analyze`
+- **THEN** the request matches `propositions:prop-analyze`
 
 #### Scenario: A next-sentence request
 
 - **WHEN** a user asks what to write next in a draft section
-- **THEN** the request matches `propositions:construct` and not `propositions:analyze`
+- **THEN** the request matches `propositions:prop-construct` and not `propositions:prop-analyze`
 
 <!-- @trace
 source: add-analyze-entry-skill

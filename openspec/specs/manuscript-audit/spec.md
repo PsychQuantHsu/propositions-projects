@@ -33,10 +33,10 @@ source: retire-python-ports-fix1
 updated: 2026-11-21
 code:
   - plugins/propositions/scripts/run-audit.sh
-  - plugins/propositions/skills/construct-batch/SKILL.md
+  - plugins/propositions/skills/prop-construct-batch/SKILL.md
   - plugins/propositions/rules/manuscript-consistency-audit.md
   - propositions-projects.code-workspace
-  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - plugins/propositions/skills/prop-manuscript-audit/SKILL.md
   - plugins/propositions/README.md
 -->
 

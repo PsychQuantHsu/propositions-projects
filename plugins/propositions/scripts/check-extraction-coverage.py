@@ -5,7 +5,7 @@ The validator's R1 proves every prop.text occurs in the manuscript (nothing was
 fabricated). This check proves the converse for one line range: every piece of
 text there is covered by some proposition, or belongs to a structure that is
 deliberately not extracted. It is the gate the extraction skill
-(propositions:extract) runs before merging new propositions.
+(propositions:prop-extract) runs before merging new propositions.
 
 Coverage is computed per character, not per sentence: a clause-level ledger
 that drops one clause of a sentence still leaves that clause uncovered.

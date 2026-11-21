@@ -1,14 +1,14 @@
 ---
-name: analyze
+name: prop-analyze
 description: >-
   Analyzes a whole LaTeX manuscript from one request: works out from its files how far it has got,
   runs the next unfinished step through the existing propositions skills, and ends with a report of
   what was done, what was found and what comes next. Use whenever the user wants a paper analyzed
   or taken through the process as a whole, or asks how far it has got ("分析這篇文章", "這篇文章跑一遍",
   "整篇分析", "這篇做到哪裡了", "analyze this paper", "go through the whole article") — even if they
-  never name this skill. Not for one passage (/propositions:extract), the next sentence or how the
-  sentences of one paragraph relate (/propositions:construct), one unclear sentence
-  (/propositions:clarity-audit), or validating a ledger (/propositions:propositions): those go
+  never name this skill. Not for one passage (/propositions:prop-extract), the next sentence or how the
+  sentences of one paragraph relate (/propositions:prop-construct), one unclear sentence
+  (/propositions:prop-clarity-audit), or validating a ledger (/propositions:prop-ledger): those go
   straight to their own skills.
 allowed-tools:
   - Read
@@ -54,12 +54,12 @@ before it are settled.
 
 | State | Holds when | Action |
 |---|---|---|
-| `no-ledger` | `$LEDGER/_meta.json` is missing | Operation D of `/propositions:propositions` |
-| `ledger-invalid` | `validate-propositions.py` exits non-zero | Stop and report; point to `/propositions:propositions` |
-| `ledger-incomplete` | the coverage check leaves uncovered sentences of the body | `/propositions:extract`, one section at a time |
-| `no-structure` | `structure.json` or `discourse.jsonl` is missing | 100 propositions or more: `/propositions:construct-batch`; fewer: `/propositions:construct` in annotate mode |
-| `structure-invalid` | `validate-structure.py --partial` exits non-zero | Stop and report; point to `/propositions:construct` |
-| `no-moves` | `structure-metrics.py` has no `moves` field, or its `proposition_share` or `paragraph_share` is below 1 | The moves-only path of `/propositions:construct-batch` |
+| `no-ledger` | `$LEDGER/_meta.json` is missing | Operation D of `/propositions:prop-ledger` |
+| `ledger-invalid` | `validate-propositions.py` exits non-zero | Stop and report; point to `/propositions:prop-ledger` |
+| `ledger-incomplete` | the coverage check leaves uncovered sentences of the body | `/propositions:prop-extract`, one section at a time |
+| `no-structure` | `structure.json` or `discourse.jsonl` is missing | 100 propositions or more: `/propositions:prop-construct-batch`; fewer: `/propositions:prop-construct` in annotate mode |
+| `structure-invalid` | `validate-structure.py --partial` exits non-zero | Stop and report; point to `/propositions:prop-construct` |
+| `no-moves` | `structure-metrics.py` has no `moves` field, or its `proposition_share` or `paragraph_share` is below 1 | The moves-only path of `/propositions:prop-construct-batch` |
 | `ready` | none of the above | The read-out and the report |
 
 ```bash
@@ -88,15 +88,15 @@ after the body (contributions, funding, competing interests), appendix instrumen
 bibliography do not.
 
 This is a judgment, so keep the location of every run you did not count: the report lists them, so
-that the user can check them. Pass these runs to `/propositions:construct` or
-`/propositions:construct-batch` when you invoke them, as runs already read and accepted, because
+that the user can check them. Pass these runs to `/propositions:prop-construct` or
+`/propositions:prop-construct-batch` when you invoke them, as runs already read and accepted, because
 their precondition stops on any uncovered text.
 
 ## Act on the state
 
 State the current state and what you will do, then do it. Invoke the skill in the table with
 `LEDGER` and `MAIN` already resolved, so that it does not ask again. For `ledger-incomplete`, give
-`/propositions:extract` the first section that has counted runs.
+`/propositions:prop-extract` the first section that has counted runs.
 
 When the invoked skill finishes, determine the state again and continue, until the state is `ready`
 or something below stops the run.
@@ -152,11 +152,11 @@ These run only when the user asks for them. In the report, say what each one not
 
 | Skill | Answers | Needs |
 |---|---|---|
-| `/propositions:proofread` | Is each claim faithful to the text and supported by what it cites? | a ledger that passes `validate-propositions.py` |
-| `/propositions:manuscript-audit` | Do the manuscript, ledger, code and bibliography agree? | a ledger that passes `validate-propositions.py` |
-| `/propositions:clarity-audit` | Can a reader follow the prose? | nothing: it runs in any state |
+| `/propositions:prop-proofread` | Is each claim faithful to the text and supported by what it cites? | a ledger that passes `validate-propositions.py` |
+| `/propositions:prop-manuscript-audit` | Do the manuscript, ledger, code and bibliography agree? | a ledger that passes `validate-propositions.py` |
+| `/propositions:prop-clarity-audit` | Can a reader follow the prose? | nothing: it runs in any state |
 
-A request for readability alone runs `/propositions:clarity-audit` and nothing above: it does not
+A request for readability alone runs `/propositions:prop-clarity-audit` and nothing above: it does not
 create a ledger.
 
 ## Report

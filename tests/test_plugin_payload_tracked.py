@@ -267,7 +267,7 @@ def test_no_orphan_skill_outside_published_entries():
     )
 
 
-PROPOSITIONS_SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "propositions" / "SKILL.md"
+PROPOSITIONS_SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "prop-ledger" / "SKILL.md"
 
 
 def test_operation_d_scaffolds_an_empty_ledger():
@@ -285,13 +285,13 @@ def test_operation_d_scaffolds_an_empty_ledger():
     assert "empty `main.jsonl`" in scaffold, "Operation D must create the ledger file"
 
 
-# ---------- propositions:analyze (Spectra change add-analyze-entry-skill) ----------
+# ---------- propositions:prop-analyze (Spectra change add-analyze-entry-skill) ----------
 #
 # The skill is text a model follows, so these tests pin what it must say: the
 # states and their order, the action for each, and the rules that keep it from
 # writing or bypassing a confirmation.
 
-ANALYZE_SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "analyze" / "SKILL.md"
+ANALYZE_SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "prop-analyze" / "SKILL.md"
 ANALYZE_STATES = [
     "no-ledger",
     "ledger-invalid",
@@ -336,19 +336,19 @@ def test_analyze_states_are_exactly_the_seven_in_order():
 @pytest.mark.parametrize(
     ("state", "needles"),
     [
-        ("no-ledger", ["_meta.json", "Operation D", "`/propositions:propositions`"]),
-        ("ledger-invalid", ["`validate-propositions.py`", "Stop", "`/propositions:propositions`"]),
-        ("ledger-incomplete", ["uncovered", "`/propositions:extract`", "one section"]),
+        ("no-ledger", ["_meta.json", "Operation D", "`/propositions:prop-ledger`"]),
+        ("ledger-invalid", ["`validate-propositions.py`", "Stop", "`/propositions:prop-ledger`"]),
+        ("ledger-incomplete", ["uncovered", "`/propositions:prop-extract`", "one section"]),
         (
             "no-structure",
-            ["`structure.json`", "`discourse.jsonl`", "100", "`/propositions:construct-batch`",
-             "`/propositions:construct`"],
+            ["`structure.json`", "`discourse.jsonl`", "100", "`/propositions:prop-construct-batch`",
+             "`/propositions:prop-construct`"],
         ),
-        ("structure-invalid", ["--partial", "Stop", "`/propositions:construct`"]),
+        ("structure-invalid", ["--partial", "Stop", "`/propositions:prop-construct`"]),
         (
             "no-moves",
             ["`moves`", "`proposition_share`", "`paragraph_share`", "moves-only",
-             "`/propositions:construct-batch`"],
+             "`/propositions:prop-construct-batch`"],
         ),
         ("ready", ["read-out"]),
     ],
@@ -368,7 +368,7 @@ def test_analyze_derives_progress_from_the_files():
 def test_analyze_description_sends_narrow_requests_elsewhere():
     """A whole-article entry must not capture what the narrow skills answer."""
     description = " ".join(_analyze_frontmatter().split())
-    for skill in ("extract", "construct", "clarity-audit", "propositions"):
+    for skill in ("prop-extract", "prop-construct", "prop-clarity-audit", "prop-ledger"):
         assert f"/propositions:{skill}" in description
 
 
@@ -408,7 +408,7 @@ def test_analyze_labels_moves_without_redrawing_the_tree():
     """construct's annotate mode redraws the tree, so moves go to the moves-only path at any length."""
     row = _analyze_state_rows()["no-moves"]
     assert "100" not in row
-    assert "`/propositions:construct`" not in row
+    assert "`/propositions:prop-construct`" not in row
 
 
 def test_analyze_reports_what_the_article_owes_as_a_finding():
@@ -420,7 +420,7 @@ def test_analyze_reports_what_the_article_owes_as_a_finding():
 def test_analyze_runs_three_steps_only_on_request():
     section = _analyze_section("Steps that run only on request")
     rows = re.findall(r"^\| `/propositions:([a-z-]+)` \|", section, flags=re.M)
-    assert rows == ["proofread", "manuscript-audit", "clarity-audit"]
+    assert rows == ["prop-proofread", "prop-manuscript-audit", "prop-clarity-audit"]
     assert "only when the user asks" in " ".join(section.split())
 
 

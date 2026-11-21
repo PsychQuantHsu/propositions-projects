@@ -20,7 +20,7 @@ validates exactly as before. The sidecars have their own validator,
 `validate-structure.py` (rules S1–S9), a state query, `structure-state.py`, and
 a metrics report, `structure-metrics.py`. `propositions paragraphs` (a command of the
 plugin's command-line tool) proposes the paragraph plan from the TeX source, and `migrate-structure-v2.py` turns version
-1.0 sidecars into the current version 2.0. The `propositions:construct` skill
+1.0 sidecars into the current version 2.0. The `propositions:prop-construct` skill
 writes the sidecars for an existing manuscript and reads them to propose the
 next sentence of a draft. (Version 1.0 came with Spectra change
 `add-article-construction-model`; version 2.0 with
@@ -267,7 +267,7 @@ Both live in `plugins/propositions/catalog/`.
   manuscript text, no proposition ids, no paragraph ids and no paths. It is a
   record of the links observed in the manuscripts that were annotated, **not a
   rule**: a link missing from it is not an error, and the validator never reads
-  it. Next mode of `propositions:construct` reads its `next` links as a hint for
+  it. Next mode of `propositions:prop-construct` reads its `next` links as a hint for
   each candidate's expected move; the hint changes neither the order of the
   candidates nor their relation. `--check` exits 1 when the file on disk differs from what the sidecars
   would produce.
@@ -604,7 +604,7 @@ introduction. On the reference manuscript the first open commitment is the
 next one kept at 94 of 231 positions under `scope` and 89 under `kind`, so
 `scope` is the default. `future_work` takes no part in the ordering. The first open
 commitment in the list is the mechanical answer to "what should the next
-proposition advance?"; the `propositions:construct` skill starts from that
+proposition advance?"; the `propositions:prop-construct` skill starts from that
 answer and adds judgement from the section's role and the frontier.
 
 Example: in a ledger of 10 propositions, position 1 opens `c-q-1` (question),
@@ -673,6 +673,6 @@ it is right. Whether `consequence` was the right relation, whether a
 proposition really hangs on the head it names, or whether it really answers the
 question it claims to discharge, is a matter for a human reader, in the same
 way that `validate-propositions.py` checks the ledger's form and
-`propositions:proofread` checks its meaning. When the ledger gains or loses
+`propositions:prop-proofread` checks its meaning. When the ledger gains or loses
 propositions, the sidecars are not updated automatically; S1 reports every
 record that no longer matches.

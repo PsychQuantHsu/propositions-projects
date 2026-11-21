@@ -650,7 +650,7 @@ import re  # noqa: E402
 
 DOCS = {
     "STRUCTURE.md": REPO_ROOT / "plugins" / "propositions" / "docs" / "STRUCTURE.md",
-    "vocabulary.md": REPO_ROOT / "plugins" / "propositions" / "skills" / "construct" / "references" / "vocabulary.md",
+    "vocabulary.md": REPO_ROOT / "plugins" / "propositions" / "skills" / "prop-construct" / "references" / "vocabulary.md",
 }
 VOCAB_HEADINGS = {"RELATIONS": "Relations (10)", "KINDS": "Commitment kinds (7)", "ROLES": "Section roles (10)"}
 
@@ -836,11 +836,11 @@ def test_fixture_notes_mark_close_calls_only() -> None:
 
 NOTE_CONTRACT = "runner-up: <the other choice>; lost because <reason>"
 NOTE_CONTRACT_SOURCES = (
-    "plugins/propositions/skills/construct/references/vocabulary.md",
+    "plugins/propositions/skills/prop-construct/references/vocabulary.md",
     "plugins/propositions/docs/STRUCTURE.md",
     "plugins/propositions/scripts/structure-batch.py",
-    "plugins/propositions/skills/construct/SKILL.md",
-    "plugins/propositions/skills/construct-batch/SKILL.md",
+    "plugins/propositions/skills/prop-construct/SKILL.md",
+    "plugins/propositions/skills/prop-construct-batch/SKILL.md",
 )
 
 

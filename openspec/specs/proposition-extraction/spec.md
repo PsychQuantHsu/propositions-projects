@@ -8,17 +8,17 @@ Proposition extraction turns a paragraph or section of a manuscript into ledger 
 
 ### Requirement: Extraction ships as its own skill
 
-The propositions plugin SHALL ship a skill whose `SKILL.md` declares `name: extract`, located under the plugin's `skills/extract/` directory. The propositions skill's Operation C SHALL direct the reader to this skill instead of describing the extraction procedure itself.
+The propositions plugin SHALL ship a skill whose `SKILL.md` declares `name: extract`, located under the plugin's `skills/prop-extract/` directory. The propositions skill's Operation C SHALL direct the reader to this skill instead of describing the extraction procedure itself.
 
 #### Scenario: Skill is present in the published payload
 
 - **WHEN** the plugin payload is inspected
-- **THEN** `plugins/propositions/skills/extract/SKILL.md` exists with frontmatter `name: extract`, and no other `SKILL.md` in the repository declares `name: extract`
+- **THEN** `plugins/propositions/skills/prop-extract/SKILL.md` exists with frontmatter `name: extract`, and no other `SKILL.md` in the repository declares `name: extract`
 
 #### Scenario: Operation C points to the extraction skill
 
 - **WHEN** a reader opens Operation C in the propositions skill
-- **THEN** the section names `propositions:extract` as the procedure for extraction
+- **THEN** the section names `propositions:prop-extract` as the procedure for extraction
 
 ---
 ### Requirement: Profile selects the extraction reference
@@ -227,7 +227,7 @@ No executable check: the mode is instructions that a model follows; the commands
 source: idd-56-skill-mode
 updated: 2026-11-21
 code:
-  - plugins/propositions/skills/extract/SKILL.md
+  - plugins/propositions/skills/prop-extract/SKILL.md
   - .claude-plugin/marketplace.json
   - propositions-projects.code-workspace
   - plugins/propositions/hooks/cli.lock

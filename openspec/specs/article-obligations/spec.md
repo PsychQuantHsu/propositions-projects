@@ -505,7 +505,7 @@ source: retire-python-ports
 updated: 2026-11-21
 code:
   - plugins/propositions/scripts/audit-citations.py
-  - plugins/propositions/skills/construct/references/vocabulary.md
+  - plugins/propositions/skills/prop-construct/references/vocabulary.md
   - plugins/propositions/.claude-plugin/plugin.json
   - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
   - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
@@ -527,11 +527,11 @@ code:
   - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
   - tests/fixtures/structure/README.md
   - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
-  - plugins/propositions/skills/construct-batch/SKILL.md
+  - plugins/propositions/skills/prop-construct-batch/SKILL.md
   - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
   - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
   - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
-  - plugins/propositions/skills/manuscript-audit/SKILL.md
+  - plugins/propositions/skills/prop-manuscript-audit/SKILL.md
   - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
   - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
   - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
@@ -556,7 +556,7 @@ code:
   - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
   - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
   - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
-  - plugins/propositions/skills/construct/SKILL.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
   - plugins/propositions/scripts/migrate-structure-v2.py
   - plugins/propositions/scripts/audit-symbols.py
   - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json

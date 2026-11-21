@@ -1,5 +1,5 @@
 ---
-name: construct
+name: prop-construct
 description: >-
   Reads out how the sentences of a paragraph relate, and answers "what should the next sentence or
   paragraph of this manuscript do?" and "does this manuscript keep what it promises?" using the
@@ -17,8 +17,8 @@ description: >-
   structure.json or discourse.jsonl by hand. It records commitments, section roles, what each
   sentence does and a dependency tree (S1–S9), and reports what the article owes the reader and
   where the next proposition can attach. Not for splitting text into propositions
-  (/propositions:extract), the R1–R13 validator (/propositions:propositions), the semantic walk
-  (/propositions:proofread), or rewriting an unclear sentence (/propositions:clarity-audit).
+  (/propositions:prop-extract), the R1–R13 validator (/propositions:prop-ledger), the semantic walk
+  (/propositions:prop-proofread), or rewriting an unclear sentence (/propositions:prop-clarity-audit).
 allowed-tools:
   - Read
   - Write
@@ -99,7 +99,7 @@ Establish, from the request or by asking once (AskUserQuestion, all at once):
   it is next mode: only write mode changes files.
 
 If `LEDGER/_meta.json` is missing, the manuscript has no ledger: point to Operation D of
-`/propositions:propositions`, then `/propositions:extract`.
+`/propositions:prop-ledger`, then `/propositions:prop-extract`.
 
 Record the ledger's fingerprint before doing anything else; every exit path compares it:
 
@@ -124,11 +124,11 @@ python3 "$COVERAGE" --tex "$FILE" --lines "$A-$B" --jsonl "$LEDGER/main.jsonl" -
 ```
 
 If the validator exits non-zero or any range reports uncovered text, **stop**: report the
-failures and send the user to `/propositions:extract`. Structure laid over a ledger with gaps
+failures and send the user to `/propositions:prop-extract`. Structure laid over a ledger with gaps
 would mislabel the propositions on both sides of each gap. Write nothing.
 
 A ledger not in TeX reading order, or one of about 100 propositions or more, goes through
-`/propositions:construct-batch`, which replaces A3 and returns here at A4. So do sidecars whose
+`/propositions:prop-construct-batch`, which replaces A3 and returns here at A4. So do sidecars whose
 tree already exists and which lack only moves and types, at any length: its moves-only path
 labels those two fields and leaves the tree alone.
 
@@ -193,7 +193,7 @@ Add `--partial` only when the manuscript is unfinished, and say so in the summar
 staged files and rerun until the exit code is 0. Look at every S7 warning: a crossing is
 usually a head chosen one sentence too far; keep it only when the text really is not
 tree-shaped there, with a `note`. An S8 warning means the ledger lacks a `cites` entry; report
-it so that the ledger is fixed (`/propositions:extract` or a ledger edit), do not drop `basis`. An S4 error means a promise the article
+it so that the ledger is fixed (`/propositions:prop-extract` or a ledger edit), do not drop `basis`. An S4 error means a promise the article
 never keeps: check the manuscript before deciding — either a discharge was missed, or the
 article really leaves it open (say so in the summary; do not delete the commitment to make
 the validator pass). A needed value that is not in the vocabularies is a stop: report it to
@@ -374,7 +374,7 @@ AFTER=$(shasum -a 256 "$MAIN" "$LEDGER/main.jsonl" "$LEDGER/structure.json" "$LE
 ```
 
 Next mode writes nothing: not the manuscript, not the ledger, not the sidecars. Adding the
-chosen sentence to the manuscript is the author's act; afterwards `/propositions:extract`
+chosen sentence to the manuscript is the author's act; afterwards `/propositions:prop-extract`
 and annotate mode bring the ledger and sidecars up to date.
 
 ## Write mode
@@ -433,7 +433,7 @@ after the paragraph has to be blank; add one. Write no other line.
 
 ### W5 — Its propositions
 
-Follow steps 1 and 5 to 7 of `/propositions:extract` on the staged manuscript file, over the
+Follow steps 1 and 5 to 7 of `/propositions:prop-extract` on the staged manuscript file, over the
 lines of the new paragraph. Locations use the staged file's line numbers, which are the numbers
 the lines will have after the commit. Then add the lines with the new ids at the end of the staged
 ledger:
@@ -515,7 +515,7 @@ request or by asking once. Then:
 written from the outline. The record to write is the first line of `outline-paragraphs.jsonl`
 that does not carry `dropped`, whose section the status shows as `stands as approved`, and that
 the trace does not name. Tell the author which record that is, and stop when there is none: a
-section that does not stand as approved is approved first, with `/propositions:outline`. Text is
+section that does not stand as approved is approved first, with `/propositions:prop-outline`. Text is
 written in the order of the paragraph file; a record further down is written only when the author
 asks for it by its id.
 
@@ -557,7 +557,7 @@ record, sections in the outline's order. It is one write of the whole manuscript
 confirmation, through `propositions write prepare --rewrite`. "重組草稿", "照改過的綱要重寫",
 "reorganize the draft" mean this mode.
 
-**G1 — The outline first.** The plan is made with `/propositions:outline`, not here: derive the
+**G1 — The outline first.** The plan is made with `/propositions:prop-outline`, not here: derive the
 outline from the manuscript, revise it as the author says, and record the author's approval of the
 whole outline. Then establish `OUTDIR` and check:
 
@@ -589,7 +589,7 @@ the rules of O2. Keep what is not a paragraph as it was: the preamble, `\begin{d
 title, the bibliography, `\end{document}`. Change an included file only when the outline moves
 text into or out of it.
 
-**G4 — Bring the ledger up, in the copies.** Run the revision mode of `/propositions:extract` (R1
+**G4 — Bring the ledger up, in the copies.** Run the revision mode of `/propositions:prop-extract` (R1
 to R6 there, and R8 for the new propositions) on the staged ledger and the staged main file, with these two choices:
 
 - In its retire step, the replacements of a proposition that is not found again are the new
@@ -738,7 +738,7 @@ Explain mode writes nothing: not the manuscript, not the ledger, not the sidecar
   with what the author decided), the gates (W7), what was written and where the originals
   are, or that the author stopped and where the copies are. List every placeholder with its
   line: the paragraph is not finished while one remains. Say that the paragraph was checked
-  mechanically and not proofread; `/propositions:proofread` and `/propositions:clarity-audit`
+  mechanically and not proofread; `/propositions:prop-proofread` and `/propositions:prop-clarity-audit`
   run when the author asks.
 - **Reorganize**: the outline's status, the counts of G8, the gates (G7), the readers' findings and
   what the author decided, what was written and where the originals are (`backup/restore.jsonl`),

@@ -1,7 +1,7 @@
 ---
-name: manuscript-audit
+name: prop-manuscript-audit
 description: >-
-  Cross-document drift audit for a math manuscript via run-audit.sh: R1 working-file path leaks (a working filepath accidentally typeset in main.tex), R2 citation/bib drift and orphans, R3 code-vs-manuscript symbol drift, R4 proposition-iso bijection. Checks consistency across main.tex + propositions/*.jsonl + analysis/*.py + refs.bib. Use after a large rewrite, before submission, or entering a new stage (submission / major revision / camera-ready) — NOT per-PR (that's a hook + CI). The cross-artifact axis — distinct from /propositions:propositions (in-file JSONL gate) and /propositions:proofread (per-prop semantic walk).
+  Cross-document drift audit for a math manuscript via run-audit.sh: R1 working-file path leaks (a working filepath accidentally typeset in main.tex), R2 citation/bib drift and orphans, R3 code-vs-manuscript symbol drift, R4 proposition-iso bijection. Checks consistency across main.tex + propositions/*.jsonl + analysis/*.py + refs.bib. Use after a large rewrite, before submission, or entering a new stage (submission / major revision / camera-ready) — NOT per-PR (that's a hook + CI). The cross-artifact axis — distinct from /propositions:prop-ledger (in-file JSONL gate) and /propositions:prop-proofread (per-prop semantic walk).
 allowed-tools:
   - Read
   - Write
@@ -118,13 +118,13 @@ manual full-audit entry point that the same `run-audit.sh` backs.
 
 ## When NOT to use
 
-- Per-line edit → the `/propositions:propositions` R1-R13 validator + sync rule is faster
+- Per-line edit → the `/propositions:prop-ledger` R1-R13 validator + sync rule is faster
 - Pure code-only change (no manuscript edit) → CI auto-skips via a paths filter
 - Pre-extraction phase (no `propositions/main.jsonl`) → R4 auto-skips, but R1/R2/R3 still useful
 
 ## Cross-link
 
-- `/propositions:propositions` — in-file JSONL R1-R13 validation (R4 here reuses that validator)
-- `/propositions:proofread` — per-prop L4 semantic walk
+- `/propositions:prop-ledger` — in-file JSONL R1-R13 validation (R4 here reuses that validator)
+- `/propositions:prop-proofread` — per-prop L4 semantic walk
 - Rule [`../../rules/manuscript-consistency-audit.md`](../../rules/manuscript-consistency-audit.md) — full SOP
 - Rule [`../../rules/code-and-manuscript-sync.md`](../../rules/code-and-manuscript-sync.md) — the per-PR hook/CI discipline this complements

@@ -1,7 +1,7 @@
 ---
-name: proofread
+name: prop-proofread
 description: >-
-  JSONL-driven per-proposition semantic walk in two modes. Mode A (derivation, L1-L5 + location): faithful decomposition, claim_type fit, cite completeness, cite validity, evidence_class consistency — for mathematics and formal proofs. Mode B (empirical, E1-E10 + location): value fidelity against analysis artifacts, computability from the dataset, figure-text agreement, figure provenance, whether the claimed contrast was actually estimated, claim strength vs test outcome, analytic vs stated sample, variable-role consistency, whether a composite claim holds for each component it names, and whether two exposures treated as separable are actually nested — for clinical cohorts, experiments, surveys and simulation studies, where claims rest on data rather than on prior propositions. Use for pre-submission polish, after a large rewrite, or to validate prop-extraction quality. The semantic-correctness axis — distinct from /propositions:propositions (mechanical R1-R13 gate) and /propositions:manuscript-audit (cross-artifact drift). Not for daily micro-edits (use the validator + sync rule).
+  JSONL-driven per-proposition semantic walk in two modes. Mode A (derivation, L1-L5 + location): faithful decomposition, claim_type fit, cite completeness, cite validity, evidence_class consistency — for mathematics and formal proofs. Mode B (empirical, E1-E10 + location): value fidelity against analysis artifacts, computability from the dataset, figure-text agreement, figure provenance, whether the claimed contrast was actually estimated, claim strength vs test outcome, analytic vs stated sample, variable-role consistency, whether a composite claim holds for each component it names, and whether two exposures treated as separable are actually nested — for clinical cohorts, experiments, surveys and simulation studies, where claims rest on data rather than on prior propositions. Use for pre-submission polish, after a large rewrite, or to validate prop-extraction quality. The semantic-correctness axis — distinct from /propositions:prop-ledger (mechanical R1-R13 gate) and /propositions:prop-manuscript-audit (cross-artifact drift). Not for daily micro-edits (use the validator + sync rule).
 allowed-tools:
   - Read
   - Write
@@ -14,7 +14,7 @@ allowed-tools:
 
 # Proofread — Per-Proposition Semantic Walk
 
-Where `/propositions:propositions` asks "is the JSONL mechanically well-formed", this skill asks
+Where `/propositions:prop-ledger` asks "is the JSONL mechanically well-formed", this skill asks
 the semantic question a machine cannot: **is each claim true, faithfully stated, and actually
 supported by what it rests on.** It is a guided per-proposition walk, not a script — the value is
 the human/LLM judgment at each layer.
@@ -53,7 +53,7 @@ manuscripts (a theory section plus an experiment) run both, section by section.
 | L5 | Is `evidence_class` consistent with `claim_type`? (derived needs cites; axiomatic truly an axiom; verified has an external proof) | schema-aware heuristic + judgment |
 | location | Does `location.line` match the actual main.tex line range? | mechanical — the R13 check in the validator |
 
-L1, L2, and location are backed by the bundled `/propositions:propositions` validator (R1-R13);
+L1, L2, and location are backed by the bundled `/propositions:prop-ledger` validator (R1-R13);
 run it first so this walk can focus on L3/L4/L5, which no script can decide.
 
 ### Mode A ROI: where findings actually hide
@@ -212,7 +212,7 @@ them, and stating it usually reveals that the untouched surface is where the err
 Mode B needs two additions. Both are **additive** — a Mode A ledger stays valid. A ledger
 that uses the new values must declare `"profile": "empirical"` with `schema_version` 1.7 in
 its `_meta.json`; under the default profile the validator's R11/R12 reject them (SCHEMA.md
-§Profiles (v1.7+)). `/propositions:extract` writes empirical ledgers with this vocabulary.
+§Profiles (v1.7+)). `/propositions:prop-extract` writes empirical ledgers with this vocabulary.
 
 ```jsonc
 {
@@ -257,7 +257,7 @@ with no trace.
 ### Step 0: Prerequisite — mechanical gate, then pick the mode
 
 ```
-/propositions:propositions   # R1-R13 must be green (or WARN-only) before walking
+/propositions:prop-ledger   # R1-R13 must be green (or WARN-only) before walking
 ```
 
 A walk on a JSONL that fails R1/R7/R8 wastes effort — fix mechanical drift first.
@@ -403,7 +403,7 @@ Two practical consequences:
 ## When NOT to use
 
 - Daily micro-edit → the R1-R13 validator + sync rule is cheaper
-- Pre-extraction phase (no JSONL yet) → run `/propositions:propositions` (Operation C) first
+- Pre-extraction phase (no JSONL yet) → run `/propositions:prop-ledger` (Operation C) first
 - Commentary-only sections → a heuristic scan suffices; deep-walk ROI is ~0%
 - Empirical manuscript with no re-runnable analysis artifacts → Mode B cannot do E1/E4/E7;
   say so explicitly rather than reporting a clean walk
@@ -463,7 +463,7 @@ the ROI numbers above.
 
 ## Cross-link
 
-- `/propositions:propositions` — the mechanical R1-R13 gate this walk assumes has passed
-- `/propositions:manuscript-audit` — cross-doc R1-R4 drift
+- `/propositions:prop-ledger` — the mechanical R1-R13 gate this walk assumes has passed
+- `/propositions:prop-manuscript-audit` — cross-doc R1-R4 drift
 - Rule [`../../rules/manuscript-jsonl-sync.md`](../../rules/manuscript-jsonl-sync.md) — sync discipline for L1/L3/L4 fixes
 - [`../../docs/VERIFICATION.md`](../../docs/VERIFICATION.md) — record walk results as `method=proofread` verdicts via `scripts/proofread-to-verification.py`

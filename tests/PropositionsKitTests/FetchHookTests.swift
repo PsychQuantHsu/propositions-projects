@@ -431,7 +431,7 @@ struct FetchHookTests {
     // spec-example: citation-order / the skill calls the binary only through the launcher
     @Test func `The skill calls the binary once, through the launcher`() throws {
         let skill = try String(
-            contentsOf: repositoryRoot.appendingPathComponent("plugins/propositions/skills/propositions/SKILL.md"),
+            contentsOf: repositoryRoot.appendingPathComponent("plugins/propositions/skills/prop-ledger/SKILL.md"),
             encoding: .utf8)
         #expect(Self.launcherProblems(in: skill) == [])
     }

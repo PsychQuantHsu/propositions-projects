@@ -222,7 +222,7 @@ def test_a_malformed_catalog_is_an_input_error(tmp_path: Path, text: str) -> Non
 
 # ---------- next mode's move hint (Spectra change add-next-mode-move-hint) ----------
 
-SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "construct" / "SKILL.md"
+SKILL = REPO_ROOT / "plugins" / "propositions" / "skills" / "prop-construct" / "SKILL.md"
 STATE = REPO_ROOT / "plugins" / "propositions" / "scripts" / "structure-state.py"
 VALIDATE = REPO_ROOT / "plugins" / "propositions" / "scripts" / "validate-structure.py"
 

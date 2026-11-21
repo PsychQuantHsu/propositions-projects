@@ -1,5 +1,5 @@
 ---
-name: construct-batch
+name: prop-construct-batch
 description: >-
   Annotates the dependency tree of a long manuscript by splitting it into paragraph-safe batches,
   sending each to its own subagent, and merging the answers back into staged structure sidecars.
@@ -8,8 +8,8 @@ description: >-
   when a ledger has to be put in reading order first ("帳冊順序不對", "reorder the ledger"),
   or when sidecars whose tree already exists need moves and paragraph types ("只標步驟", "label
   the moves only").
-  It only drafts in staging; review and writing stay with /propositions:construct. Not for
-  short manuscripts, the next-sentence question, or commitments, which /propositions:construct
+  It only drafts in staging; review and writing stay with /propositions:prop-construct. Not for
+  short manuscripts, the next-sentence question, or commitments, which /propositions:prop-construct
   handles directly.
 allowed-tools:
   - Read
@@ -21,7 +21,7 @@ allowed-tools:
 
 # Construct in batches
 
-`/propositions:construct` annotate mode holds the rules. This skill replaces only its step A3
+`/propositions:prop-construct` annotate mode holds the rules. This skill replaces only its step A3
 for manuscripts too long to label well in one pass. Everything before A3 and after it stays
 with that skill: preconditions, section and paragraph plan, validation, summary, confirmation.
 

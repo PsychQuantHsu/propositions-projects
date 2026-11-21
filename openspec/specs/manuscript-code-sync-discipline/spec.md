@@ -44,7 +44,7 @@ code:
   - rules/code-and-manuscript-sync.md
   - .agents/skills/spectra-propose/SKILL.md
   - references/mcs.pdf
-  - skills/proofread/SKILL.md
+  - skills/prop-proofread/SKILL.md
   - .agents/skills/spectra-debug/SKILL.md
   - AGENTS.md
   - .agents/skills/spectra-ingest/SKILL.md
@@ -80,7 +80,7 @@ code:
   - rules/code-and-manuscript-sync.md
   - .agents/skills/spectra-propose/SKILL.md
   - references/mcs.pdf
-  - skills/proofread/SKILL.md
+  - skills/prop-proofread/SKILL.md
   - .agents/skills/spectra-debug/SKILL.md
   - AGENTS.md
   - .agents/skills/spectra-ingest/SKILL.md
@@ -120,7 +120,7 @@ code:
   - rules/code-and-manuscript-sync.md
   - .agents/skills/spectra-propose/SKILL.md
   - references/mcs.pdf
-  - skills/proofread/SKILL.md
+  - skills/prop-proofread/SKILL.md
   - .agents/skills/spectra-debug/SKILL.md
   - AGENTS.md
   - .agents/skills/spectra-ingest/SKILL.md

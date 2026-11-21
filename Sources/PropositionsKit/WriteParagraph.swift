@@ -195,7 +195,12 @@ public enum WriteParagraph {
         if rewrite == nil, end == fileLines.count, !endsWithLineBreak(read["manuscript"]!.data) {
             throw Failure(message: "line \(end) of \(CiteOrder.visible(fileName)) has no line ending; add one and prepare again")
         }
-        let notes = retired.compactMap { item -> String? in
+        var unreadNotes: [String] = []
+        if let bytes = outlineBytes {
+            let text = bytes.map { String(decoding: $0, as: UTF8.self) }
+            unreadNotes = WriteFromOutline.unreadNotes(Outline(sections: text[0], paragraphs: text[1], approvals: text[2]), only: plan?.section)
+        }
+        let notes = unreadNotes + retired.compactMap { item -> String? in
             let name = item.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) } ?? "main.tex"
             guard rewrite == nil, name == fileName, item.line > end else { return nil }
             return "[warn] a retired proposition is located at \(CiteOrder.visible(name)):L\(item.line), after the new paragraph: its location will no longer name its old lines"

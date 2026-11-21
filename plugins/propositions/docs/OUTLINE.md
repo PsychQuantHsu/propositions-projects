@@ -244,6 +244,7 @@ lines is the order of the sections in the article.
 | `dropped` | no | A non-empty string giving the reason the section is left out of the article |
 | `moved_to` | no | A non-empty string naming where a section that is left out goes: another article, or a part that has no outline here. Only on a record that carries `dropped` |
 | `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the part of the section it is under, and a section under none is in the main text |
+| `unread` | no | A list of one or more included files that were not read when the outline was derived, each `{"file": <the name as the include command writes it>, "why": <the reason>}` (see below) |
 | `length` | no | A whole number from 1 to 999999999: the target length of the section in words, the sections under it included (see "article.json") |
 
 `says` is a sentence. A heading, a label or a list of topics does not state
@@ -257,6 +258,25 @@ article when the section it is under is not.
 
 ```json
 {"id": "s-intro", "heading": "Introduction", "role": "introduction", "says": "Standard errors from the usual method are too small in short tests, and this article shows why."}
+```
+
+**Included files that were not read.** A section record can list, in `unread`, the included
+files of its section that were not read when the outline was derived (a file git ignores, one
+outside the repository, one behind a symbolic link, a missing one), each with the reason
+(issue #117). An entry belongs to the record of the section the include command stands in. It
+is not a locator: it names the file as the include command writes it and does not have to name
+one place, so a file that is included twice is two entries, and a section whose whole text is
+in such files still has its section record to carry them. The position of the include inside
+the section is not recorded, and neither is what the file holds: the outline only keeps that
+something there was not read. `propositions outline check` checks the shape,
+`propositions outline status` counts the sections that carry `unread`, and
+`propositions write prepare` names the unread files of a section before a paragraph is written
+into it (for a rewrite, of every section). An outline whose sections all carry `unread` can have
+an empty paragraph file. When the file becomes readable, the section is derived again or the
+entry is removed through revise; either way the section is approved again.
+
+```json
+{"id": "s-method", "heading": "Method", "says": "The study compared two review schedules.", "unread": [{"file": "generated/sample-sizes", "why": "ignored by git"}]}
 ```
 
 ## Paragraph records
@@ -1328,7 +1348,7 @@ and text that was not written from the outline has no trace record and is not co
 
 ## What this version leaves open
 
-Four questions about the design were raised with this format and are not
+Three questions about the design were raised with this format and are not
 answered by it.
 
 - **How an outline paragraph is tied to a paragraph of the structure sidecar.**
@@ -1342,8 +1362,3 @@ answered by it.
   passage by a label or by opening words that occur once. Two passages of one
   file that are the same to their end have neither, and derive stops on them
   (issue #84).
-- **Whether the outline shows an included file that derive did not read.**
-  Derive names such a file to the author and records nothing for it, so the
-  outline itself does not show that part of the original is missing. Two ways
-  of recording it were tried and each stopped derive on some manuscript
-  (issue #117).

@@ -88,6 +88,8 @@ public enum OutlineStatus {
         }
         out.append("points that carry pending\t\(pending)")
         out.append("records that carry dropped\t\((sections + paragraphs).filter { $0.has("dropped") }.count)")
+        let unread = sections.filter { $0.has("unread") && !$0.has("dropped") }.map(id)
+        out.append("sections that carry unread\t\(unread.count)" + (unread.isEmpty ? "" : "\t[" + unread.map(shown).joined(separator: ",") + "]"))
         out.append("ok status")
         return out
     }

@@ -79,6 +79,29 @@ public enum WriteFromOutline {
         return Plan(directory: directory.path, paragraph: paragraph, section: section, approvalLine: approval.number, traceHash: hash)
     }
 
+    /// One note for each included file that was not read when the outline was derived (issue 117),
+    /// for the section `only` and the sections above it, or for every section that is not dropped.
+    static func unreadNotes(_ outline: Outline, only section: String? = nil) -> [String] {
+        let records = outline.sections.compactMap(\.value)
+        var wanted: [String]? = nil
+        if var at = section {
+            var chain = [at]
+            while let parent = records.first(where: { same($0["id"]?.string, at) })?["parent"]?.string, !chain.contains(parent) {
+                chain.append(parent); at = parent
+            }
+            wanted = chain
+        }
+        var out: [String] = []
+        for record in records where !record.has("dropped") {
+            guard let id = record["id"]?.string, wanted?.contains(where: { same($0, id) }) ?? true else { continue }
+            for item in record["unread"]?.array ?? [] {
+                guard let file = item["file"]?.string, let why = item["why"]?.string else { continue }
+                out.append("[unread] section \(CiteOrder.visible(id)): the included file \(CiteOrder.visible(file)) was not read when the outline was derived (\(CiteOrder.visible(why))); the outline does not say what it holds")
+            }
+        }
+        return out
+    }
+
     /// The record of one written paragraph, with its line feed.
     static func record(_ plan: Plan, firstProposition: String) -> Data {
         Data(("{\"outline\": \(Revise.quoted(plan.paragraph)), \"first_prop\": \(Revise.quoted(firstProposition)), "

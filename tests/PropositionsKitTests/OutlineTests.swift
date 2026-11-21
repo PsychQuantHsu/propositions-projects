@@ -292,7 +292,7 @@ struct OutlineStatusTests {
             "\"s-a\"\tstands as approved", "\"s-b\"\tstands as approved",
             "order of sections\tno approval of the whole outline is on record",
             "sections removed since their approval\t0", "paragraph records that name no section\t0",
-            "points that carry pending\t0", "records that carry dropped\t0", "ok status",
+            "points that carry pending\t0", "records that carry dropped\t0", "sections that carry unread\t0", "ok status",
         ])
     }
 
@@ -305,7 +305,7 @@ struct OutlineStatusTests {
             "\"s-a\"\tnever approved", "\"s-b\"\tnever approved",
             "order of sections\tno approval of the whole outline is on record",
             "sections removed since their approval\t0", "paragraph records that name no section\t1\t[\"p-9\"]",
-            "points that carry pending\t1", "records that carry dropped\t1", "ok status",
+            "points that carry pending\t1", "records that carry dropped\t1", "sections that carry unread\t0", "ok status",
         ])
     }
 

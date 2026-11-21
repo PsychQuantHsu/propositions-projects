@@ -32,7 +32,7 @@ public enum WriteRewrite {
         let status: [String]
         do { status = try OutlineStatus.lines(outline) } catch { throw fail("\(error)") }
         let summary = ["order of sections", "sections removed since their approval", "paragraph records that name no section",
-                       "points that carry pending", "records that carry dropped", "ok status"]
+                       "points that carry pending", "records that carry dropped", "sections that carry unread", "ok status"]
         let names = status.map { $0.components(separatedBy: "\t").first ?? "" }
         guard names.last == "ok status", ["order of sections", "sections removed since their approval",
                                           "paragraph records that name no section"].allSatisfy(names.contains),

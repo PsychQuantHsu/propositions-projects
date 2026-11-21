@@ -106,6 +106,19 @@ public enum OutlineCheck {
             if record.has("part"), !(record["part"]?.string.map(parts.contains) ?? false) {
                 report("part is not one of main, appendix, supplement")
             }
+            if record.has("unread") {
+                // Included files derive did not read (issue 117). The same file can be listed more than once.
+                if let unread = record["unread"]?.array, !unread.isEmpty {
+                    for item in unread {
+                        guard item.isObject, let name = item["file"]?.nonEmptyString, OutlineText.isClean(name), item["why"]?.nonEmptyString != nil else {
+                            report("unread has an entry that is not an object with a file and a why that are non-empty strings")
+                            continue
+                        }
+                    }
+                } else {
+                    report("unread is not a list of one or more files that were not read")
+                }
+            }
             if record.has("length"), OutlineLength.count(record["length"]) == nil {
                 report("length is not a whole number from 1 to 999999999")
             }

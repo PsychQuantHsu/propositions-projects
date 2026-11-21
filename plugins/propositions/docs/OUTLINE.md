@@ -1251,6 +1251,34 @@ A trace outlives the outline it was written from when the three files are moved 
 outline is started in the same directory: its records then name ids of the new outline. Move
 `outline-trace.jsonl` with the three files.
 
+## article.json: what is true of the whole article
+
+One optional file, `article.json`, holds what is true of the whole article and not of one
+section. It is a JSON object in the directory of the outline files, which is the directory of
+the ledger; a manuscript with a ledger and no outline can have one too. It is not an outline
+file: no approval record copies it, and changing it does not change whether a section stands as
+approved. The outline skill does not write it; the author does. Every key is optional, and a
+key that is not defined here is left alone.
+
+| Key | Value |
+|---|---|
+| `banned` | A list of phrasings that are not to appear in the article: objects with a `phrase` and a `reason`, both non-empty strings (issue #118) |
+
+```json
+{"banned": [{"phrase": "clearly shows", "reason": "say what the data show"}]}
+```
+
+**Banned phrasings.** `propositions write prepare` reads the file from the outline directory
+when a paragraph is written from an outline, and otherwise from the directory of the ledger,
+and copies it as an input of the run. `write check` reports every banned phrasing in the text
+the run adds (the new paragraph; for a rewrite, every file of the manuscript) as a problem, and
+`write commit` then writes nothing: the author rewords the text, or changes the list and
+prepares again. `propositions phrasing --tex <main file> --article <file>` compares a whole
+manuscript, for a list that changed after text was written. The comparison is literal: letter
+case does not count, a run of white space with its line breaks is one space, a LaTeX comment is
+not compared, and a phrasing does not run across an empty line. It finds the words, not the
+claim: the same thing said in other words is not found.
+
 ## What this version leaves open
 
 Five questions about the design were raised with this format and are not

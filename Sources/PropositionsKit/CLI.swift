@@ -52,6 +52,9 @@ public enum PropositionsCLI {
                                                  rewrite: prepare.rewrite,
                                                  workingDirectory: workingDirectory)
             }
+            if let phrasing = command as? PhrasingOptions {
+                return PhrasingRun.run(tex: phrasing.tex, article: phrasing.article, workingDirectory: workingDirectory)
+            }
             if let check = command as? WriteCheckOptions {
                 return WriteParagraphRun.check(stage: check.stage, workingDirectory: workingDirectory)
             }
@@ -137,7 +140,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, WriteOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, WriteOptions.self, OutlineOptions.self, PhrasingOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -211,6 +214,26 @@ struct ParagraphsOptions: ParsableCommand {
 
     @Option(help: "A structure sidecar whose sections the paragraphs must not cross.")
     var structure: String?
+}
+
+struct PhrasingOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "phrasing",
+        abstract: "List where a manuscript holds a banned phrasing of article.json.",
+        discussion: """
+            Compares every file of the main file's input tree with the banned list of article.json. \
+            Letter case does not count, a run of white space (a line break included) is one space, \
+            a comment is not compared, and a phrasing does not run across an empty line. The \
+            comparison is literal.
+            Exit codes: 0 no occurrence; 1 an occurrence; 2 a file cannot be read, or article.json \
+            is not in the format.
+            """)
+
+    @Option(help: "The manuscript's main file.")
+    var tex: String
+
+    @Option(help: "The article file, article.json.")
+    var article: String
 }
 
 struct WriteOptions: ParsableCommand {

@@ -50,6 +50,8 @@ public enum WriteParagraph {
         /// tree other than the main file, which a rewrite may change and commit writes back.
         var rewrite: WriteRewrite.Plan?
         var rewriteFiles: [Input]?
+        /// `article.json`, when the run has one: an input whose banned phrasings the check reads.
+        var article: Input?
     }
 
     static let roles = ["manuscript", "ledger", "discourse", "structure"]
@@ -228,6 +230,20 @@ public enum WriteParagraph {
             inputs.append(Input(original: meta.path, staged: copy.path, hash: sha256(data)))
             stagedMeta = copy.path
         }
+        // What is true of the whole article: beside the outline when the run has one, else beside the ledger.
+        var articleInput: Input?
+        if let found = try Article.read(in: outlineDirectory ?? ledger.deletingLastPathComponent()) {
+            guard !(written + treeTargets).contains(canonical(found.url)) else {
+                throw Failure(message: "\(Article.fileName) is one of the files the run writes")
+            }
+            let articleDir = stage.appendingPathComponent("article")
+            try fm.createDirectory(at: articleDir, withIntermediateDirectories: true)
+            let copy = articleDir.appendingPathComponent(Article.fileName)
+            try create(found.data, at: copy)
+            let input = Input(original: found.url.path, staged: copy.path, hash: sha256(found.data))
+            inputs.append(input)
+            articleInput = input
+        }
         if let directory = outlineDirectory {
             // The outline is read, not written: its three files have to stay as they are.
             let outlineDir = stage.appendingPathComponent("outline")
@@ -255,7 +271,7 @@ public enum WriteParagraph {
         let manifest = Manifest(originals: originals, staged: staged, hashes: hashes, inputs: inputs, file: fileName,
                                 after: end, stagedMain: manuscriptDir.appendingPathComponent(mainURL.lastPathComponent).path,
                                 stagedMeta: stagedMeta, heading: heading ? true : nil, outline: plan,
-                                rewrite: rewritePlan, rewriteFiles: rewrite != nil ? rewriteFiles : nil)
+                                rewrite: rewritePlan, rewriteFiles: rewrite != nil ? rewriteFiles : nil, article: articleInput)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try create(try encoder.encode(manifest) + Data("\n".utf8), at: stage.appendingPathComponent("write.json"))
@@ -289,6 +305,9 @@ public enum WriteParagraph {
         var outline: Outline?
         var outlineProblem: String?
         var map: Data?
+        /// The banned phrasings of the staged `article.json`, or why it cannot be read.
+        var banned: [Article.Banned] = []
+        var articleProblem: String?
     }
 
     static func load(_ manifest: Manifest) throws -> Payload {
@@ -315,6 +334,19 @@ public enum WriteParagraph {
                 throw Failure(message: "the staged \(CiteOrder.visible(file.staged)) cannot be read; nothing was written")
             }
             payload.rewriteStaged[file.original] = data
+        }
+        if let article = manifest.article {
+            guard manifest.inputs.contains(article) else {
+                throw Failure(message: "write.json names an \(Article.fileName) prepare did not record; nothing was written")
+            }
+            do {
+                guard let data = LedgerOrder.read(URL(fileURLWithPath: article.staged))?.data else {
+                    throw Article.Failure(message: "the staged \(Article.fileName) cannot be read")
+                }
+                payload.banned = try Article.parse(data).banned
+            } catch {
+                payload.articleProblem = (error as? Article.Failure)?.message ?? "the staged \(Article.fileName) cannot be read"
+            }
         }
         if let plan = manifest.rewrite {
             let directory = URL(fileURLWithPath: plan.directory)
@@ -398,6 +430,7 @@ public enum WriteParagraph {
         if manifest.rewrite != nil { return rewriteCheck(manifest, payload) }
         var report = Report()
         report.problems += payload.changedInputs
+        if let problem = payload.articleProblem { report.problems.append(problem) }
         let original = payload.originals["manuscript"]!.data, staged = payload.staged["manuscript"]!
         let ends = lineEnds(original)
         let name = CiteOrder.visible(manifest.file)
@@ -439,6 +472,7 @@ public enum WriteParagraph {
                 if let next, !LedgerOrder.stripped(next).isEmpty, blank.last != true {
                     report.problems.append("the new paragraph does not end with a blank line before the text that follows it")
                 }
+                report.problems += Phrasing.occurrences(in: lines, first: manifest.after + 1, file: manifest.file, banned: payload.banned)
                 report.placeholders = lines.enumerated().filter { $0.element.contains(placeholder) }.map { manifest.after + $0.offset + 1 }
             } else {
                 report.problems.append("the lines added after line \(manifest.after) are not UTF-8")
@@ -498,9 +532,20 @@ public enum WriteParagraph {
     static func rewriteCheck(_ manifest: Manifest, _ payload: Payload) -> Report {
         var report = Report()
         report.problems += payload.changedInputs
+        if let problem = payload.articleProblem { report.problems.append(problem) }
         for data in [payload.staged["manuscript"]!] + Array(payload.rewriteStaged.values) where String(data: data, encoding: .utf8) == nil {
             report.problems.append("a staged file of the manuscript is not UTF-8")
             break
+        }
+        // The banned phrasings, over every staged file of the tree, in the order prepare read them.
+        let stagedRoot = URL(fileURLWithPath: manifest.stagedMain).deletingLastPathComponent().path + "/"
+        let tree = [(manifest.file, payload.staged["manuscript"]!)]
+            + (manifest.rewriteFiles ?? []).compactMap { file in
+                payload.rewriteStaged[file.original].map { (file.staged.hasPrefix(stagedRoot) ? String(file.staged.dropFirst(stagedRoot.count)) : file.staged, $0) }
+            }
+        for (name, data) in tree {
+            guard let text = String(data: data, encoding: .utf8) else { continue }
+            report.problems += Phrasing.occurrences(in: LatexLine.splitLines(text), file: name, banned: payload.banned)
         }
         let ledger = WriteRewrite.ledger(old: payload.originals["ledger"]!.data, new: payload.staged["ledger"]!)
         report.problems += ledger.problems

@@ -15,7 +15,14 @@ public struct Article: Equatable, Sendable {
         public let message: String
     }
 
+    /// The limit on the article's length, in words, and the parts it counts (issue 119).
+    public struct Length: Equatable, Sendable {
+        public let limit: Int
+        public let parts: [String]
+    }
+
     public var banned: [Banned] = []
+    public var length: Length?
 
     /// Reads the file's bytes; throws with what is wrong, named from `article.json`.
     public static func parse(_ data: Data) throws -> Article {
@@ -35,6 +42,20 @@ public struct Article: Equatable, Sendable {
                 }
                 article.banned.append(Banned(phrase: phrase, reason: reason))
             }
+        }
+        if let length = value["length"] {
+            guard length.isObject, let limit = OutlineLength.count(length["limit"]) else {
+                throw fail("length is not an object with a limit that is a whole number from 1 to 999999999")
+            }
+            var parts = ["main"]
+            if length.has("parts") {
+                guard let list = length["parts"]?.array, !list.isEmpty, let names = Optional(list.compactMap(\.string)), names.count == list.count,
+                      names.allSatisfy(OutlineCheck.parts.contains), Set(names).count == names.count else {
+                    throw fail("the parts of length is not a list of one or more of main, appendix, supplement, each once")
+                }
+                parts = names
+            }
+            article.length = Length(limit: limit, parts: parts)
         }
         return article
     }

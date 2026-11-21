@@ -106,6 +106,9 @@ public enum OutlineCheck {
             if record.has("part"), !(record["part"]?.string.map(parts.contains) ?? false) {
                 report("part is not one of main, appendix, supplement")
             }
+            if record.has("length"), OutlineLength.count(record["length"]) == nil {
+                report("length is not a whole number from 1 to 999999999")
+            }
             checkLeftOut(record, report)
             if record.has("parent") {
                 if let parent = record["parent"]?.string, let info = known[JSONKey(parent)] {

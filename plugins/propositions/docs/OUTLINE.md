@@ -243,7 +243,8 @@ lines is the order of the sections in the article.
 | `parent` | no | The `id` of a section record on an earlier line |
 | `dropped` | no | A non-empty string giving the reason the section is left out of the article |
 | `moved_to` | no | A non-empty string naming where a section that is left out goes: another article, or a part that has no outline here. Only on a record that carries `dropped` |
-| `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the main text |
+| `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the part of the section it is under, and a section under none is in the main text |
+| `length` | no | A whole number from 1 to 999999999: the target length of the section in words, the sections under it included (see "article.json") |
 
 `says` is a sentence. A heading, a label or a list of topics does not state
 what the section says.
@@ -1289,6 +1290,7 @@ key that is not defined here is left alone.
 | Key | Value |
 |---|---|
 | `banned` | A list of phrasings that are not to appear in the article: objects with a `phrase` and a `reason`, both non-empty strings (issue #118) |
+| `length` | The limit on the article's length: an object with `limit`, a whole number of words from 1 to 999999999, and optionally `parts`, the parts the limit counts, a list of one or more of `main`, `appendix`, `supplement`; without `parts` it counts `main` (issue #119) |
 
 ```json
 {"banned": [{"phrase": "clearly shows", "reason": "say what the data show"}]}
@@ -1304,6 +1306,25 @@ manuscript, for a list that changed after text was written. The comparison is li
 case does not count, a run of white space with its line breaks is one space, a LaTeX comment is
 not compared, and a phrasing does not run across an empty line. It finds the words, not the
 claim: the same thing said in other words is not found.
+
+**Lengths.** A section record can carry `length`, its target in words, and `article.json` the
+limit of the article. `propositions outline length <directory>` prints, for each section that
+is not dropped, its part and its target, then the sum of the targets of each part and, against
+the limit, the sum over the parts the limit counts; a target is counted once when a section and
+a section above it both carry one, and a section whose subsections plan more than it does is
+marked. With `--jsonl <ledger> --tex <main file>` it also counts what was written: the words of
+each paragraph that `outline-trace.jsonl` ties to a paragraph record, added up by section (the
+sections under it included) and by part. A line over its target or its limit is marked. The
+command only reports: it exits with 0 whatever the lengths are, and no other command refuses
+text because of its length. The count is an estimate for planning, not the count of any
+journal: comments, mathematics, command names, and the arguments of commands that take names
+(labels, references, citations, included files) are not counted; a run of letters and digits
+is one word, and each Chinese character, kana or hangul syllable is one. Pages are not counted,
+and text that was not written from the outline has no trace record and is not counted either.
+
+```json
+{"banned": [], "length": {"limit": 8000, "parts": ["main"]}}
+```
 
 ## What this version leaves open
 

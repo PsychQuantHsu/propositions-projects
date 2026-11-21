@@ -884,7 +884,7 @@ table or a figure that comes from a file that was not read is still one record
 that carries `carry`, named in the file that includes it. Any other included
 file that was not read gets nothing in the outline (no record, no locator, no
 point, no `note`); derive names it to the author, and the outline itself does
-not show the gap (whether it should is open, issue #51). An include command
+not show the gap (whether it should is open, issue #117). An include command
 `\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex` in any letter case, and
 `x.tex` otherwise, taken from the directory of the main file; it is read only
 when it is a file the skill reads, and the skill does not look for it
@@ -1200,20 +1200,56 @@ records are in the order of the section file; only the author's reading stands
 in for these. Whether a `uses` entry names a record or a point on an earlier
 line is one of the five kinds the premise check's agent judges.
 
+## Writing text from the outline
+
+Text is written from the outline one paragraph record at a time, by the write mode of
+`/propositions:construct`, through `propositions write prepare --outline <directory>
+--outline-paragraph <id>`, `write check` and `write commit` (issue #51). Prepare stages nothing
+unless the outline passes `propositions outline check`, the id names exactly one paragraph record,
+that record does not carry `dropped`, and its section stands as approved (see "When a section
+stands as approved"). The three files are copied into the staging directory as files that are
+not written back: a change to them after prepare makes the commit refuse.
+
+After it writes the paragraph, `write commit` appends one line to a fourth file in the outline
+directory, `outline-trace.jsonl`:
+
+| Key | Value |
+|---|---|
+| `outline` | The id of the paragraph record the paragraph was written from |
+| `first_prop` | The id of the first proposition of the written paragraph |
+| `section` | The id of the record's section |
+| `approval_line` | The line of `outline-approvals.jsonl` that holds the approval the section stood on |
+
+```json
+{"outline": "p-1", "first_prop": "019a3c5e-7a00-7000-8000-00000000000d", "section": "s-a", "approval_line": 1}
+```
+
+This file is the only tie between a paragraph record and text. The id of a paragraph record and
+the id of a paragraph in `structure.json` have the same shape (`p-1`) and say nothing about each
+other: `p-1` here is not `p-1` there. Neither the ledger nor the structure sidecars change format
+for it. No skill writes the file except through `write commit`; the outline skill reads and
+writes only the three files. `propositions outline trace <directory> --jsonl <ledger>` lists the
+records with the location of each proposition and reports a record that names no paragraph
+record, a proposition that is not exactly one live proposition of the ledger, or a proposition
+recorded twice.
+
+A trace outlives the outline it was written from when the three files are moved and a new
+outline is started in the same directory: its records then name ids of the new outline. Move
+`outline-trace.jsonl` with the three files.
+
 ## What this version leaves open
 
 Five questions about the design were raised with this format and are not
 answered by it.
 
 - **How an outline paragraph is tied to a paragraph of the structure sidecar.**
-  A paragraph record here and a paragraph of `structure.json` have separate
-  ids, and nothing maps one to the other. The tie can only be made once text
-  has been written from the outline, which is when a paragraph of text exists
-  to point at (issue #51).
+  Answered for text written from the outline: `outline-trace.jsonl` names the
+  first proposition of each written paragraph (see "Writing text from the
+  outline"). Text that was not written from the outline has no tie.
 - **Whether commitments can be planned on the outline.** The structure
   sidecars record which sentence opens a commitment and which discharges it.
   The outline has no key for either: it cannot say that a paragraph will open
-  or discharge a commitment (issue #51).
+  or discharge a commitment (issue #116).
 - **Whether the points of one paragraph are related to each other.** A
   paragraph's points are an ordered list and nothing more. `uses` says that a
   record relies on an earlier record or point; it does not say how.
@@ -1225,4 +1261,4 @@ answered by it.
   Derive names such a file to the author and records nothing for it, so the
   outline itself does not show that part of the original is missing. Two ways
   of recording it were tried and each stopped derive on some manuscript
-  (issue #51).
+  (issue #117).

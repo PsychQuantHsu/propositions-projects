@@ -42,6 +42,10 @@ public enum WriteParagraph {
         /// The staged main file and `_meta.json`, for the checks the skill runs.
         var stagedMain: String
         var stagedMeta: String?
+        /// Whether the paragraph may come with one line of a section heading before it.
+        var heading: Bool?
+        /// The outline record the paragraph is written from, when it is.
+        var outline: WriteFromOutline.Plan?
     }
 
     static let roles = ["manuscript", "ledger", "discourse", "structure"]
@@ -91,7 +95,8 @@ public enum WriteParagraph {
 
     // MARK: prepare
 
-    static func prepare(ledger: URL, main: URL, structure: URL, discourse: URL, stage: URL) throws -> (Manifest, [String]) {
+    static func prepare(ledger: URL, main: URL, structure: URL, discourse: URL, stage: URL,
+                        heading: Bool = false, outline: (directory: URL, paragraph: String)? = nil) throws -> (Manifest, [String]) {
         let fm = FileManager.default
         var isDirectory: ObjCBool = false
         if fm.fileExists(atPath: stage.path, isDirectory: &isDirectory) {
@@ -126,8 +131,8 @@ public enum WriteParagraph {
                 last = (position, location.file, location.start, id)
             }
         }
-        guard let last else { throw Failure(message: "the ledger has no live proposition to write after") }
-        let key = last.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
+        let plan = try outline.map { try WriteFromOutline.gate(directory: $0.directory, paragraph: $0.paragraph) }
+        let key = last?.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
         let fileName = key ?? "main.tex"
         var tree: [(name: String, relative: String, url: URL)] = []
         for (index, name) in order.files.enumerated() {
@@ -146,12 +151,24 @@ public enum WriteParagraph {
         }
         read["manuscript"] = try snapshot(target.url.path)
         let fileLines = LatexLine.splitLines(String(decoding: read["manuscript"]!.data, as: UTF8.self))
-        let runs = Paragraphs.runs(fileLines)
-        guard last.line <= runs.count, let run = runs[last.line - 1] else {
-            throw Failure(message: "the last proposition, \(CiteOrder.visible(last.id)), does not start inside a paragraph")
+        var end: Int
+        if let last {
+            let runs = Paragraphs.runs(fileLines)
+            guard last.line <= runs.count, let run = runs[last.line - 1] else {
+                throw Failure(message: "the last proposition, \(CiteOrder.visible(last.id)), does not start inside a paragraph")
+            }
+            end = last.line
+            while end < runs.count, runs[end] == run { end += 1 }
+        } else {
+            // No proposition yet: the end of the draft is its last line of text before \end{document}.
+            guard let close = fileLines.firstIndex(where: { LedgerOrder.stripped($0) == "\\end{document}" }) else {
+                throw Failure(message: "the ledger has no live proposition, and the main file has no line \\end{document} to write before")
+            }
+            guard let text = fileLines[..<close].lastIndex(where: { !LedgerOrder.stripped($0).isEmpty }) else {
+                throw Failure(message: "the main file has no line before \\end{document} to write after")
+            }
+            end = text + 1
         }
-        var end = last.line
-        while end < runs.count, runs[end] == run { end += 1 }
         if end == fileLines.count, !endsWithLineBreak(read["manuscript"]!.data) {
             throw Failure(message: "line \(end) of \(CiteOrder.visible(fileName)) has no line ending; add one and prepare again")
         }
@@ -188,6 +205,18 @@ public enum WriteParagraph {
             inputs.append(Input(original: meta.path, staged: copy.path, hash: sha256(data)))
             stagedMeta = copy.path
         }
+        if let plan {
+            // The outline is read, not written: its three files have to stay as they are.
+            let outlineDir = stage.appendingPathComponent("outline")
+            try fm.createDirectory(at: outlineDir, withIntermediateDirectories: true)
+            for name in [Outline.sectionFile, Outline.paragraphFile, Outline.approvalFile] {
+                let original = URL(fileURLWithPath: plan.directory).appendingPathComponent(name)
+                let data = try snapshot(original.path).data
+                let copy = outlineDir.appendingPathComponent(name)
+                try create(data, at: copy)
+                inputs.append(Input(original: original.path, staged: copy.path, hash: sha256(data)))
+            }
+        }
         for (role, url) in side {
             let copy = ledgerDir.appendingPathComponent(url.lastPathComponent)
             try create(read[role]!.data, at: copy)
@@ -203,7 +232,7 @@ public enum WriteParagraph {
         }
         let manifest = Manifest(originals: originals, staged: staged, hashes: hashes, inputs: inputs, file: fileName,
                                 after: end, stagedMain: manuscriptDir.appendingPathComponent(mainURL.lastPathComponent).path,
-                                stagedMeta: stagedMeta)
+                                stagedMeta: stagedMeta, heading: heading ? true : nil, outline: plan)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try create(try encoder.encode(manifest) + Data("\n".utf8), at: stage.appendingPathComponent("write.json"))
@@ -256,6 +285,19 @@ public enum WriteParagraph {
         var placeholders: [Int] = []
         var newPropositions = 0
         var newRecords = 0
+        var heading: String?
+        /// The id of the first proposition added to the ledger.
+        var firstNew: String?
+    }
+
+    /// A line that is one sectioning command: `\part`, `\chapter`, `\section`, `\subsection` or
+    /// `\subsubsection`, starred or not, followed by its argument.
+    static func isHeading(_ line: String) -> Bool {
+        let text = LedgerOrder.stripped(line)
+        return ["part", "chapter", "section", "subsection", "subsubsection"].contains { name in
+            for prefix in ["\\" + name + "{", "\\" + name + "*{", "\\" + name + "["] where text.hasPrefix(prefix) { return true }
+            return false
+        }
     }
 
     /// The lines `new` adds at the end of `old`, when it is `old` with whole lines added and
@@ -306,9 +348,18 @@ public enum WriteParagraph {
                 let lines = LatexLine.splitLines(text)
                 report.inserted = lines.count
                 let blank = lines.map { LedgerOrder.stripped($0).isEmpty }
-                let runs = zip(blank, [true] + blank).filter { !$0.0 && $0.1 }.count
+                let starts = zip(blank, [true] + blank).enumerated().filter { !$0.element.0 && $0.element.1 }.map(\.offset)
+                var runs = starts.count
+                if manifest.heading == true, let first = starts.first, isHeading(lines[first]),
+                   first + 1 < lines.count, blank[first + 1] {
+                    report.heading = lines[first]
+                    runs -= 1
+                }
                 if blank.first != true { report.problems.append("the new paragraph does not start with a blank line after line \(manifest.after)") }
-                if runs != 1 { report.problems.append("the lines added after line \(manifest.after) hold \(runs) paragraphs, not one") }
+                if runs != 1 {
+                    let what = manifest.heading == true ? "after a heading line, " : ""
+                    report.problems.append("the lines added after line \(manifest.after) hold \(what)\(runs) paragraphs, not one")
+                }
                 if cut < original.count, !endsWithLineBreak(block) {
                     report.problems.append("the lines added after line \(manifest.after) do not end with a line ending")
                 }
@@ -332,9 +383,17 @@ public enum WriteParagraph {
                     report.problems.append("a line added to the staged \(role) is not a JSON object"); break
                 }
             }
-            if role == "ledger" { report.newPropositions = rows.count } else { report.newRecords = rows.count }
+            if role == "ledger" {
+                report.newPropositions = rows.count
+                report.firstNew = rows.first.flatMap { try? JSONValue.parse($0) }?["id"]?.string
+            } else {
+                report.newRecords = rows.count
+            }
         }
         if report.newPropositions == 0 { report.problems.append("the staged ledger has no new proposition") }
+        if manifest.outline != nil, report.newPropositions > 0, report.firstNew == nil {
+            report.problems.append("the first proposition added to the staged ledger has no id")
+        }
         let oldStructure = try? JSONValue.parse(String(decoding: payload.originals["structure"]!.data, as: UTF8.self))
         let newStructure = try? JSONValue.parse(String(decoding: payload.staged["structure"]!, as: UTF8.self))
         if let oldStructure, let newStructure {
@@ -357,6 +416,7 @@ public enum WriteParagraph {
         for role in roles where sha256(payload.originals[role]!.data) != manifest.hashes[role] {
             throw Failure(message: "\(CiteOrder.visible(manifest.originals[role]!)) changed after prepare; nothing was written. Prepare again")
         }
+        let trace = try manifest.outline.map { try WriteFromOutline.traceSnapshot($0) }
         let report = check(manifest, payload)
         guard report.problems.isEmpty else { throw Failure(message: report.problems[0] + "; nothing was written") }
         let backup = stage.appendingPathComponent("backup")
@@ -376,6 +436,14 @@ public enum WriteParagraph {
             }
             written.append(path)
         }
+        if let plan = manifest.outline, let first = report.firstNew {
+            do {
+                try WriteFromOutline.append(plan, firstProposition: first, to: trace ?? nil)
+            } catch {
+                throw Failure(message: "\(CiteOrder.visible(WriteFromOutline.traceURL(plan).path)): the record could not be added; already written: \(written.map(CiteOrder.visible).joined(separator: ", ")). The originals are in \(CiteOrder.visible(backup.path))")
+            }
+            written.append(WriteFromOutline.traceURL(plan).path)
+        }
         return written
     }
 }
@@ -393,12 +461,17 @@ public enum WriteParagraphRun {
     }
 
     public static func prepare(jsonl: String, tex: String, structure: String, discourse: String, stage: String,
+                               heading: Bool = false, outline: String? = nil, outlineParagraph: String? = nil,
                                workingDirectory: URL) -> CommandResult {
+        guard (outline == nil) == (outlineParagraph == nil) else {
+            return CommandResult(stderr: ["error: --outline and --outline-paragraph go together"], exitCode: 2)
+        }
         do {
             let (manifest, notes) = try WriteParagraph.prepare(
                 ledger: resolve(jsonl, workingDirectory), main: resolve(tex, workingDirectory),
                 structure: resolve(structure, workingDirectory), discourse: resolve(discourse, workingDirectory),
-                stage: resolve(stage, workingDirectory))
+                stage: resolve(stage, workingDirectory), heading: heading,
+                outline: outline.map { (resolve($0, workingDirectory), outlineParagraph!) })
             return CommandResult(stdout: [
                 "the new paragraph goes after line \(manifest.after) of \(CiteOrder.visible(manifest.file))",
                 "staged manuscript file: \(CiteOrder.visible(manifest.staged["manuscript"]!))",
@@ -417,6 +490,7 @@ public enum WriteParagraphRun {
             let manifest = try WriteParagraph.manifest(resolve(stage, workingDirectory))
             let report = WriteParagraph.check(manifest, try WriteParagraph.load(manifest))
             var out = report.problems
+            if let heading = report.heading { out.append("heading: \(heading)") }
             out.append("\(report.inserted) line(s) added, \(report.newPropositions) new proposition(s), "
                        + "\(report.newRecords) new record(s), \(report.placeholders.count) placeholder line(s)"
                        + (report.placeholders.isEmpty ? "" : ": \(report.placeholders.map(String.init).joined(separator: ", "))"))

@@ -46,8 +46,12 @@ enum AuditCitations {
         let end: Int
     }
 
+    /// Commands that define or configure citation commands, not cite: their names begin so.
+    static let defining = ["declare", "def", "new", "renew", "provide", "set"]
+
     static func isCitation(_ name: String) -> Bool {
-        name.lowercased().contains("cite") && !notCiting.contains(name)
+        let lower = name.lowercased()
+        return lower.contains("cite") && !notCiting.contains(name) && !defining.contains { lower.hasPrefix($0) }
     }
 
     /// Reads a citation command: up to two optional arguments before its keys; a command whose
@@ -55,9 +59,12 @@ enum AuditCitations {
     /// groups. `nil` when no group of keys follows.
     static func syntax(_ chars: [Character], start: Int, name: String, end: Int) -> Syntax? {
         var at = end
-        if at < chars.count, chars[at] == "*" { at += 1 }
+        let starred = LatexText.skipSpace(chars, from: end)
+        if starred < chars.count, chars[starred] == "*" { at = starred + 1 }
         let nameEnd = at
         let multiple = name.hasSuffix("s")
+        // `\volcite[pre]{volume}[page]{key}` and its kin: the first braced argument is a volume.
+        let volume = name.lowercased().contains("volcite")
         var optionals: [Range<Int>] = []
         var groups: [Range<Int>] = []
         if multiple {
@@ -72,6 +79,18 @@ enum AuditCitations {
             var next = LatexText.skipSpace(chars, from: at)
             var count = 0
             var round: [Range<Int>] = []
+            if volume {
+                if next < chars.count, chars[next] == "[", let group = LatexText.group(chars, at: next) {
+                    round.append(group.range)
+                    at = group.end
+                    next = LatexText.skipSpace(chars, from: at)
+                }
+                guard next < chars.count, chars[next] == "{", let number = LatexText.group(chars, at: next) else { break }
+                round.append(number.range)
+                at = number.end
+                next = LatexText.skipSpace(chars, from: at)
+                count = 1
+            }
             while count < 2, next < chars.count, chars[next] == "[", let group = LatexText.group(chars, at: next) {
                 round.append(group.range)
                 count += 1
@@ -99,7 +118,8 @@ enum AuditCitations {
         for command in LatexText.commands(part) where command.name == "texttt" {
             let at = LatexText.skipSpace(part, from: command.end)
             guard at < part.count, part[at] == "{", let group = LatexText.group(part, at: at) else { continue }
-            let word = String(part[group.range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            // A brace that only groups does not change the printed label.
+            let word = String(part[group.range].filter { $0 != "{" && $0 != "}" }).trimmingCharacters(in: .whitespacesAndNewlines)
             guard label.firstMatch(in: word, range: NSRange(word.startIndex..., in: word)) != nil else { continue }
             if !only { return true }
             let before = String(part[..<command.start]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -155,8 +175,29 @@ enum AuditCitations {
         return declared
     }
 
+    /// The end of a BibTeX record that opens at `start` with `{` or `(`: braces nest, and a `"` at
+    /// the record's own level opens a value in which only braces count.
+    static func record(_ text: [Character], at start: Int) -> (range: Range<Int>, end: Int)? {
+        let close: Character = text[start] == "{" ? "}" : ")"
+        var braces = 0
+        var quoted = false
+        var index = start + 1
+        while index < text.count {
+            let ch = text[index]
+            if ch == "{" { braces += 1 }
+            else if ch == "}" {
+                if braces == 0, close == "}" { return ((start + 1)..<index, index + 1) }
+                braces = max(0, braces - 1)
+            } else if ch == "\"", braces == 0 { quoted.toggle() }
+            else if ch == ")", close == ")", braces == 0, !quoted { return ((start + 1)..<index, index + 1) }
+            index += 1
+        }
+        return nil
+    }
+
     /// The entries of a BibTeX file: each `@type{key, …}` or `@type(key, …)` read as a whole, so
-    /// that an entry written inside `@comment{…}` is not one. Text between entries is ignored.
+    /// that an entry written inside `@comment{…}` or a field is not one. A key is followed by a
+    /// comma or by the end of the record. Text between records is ignored. The offset is the `@`'s.
     static func entries(in text: [Character]) -> [(key: String, offset: Int)] {
         var found: [(String, Int)] = []
         var index = 0
@@ -168,22 +209,26 @@ enum AuditCitations {
             let type = String(text[typeStart..<at]).lowercased()
             let open = LatexText.skipSpace(text, from: at)
             guard !type.isEmpty, open < text.count, text[open] == "{" || text[open] == "(",
-                  let body = LatexText.group(text, at: open)
+                  let body = record(text, at: open)
             else { index += 1; continue }
             if !directives.contains(type) {
                 let keyStart = LatexText.skipSpace(text, from: open + 1)
                 var keyEnd = keyStart
                 while keyEnd < body.range.upperBound, text[keyEnd] != ",", !text[keyEnd].isWhitespace { keyEnd += 1 }
-                if keyEnd > keyStart { found.append((String(text[keyStart..<keyEnd]), keyStart)) }
+                let after = LatexText.skipSpace(text, from: keyEnd)
+                if keyEnd > keyStart, after >= body.range.upperBound || text[after] == "," {
+                    found.append((String(text[keyStart..<keyEnd]), index))
+                }
             }
             index = body.end
         }
         return found
     }
 
-    static func bibliography(_ manuscript: Audit.Manuscript) throws -> (Bibliography, [String]) {
+    /// The bibliography the declarations name. Their warnings are the caller's to print, before
+    /// a file that cannot be read stops the audit.
+    static func bibliography(_ manuscript: Audit.Manuscript, declared: Declared) throws -> Bibliography {
         var bibliography = Bibliography()
-        let declared = declared(manuscript)
         var urls: [(url: URL, place: String?)] = declared.names.map { item in
             let url = item.name.hasPrefix("/") ? URL(fileURLWithPath: item.name)
                 : manuscript.mainDirectory.appendingPathComponent(item.name)
@@ -210,7 +255,7 @@ enum AuditCitations {
                 bibliography.keys.insert(scalars(entry.key))
             }
         }
-        return (bibliography, declared.notes)
+        return bibliography
     }
 
     // MARK: the citations
@@ -221,10 +266,12 @@ enum AuditCitations {
         let source: Int
         let offset: Int
         let position: [Int]
+
+        var place: (position: [Int], offset: Int) { (position, offset) }
     }
 
     static func findings(_ manuscript: Audit.Manuscript, bibliography: Bibliography) -> [Audit.Finding] {
-        var leaks: [(position: [Int], finding: Audit.Finding)] = []
+        var leaks: [(place: (position: [Int], offset: Int), finding: Audit.Finding)] = []
         var citations: [Citation] = []
         for (sourceIndex, source) in manuscript.sources.enumerated() {
             let chars = source.code.chars
@@ -232,9 +279,10 @@ enum AuditCitations {
                 guard let syntax = syntax(chars, start: command.start, name: command.name, end: command.end) else { continue }
                 let offset = source.code.offsets[command.start]
                 let line = source.line(of: offset)
+                // A key with `#` is a macro's parameter, in a definition, not a key.
                 let keys = syntax.keyGroups.flatMap { group in
                     String(chars[(group.lowerBound + 1)..<(group.upperBound - 1)]).split(separator: ",")
-                        .map { LedgerOrder.stripped(String($0)) }.filter { !$0.isEmpty }
+                        .map { LedgerOrder.stripped(String($0)) }.filter { !$0.isEmpty && !$0.contains("#") }
                 }
                 let position = manuscript.position(source: sourceIndex, offset: offset)
                 citations.append(Citation(name: command.name, keys: keys, source: sourceIndex, offset: offset, position: position))
@@ -247,7 +295,7 @@ enum AuditCitations {
                     end = group.end
                 }
                 if leaked {
-                    leaks.append((position, Audit.Finding(
+                    leaks.append(((position, offset), Audit.Finding(
                         rule: "R2", severity: "likely", file: source.shown, line: line,
                         match: String(chars[command.start..<end]), context: Audit.context(source.lines, line: line),
                         proposedFix: "替換 snake_case label 為 content-based 描述,e.g. `Theorem on $\\eta = f(s)$ case`")))
@@ -257,29 +305,31 @@ enum AuditCitations {
         // The first citation of a key is the first in reading order, whichever file it is in.
         var first: [[UInt32]: (key: String, citation: Citation)] = [:]
         var everything = false
-        for citation in citations.sorted(by: { ReadingOrder.precedes($0.position, $1.position) }) {
+        for citation in citations.sorted(by: { Audit.Manuscript.precedes($0.place, $1.place) }) {
             for key in citation.keys {
                 if key == "*" && citation.name == "nocite" { everything = true; continue }
                 if first[scalars(key)] == nil { first[scalars(key)] = (key, citation) }
             }
         }
         let bibNames = bibliography.files.isEmpty ? "the bibliography (none was read)" : bibliography.files.joined(separator: ", ")
-        var findings = leaks.sorted { ReadingOrder.precedes($0.position, $1.position) }.map(\.finding)
+        var findings = leaks.sorted { Audit.Manuscript.precedes($0.place, $1.place) }.map(\.finding)
         for key in sortedKeys(first.values.map(\.key)) where !bibliography.keys.contains(scalars(key)) {
             let citation = first[scalars(key)]!.citation
             let source = manuscript.sources[citation.source]
+            let shown = CiteOrder.visible(key)
             findings.append(Audit.Finding(
                 rule: "R2-bis", severity: "definite", file: source.shown, line: source.line(of: citation.offset), match: key,
-                context: "\\cite*{\(key)} but \(key) not in \(bibNames)",
-                proposedFix: "加 \(key) 條目到 bibliography,或修正 cite key typo"))
+                context: "\\cite*{\(shown)} but \(shown) not in \(bibNames)",
+                proposedFix: "加 \(shown) 條目到 bibliography,或修正 cite key typo"))
         }
         if !everything {
             let orphans = bibliography.entries.filter { first[scalars($0.key)] == nil }
             for entry in orphans.sorted(by: { scalars($0.key).lexicographicallyPrecedes(scalars($1.key)) }) {
+                let shown = CiteOrder.visible(entry.key)
                 findings.append(Audit.Finding(
                     rule: "R2-bis", severity: "FYI", file: entry.file, line: entry.line, match: entry.key,
-                    context: "@type{\(entry.key), ...} in \(entry.file) but never cited",
-                    proposedFix: "考慮刪除 \(entry.key) 條目,或確認是否預期但漏 cite"))
+                    context: "@type{\(shown), ...} in \(entry.file) but never cited",
+                    proposedFix: "考慮刪除 \(shown) 條目,或確認是否預期但漏 cite"))
             }
         }
         return findings

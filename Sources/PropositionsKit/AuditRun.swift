@@ -35,8 +35,9 @@ public enum AuditRun {
                 })
                 findings = AuditSymbols.findings(manuscript, bibliographyNames: names)
             case .citations:
-                let (bibliography, bibNotes) = try AuditCitations.bibliography(manuscript)
-                notes += bibNotes
+                let declared = AuditCitations.declared(manuscript)
+                notes += declared.notes
+                let bibliography = try AuditCitations.bibliography(manuscript, declared: declared)
                 files += bibliography.files
                 findings = AuditCitations.findings(manuscript, bibliography: bibliography)
             }

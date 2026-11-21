@@ -355,6 +355,119 @@ struct AuditTests {
         #expect(report.findings.first?["file"] == "manuscript/..notes/a.tex")
     }
 
+    // MARK: the second review
+
+    @Test func `The input tree skips examples in verb, minted and addresses, and follows what comes after them`() throws {
+        let report = try audit("symbols", [
+            "main.tex": #"""
+                \verb%example% \input{real}
+                \url{https://x.org/a%20b}\input{other}
+                \verb{\input{missing}{ is an example that ends at the next brace
+                \begin{minted}{latex}
+                \input{missing}
+                \end{minted}
+                """#,
+            "real.tex": "Real.\n", "other.tex": "Other.\n",
+        ])
+        #expect(report.result.exitCode == 0)
+        #expect(report.files == ["manuscript/main.tex", "manuscript/real.tex", "manuscript/other.tex"])
+    }
+
+    @Test func `Commented environment openers, addresses on the next line and options of href`() throws {
+        let main = #"""
+            \begin% a note
+            {verbatim}
+            \cite{InExample}
+            \end{verbatim}
+            \url
+              {https://x.org/a%20b} \href[pdfnewwindow]{https://x.org/c%20d}{text} \cite{A}
+            \begin{comment}
+            The string \end{comment} closes it, says this prose.
+            \cite{InComment}
+            \end{comment}
+            """#
+        let report = try audit("citations", ["main.tex": main, "refs.bib": "@misc{A,}\n"])
+        #expect(report.result.exitCode == 0)
+        #expect(report.findings.isEmpty)
+    }
+
+    @Test func `A literal stays opaque: it neither joins what is around it nor holds a citation`() throws {
+        let report = try audit("citations", [
+            "main.tex": "\\cite{A} (\\verb|see| \\texttt{main\\_thm}) \\path{\\cite{Example}}\n",
+            "refs.bib": "@misc{A,}\n",
+        ])
+        #expect(report.findings.isEmpty)
+    }
+
+    @Test func `A star after a space, volume citations, definitions and parameters`() throws {
+        let main = #"""
+            \cite *[see]{A} \volcite[see]{2}[35]{B} \Volcites[x]{3}{C}
+            \defcitealias{Alias}{the survey} \DeclareCiteCommand{\citepubyear}{x}{y}
+            \newcommand{\mycite}[1]{\cite{#1}}
+            """#
+        let report = try audit("citations", ["main.tex": main, "refs.bib": "@misc{A,}\n@misc{B,}\n@misc{C,}\n"])
+        #expect(report.findings.isEmpty)
+        let symbols = try audit("symbols", ["main.tex": "\\includegraphics *[width=1cm]{fig/plot.tex}\n"])
+        #expect(symbols.findings.isEmpty)
+    }
+
+    @Test func `A citation before an input on the same line comes first`() throws {
+        let report = try audit("citations", [
+            "main.tex": "See \\cite{Missing} \\input{sections/a}\n",
+            "sections/a.tex": "\\cite{Missing}\n",
+        ])
+        #expect(report.findings.map { "\($0["file"] ?? ""):\($0["line"] ?? "")" } == ["manuscript/main.tex:1"])
+    }
+
+    @Test func `Paths in formatted text are read as printed`() throws {
+        let main = #"""
+            \texttt{\ref{analysis/private.py}} \texttt{analysis/{run}.py} \verb|analysis/old.py~|
+            \url{https://example.org/analysis/my%20script.py} see foo.py~and \emph{foo}bar.py
+            """#
+        let report = try audit("symbols", ["main.tex": main])
+        #expect(report.findings.map { [$0["match"] ?? "", $0["severity"] ?? ""] } == [
+            ["analysis/run.py", "definite"], ["//example.org/analysis/my%20script.py", "definite"],
+            ["foo.py", "suspicious"], ["foobar.py", "suspicious"],
+        ])
+        let citations = try audit("citations", ["main.tex": "\\cite[\\texttt{{main\\_thm}}]{A}\n", "refs.bib": "@misc{A,}\n"])
+        #expect(citations.findings.map { $0["rule"] ?? "" } == ["R2"])
+    }
+
+    @Test func `BibTeX records are read with their quoted values, and a key needs a comma or the end`() throws {
+        let bib = """
+            @article(A, title = "A survey (revised)", note = "example: @misc{Fake,}")
+            @online{O1 not a record}
+            @misc{Late,
+            }
+            @book{
+              Multi,
+              title={x}}
+            """
+        let report = try audit("citations", ["main.tex": "\\cite{A}\n", "refs.bib": bib])
+        #expect(report.findings.map { "\($0["match"] ?? ""):\($0["line"] ?? "")" } == ["Late:3", "Multi:5"])
+    }
+
+    @Test func `A key on several lines is written on one line of the Markdown report`() throws {
+        let box = try Box()
+        _ = try box.write("\\cite{X\n  Y}\n", to: "manuscript/main.tex")
+        let result = PropositionsCLI.run(["audit", "citations", "--manuscript-root", "manuscript"], workingDirectory: box.url)
+        #expect(result.exitCode == 1)
+        let report = result.stdout.joined(separator: "\n").split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(report.filter { $0.hasPrefix("## ") } == ["## Definite (1)"])
+        #expect(report.contains { $0.contains("加 X\\u{A}  Y 條目") })
+        #expect(!report.contains { $0.hasPrefix("  Y") })
+    }
+
+    @Test func `The warning about a remote bibliography comes before the error`() throws {
+        let report = try audit("citations", [
+            "main.tex": "\\addbibresource[location=remote]{https://x.org/a.bib}\n\\addbibresource{missing.bib}\n",
+        ])
+        #expect(report.result.exitCode == 2)
+        #expect(report.result.stderr.count == 2)
+        #expect(report.result.stderr.first?.contains("remote bibliography") == true)
+        #expect(report.result.stderr.last?.hasPrefix("error: ") == true)
+    }
+
     // MARK: reports and errors
 
     @Test func `The Markdown report keeps the layout run-audit.sh reads, and names the files`() throws {

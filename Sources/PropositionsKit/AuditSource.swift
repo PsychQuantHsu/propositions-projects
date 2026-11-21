@@ -70,10 +70,15 @@ public enum Audit {
         let rootShown: String
         let notes: [String]
 
-        /// Where an offset of a source comes in the manuscript's reading order.
+        /// Where a line of a source comes in the manuscript's reading order.
         func position(source: Int, offset: Int) -> [Int] {
             let item = sources[source]
-            return (order.position(file: item.key, line: item.line(of: offset)) ?? [Int.max]) + [offset]
+            return order.position(file: item.key, line: item.line(of: offset)) ?? [Int.max]
+        }
+
+        /// Whether a place comes before another: by reading order, then, on one line, by offset.
+        static func precedes(_ a: (position: [Int], offset: Int), _ b: (position: [Int], offset: Int)) -> Bool {
+            a.position == b.position ? a.offset < b.offset : ReadingOrder.precedes(a.position, b.position)
         }
     }
 
@@ -159,6 +164,11 @@ enum LatexText {
     /// Commands whose braced argument TeX reads as it is written, `%` included.
     static let literalArgument: Set<String> = ["url", "path", "nolinkurl", "href"]
 
+    /// What stands in the source for text read as it is written (`\verb|…|`, the body of a verbatim
+    /// environment, the address of `\url`): not white space, so that what is around it is not joined,
+    /// and not a character a command, a key or a path is made of.
+    static let opaque: Character = "\u{FFFC}"
+
     /// Splits a file's text into what TeX reads as source and what it prints as it is written.
     static func tokenize(_ text: [Character]) -> (code: Audit.Piece, displayed: [Audit.Piece]) {
         var code = Audit.Piece()
@@ -169,6 +179,10 @@ enum LatexText {
             piece.take(text, range)
             displayed.append(piece)
         }
+        func hide(at offset: Int) {
+            code.chars.append(opaque)
+            code.offsets.append(offset)
+        }
         /// The index of `ch` after `start` on the same line.
         func onLine(_ ch: Character, after start: Int) -> Int? {
             var index = start
@@ -177,6 +191,14 @@ enum LatexText {
                 index += 1
             }
             return nil
+        }
+        /// The argument of a command that reads it as written: copied into the source with its text
+        /// made opaque, and shown.
+        func literal(_ group: (range: Range<Int>, end: Int), open: Int) {
+            code.take(text, open..<(open + 1))
+            for offset in group.range { hide(at: offset) }
+            code.take(text, (group.end - 1)..<group.end)
+            show(group.range)
         }
         var index = 0
         while index < count {
@@ -194,26 +216,27 @@ enum LatexText {
             let name = String(text[(index + 1)..<end])
             switch name {
             case "begin":
-                guard let (environment, after) = environmentName(text, from: end),
-                      let printed = literalEnvironments[environment.hasSuffix("*") ? String(environment.dropLast()) : environment]
-                else { break }
-                var body = after
+                guard let (environment, after) = environmentName(text, from: end) else { break }
                 let base = environment.hasSuffix("*") ? String(environment.dropLast()) : environment
-                if base == "lstlisting" || base == "minted" || base == "Verbatim" || base == "BVerbatim" {
+                guard let printed = literalEnvironments[base] else { break }
+                var body = after
+                if ["lstlisting", "minted", "Verbatim", "BVerbatim"].contains(base) {
                     if body < count, text[body] == "[", let group = group(text, at: body) { body = group.end }
                 }
                 if base == "minted" {
                     let next = skipSpace(text, from: body)
                     if next < count, text[next] == "{", let group = group(text, at: next) { body = group.end }
                 }
-                let (closeStart, closeEnd) = endOfEnvironment(text, environment, from: body) ?? (count, count)
-                if printed { show(body..<closeStart) }
-                index = closeEnd
+                let close = endOfEnvironment(text, environment, from: body, ownLine: base == "comment") ?? (count, count)
+                hide(at: index)
+                if printed { show(body..<close.0) }
+                index = close.1
                 continue
             case "verb":
                 var at = end
                 if at < count, text[at] == "*" { at += 1 }
                 if at < count, !text[at].isLetter, !text[at].isWhitespace, let close = onLine(text[at], after: at + 1) {
+                    hide(at: index)
                     show((at + 1)..<close)
                     index = close + 1
                     continue
@@ -222,25 +245,34 @@ enum LatexText {
                 var at = end
                 if at < count, text[at] == "[", let group = group(text, at: at) { at = group.end }
                 if at < count, text[at] == "{", let group = group(text, at: at) {
+                    hide(at: index)
                     show(group.range)
                     index = group.end
                     continue
                 }
                 if at < count, !text[at].isLetter, !text[at].isWhitespace, let close = onLine(text[at], after: at + 1) {
+                    hide(at: index)
                     show((at + 1)..<close)
                     index = close + 1
                     continue
                 }
             default:
-                if literalArgument.contains(name) {
-                    var at = end
-                    while at < count, text[at] == " " || text[at] == "\t" { at += 1 }
-                    if at < count, text[at] == "{", let group = group(text, at: at) {
-                        code.take(text, index..<group.end)
-                        index = group.end
-                        continue
-                    }
+                guard literalArgument.contains(name) else { break }
+                code.take(text, index..<end)
+                var at = end
+                if name == "href", at < count, text[at] == "[", let options = group(text, at: at) {
+                    code.take(text, at..<options.end)
+                    at = options.end
                 }
+                let next = skipSpace(text, from: at)
+                code.take(text, at..<next)
+                if next < count, text[next] == "{", let group = group(text, at: next) {
+                    literal(group, open: next)
+                    index = group.end
+                } else {
+                    index = next
+                }
+                continue
             }
             code.take(text, index..<end)
             index = end
@@ -248,22 +280,34 @@ enum LatexText {
         return (code, displayed)
     }
 
-    /// The name in `{…}` after `\begin`, and the index after its closing brace.
+    /// The name in `{…}` after `\begin`, and the index after its closing brace. White space and a
+    /// comment may stand between them.
     static func environmentName(_ text: [Character], from start: Int) -> (String, Int)? {
-        let at = skipSpace(text, from: start)
+        var at = start
+        while at < text.count {
+            if text[at].isWhitespace { at += 1; continue }
+            if text[at] == "%" {
+                while at < text.count, text[at] != "\n" { at += 1 }
+                continue
+            }
+            break
+        }
         guard at < text.count, text[at] == "{", let close = text[at...].firstIndex(of: "}") else { return nil }
         return (String(text[(at + 1)..<close]).trimmingCharacters(in: .whitespaces), close + 1)
     }
 
     /// Where `\end{name}` starts and the index after it, from `start`. Inside the environment
-    /// nothing is a command but its own end.
-    static func endOfEnvironment(_ text: [Character], _ name: String, from start: Int) -> (Int, Int)? {
+    /// nothing is a command but its own end; with `ownLine`, as for `comment`, only an end that
+    /// begins its line counts.
+    static func endOfEnvironment(_ text: [Character], _ name: String, from start: Int, ownLine: Bool) -> (Int, Int)? {
         var index = start
         let marker = Array("\\end")
         while index + marker.count <= text.count {
             if Array(text[index..<(index + marker.count)]) == marker,
                let (found, after) = environmentName(text, from: index + marker.count), found == name {
-                return (index, after)
+                var lineStart = index
+                while lineStart > 0, text[lineStart - 1] != "\n" { lineStart -= 1 }
+                if !ownLine || text[lineStart..<index].allSatisfy({ $0 == " " || $0 == "\t" }) { return (index, after) }
             }
             index += 1
         }

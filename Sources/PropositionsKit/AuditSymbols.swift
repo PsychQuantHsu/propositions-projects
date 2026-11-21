@@ -14,16 +14,13 @@ enum AuditSymbols {
     /// after a space, as in `note (Hsu 2024-02).tex`, and the extension is its end: `report.py.pdf`
     /// and `tools.py/README` are not paths that end in `.py`.
     static let path = try! NSRegularExpression(
-        pattern: #"[\w/.\-\\+~@]+(?:\s+\([^)\n]*\))?\.(?:"# + extensions.joined(separator: "|") + #")(?![\w/\-+]|\.\w)"#)
+        pattern: #"[\w/.\-\\+~@%]+(?:\s+\([^)\n]*\))?\.(?:"# + extensions.joined(separator: "|") + #")(?![\w/\-+~]|\.\w)"#)
 
     static let definite = [
-        #"(?:^|/)analysis/[\w\-/.+]+\.py$"#, #"(?:^|/)manuscript/docs/[\w\-_/. +]+\.(?:md|tex)$"#, #"(?:^|/)note\s*\([^)]+\)\.tex$"#,
+        #"(?:^|/)analysis/[\w\-/.+%]+\.py$"#, #"(?:^|/)manuscript/docs/[\w\-_/. +]+\.(?:md|tex)$"#, #"(?:^|/)note\s*\([^)]+\)\.tex$"#,
     ].map { try! NSRegularExpression(pattern: $0) }
 
     static let whitelist: Set<String> = ["refs.bib", "bibliography.bib", "references.bib"]
-
-    /// Commands whose argument is a URL or a path shown as it is written.
-    static let shownAsWritten: Set<String> = ["texttt", "url", "path", "nolinkurl"]
 
     /// Commands whose arguments name a file, a package or a label for LaTeX: how many optional and
     /// how many braced arguments are not shown. Arguments after those are read as text, so that the
@@ -57,19 +54,34 @@ enum AuditSymbols {
         return "review:可能 false positive,確認 context"
     }
 
-    /// `\_` read as `_` and `\ ` as a space, each character keeping its offset.
-    static func unescaped(_ piece: Audit.Piece) -> Audit.Piece {
+    /// Running text as it is printed, each character keeping its offset: a command's name is not
+    /// printed; `\_`, `\%`, `\&`, `\#`, `\$`, `\{` and `\}` are their character; `\ `, `\\` and `~`
+    /// are a space; a brace that groups prints nothing.
+    static func printed(_ piece: Audit.Piece) -> Audit.Piece {
         var out = Audit.Piece()
+        let chars = piece.chars
+        func put(_ ch: Character, _ at: Int) {
+            out.chars.append(ch)
+            out.offsets.append(piece.offsets[at])
+        }
         var index = 0
-        while index < piece.chars.count {
-            if piece.chars[index] == "\\", index + 1 < piece.chars.count, piece.chars[index + 1] == "_" || piece.chars[index + 1] == " " {
-                out.chars.append(piece.chars[index + 1])
-                out.offsets.append(piece.offsets[index])
+        while index < chars.count {
+            let ch = chars[index]
+            if ch == "\\", index + 1 < chars.count {
+                let next = chars[index + 1]
+                if next.isLetter {
+                    var end = index + 1
+                    while end < chars.count, chars[end].isLetter { end += 1 }
+                    put(" ", index)
+                    index = end
+                    continue
+                }
+                if "_%&#${}".contains(next) { put(next, index + 1) } else { put(" ", index) }
                 index += 2
                 continue
             }
-            out.chars.append(piece.chars[index])
-            out.offsets.append(piece.offsets[index])
+            if ch == "{" || ch == "}" { index += 1; continue }
+            put(ch == "~" ? " " : ch, index)
             index += 1
         }
         return out
@@ -85,26 +97,20 @@ enum AuditSymbols {
         }
     }
 
-    /// The pieces of a file's source to look for a path in.
-    static func pieces(_ code: Audit.Piece) -> [Audit.Piece] {
+    /// A file's source as running text, with the arguments that are not shown blanked.
+    static func runningText(_ code: Audit.Piece) -> Audit.Piece {
         let chars = code.chars
         var plain = code
-        var pieces: [Audit.Piece] = []
         var consumed = 0
         func blank(_ range: Range<Int>) { for i in range where i < plain.chars.count { plain.chars[i] = " " } }
-        func slice(_ range: Range<Int>) -> Audit.Piece {
-            Audit.Piece(chars: Array(chars[range]), offsets: Array(code.offsets[range]))
+        /// The index after a `*` that follows a command, white space allowed before it.
+        func star(_ end: Int) -> Int {
+            let next = LatexText.skipSpace(chars, from: end)
+            return next < chars.count && chars[next] == "*" ? next + 1 : end
         }
         for command in LatexText.commands(chars) where command.start >= consumed {
-            let at = LatexText.skipSpace(chars, from: command.end)
-            if shownAsWritten.contains(command.name) || command.name == "href" {
-                guard at < chars.count, chars[at] == "{", let group = LatexText.group(chars, at: at) else { continue }
-                pieces.append(command.name == "texttt" ? unescaped(slice(group.range)) : slice(group.range))
-                blank(command.start..<group.end)
-                consumed = group.end
-            } else if let arity = quiet[command.name] {
-                var end = command.end
-                if end < chars.count, chars[end] == "*" { end += 1 }
+            if let arity = quiet[command.name] {
+                var end = star(command.end)
                 for _ in 0..<arity.optional {
                     let next = LatexText.skipSpace(chars, from: end)
                     guard next < chars.count, chars[next] == "[", let group = LatexText.group(chars, at: next) else { break }
@@ -124,14 +130,13 @@ enum AuditSymbols {
                 syntax.keyGroups.forEach(blank)
             }
         }
-        pieces.append(unescaped(plain))
-        return pieces
+        return printed(plain)
     }
 
     static func findings(_ manuscript: Audit.Manuscript, bibliographyNames: Set<String>) -> [Audit.Finding] {
         var findings: [Audit.Finding] = []
         for source in manuscript.sources {
-            var found = pieces(source.code).flatMap(paths)
+            var found = paths(in: runningText(source.code))
             found += source.displayed.flatMap(paths)
             for item in found.sorted(by: { $0.offset < $1.offset }) {
                 let name = item.path

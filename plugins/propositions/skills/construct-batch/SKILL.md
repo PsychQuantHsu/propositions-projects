@@ -31,6 +31,8 @@ Steps 1–7 annotate a manuscript from the start. Sidecars whose tree already ex
 ```bash
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/propositions-projects/propositions/*/ 2>/dev/null | sort -V | tail -1)}"
 SCRIPTS="$PLUGIN_ROOT/scripts"
+: "${LEDGER:?set LEDGER to the ledger directory, as in construct}"
+: "${MAIN:?set MAIN to the manuscript's main .tex file, as in construct}"
 ```
 
 ## 1. Put the ledger in reading order

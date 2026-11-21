@@ -118,7 +118,7 @@ if [[ -f "$PROPS_JSONL" ]] && [[ -f "$MAIN_TEX" ]]; then
   META_FLAG=()
   [[ -f "$PROPS_META" ]] && META_FLAG=(--meta "$PROPS_META")
   "$PYTHON" "$REPO_ROOT/scripts/validate-propositions.py" \
-    --jsonl "$PROPS_JSONL" "${META_FLAG[@]}" --tex "$MAIN_TEX" > "$R4_OUT" 2>&1 || R4_RC=$?
+    --jsonl "$PROPS_JSONL" ${META_FLAG[@]+"${META_FLAG[@]}"} --tex "$MAIN_TEX" > "$R4_OUT" 2>&1 || R4_RC=$?
 elif [[ -f "$PROPS_JSON_LEGACY" ]] && [[ -f "$MAIN_TEX" ]]; then
   "$PYTHON" "$REPO_ROOT/scripts/validate-propositions.py" \
     --json "$PROPS_JSON_LEGACY" --tex "$MAIN_TEX" > "$R4_OUT" 2>&1 || R4_RC=$?
@@ -129,7 +129,14 @@ fi
 
 # Bail on tool error (rc=2) from any pass
 if [[ "$R1_RC" -ge 2 ]] || [[ "$R2_RC" -ge 2 ]] || [[ "$R3_RC" -ge 2 ]] || [[ "$R4_RC" -ge 2 ]]; then
-  echo "error: at least one audit pass failed with rc=2" >&2
+  # Exit 3 is the launcher's: the pinned binary is not there, and the pass did not run.
+  for pass in R1 R2; do
+    rc_var="${pass}_RC"; out_var="${pass}_OUT"
+    if [[ "${!rc_var}" -eq 3 ]]; then
+      echo "error: ${pass} did not run: $(head -1 "${!out_var}")" >&2
+    fi
+  done
+  echo "error: at least one audit pass did not run or failed with rc>=2 (R1=${R1_RC} R2=${R2_RC} R3=${R3_RC} R4=${R4_RC})" >&2
   exit 2
 fi
 

@@ -157,7 +157,11 @@ cd manuscript && git pull --rebase && cd ..
 
 ```bash
 # Phase 1 only (Rule R1 + R2). The commands of the propositions command-line tool replaced
-# audit-symbols.py and audit-citations.py, which were retired on 2026-11-21:
+# audit-symbols.py and audit-citations.py, which were retired on 2026-11-21. In a plugin session
+# the tool is in the plugin's data directory, not on PATH: run it as
+#   bash <plugin root>/hooks/run-cli.sh <plugin data directory> audit symbols …
+# and give run-audit.sh the same directory in PROPOSITIONS_PLUGIN_DATA. Outside a session, put the
+# binary of a release on PATH or name it in PROPOSITIONS_CLI.
 propositions audit symbols --manuscript-root manuscript/ --report-format md
 propositions audit citations --manuscript-root manuscript/ --report-format md
 

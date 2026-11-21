@@ -62,11 +62,15 @@ If dirty, ask whether to commit/stash before running.
 ### Step 2: Run the orchestrator
 
 ```bash
-# R1 and R2 run on the plugin's pinned propositions binary (fetched at session start, macOS).
-export PROPOSITIONS_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}"
-bash "$RUNNER" "$MANUSCRIPT_ROOT"                  # R3 defaults --code-root to analysis/
-# If code lives elsewhere:   bash "$RUNNER" "$MANUSCRIPT_ROOT" --code-root path/to/code
+# R1 and R2 run on the plugin's pinned propositions binary (fetched at session start, macOS),
+# through the launcher only: an inherited PROPOSITIONS_CLI is dropped, so no other binary is used.
+env -u PROPOSITIONS_CLI PROPOSITIONS_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA}" bash "$RUNNER" "$MANUSCRIPT_ROOT"   # R3 defaults --code-root to analysis/
+# If code lives elsewhere: add --code-root path/to/code after "$MANUSCRIPT_ROOT".
 ```
+
+When the pinned binary is not installed (another system than macOS, a session that could not
+fetch it), the run stops with exit 2 and names R1 and R2 as not run: report the audit as not run,
+not as clean.
 
 `run-audit.sh` runs R1+R2+R3+R4 in order, writes a merged report to
 `$MANUSCRIPT_ROOT/docs/audit/audit-YYYY-MM-DD.md`, and exits `0` clean / `1` ≥1 finding /

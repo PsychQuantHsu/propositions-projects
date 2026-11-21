@@ -10,7 +10,8 @@ description: >-
   ("organized as follows" followed, "we now examine" carried out: "研究問題有沒有回答到", "論證的走向有沒有斷掉",
   "承諾有沒有兌現"), or wants the article structure annotated ("標註文章結構", "annotate the article structure",
   section roles), or wants the next paragraph written into the draft ("幫我把下一段寫進稿件", "write the next
-  paragraph into the draft") — even if they never name this skill. Invoke it before opening the manuscript or
+  paragraph into the draft"), also from an approved outline ("照綱要寫", "write from the outline") — even if
+  they never name this skill. Invoke it before opening the manuscript or
   the sidecars: it finds them itself and has the tool that reads them out, so do not parse
   structure.json or discourse.jsonl by hand. It records commitments, section roles, what each
   sentence does and a dependency tree (S1–S9), and reports what the article owes the reader and
@@ -494,6 +495,59 @@ originals back is the author's decision; do not do it unasked.
 
 After a commit, the draft has a new end: next mode and write mode start again from it.
 
+### Writing from an outline
+
+When the author asks to write from the outline ("照綱要寫", "write the next paragraph from the
+outline"), write mode takes its plan from one paragraph record of an approved outline (the
+outline's format: `docs/OUTLINE.md` of this plugin, "Writing text from the outline"). The steps
+are W1 to W9, with these differences.
+
+**O1 — Which record.** Establish `OUTDIR`, the directory that holds the outline files, from the
+request or by asking once. Then:
+
+```bash
+"${CLI[@]}" outline status "$OUTDIR"
+"${CLI[@]}" outline trace "$OUTDIR" --jsonl "$LEDGER/main.jsonl"
+```
+
+`outline trace` exits 2 when there is no `outline-trace.jsonl` yet; that means nothing has been
+written from the outline. The record to write is the first line of `outline-paragraphs.jsonl`
+that does not carry `dropped`, whose section the status shows as `stands as approved`, and that
+the trace does not name. Tell the author which record that is, and stop when there is none: a
+section that does not stand as approved is approved first, with `/propositions:outline`. Text is
+written in the order of the paragraph file; a record further down is written only when the author
+asks for it by its id.
+
+**O2 — Instead of W2.** The paragraph says the record's points, in their order, and nothing that
+the points do not say. A point with `pending` gets a placeholder `{PENDING: <the pending text>}`
+for what it names. A record that carries `carry` is the block its `from` names, copied character
+for character, with only the changes its `edits` lists. A citation is the key a point's `basis` or
+the manuscript's bibliography gives; any other is a placeholder. When the record is the first of
+its section and the section's heading is not in the draft yet, the paragraph comes with the
+heading line, written from the section record's `heading`.
+
+**O3 — Instead of the W3 command.** Add the outline, and `--heading` when O2 writes a heading:
+
+```bash
+"${CLI[@]}" write prepare --jsonl "$LEDGER/main.jsonl" --tex "$MAIN" \
+  --structure "$LEDGER/structure.json" --discourse "$LEDGER/discourse.jsonl" --stage "$STAGE" \
+  --outline "$OUTDIR" --outline-paragraph "<record id>" [--heading]
+```
+
+Exit 2 names why the record cannot be written from: the outline does not pass `outline check`,
+the id names no record or a dropped one, or the section does not stand as approved.
+
+**O4 — Between W7 and W8, the reader.** Write the paragraph record, as one JSON object, to
+`$STAGE/outline-record.json`, and the new paragraph, exactly as it stands in the staged
+manuscript file, to `$STAGE/paragraph.tex`. Then dispatch the agent `propositions:outline-point-reader`
+with a task message that holds those two paths and nothing else. It reports points the paragraph
+does not say and results, numbers or citations the points do not state. Show its findings in W8
+with the rest; they are a reader's judgment, not a check, and the author decides what to change.
+After a change to the copies, run W7 and the reader again.
+
+**O5 — After W9.** `write commit` appends the record to `outline-trace.jsonl` itself; do not
+write that file. Run `outline trace` once more and report its count.
+
 ## Explain mode
 
 ### E1 — Preconditions: sidecars for this text
@@ -583,7 +637,8 @@ Explain mode writes nothing: not the manuscript, not the ledger, not the sidecar
   staged files are), and the `main.jsonl` fingerprint check.
 - **Next**: the state (section, role, open commitments), the move hint or why it was skipped,
   the candidates, and the fingerprint check.
-- **Write**: what the paragraph does, the gates (W7), what was written and where the originals
+- **Write**: what the paragraph does (from an outline: the record's id, and the reader's findings
+  with what the author decided), the gates (W7), what was written and where the originals
   are, or that the author stopped and where the copies are. List every placeholder with its
   line: the paragraph is not finished while one remains. Say that the paragraph was checked
   mechanically and not proofread; `/propositions:proofread` and `/propositions:clarity-audit`

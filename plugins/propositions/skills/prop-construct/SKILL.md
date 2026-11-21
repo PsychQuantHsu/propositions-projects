@@ -425,6 +425,12 @@ those paths. Exit 2 names what it refused; a warning names a retired proposition
 will shift. Edit nothing outside the staging directory from here on, and in the staging
 directory only these four copies.
 
+When the directory of the ledger holds `article.json` (`docs/OUTLINE.md` of this plugin,
+"article.json"), `prepare` copies it too, as a file that may not change. Its `banned` list names
+phrasings that are not to appear in the article, each with a reason: read the staged copy
+(`$STAGE/article/article.json`) before W4 and do not write them. Exit 2 that names `article.json`
+means the file is not in its format; say what was printed and stop, the author corrects it.
+
 ### W4 — Write the paragraph in the copy
 
 In the staged manuscript file, after the line `prepare` named, add one blank line and the
@@ -466,7 +472,11 @@ python3 "$VSTRUCT" --jsonl "<staged ledger>" --structure "<staged structure.json
 All four have to pass: the first three exit 0, and `cite-order` reports no forward citation
 that involves a new proposition. A forward citation the draft already had is reported, not fixed
 here. When one fails, fix the copies and run all four again. `write check`
-prints the lines that hold a placeholder; they are allowed, and the report lists them. A launcher
+prints the lines that hold a placeholder; they are allowed, and the report lists them. A line
+`<file>:L<n>: the banned phrasing "…" (<reason>)` is a phrasing of `article.json` in the new
+paragraph: reword the paragraph and run the gates again. Do not change `article.json` to make
+the check pass; when the author says the phrasing is wanted here, the author changes the list,
+and write mode starts again from W3. A launcher
 exit of 3 counts as not run, and write mode then stops: nothing is written without the check.
 
 ### W8 — Show it and ask once
@@ -504,7 +514,10 @@ outline's format: `docs/OUTLINE.md` of this plugin, "Writing text from the outli
 are W1 to W9, with these differences.
 
 **O1 — Which record.** Establish `OUTDIR`, the directory that holds the outline files, from the
-request or by asking once. Then:
+request or by asking once. When `$OUTDIR/article.json` has `destinations`, the article is written
+into more than one document (see O3), and the `--jsonl` of the two commands below is the ledger of
+the document being written: `outline trace` checks the records of that document and lists the
+others as `in the document of the part <part>`. Then:
 
 ```bash
 "${CLI[@]}" outline status "$OUTDIR"
@@ -527,6 +540,15 @@ the manuscript's bibliography gives; any other is a placeholder. When the record
 its section and the section's heading is not in the draft yet, the paragraph comes with the
 heading line, written from the section record's `heading`.
 
+The record can plan commitments: `opens` lists the commitments its paragraph opens, each with an
+id and a kind, and `discharges` the ids it discharges. The paragraph then does exactly that, and
+in W6 its records carry those ids and kinds as written, on the propositions that open or
+discharge them. When any record of the outline that is not dropped carries either key and this
+one carries neither, its paragraph opens and discharges nothing. When no record carries either,
+the commitments are chosen as in W2. `write check` compares the staged records with the plan and
+reports each difference (W7): fix the paragraph or its records; a plan that is wrong is changed
+with `/propositions:prop-outline` and the section approved again, not here.
+
 **O3 — Instead of the W3 command.** Add the outline, and `--heading` when O2 writes a heading:
 
 ```bash
@@ -538,6 +560,20 @@ heading line, written from the section record's `heading`.
 Exit 2 names why the record cannot be written from: the outline does not pass `outline check`,
 the id names no record or a dropped one, or the section does not stand as approved.
 
+With `destinations` in `$OUTDIR/article.json`, exit 2 can also say that the section goes to a
+part and name the `--tex` and `--jsonl` to give: that part is another document. Run `prepare`
+again with those two files and with the `structure.json` and `discourse.jsonl` beside that ledger
+(ask the author where they are when they are not there; a document with no ledger yet is set up
+first, with Operation D of `/propositions:prop-ledger`), and use that document's files in every
+later step. When it says that `article.json` names no destination for the part, stop: the author
+adds one. A run with an outline reads `article.json` from `OUTDIR`, not from the directory of the
+ledger.
+
+`prepare` prints a line that begins with `[unread]` for each included file of the record's
+section, or of a section above it, that was not read when the outline was derived. Tell the
+author at once, before writing: the outline does not say what those files hold, so the section's
+plan may leave out what they say. Go on when the author says to, and repeat the lines in W8.
+
 **O4 — Between W7 and W8, the reader.** Write the paragraph record, as one JSON object, to
 `$STAGE/outline-record.json`, and the new paragraph, exactly as it stands in the staged
 manuscript file, to `$STAGE/paragraph.tex`. Then dispatch the agent `propositions:outline-point-reader`
@@ -548,6 +584,18 @@ After a change to the copies, run W7 and the reader again.
 
 **O5 — After W9.** `write commit` appends the record to `outline-trace.jsonl` itself; do not
 write that file. Run `outline trace` once more and report its count.
+
+When a section record carries `length` or `$OUTDIR/article.json` has `length`, report the
+lengths as well:
+
+```bash
+"${CLI[@]}" outline length "$OUTDIR" --jsonl "$LEDGER/main.jsonl" --tex "$MAIN"
+```
+
+With `destinations`, give `--written` in place of `--jsonl` and `--tex`: each part is counted
+from its own document. Report the line of the section just written, the lines of the parts and
+the `limit` line, and say which are marked as over. The numbers are an estimate in words and stop
+nothing; what to cut is the author's decision.
 
 ## Reorganize mode
 
@@ -579,6 +627,14 @@ STAGE=$(mktemp -d)/write
 
 It prints the path of `outline-map.jsonl` and of each copy. Edit only the copies from here on.
 
+It prints an `[unread]` line for each included file that was not read when the outline was
+derived, for every section; tell the author before rewriting, as in O3. With `destinations` in
+`$OUTDIR/article.json`, a rewrite is of one document: give the main file, ledger and sidecars of
+that document, and rewrite only the sections that go to it (a section goes to its own `part`,
+else to the part of the section it is under, else to `main`). The sections of another document
+are rewritten in a run of their own. Content cannot be moved from one document to another this
+way: say so and stop when the revised outline asks for it.
+
 **G3 — Rewrite the copies.** Follow the outline: its sections in order, each with its heading
 line, and in each section its paragraph records in order. A record that carries `carry` is the
 block its `from` names, copied character for character with only the changes its `edits` lists. Any
@@ -605,7 +661,8 @@ staged copies.
 
 **G6 — The map.** Write `$STAGE/outline-map.jsonl`: one line `{"outline": <record id>,
 "first_prop": <id>}` per paragraph record that is not dropped, in the order of the paragraph file,
-naming the proposition that starts the paragraph written from it.
+naming the proposition that starts the paragraph written from it. With `destinations`, list only
+the records whose sections go to the document being rewritten.
 
 **G7 — The gates, on the copies.**
 
@@ -619,7 +676,10 @@ python3 "$VSTRUCT" --jsonl "<staged ledger>" --structure "<staged structure.json
 
 Run the structure validator with `--partial` only when the manuscript was unfinished before the
 rewrite. All five have to pass (`cite-order` as in W7). When one fails, fix the copies and run them
-all again.
+all again. On a rewrite `write check` also reports a banned phrasing of `article.json` anywhere in
+the staged manuscript, a paragraph that does not open and discharge what its record plans (when
+the outline plans commitments), and a file the staged manuscript includes that `prepare` did not
+copy: a rewrite cannot add a file to the input tree.
 
 **G8 — The readers, then show it and ask once.** For each paragraph written from a record (not a
 record that carries `carry`), dispatch `propositions:outline-point-reader` as in O4, the record and
@@ -643,7 +703,13 @@ and the readers again, then asks again.
 It writes the files that changed and writes `outline-trace.jsonl` anew from the map. The originals
 are in `$STAGE/backup/`, and `backup/restore.jsonl` says where each came from (the old trace
 included). When a write fails part way, report what was written and that list, and stop: putting
-the originals back is the author's decision. Then run `outline trace` and report its count.
+the originals back is the author's decision. Then run `outline trace` and report its count, and
+the lengths as in O5 when the outline or `article.json` has a `length`.
+
+When the author changes the `banned` list of `article.json` after text was written, the whole
+manuscript is compared with `"${CLI[@]}" phrasing --tex "$MAIN" --article <the article file>`:
+exit 1 lists each occurrence with its line. Report them; rewording them is a revision the author
+asks for.
 
 ## Explain mode
 

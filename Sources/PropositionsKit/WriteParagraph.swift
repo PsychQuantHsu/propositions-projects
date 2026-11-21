@@ -328,7 +328,9 @@ public enum WriteParagraph {
         // article.json it was prepared with would pass over their checks.
         let fm = FileManager.default
         guard fm.fileExists(atPath: stage.appendingPathComponent("outline").path) == (manifest.outline != nil || manifest.rewrite != nil),
-              fm.fileExists(atPath: stage.appendingPathComponent("article").path) == (manifest.article != nil)
+              fm.fileExists(atPath: stage.appendingPathComponent("article").path) == (manifest.article != nil),
+              manifest.article.map({ canonical(URL(fileURLWithPath: $0.staged)) == canonical(stage.appendingPathComponent("article").appendingPathComponent(Article.fileName))
+                                      && URL(fileURLWithPath: $0.original).lastPathComponent == Article.fileName }) ?? true
         else { throw Failure(message: "the write.json in \(CiteOrder.visible(stage.path)) does not name the outline or the \(Article.fileName) that prepare copied; prepare again") }
         return manifest
     }

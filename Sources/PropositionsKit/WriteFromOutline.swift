@@ -237,7 +237,7 @@ public enum OutlineTraceRun {
                 // Which document the ledger is: the parts whose destination names it.
                 let url = WriteParagraphRun.resolve(jsonl, workingDirectory)
                 parts = ["main", "appendix", "supplement"].filter { part in
-                    article.destinations?[part].map { Article.real(Article.resolve($0.jsonl, dir)) == Article.real(url) } ?? false
+                    article.destinations?[part].map { Article.same(Article.resolve($0.jsonl, dir), url) } ?? false
                 }
                 if parts!.isEmpty {
                     return CommandResult(stderr: ["error: \(Article.fileName) names destinations, and \(CiteOrder.visible(jsonl)) is the ledger of none of them"], exitCode: 2)

@@ -12,7 +12,8 @@ enum Phrasing {
     /// A text without the difference of letter case, in form C: upper case and then lower case,
     /// so that `ß` and `SS`, and the two lower-case sigmas, compare equal.
     static func caseless(_ text: String) -> String {
-        text.precomposedStringWithCanonicalMapping.uppercased().lowercased().precomposedStringWithCanonicalMapping
+        // Lower case first: the capital sharp s has no upper-case mapping of its own.
+        text.precomposedStringWithCanonicalMapping.lowercased().uppercased().lowercased().precomposedStringWithCanonicalMapping
     }
 
     /// A phrase as it is compared: without letter case, in form C, each run of white space one
@@ -55,18 +56,22 @@ enum Phrasing {
         var space = false
         for (offset, line) in lines.enumerated() {
             if LedgerOrder.stripped(line).isEmpty {
+                // The line break that ends a paragraph is white space after its last word.
+                if space, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(lineOf[lineOf.count - 1]) }
                 text.append(paragraphBreak); lineOf.append(first + offset)
                 space = false
                 continue
             }
             for scalar in caseless(String(withoutComment(line))).unicodeScalars {
                 if scalar.properties.isWhitespace { space = true; continue }
-                if space, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(first + offset) }
+                // White space before the first word of a paragraph is a space too.
+                if space { text.append(0x20); lineOf.append(first + offset) }
                 space = false
                 text.append(scalar.value); lineOf.append(first + offset)
             }
             space = true
         }
+        if space, let last = text.last, last != paragraphBreak { text.append(0x20); lineOf.append(lineOf[lineOf.count - 1]) }
         var found: [(at: Int, order: Int, line: String)] = []
         for (order, entry) in banned.enumerated() {
             let phrase = fold(entry.phrase)

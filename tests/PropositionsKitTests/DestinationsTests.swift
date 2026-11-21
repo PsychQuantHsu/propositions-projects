@@ -223,4 +223,32 @@ struct DestinationsTests {
         // A path that holds a control character is not in the format.
         #expect(throws: Article.Failure.self) { try Article.parse(Data(#"{"destinations": {"main": {"tex": "a\tb.tex", "jsonl": "m.jsonl"}}}"#.utf8)) }
     }
+
+    // MARK: review round 2
+
+    @Test func `A destination the file system does not resolve is not the document given`() throws {
+        let box = try setUp()
+        _ = try box.write(#"{"destinations": {"main": {"tex": "missing/../../main.tex", "jsonl": "../propositions/main.jsonl"}}}"#, to: "paper/outline/article.json")
+        let result = write(Self.prepare("main", stage: "stage", ["--outline-paragraph", "p-1"]), in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.first?.contains("goes to the part main") == true)
+    }
+
+    @Test func `Two parts of one document count a paragraph once, and a kept record keeps its missing line ending`() throws {
+        let box = try setUp(sections: [Self.section("s-a"), Self.section("s-x", #","part":"appendix""#)], paragraphs: [("p-1", "s-a"), ("p-x", "s-x")])
+        _ = try box.write(#"{"destinations": {"main": {"tex": "../main.tex", "jsonl": "../propositions/main.jsonl"}, "appendix": {"tex": "../main.tex", "jsonl": "../propositions/main.jsonl"}}}"#,
+                          to: "paper/outline/article.json")
+        func record(_ id: String, _ section: String, _ part: String) -> String {
+            #"{"outline": "\#(id)", "first_prop": "019a3c5e-7a00-7000-8000-00000000000c", "section": "\#(section)", "approval_line": 1, "part": "\#(part)"}"#
+        }
+        _ = try box.write(record("p-1", "s-a", "main") + "\n" + record("p-x", "s-x", "appendix") + "\n", to: "paper/outline/outline-trace.jsonl")
+        let result = PropositionsCLI.run(["outline", "length", "paper/outline", "--written"], workingDirectory: box.url)
+        #expect(result.stdout.prefix(2) == ["\"s-a\"\tmain\ttarget -\twritten 13\t1 of 1 record(s)", "\"s-x\"\tappendix\ttarget -\twritten 0\t0 of 1 record(s)"])
+
+        let kept = Data(#"{"outline": "p-s", "first_prop": "x", "section": "s-sup", "approval_line": 1, "part": "supplement"}"#.utf8)
+        let outline = Outline(sections: Self.section("s-a") + "\n", paragraphs: "", approvals: nil)
+        #expect(WriteRewrite.traceLines([], outline: outline, parts: ["main"], kept: kept) == kept)
+        #expect(WriteRewrite.traceLines([], outline: outline, parts: ["main"], kept: kept + Data("\r\n".utf8)) == kept + Data("\r\n".utf8))
+        #expect(WriteRewrite.traceLines([("p-1", "y")], outline: outline, parts: ["main"], kept: kept).starts(with: kept + Data("\n".utf8)))
+    }
 }

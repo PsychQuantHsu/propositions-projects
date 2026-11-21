@@ -172,10 +172,14 @@ public enum WriteRewrite {
         var data = Data()
         if let parts, let kept {
             // A kept record is copied byte for byte, with the line ending it had.
-            for raw in kept.split(separator: 0x0A, omittingEmptySubsequences: false) where !(raw.isEmpty || Array(raw) == [0x0D]) {
+            let pieces = kept.split(separator: 0x0A, omittingEmptySubsequences: false)
+            for (index, raw) in pieces.enumerated() where !(raw.isEmpty || Array(raw) == [0x0D]) {
                 let value = String(data: Data(raw), encoding: .utf8).flatMap { try? JSONValue.parse($0) }
-                if value?.isObject != true || !parts.contains(WriteFromOutline.part(of: value)) { data += Data(raw) + Data([0x0A]) }
+                // The last piece is a record without a line ending; every other piece had one.
+                if value?.isObject != true || !parts.contains(WriteFromOutline.part(of: value)) { data += Data(raw) + (index < pieces.count - 1 ? Data([0x0A]) : Data()) }
             }
+            // A record that had no line ending gets one only when a record follows it.
+            if !records.isEmpty, !data.isEmpty, data.last != 0x0A { data.append(0x0A) }
         }
         let partOf = Dictionary(OutlineLength.sections(outline).map { (JSONKey($0.id), $0.part) }, uniquingKeysWith: { a, _ in a })
         for (outlineID, first) in records {

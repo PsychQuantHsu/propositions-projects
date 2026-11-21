@@ -38,8 +38,7 @@ public struct Article: Equatable, Sendable {
     func parts(tex: URL, jsonl: URL, directory: URL) -> [String] {
         ["main", "appendix", "supplement"].filter { part in
             guard let destination = destinations?[part] else { return false }
-            return Article.real(Article.resolve(destination.tex, directory)) == Article.real(tex)
-                && Article.real(Article.resolve(destination.jsonl, directory)) == Article.real(jsonl)
+            return Article.same(Article.resolve(destination.tex, directory), tex) && Article.same(Article.resolve(destination.jsonl, directory), jsonl)
         }
     }
 
@@ -48,10 +47,18 @@ public struct Article: Equatable, Sendable {
 
     /// The name the file system gives the file (links followed in the order of the path); the
     /// tidied path when the file is not there.
-    static func real(_ url: URL) -> String {
-        guard let pointer = realpath(url.path, nil) else { return WriteParagraph.canonical(url) }
+    /// The name the file system gives the file (links followed in the order of the path), or nil
+    /// when the file system does not resolve the path.
+    static func real(_ url: URL) -> String? {
+        guard let pointer = realpath(url.path, nil) else { return nil }
         defer { free(pointer) }
         return String(cString: pointer)
+    }
+
+    /// Whether two paths are one file: both resolve, to the same name.
+    static func same(_ a: URL, _ b: URL) -> Bool {
+        guard let x = real(a), let y = real(b) else { return false }
+        return x == y
     }
 
     /// Reads the file's bytes; throws with what is wrong, named from `article.json`.

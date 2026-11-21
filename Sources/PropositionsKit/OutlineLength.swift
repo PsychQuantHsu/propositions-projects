@@ -56,7 +56,7 @@ public enum OutlineLength {
                 if Array(chars[at..<(at + end.count)]) == end {
                     var brace = at + end.count
                     while brace < chars.count, chars[brace].isWhitespace { brace += 1 }
-                    if let close = group(at: brace), String(chars[(brace + 1)..<(close - 1)]) == name { return close }
+                    if let close = group(at: brace), close - 1 > brace, chars[close - 1] == "}", String(chars[(brace + 1)..<(close - 1)]) == name { return close }
                 }
                 at += chars[at] == "\\" && at + 1 < chars.count && chars[at + 1] == "\\" ? 2 : 1
             }
@@ -64,7 +64,12 @@ public enum OutlineLength {
         }
         func spaces(_ start: Int) -> Int {
             var at = start
-            while at < chars.count, chars[at] == " " || chars[at] == "\t" { at += 1 }
+            // White space before an argument, a line break included; an empty line ends the paragraph and is not skipped.
+            var breaks = 0
+            while at < chars.count, chars[at].isWhitespace {
+                if chars[at].isNewline { breaks += 1; if breaks > 1 { return start } }
+                at += 1
+            }
             return at
         }
         func group(at start: Int) -> Int? {
@@ -96,8 +101,8 @@ public enum OutlineLength {
                 if end < chars.count, chars[end] == "*" { end += 1 }
                 index = end
                 out.append(" ")
-                if name == "begin", let close = group(at: spaces(index)) {
-                    let raw = String(chars[min(spaces(index) + 1, close - 1)..<(close - 1)])
+                if name == "begin", let close = group(at: spaces(index)), close - 1 > spaces(index) {
+                    let raw = String(chars[(spaces(index) + 1)..<(close - 1)])
                     index = close
                     if mathEnvironments.contains(raw.replacingOccurrences(of: "*", with: "")) { index = skipEnvironment(raw, from: index) }
                 } else if nameCommands.contains(name) {
@@ -170,11 +175,15 @@ public enum OutlineLength {
     static func report(outline: Outline, article: Article?, trace: Data?, written: (ledger: Data, main: URL)?,
                        documents: [String: (ledger: Data, main: URL)]? = nil) throws -> [String] {
         if let documents {
-            // One pass per part, over its trace records and against its own ledger and main file.
+            // One pass per document (a main file with a ledger), over the trace records of its parts in trace
+            // order, so that a paragraph two parts of one document name is counted once.
             var tables: [(words: [JSONKey: Int], done: [JSONKey: Int], unplaced: Int)] = []
-            for part in documents.keys.sorted() {
-                let lines = Outline.lines(of: trace ?? Data()).filter { WriteFromOutline.part(of: $0.value) == part }
-                tables.append(try count(outline: outline, trace: lines, written: documents[part]!))
+            let groups = Dictionary(grouping: documents.keys.sorted()) {
+                (Article.real(documents[$0]!.main) ?? documents[$0]!.main.path) + "\n" + WriteParagraph.sha256(documents[$0]!.ledger)
+            }
+            for parts in groups.values.sorted(by: { $0[0] < $1[0] }) {
+                let lines = Outline.lines(of: trace ?? Data()).filter { parts.contains(WriteFromOutline.part(of: $0.value)) }
+                tables.append(try count(outline: outline, trace: lines, written: documents[parts[0]]!))
             }
             let known = Set(documents.keys)
             let strays = Outline.lines(of: trace ?? Data()).filter { !known.contains(WriteFromOutline.part(of: $0.value)) }.count

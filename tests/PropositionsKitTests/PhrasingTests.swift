@@ -189,4 +189,34 @@ struct PhrasingTests {
         #expect(check.exitCode == 1)
         #expect(check.stdout.first?.hasPrefix("supp.tex:L4: the banned phrasing") == true, "\(check.stdout)")
     }
+
+    // MARK: review round 2
+
+    @Test func `The capital sharp s, and a phrase with spaces at the ends of a paragraph`() {
+        let banned = [Article.Banned(phrase: "Straße", reason: "r"), Article.Banned(phrase: " cat ", reason: "r")]
+        func found(_ lines: [String]) -> Int { Phrasing.occurrences(in: lines, file: "f.tex", banned: banned).count }
+        #expect(found(["Die STRAẞE ist lang."]) == 1)
+        #expect(found(["Die Strasse ist lang."]) == 1)
+        #expect(found([" cat sat."]) == 1)
+        #expect(found(["A cat", "", "sat."]) == 1)
+        #expect(found(["A cat"]) == 1)
+        #expect(found(["cat sat."]) == 0)
+        #expect(found(["Acat sat."]) == 0)
+    }
+
+    @Test func `A write json whose article entry names another input is refused`() throws {
+        let box = try base.setUp()
+        try WriteFromOutlineTests().outline(in: box)
+        _ = try box.write(Self.article + "\n", to: "paper/outline/article.json")
+        #expect(write(WriteParagraphTests.prepare + ["--outline", "paper/outline", "--outline-paragraph", "p-1"], in: box).exitCode == 0)
+        try base.draft(box, text: "The effect was very large.")
+        #expect(write(["check", "--stage", "stage"], in: box).exitCode == 1)
+        let url = box.url.appendingPathComponent("stage/write.json")
+        var object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+        let inputs = object["inputs"] as! [[String: Any]]
+        object["article"] = inputs.first { ($0["original"] as! String).hasSuffix("outline-sections.jsonl") }!
+        try JSONSerialization.data(withJSONObject: object).write(to: url)
+        #expect(write(["check", "--stage", "stage"], in: box).exitCode == 2)
+        #expect(write(["commit", "--stage", "stage"], in: box).exitCode == 2)
+    }
 }

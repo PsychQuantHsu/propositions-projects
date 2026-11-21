@@ -122,4 +122,14 @@ struct OutlineLengthTests {
         #expect(unreadable.exitCode == 2)
         #expect(unreadable.stdout.isEmpty)
     }
+
+    // MARK: review round 2
+
+    @Test func `Unfinished LaTeX and arguments on the next line`() {
+        #expect(OutlineLength.words(in: ["Text \\begin{equation} x=y \\end{"]) == 1)
+        #expect(OutlineLength.words(in: ["Text \\begin{"]) == 1)
+        #expect(OutlineLength.words(in: ["Text \\cite{"]) == 1)
+        #expect(OutlineLength.words(in: ["See \\cite", "[see also]", "{smith2020} here."]) == 2)
+        #expect(OutlineLength.words(in: ["See \\cite", "", "{smith2020} here."]) == 3)
+    }
 }

@@ -17,6 +17,10 @@ public enum WriteFromOutline {
         var approvalLine: Int
         /// The SHA-256 of `outline-trace.jsonl` at prepare; nil when there was no such file.
         var traceHash: String?
+        /// The part the section goes to, when `article.json` names destinations (issue 120).
+        var part: String? = nil
+        /// The parts whose destination is the document the paragraph is written into.
+        var documentParts: [String]? = nil
     }
 
     static func fail(_ message: String) -> WriteParagraph.Failure { WriteParagraph.Failure(message: message) }
@@ -79,10 +83,36 @@ public enum WriteFromOutline {
         return Plan(directory: directory.path, paragraph: paragraph, section: section, approvalLine: approval.number, traceHash: hash)
     }
 
+    /// One note for each included file that was not read when the outline was derived (issue 117),
+    /// for the section `only` and the sections above it, or for every section that is not dropped.
+    static func unreadNotes(_ outline: Outline, only section: String? = nil) -> [String] {
+        let records = outline.sections.compactMap(\.value)
+        var wanted: [String]? = nil
+        if var at = section {
+            var chain = [at]
+            // Ids are compared scalar by scalar, as the outline check compares them.
+            while let parent = records.first(where: { same($0["id"]?.string, at) })?["parent"]?.string,
+                  !chain.contains(where: { same($0, parent) }) {
+                chain.append(parent); at = parent
+            }
+            wanted = chain
+        }
+        var out: [String] = []
+        for record in records where !record.has("dropped") {
+            guard let id = record["id"]?.string, wanted?.contains(where: { same($0, id) }) ?? true else { continue }
+            for item in record["unread"]?.array ?? [] {
+                guard let file = item["file"]?.string, let why = item["why"]?.string else { continue }
+                out.append("[unread] section \(CiteOrder.visible(id)): the included file \(CiteOrder.visible(file)) was not read when the outline was derived (\(CiteOrder.visible(why))); the outline does not say what it holds")
+            }
+        }
+        return out
+    }
+
     /// The record of one written paragraph, with its line feed.
     static func record(_ plan: Plan, firstProposition: String) -> Data {
         Data(("{\"outline\": \(Revise.quoted(plan.paragraph)), \"first_prop\": \(Revise.quoted(firstProposition)), "
-              + "\"section\": \(Revise.quoted(plan.section)), \"approval_line\": \(plan.approvalLine)}\n").utf8)
+              + "\"section\": \(Revise.quoted(plan.section)), \"approval_line\": \(plan.approvalLine)"
+              + (plan.part.map { ", \"part\": \(Revise.quoted($0))" } ?? "") + "}\n").utf8)
     }
 
     static func traceURL(_ plan: Plan) -> URL { URL(fileURLWithPath: plan.directory).appendingPathComponent(traceFile) }
@@ -127,9 +157,13 @@ public enum WriteFromOutline {
     }
 
     /// Whether the trace already names a proposition.
-    static func names(_ snapshot: LedgerOrder.Snapshot?, _ id: String) -> Bool {
+    /// With `parts` (the parts of the document written into, when `article.json` names
+    /// destinations), only the records of those parts count: another document has its own ledger.
+    static func names(_ snapshot: LedgerOrder.Snapshot?, _ id: String, parts: [String]? = nil) -> Bool {
         guard let snapshot else { return false }
-        return Outline.lines(of: snapshot.data).contains { same($0.value?["first_prop"]?.string, id) }
+        return Outline.lines(of: snapshot.data).contains {
+            same($0.value?["first_prop"]?.string, id) && (parts?.contains(part(of: $0.value)) ?? true)
+        }
     }
 
     // MARK: outline trace
@@ -139,7 +173,19 @@ public enum WriteFromOutline {
     static func isNumber(_ value: JSONValue?) -> Bool { if case .number = value { return true } else { return false } }
 
     /// One line per record (`<outline id>\t<first_prop>\t<location>`), then the problems.
-    static func trace(directory: URL, ledger: Data) throws -> (rows: [String], problems: [String]) {
+    /// The part a trace record belongs to: its `part`, or `main` when it has none.
+    static func part(of record: JSONValue?) -> String { record?["part"]?.string ?? "main" }
+
+    /// Whether a trace record has exactly the keys of the format: the four, and optionally `part`.
+    static func hasTraceKeys(_ members: [JSONMember]) -> Bool {
+        let names = members.map(\.key)
+        return Set(names).count == names.count && Set(names).subtracting(["part"]) == Set(keys)
+            && (members.first { $0.key == "part" }.map { $0.value.string.map(OutlineCheck.parts.contains) ?? false } ?? true)
+    }
+
+    /// `parts`: when `article.json` names destinations, the parts whose document the ledger is;
+    /// the records of other parts are listed and not checked against this ledger.
+    static func trace(directory: URL, ledger: Data, parts: [String]? = nil) throws -> (rows: [String], problems: [String]) {
         guard let snapshot = LedgerOrder.read(directory.appendingPathComponent(traceFile)) else {
             throw fail("cannot read \(CiteOrder.visible(directory.appendingPathComponent(traceFile).path))")
         }
@@ -151,11 +197,14 @@ public enum WriteFromOutline {
         var seen: [[UInt32]: Int] = [:]
         for line in Outline.lines(of: snapshot.data) {
             let at = "\(traceFile) line \(line.number)"
-            guard let value = line.value, case .object(let members) = value,
-                  Set(members.map(\.key)) == Set(keys), members.count == keys.count,
+            guard let value = line.value, case .object(let members) = value, hasTraceKeys(members),
                   let outlineID = value["outline"]?.string, let first = value["first_prop"]?.string,
                   value["section"]?.string != nil, isNumber(value["approval_line"])
-            else { problems.append("\(at): not a record with exactly the keys \(keys.joined(separator: ", "))"); continue }
+            else { problems.append("\(at): not a record with exactly the keys \(keys.joined(separator: ", ")), and optionally part"); continue }
+            if let parts, !parts.contains(part(of: value)) {
+                rows.append("\(CiteOrder.visible(outlineID))\t\(CiteOrder.visible(first))\tin the document of the part \(part(of: value))")
+                continue
+            }
             if !outlineIDs.contains(where: { same($0, outlineID) }) {
                 problems.append("\(at): \(CiteOrder.visible(outlineID)) is no paragraph record of the outline")
             }
@@ -183,7 +232,18 @@ public enum OutlineTraceRun {
             return CommandResult(stderr: ["error: cannot read the ledger \(CiteOrder.visible(jsonl))"], exitCode: 2)
         }
         do {
-            let (rows, problems) = try WriteFromOutline.trace(directory: dir, ledger: ledger.data)
+            var parts: [String]?
+            if let article = try Article.read(in: dir)?.article, article.destinations != nil {
+                // Which document the ledger is: the parts whose destination names it.
+                let url = WriteParagraphRun.resolve(jsonl, workingDirectory)
+                parts = ["main", "appendix", "supplement"].filter { part in
+                    article.destinations?[part].map { Article.same(Article.resolve($0.jsonl, dir), url) } ?? false
+                }
+                if parts!.isEmpty {
+                    return CommandResult(stderr: ["error: \(Article.fileName) names destinations, and \(CiteOrder.visible(jsonl)) is the ledger of none of them"], exitCode: 2)
+                }
+            }
+            let (rows, problems) = try WriteFromOutline.trace(directory: dir, ledger: ledger.data, parts: parts)
             return CommandResult(stdout: rows + problems + ["\(rows.count) record(s), \(problems.count) problem(s)"],
                                  exitCode: problems.isEmpty ? 0 : 1)
         } catch {

@@ -18,6 +18,13 @@ public enum WriteRewrite {
         var directory: String
         /// The SHA-256 of `outline-trace.jsonl` at prepare; nil when there was no such file.
         var traceHash: String?
+        /// The parts whose document is rewritten, when `article.json` names destinations (issue 120).
+        var parts: [String]? = nil
+    }
+
+    /// The ids of the sections that go to one of `parts`; nil when the run has no destinations.
+    static func sections(of parts: [String]?, in outline: Outline) -> [String]? {
+        parts.map { wanted in OutlineLength.sections(outline).filter { wanted.contains($0.part) }.map(\.id) }
     }
 
     /// Refuses unless the outline passes `outline check` and stands as approved as a whole: every
@@ -32,7 +39,7 @@ public enum WriteRewrite {
         let status: [String]
         do { status = try OutlineStatus.lines(outline) } catch { throw fail("\(error)") }
         let summary = ["order of sections", "sections removed since their approval", "paragraph records that name no section",
-                       "points that carry pending", "records that carry dropped", "ok status"]
+                       "points that carry pending", "records that carry dropped", "sections that carry unread", "ok status"]
         let names = status.map { $0.components(separatedBy: "\t").first ?? "" }
         guard names.last == "ok status", ["order of sections", "sections removed since their approval",
                                           "paragraph records that name no section"].allSatisfy(names.contains),
@@ -109,9 +116,13 @@ public enum WriteRewrite {
     }
 
     /// The problems of `outline-map.jsonl`, and its records as (outline id, first proposition).
-    static func map(_ data: Data?, outline: Outline, ledger: Data) -> (problems: [String], records: [(String, String)]) {
+    static func map(_ data: Data?, outline: Outline, ledger: Data, parts: [String]? = nil) -> (problems: [String], records: [(String, String)]) {
         guard let data else { return (["the staging directory holds no \(mapFile): list each paragraph written from the outline"], []) }
-        let records = outline.paragraphs.compactMap(\.value).filter { !$0.has("dropped") }
+        // With destinations, only the records whose section goes to the document being rewritten.
+        let own = sections(of: parts, in: outline)
+        let records = outline.paragraphs.compactMap(\.value).filter { record in
+            !record.has("dropped") && (own.map { ids in ids.contains { WriteFromOutline.same(record["section"]?.string, $0) } } ?? true)
+        }
         let ids = records.compactMap { $0["id"]?.string }
         let rows = (try? ReviseLedger.lines(ledger)) ?? []
         var problems: [String] = [], out: [(String, String)] = []
@@ -122,7 +133,8 @@ public enum WriteRewrite {
                   members.count == 2, let outlineID = value["outline"]?.string, let first = value["first_prop"]?.string
             else { problems.append("\(at): not a record with exactly the keys outline, first_prop"); continue }
             if !ids.contains(where: { WriteFromOutline.same($0, outlineID) }) {
-                problems.append("\(at): \(CiteOrder.visible(outlineID)) is no paragraph record of the outline that is not dropped")
+                problems.append("\(at): \(CiteOrder.visible(outlineID)) is no paragraph record of the outline that is not dropped"
+                                + (parts == nil ? "" : " and goes to this document"))
             }
             let live = rows.filter { WriteFromOutline.same($0.id, first) }
             if live.count != 1 || live[0].isRetired {
@@ -139,26 +151,41 @@ public enum WriteRewrite {
     }
 
     /// The section of each paragraph record, and the line of the last approval that holds it.
-    static func approvals(_ outline: Outline) -> [String: (section: String, line: Int)] {
-        var out: [String: (String, Int)] = [:]
+    static func approvals(_ outline: Outline) -> [JSONKey: (section: String, line: Int)] {
+        var out: [JSONKey: (String, Int)] = [:]
         for record in outline.paragraphs.compactMap(\.value) {
             guard let id = record["id"]?.string, let section = record["section"]?.string else { continue }
             let line = (outline.approvals ?? []).last { line in
                 (line.value?["sections"]?.array ?? []).contains { WriteFromOutline.same($0["section"]?["id"]?.string, section) }
             }?.number ?? 0
-            out[id] = (section, line)
+            out[JSONKey(id)] = (section, line)
         }
         return out
     }
 
     /// The trace `commit` writes for the map: a rewrite writes it anew, since the old records name
     /// paragraphs of the text it replaces (the old trace is kept in `backup/`).
-    static func traceLines(_ records: [(String, String)], outline: Outline) -> Data {
+    /// With `parts`, each record carries the part of its section, and the records of `kept` (the
+    /// old trace) that belong to other parts come first, as they were.
+    static func traceLines(_ records: [(String, String)], outline: Outline, parts: [String]? = nil, kept: Data? = nil) -> Data {
         let where_ = approvals(outline)
         var data = Data()
+        if let parts, let kept {
+            // A kept record is copied byte for byte, with the line ending it had.
+            let pieces = kept.split(separator: 0x0A, omittingEmptySubsequences: false)
+            for (index, raw) in pieces.enumerated() where !(raw.isEmpty || Array(raw) == [0x0D]) {
+                let value = String(data: Data(raw), encoding: .utf8).flatMap { try? JSONValue.parse($0) }
+                // The last piece is a record without a line ending; every other piece had one.
+                if value?.isObject != true || !parts.contains(WriteFromOutline.part(of: value)) { data += Data(raw) + (index < pieces.count - 1 ? Data([0x0A]) : Data()) }
+            }
+            // A record that had no line ending gets one only when a record follows it.
+            if !records.isEmpty, !data.isEmpty, data.last != 0x0A { data.append(0x0A) }
+        }
+        let partOf = Dictionary(OutlineLength.sections(outline).map { (JSONKey($0.id), $0.part) }, uniquingKeysWith: { a, _ in a })
         for (outlineID, first) in records {
-            let (section, line) = where_[outlineID] ?? ("", 0)
-            let plan = WriteFromOutline.Plan(directory: "", paragraph: outlineID, section: section, approvalLine: line, traceHash: nil)
+            let (section, line) = where_[JSONKey(outlineID)] ?? ("", 0)
+            let plan = WriteFromOutline.Plan(directory: "", paragraph: outlineID, section: section, approvalLine: line, traceHash: nil,
+                                             part: parts == nil ? nil : (partOf[JSONKey(section)] ?? "main"))
             data += WriteFromOutline.record(plan, firstProposition: first)
         }
         return data
@@ -173,7 +200,14 @@ public enum WriteRewrite {
         let directory = stagedMain.deletingLastPathComponent()
         var problems: [String] = []
         for row in rows where !row.isRetired {
-            guard let id = row.id, let location = row.location else { continue }
+            guard let id = row.id else { continue }
+            guard let location = row.location else {
+                // A proposition the map names has to say where its paragraph starts.
+                if mapped.contains(where: { WriteFromOutline.same($0, id) }) {
+                    problems.append("\(CiteOrder.visible(id)), listed in \(mapFile), has no location that can be read")
+                }
+                continue
+            }
             guard order.position(file: location.file, line: location.start) != nil else {
                 problems.append("\(CiteOrder.visible(id)) is located outside the staged manuscript"); continue
             }
@@ -188,6 +222,37 @@ public enum WriteRewrite {
             if !starts {
                 problems.append("\(CiteOrder.visible(id)), listed in \(mapFile), does not start a paragraph")
             }
+        }
+        return problems
+    }
+
+    /// What each written paragraph opens and discharges, against what its outline record plans
+    /// (issue 116). The propositions of a paragraph are the live ones from the proposition the
+    /// map names up to the one the map names next, in reading order.
+    static func commitments(records: [(String, String)], outline: Outline, stagedMain: URL, ledger: Data, discourse: Data) -> [String] {
+        guard OutlineCommitments.plansAny(outline.paragraphs.compactMap(\.value)),
+              let order = try? ReadingOrder(mainFile: stagedMain), let rows = try? ReviseLedger.lines(ledger) else { return [] }
+        var placed: [(position: [Int], id: String)] = []
+        for row in rows where !row.isRetired {
+            guard let id = row.id, let location = row.location, let position = order.position(file: location.file, line: location.start) else { continue }
+            placed.append((position, id))
+        }
+        // A stable order: reading order, and the ledger's order among propositions of one line.
+        let sorted = placed.enumerated().sorted { a, b in
+            if ReadingOrder.precedes(a.element.position, b.element.position) { return true }
+            if ReadingOrder.precedes(b.element.position, a.element.position) { return false }
+            return a.offset < b.offset
+        }.map(\.element.id)
+        let starts = records.compactMap { record in sorted.firstIndex { WriteFromOutline.same($0, record.1) } }
+        let rowsOfDiscourse = OutlineCommitments.objects(discourse)
+        let planned = outline.paragraphs.compactMap(\.value)
+        var problems: [String] = []
+        for (outlineID, first) in records {
+            guard let start = sorted.firstIndex(where: { WriteFromOutline.same($0, first) }),
+                  let record = planned.first(where: { WriteFromOutline.same($0["id"]?.string, outlineID) }) else { continue }
+            let end = starts.filter { $0 > start }.min() ?? sorted.count
+            let written = OutlineCommitments.written(discourse: rowsOfDiscourse, propositions: Array(sorted[start..<end]))
+            problems += OutlineCommitments.differences(record: record, written: written)
         }
         return problems
     }

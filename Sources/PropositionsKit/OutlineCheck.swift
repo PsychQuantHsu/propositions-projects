@@ -84,6 +84,7 @@ public enum OutlineCheck {
     struct SectionInfo {
         let index: Int
         let dropped: Bool
+        var abstract = false
     }
 
     private static func checkSections(_ lines: [OutlineLine], into out: inout [String]) -> [JSONKey: SectionInfo] {
@@ -105,6 +106,22 @@ public enum OutlineCheck {
             if record.has("part"), !(record["part"]?.string.map(parts.contains) ?? false) {
                 report("part is not one of main, appendix, supplement")
             }
+            if record.has("unread") {
+                // Included files derive did not read (issue 117). The same file can be listed more than once.
+                if let unread = record["unread"]?.array, !unread.isEmpty {
+                    for item in unread {
+                        guard item.isObject, let name = item["file"]?.nonEmptyString, OutlineText.isClean(name), item["why"]?.nonEmptyString != nil else {
+                            report("unread has an entry that is not an object with a file and a why that are non-empty strings")
+                            continue
+                        }
+                    }
+                } else {
+                    report("unread is not a list of one or more files that were not read")
+                }
+            }
+            if record.has("length"), OutlineLength.count(record["length"]) == nil {
+                report("length is not a whole number from 1 to 999999999")
+            }
             checkLeftOut(record, report)
             if record.has("parent") {
                 if let parent = record["parent"]?.string, let info = known[JSONKey(parent)] {
@@ -118,7 +135,7 @@ public enum OutlineCheck {
             if let id {
                 ids.append((id, line.number))
                 if known[JSONKey(id)] == nil {
-                    known[JSONKey(id)] = SectionInfo(index: index, dropped: record.has("dropped"))
+                    known[JSONKey(id)] = SectionInfo(index: index, dropped: record.has("dropped"), abstract: record["role"]?.string == "abstract")
                 }
             }
         }
@@ -194,6 +211,8 @@ public enum OutlineCheck {
         var closed = Set<JSONKey>()
         var current: JSONKey? = nil
         var furthest: (index: Int, id: String)? = nil
+        // The commitments a record that is not dropped opens, on this line or an earlier one.
+        var opened = Set<JSONKey>()
 
         for line in lines {
             guard let record = record(line, file: file, controlCharacters: true, into: &out) else { continue }
@@ -267,6 +286,50 @@ public enum OutlineCheck {
             }
             checkLeftOut(record, report)
             if record.has("note"), record["note"]?.string == nil { report("note is not a string") }
+
+            // commitments (issue 116)
+            if dropped, record.has("opens") || record.has("discharges") {
+                report("a record that carries dropped carries opens or discharges")
+            }
+            if record.has("opens") {
+                if let opens = record["opens"]?.array, !opens.isEmpty {
+                    var own = Set<JSONKey>()
+                    for item in opens {
+                        guard item.isObject, let commitment = item["id"]?.string, OutlineCommitments.isID(commitment),
+                              let kind = item["kind"]?.string, OutlineCommitments.kinds.contains(kind) else {
+                            report("opens has an entry that is not an object with a commitment id and a kind of the format")
+                            continue
+                        }
+                        if !own.insert(JSONKey(commitment)).inserted || (!dropped && opened.contains(JSONKey(commitment))) {
+                            report("the commitment \(JSONValue.quoted(commitment)) is opened more than once")
+                        }
+                    }
+                    if !dropped { opened.formUnion(own) }
+                    if let section = record["section"]?.string, sections[JSONKey(section)]?.abstract == true {
+                        report("a record of the abstract opens a commitment")
+                    }
+                } else {
+                    report("opens is not a list of one or more commitments")
+                }
+            }
+            if record.has("discharges") {
+                if let discharges = record["discharges"]?.array, !discharges.isEmpty {
+                    var own = Set<JSONKey>()
+                    for item in discharges {
+                        guard let commitment = item.string, OutlineCommitments.isID(commitment) else {
+                            report("discharges has an entry that is not a commitment id")
+                            continue
+                        }
+                        if !own.insert(JSONKey(commitment)).inserted {
+                            report("the commitment \(JSONValue.quoted(commitment)) is discharged twice by one record")
+                        } else if !dropped, !opened.contains(JSONKey(commitment)) {
+                            report("discharges names \(JSONValue.quoted(commitment)), which no record that is not dropped opens on this line or an earlier one")
+                        }
+                    }
+                } else {
+                    report("discharges is not a list of one or more commitment ids")
+                }
+            }
 
             // uses
             if record.has("uses") {

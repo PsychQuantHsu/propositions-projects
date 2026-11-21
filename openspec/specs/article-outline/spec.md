@@ -1299,9 +1299,9 @@ tests:
 ---
 ### Requirement: outline-trace.jsonl records which outline record each written paragraph came from
 
-The outline directory MAY hold a fourth file, `outline-trace.jsonl`, written only by `propositions write commit` (the capability `write`). Each line is one paragraph written from the outline: `outline`, the id of the paragraph record; `first_prop`, the id of the first proposition of the written paragraph; `section`, the id of the record's section; and `approval_line`, the line of `outline-approvals.jsonl` that held the approval the section stood on. It is the only tie between a paragraph record and written text: the ids of paragraph records and the ids of paragraphs in `structure.json` have the same shape and are unrelated. The ledger and the structure sidecars do not change format for it.
+The outline directory MAY hold a fourth file, `outline-trace.jsonl`, written only by `propositions write commit` (the capability `write`). Each line is one paragraph written from the outline: `outline`, the id of the paragraph record; `first_prop`, the id of the first proposition of the written paragraph; `section`, the id of the record's section; and `approval_line`, the line of `outline-approvals.jsonl` that held the approval the section stood on. When `article.json` names destinations, a line also holds `part`, the part its section went to; a line without it belongs to `main`. It is the only tie between a paragraph record and written text: the ids of paragraph records and the ids of paragraphs in `structure.json` have the same shape and are unrelated. The ledger and the structure sidecars do not change format for it.
 
-`propositions outline trace <directory> --jsonl <ledger>` SHALL print, for each record, the paragraph record's id, the proposition's id and its location, tab-separated, then the problems and a count, and exit with 1 when any record is not an object with exactly those four keys (`outline`, `first_prop`, `section` strings, `approval_line` a number), names no paragraph record of the outline, names a proposition that is not exactly one live proposition of the ledger, or names a proposition an earlier record names; with 0 otherwise; and with 2 when a file cannot be read.
+`propositions outline trace <directory> --jsonl <ledger>` SHALL print, for each record, the paragraph record's id, the proposition's id and its location, tab-separated, then the problems and a count, and exit with 1 when any record is not an object with exactly those four keys (`outline`, `first_prop`, `section` strings, `approval_line` a number) and optionally `part` (one of `main`, `appendix`, `supplement`), names no paragraph record of the outline, names a proposition that is not exactly one live proposition of the ledger, or names a proposition an earlier record names; with 0 otherwise; and with 2 when a file cannot be read. When `article.json` names destinations, only the records of the parts whose destination names the ledger are checked this way; the others are listed as belonging to another document, as the requirement on destinations says.
 
 #### Scenario: The trace is checked
 
@@ -1326,4 +1326,223 @@ code:
   - Sources/PropositionsKit/Version.swift
   - Sources/PropositionsKit/WriteParagraph.swift
   - tests/PropositionsKitTests/WriteFromOutlineTests.swift
+-->
+
+
+<!-- @trace
+source: idd-120-fix2
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: A paragraph record can plan the commitments its paragraph opens and discharges
+
+A paragraph record MAY carry `opens`, a list of one or more objects, each with an `id` and a `kind`, and `discharges`, a list of one or more commitment ids. A commitment id SHALL be written as the structure sidecars write it (a lower-case letter or digit, then up to 63 lower-case letters, digits or hyphens), and a `kind` SHALL be one of `question`, `aim`, `hypothesis`, `plan`, `announcement`, `setup`, `future_work`. Both keys are part of the record: a change to either means its section no longer stands as approved.
+
+`propositions outline check` SHALL report: `opens` or `discharges` that is not such a list; a commitment opened more than once, by one record or by two records that are not dropped; a commitment one record discharges twice; a `discharges` entry that no record that is not dropped opens on the same line or an earlier one; a record that carries `dropped` and either key; and a record whose section has the role `abstract` and that carries `opens`.
+
+An outline plans commitments when a record that is not dropped carries either key. A record of such an outline that carries neither plans that its paragraph opens and discharges none.
+
+#### Scenario: A discharge has to follow its opening
+
+- **WHEN** a record discharges a commitment that a later record opens, or that only a dropped record opens
+- **THEN** `outline check` reports the record and the commitment
+
+##### Example: planned commitments pass the check
+
+- **GIVEN** an outline whose record `p-1` carries `"opens": [{"id": "c-q-spacing", "kind": "question"}]` and whose later record `p-3` carries `"discharges": ["c-q-spacing"]`
+- **WHEN** `propositions outline check` runs
+- **THEN** it reports nothing; and a record that both opens and discharges `c-q-spacing` passes too
+
+##### Example: what the check reports about commitments
+
+- **GIVEN** records that carry, one at a time: `"opens": []`; `"opens": [{"id": "c-x", "kind": "promise"}]`; `"opens": [{"id": "C x", "kind": "aim"}]`; `"discharges": ["c-none"]`; `"discharges": ["c-q", "c-q"]` after a record that opens `c-q`; `opens` of `c-q` on two records; `"dropped": "cut"` with `"discharges": ["c-q"]`; `opens` on a record of a section whose role is `abstract`; a discharge on `p-1` of a commitment that `p-2` opens
+- **WHEN** `propositions outline check` runs on each
+- **THEN** each is reported: the list or entry that is not in the format, the commitment opened more than once, the commitment discharged twice, the discharge that nothing earlier opens, the dropped record, and the record of the abstract
+
+<!-- @trace
+source: idd-116-planned-commitments
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: A section can carry a length target, and a command reports lengths against targets and the limit
+
+A section record MAY carry `length`, a whole number from 1 to 999999999: the target length of the section, in words, the sections under it included. `propositions outline check` SHALL report a `length` that is not such a number. `length` is part of the record: a change to it means the section no longer stands as approved.
+
+`article.json` MAY carry `length`, an object with `limit`, a whole number from 1 to 999999999, and optionally `parts`, a list of one or more of `main`, `appendix`, `supplement`, each once; without `parts` the limit counts `main`. A file whose `length` is not in this format is not in the format of `article.json`.
+
+A section goes to a part: its own `part`, else the part of the section it is under, else `main`.
+
+Words are counted as follows, as an estimate: the text of a LaTeX comment, mathematics (`$…$`, `$$…$$`, `\(…\)`, `\[…\]` and the equation environments), command names, and the arguments of commands that take names (labels, references, citations, included files, environments) are not counted; in what remains, a run of letters and digits is one word, an apostrophe, a hyphen or a full stop between two of them does not end it, and each Chinese character, kana or hangul syllable is one word.
+
+`propositions outline length <directory>` SHALL refuse (exit 2) an outline that does not pass `outline check`, and otherwise print, with tabs between the fields, and exit with 0 whatever the lengths are:
+
+- one line for each section record that is not dropped, in file order: its id as JSON, its part, `target <n>` or `target -`; when its target is below the sum of the targets of the sections directly under it, `its subsections plan <sum>`;
+- one line for each part a section goes to, `part <part>`, `targets <sum>`, where the sum takes each target that no section above it also carries;
+- when `article.json` in the directory has `length`, one line `limit <n>`, the parts joined by commas, `targets <sum>` over those parts, followed by ` (over by <k>)` when the sum is above the limit;
+- `ok length`.
+
+With `--jsonl <ledger>` and `--tex <main file>` (which go together), it SHALL also count what was written: for each record of `outline-trace.jsonl` that names a paragraph record that is not dropped and exactly one live proposition of the ledger, the words of the paragraph that holds the start of that proposition (the run of lines without an empty line, a heading line not counted). Each section line then also holds `written <n>` and `<k> of <m> record(s)`, both with the sections under it included, and `over its target by <k>` when the words exceed the target; each part line holds `written <n>`; the limit line holds `written <n>`, followed by ` (over by <k>)` when above the limit. A trace record whose proposition is not found is not counted, and one line says how many there are. Without a trace file nothing is written yet.
+
+#### Scenario: The plan and the text are both compared with the limit
+
+- **WHEN** the targets of the sections add up to more than the limit, or the words written from a section exceed its target
+- **THEN** the report marks the line and still exits with 0
+
+##### Example: targets are reported against the limit before anything is written
+
+- **GIVEN** an outline with sections `s-a` (`length` 300), `s-b` (`length` 500) with `s-b1` under it (`length` 600), and `s-x` (`part` `appendix`, `length` 200), and `article.json` with `{"length": {"limit": 700}}`
+- **WHEN** `propositions outline length <directory>` runs
+- **THEN** it prints `"s-a"	main	target 300`, `"s-b"	main	target 500	its subsections plan 600`, `"s-b1"	main	target 600`, `"s-x"	appendix	target 200`, `part main	targets 800`, `part appendix	targets 200`, `limit 700	main	targets 800 (over by 100)`, `ok length`, and exits with 0
+
+##### Example: what was written is counted from the trace
+
+- **GIVEN** the structure fixture, an outline of section `s-a` with `length` 5 and records `p-1` and `p-2`, and a trace that names `p-1` with the proposition that starts the fixture's last paragraph ("In addition, future studies could test whether the advantage lasts beyond one week.", 13 words)
+- **WHEN** `propositions outline length <directory> --jsonl <ledger> --tex <main file>` runs
+- **THEN** it prints `"s-a"	main	target 5	written 13	1 of 2 record(s)	over its target by 8`, `part main	targets 5	written 13`, `ok length`, and exits with 0
+
+##### Example: how words are counted
+
+- **GIVEN** the lines `The well-known effect ($d = 0.8$) isn't small~\cite{smith2020}. % not this`, `\begin{equation}` / `x = y + z` / `\end{equation}`, `\emph{Recall} was 0.62.` and `間隔複習有效`
+- **WHEN** their words are counted
+- **THEN** the counts are 5, 0, 3 and 6
+
+##### Example: a length that is not in the format
+
+- **GIVEN** a section record with `"length": 0`, with `"length": 1.5`, with `"length": "300"`; and an `article.json` with `{"length": {"limit": 0}}`, with `{"length": 700}`, and with `{"length": {"limit": 700, "parts": ["online"]}}`
+- **WHEN** `propositions outline check` runs on each outline, and `propositions outline length` on a directory with each `article.json`
+- **THEN** the check reports `length is not a whole number from 1 to 999999999` for each record, and `outline length` exits with 2 and names `article.json` for each file
+
+<!-- @trace
+source: idd-119-section-lengths
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: A section record can list the included files that were not read
+
+A section record MAY carry `unread`, a list of one or more objects, each with a `file` and a `why` that are non-empty strings: an included file that was not read when the outline was derived, named as the include command writes it, and the reason it was not read. The entry belongs to the record of the section the include command stands in. One file MAY be listed more than once, in one record or in several: an entry is not a locator and does not have to name one place. `unread` is part of the record: a change to it means the section no longer stands as approved.
+
+`propositions outline check` SHALL report an `unread` that is not such a list, and an entry whose `file` holds a control character. It SHALL NOT report a paragraph file that holds no record: an outline whose sections all carry `unread` and have no paragraph record passes.
+
+`propositions outline status` SHALL print, after the line `records that carry dropped` and before `ok status`, the line `sections that carry unread`, a tab, the number of section records that carry `unread` and not `dropped`, and, when there is one, a tab and the list of their ids as JSON.
+
+#### Scenario: The two manuscripts the earlier designs stopped on
+
+- **WHEN** one unread file is included twice in a section, or every section holds only includes of unread files
+- **THEN** the outline that records them passes `outline check`, and `outline status` counts the sections
+
+##### Example: a file included twice, and sections with nothing else
+
+- **GIVEN** an outline whose section `s-a` carries `"unread": [{"file": "generated/numbers", "why": "ignored by git"}, {"file": "generated/numbers", "why": "ignored by git"}]`, whose section `s-b` carries `"unread": [{"file": "../shared/methods.tex", "why": "outside the repository"}]`, and whose paragraph file is empty
+- **WHEN** `propositions outline check` and `propositions outline status` run
+- **THEN** the check prints `ok outline check`; the status ends with `sections that carry unread	2	["s-a","s-b"]` and `ok status`
+
+##### Example: an unread list that is not in the format
+
+- **GIVEN** section records that carry, one at a time, `"unread": []`, `"unread": "generated/numbers"`, `"unread": [{"file": "generated/numbers"}]`, `"unread": [{"file": "", "why": "x"}]` and `"unread": ["generated/numbers"]`
+- **WHEN** `propositions outline check` runs on each
+- **THEN** the first two are reported as `unread is not a list of one or more files that were not read`, and the others as `unread has an entry that is not an object with a file and a why that are non-empty strings`
+
+##### Example: a dropped section is not counted
+
+- **GIVEN** an outline whose only section that carries `unread` also carries `dropped`
+- **WHEN** `propositions outline status` runs
+- **THEN** it prints `sections that carry unread	0`
+
+<!-- @trace
+source: idd-117-unread-includes
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The trace and the length report follow the destinations of the parts
+
+A record of `outline-trace.jsonl` MAY carry a fifth key, `part`, one of `main`, `appendix`, `supplement`: the part its section went to when `article.json` named destinations. A record without it belongs to `main`.
+
+When the `article.json` of the outline directory has `destinations`, `propositions outline trace <directory> --jsonl <ledger>` SHALL check, against that ledger, the records of the parts whose destination names it, and print each other record as its outline id, its proposition and `in the document of the part <part>`, without checking it. It exits with 2 when the ledger is the destination of no part. Without `destinations` it checks every record against the ledger given, as before.
+
+`propositions outline length <directory> --written` SHALL count what was written from the documents the destinations name: each trace record in the ledger and main file of its part. It exits with 2 when `article.json` has no `destinations`, when a document cannot be read, or when it is given with `--jsonl` and `--tex`; and `--jsonl` and `--tex` are refused (exit 2) when `article.json` has `destinations`. A trace record of a part without a destination is not counted and is in the count of records that were not found.
+
+#### Scenario: Each document is checked with its own ledger
+
+- **WHEN** the trace holds records of the main text and of the supplement
+- **THEN** `outline trace` with the main text's ledger checks the first and lists the second as being in the other document
+
+##### Example: trace and length with two documents
+
+- **GIVEN** the two documents, the outline and the trace of the example "a paragraph goes to the document of its part" of the capability `write`, after both paragraphs were written
+- **WHEN** `propositions outline trace <directory> --jsonl <the main text's ledger>` runs, then with a ledger that no destination names, then `propositions outline length <directory> --written`, then `outline length` with `--jsonl` and `--tex`
+- **THEN** the first prints the record of `p-s` as `in the document of the part supplement`, the record of `p-1` with its location, and `2 record(s), 0 problem(s)`, and exits with 0; the second exits with 2; the third prints `written` counts above zero for `s-a` and for `s-sup` and a line for each of the parts `main` and `supplement`; the fourth exits with 2 and says to use `--written`
+
+<!-- @trace
+source: idd-120-destinations
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The length report counts each written paragraph once and stops on a file it cannot read
+
+In the word count, a command that takes a name is followed by its optional arguments in square brackets and one argument in braces, white space allowed before each; they are not counted, and a group after them is text. An equation environment ends at its `\end`, white space allowed before the brace. The punctuation of the kana and Han blocks is not a word, a half-width kana is one, and a number sign that is not a digit (a fraction) is not part of a word.
+
+`propositions outline length` SHALL exit with 2, and print no report, when a file of a manuscript it counts from cannot be read as UTF-8: the main file, or the file a counted proposition is located in. Such a file is not counted as a proposition that was not found.
+
+A paragraph SHALL be counted once however many trace records name its proposition, and a trace record that names a dropped paragraph record, or no paragraph record, does not keep a later record of the same proposition from being counted.
+
+#### Scenario: A stale trace record does not hide a paragraph
+
+- **WHEN** the trace names one proposition twice, first for a dropped record and then for a record that is not dropped
+- **THEN** the paragraph is counted once, for the second record's section
+
+##### Example: names with spaces, groups after a name, and a spaced end
+
+- **GIVEN** the lines `See \cite {smith2020} and \label{eq:r}{visible words} here.`, the lines `\begin{equation}` / `x = y` / `\end {equation}` / `After it.`, and the line `カ・ナ ｶﾅ ¼ cup`
+- **WHEN** their words are counted
+- **THEN** the counts are 5, 2 and 5
+
+##### Example: a stale record, a repeated record and an unreadable file
+
+- **GIVEN** the structure fixture, an outline of section `s-a` with a dropped record `p-old` and a record `p-1`, and a trace that names the proposition of the fixture's last paragraph for `p-old`, then twice for `p-1`
+- **WHEN** `propositions outline length <directory> --jsonl <ledger> --tex <main file>` runs; and again after the main file is replaced by bytes that are not UTF-8
+- **THEN** the first prints `"s-a"	main	target -	written 13	1 of 1 record(s)`; the second exits with 2 and prints no report
+
+<!-- @trace
+source: idd-119-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The length report reads each part from its own ledger
+
+`propositions outline length <directory> --written` SHALL look up the trace records of a part in the ledger and main file that part's destination names, also when two parts name the same main file with different ledgers.
+
+#### Scenario: Two parts share a main file and not a ledger
+
+- **WHEN** the appendix is in the main text's input tree and has a ledger of its own
+- **THEN** a record of the appendix is found in the appendix's ledger
+
+##### Example: two parts, one main file, two ledgers
+
+- **GIVEN** the structure fixture, a second ledger that holds one proposition located on the fixture's last paragraph, an outline with section `s-a` and section `s-x` (`part` `appendix`), `destinations` that name the fixture's main file for both parts, with the fixture's ledger for `main` and the second ledger for `appendix`, and a trace with one record of `s-x`, `"part": "appendix"`, that names that proposition
+- **WHEN** `propositions outline length <directory> --written` runs
+- **THEN** the line of `s-x` holds `written 13	1 of 1 record(s)` and no line says a record was not found
+
+<!-- @trace
+source: idd-120-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
 -->

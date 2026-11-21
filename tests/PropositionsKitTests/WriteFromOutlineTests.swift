@@ -151,6 +151,7 @@ struct WriteFromOutlineTests {
         #expect(try Data(contentsOf: other.url.appendingPathComponent("paper/main.tex")) == main)
     }
 
+    // spec-example: article-outline / the trace check reports a record it cannot follow
     @Test func `The trace check reports a record it cannot follow`() throws {
         let box = try base.setUp()
         try outline(in: box)

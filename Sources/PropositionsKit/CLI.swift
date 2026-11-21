@@ -52,6 +52,9 @@ public enum PropositionsCLI {
                                                  rewrite: prepare.rewrite,
                                                  workingDirectory: workingDirectory)
             }
+            if let phrasing = command as? PhrasingOptions {
+                return PhrasingRun.run(tex: phrasing.tex, article: phrasing.article, workingDirectory: workingDirectory)
+            }
             if let check = command as? WriteCheckOptions {
                 return WriteParagraphRun.check(stage: check.stage, workingDirectory: workingDirectory)
             }
@@ -64,6 +67,9 @@ public enum PropositionsCLI {
             }
             if let check = command as? OutlineCheckOptions {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
+            }
+            if let length = command as? OutlineLengthOptions {
+                return OutlineLengthRun.run(directory: length.directory, jsonl: length.jsonl, tex: length.tex, written: length.written, workingDirectory: workingDirectory)
             }
             if let trace = command as? OutlineTraceOptions {
                 return OutlineTraceRun.run(directory: trace.directory, jsonl: trace.jsonl, workingDirectory: workingDirectory)
@@ -137,7 +143,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, WriteOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, WriteOptions.self, OutlineOptions.self, PhrasingOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -213,6 +219,26 @@ struct ParagraphsOptions: ParsableCommand {
     var structure: String?
 }
 
+struct PhrasingOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "phrasing",
+        abstract: "List where a manuscript holds a banned phrasing of article.json.",
+        discussion: """
+            Compares every file of the main file's input tree with the banned list of article.json. \
+            Letter case does not count, a run of white space (a line break included) is one space, \
+            a comment is not compared, and a phrasing does not run across an empty line. The \
+            comparison is literal.
+            Exit codes: 0 no occurrence; 1 an occurrence; 2 a file cannot be read, or article.json \
+            is not in the format.
+            """)
+
+    @Option(help: "The manuscript's main file.")
+    var tex: String
+
+    @Option(help: "The article file, article.json.")
+    var article: String
+}
+
 struct WriteOptions: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "write",
@@ -239,6 +265,9 @@ struct WritePrepareOptions: ParsableCommand {
             may change, and retired may be added), and the staging directory has to hold \
             outline-map.jsonl, one line per paragraph record written, which commit copies into \
             outline-trace.jsonl.
+            An article.json in the outline directory (else beside the ledger) is copied as an input: \
+            its banned phrasings are compared with the new text, and with destinations the main \
+            file and ledger given have to be the document of the section's part.
             Exit codes: 0 staged; 2 a file cannot be read, the staging directory is not empty, \
             the paragraph has nowhere to go, or the outline record cannot be written from.
             """)
@@ -483,7 +512,7 @@ struct OutlineOptions: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "outline",
         abstract: "Mechanical checks for the three files of an article outline.",
-        subcommands: [OutlineCheckOptions.self, OutlineStatusOptions.self, OutlineLocatorsOptions.self, OutlineTraceOptions.self])
+        subcommands: [OutlineCheckOptions.self, OutlineStatusOptions.self, OutlineLocatorsOptions.self, OutlineTraceOptions.self, OutlineLengthOptions.self])
 }
 
 struct OutlineCheckOptions: ParsableCommand {
@@ -503,6 +532,35 @@ struct OutlineCheckOptions: ParsableCommand {
     var directory: String
 }
 
+struct OutlineLengthOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "length",
+        abstract: "Report the length target of each section, what was written from it, and the totals against the limit.",
+        discussion: """
+            Prints one line for each section that is not dropped: its id, the part it goes to, its \
+            target, and, with --jsonl and --tex, the words written from its paragraph records (as \
+            outline-trace.jsonl names them) and how many of its records are written. Then one line \
+            for each part, one for the limit of article.json when it has one, and `ok length`. \
+            A length over its target or its limit is marked; the exit code does not change. Words \
+            are an estimate: mathematics, comments and command names are not counted, and each \
+            Chinese character, kana or hangul syllable is one word.
+            Exit codes: 0 the report was printed; 2 a file cannot be read, the outline does not \
+            pass outline check, or an argument is wrong.
+            """)
+
+    @Argument(help: "The directory that holds the outline files.")
+    var directory: String
+
+    @Option(help: "The ledger, to count what was written.")
+    var jsonl: String?
+
+    @Option(help: "The manuscript's main file, to count what was written.")
+    var tex: String?
+
+    @Flag(help: "Count what was written from the documents article.json names as destinations.")
+    var written = false
+}
+
 struct OutlineStatusOptions: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "status",
@@ -510,7 +568,8 @@ struct OutlineStatusOptions: ParsableCommand {
         discussion: """
             Prints one line for each section, one for the order of sections, one for the sections \
             removed since their approval, one for the paragraph records that name no section, \
-            two counts, and `ok status`. Records are compared as JSON values.
+            two counts, one for the sections that carry unread (included files that were not read), \
+            and `ok status`. Records are compared as JSON values.
             Exit codes: 0 the status was printed; 2 a file is missing, a line is not a record, or \
             an argument is wrong.
             """)

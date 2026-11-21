@@ -243,7 +243,9 @@ lines is the order of the sections in the article.
 | `parent` | no | The `id` of a section record on an earlier line |
 | `dropped` | no | A non-empty string giving the reason the section is left out of the article |
 | `moved_to` | no | A non-empty string naming where a section that is left out goes: another article, or a part that has no outline here. Only on a record that carries `dropped` |
-| `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the main text |
+| `part` | no | One of `main`, `appendix`, `supplement`: the part of the article the section is in. Without it the section is in the part of the section it is under, and a section under none is in the main text |
+| `unread` | no | A list of one or more included files that were not read when the outline was derived, each `{"file": <the name as the include command writes it>, "why": <the reason>}` (see below) |
+| `length` | no | A whole number from 1 to 999999999: the target length of the section in words, the sections under it included (see "article.json") |
 
 `says` is a sentence. A heading, a label or a list of topics does not state
 what the section says.
@@ -256,6 +258,25 @@ article when the section it is under is not.
 
 ```json
 {"id": "s-intro", "heading": "Introduction", "role": "introduction", "says": "Standard errors from the usual method are too small in short tests, and this article shows why."}
+```
+
+**Included files that were not read.** A section record can list, in `unread`, the included
+files of its section that were not read when the outline was derived (a file git ignores, one
+outside the repository, one behind a symbolic link, a missing one), each with the reason
+(issue #117). An entry belongs to the record of the section the include command stands in. It
+is not a locator: it names the file as the include command writes it and does not have to name
+one place, so a file that is included twice is two entries, and a section whose whole text is
+in such files still has its section record to carry them. The position of the include inside
+the section is not recorded, and neither is what the file holds: the outline only keeps that
+something there was not read. `propositions outline check` checks the shape,
+`propositions outline status` counts the sections that carry `unread`, and
+`propositions write prepare` names the unread files of a section before a paragraph is written
+into it (for a rewrite, of every section). An outline whose sections all carry `unread` can have
+an empty paragraph file. When the file becomes readable, the section is derived again or the
+entry is removed through revise; either way the section is approved again.
+
+```json
+{"id": "s-method", "heading": "Method", "says": "The study compared two review schedules.", "unread": [{"file": "generated/sample-sizes", "why": "ignored by git"}]}
 ```
 
 ## Paragraph records
@@ -275,6 +296,8 @@ Each line of `outline-paragraphs.jsonl` is a paragraph record.
 | `dropped` | no | A non-empty string giving the reason the paragraph is left out of the article |
 | `moved_to` | no | A non-empty string naming where a paragraph that is left out goes. Only on a record that carries `dropped` |
 | `note` | no | A string for the author |
+| `opens` | no | A list of one or more commitments the paragraph is planned to open, each `{"id": <commitment id>, "kind": <kind>}` (see "Planned commitments") |
+| `discharges` | no | A list of one or more ids of commitments the paragraph is planned to discharge |
 
 A point is an object.
 
@@ -317,6 +340,30 @@ record's points. A record can carry both `from` and `replaces`, for a
 paragraph that draws on one passage and takes the place of another; the same
 locator is not in both, and the write check reports one that is.
 
+
+**Planned commitments.** The structure sidecars record which proposition opens a commitment
+(a question, an aim, a hypothesis, a plan item, an announcement, a setup, future work) and which
+discharges it (`docs/STRUCTURE.md`). A paragraph record can plan both before the text exists
+(issue #116): `opens` lists the commitments its paragraph will open, with the `kind` of each,
+and `discharges` lists the ids of the ones it will discharge. The ids and kinds are written as
+in the sidecars, so that the plan and the written text can be compared by id. A commitment is
+opened once in the outline; a discharge names a commitment that the same record or a record on
+an earlier line opens; a record that carries `dropped` carries neither key; and a record of a
+section whose role is `abstract` opens none, as in the sidecars. `propositions outline check`
+reports each of these. An outline plans commitments when a record that is not dropped carries
+either key; a record of such an outline that carries neither plans that its paragraph opens and
+discharges none. When a paragraph is written from such an outline, `write check` compares what
+the paragraph opens and discharges in the staged discourse sidecar with its record, and each
+difference is a problem that stops `write commit`: the author changes the text, or changes the
+plan and approves the section again. An outline with neither key on any record (one derived
+from a finished manuscript: derive does not write them) is not compared. The comparison is by
+id and kind only; whether a sentence really opens a commitment is the judgment of whoever
+annotates the paragraph.
+
+```json
+{"id": "p-1", "section": "s-intro", "points": [{"id": "p-1.1", "text": "It is not known whether spacing helps delayed recall."}], "opens": [{"id": "c-q-spacing", "kind": "question"}]}
+{"id": "p-9", "section": "s-results", "points": [{"id": "p-9.1", "text": "Spacing improved delayed recall."}], "discharges": ["c-q-spacing"]}
+```
 
 **Order.** The paragraph records are grouped by section. The records naming one
 section are on consecutive lines, and the groups come in the order of the
@@ -1219,6 +1266,7 @@ directory, `outline-trace.jsonl`:
 | `first_prop` | The id of the first proposition of the written paragraph |
 | `section` | The id of the record's section |
 | `approval_line` | The line of `outline-approvals.jsonl` that holds the approval the section stood on |
+| `part` | Only when `article.json` names destinations: the part the section goes to, one of `main`, `appendix`, `supplement` (see "article.json"). A record without it belongs to `main` |
 
 ```json
 {"outline": "p-1", "first_prop": "019a3c5e-7a00-7000-8000-00000000000d", "section": "s-a", "approval_line": 1}
@@ -1251,19 +1299,86 @@ A trace outlives the outline it was written from when the three files are moved 
 outline is started in the same directory: its records then name ids of the new outline. Move
 `outline-trace.jsonl` with the three files.
 
+## article.json: what is true of the whole article
+
+One optional file, `article.json`, holds what is true of the whole article and not of one
+section. It is a JSON object in the directory of the outline files, which is the directory of
+the ledger; a manuscript with a ledger and no outline can have one too. It is not an outline
+file: no approval record copies it, and changing it does not change whether a section stands as
+approved. The outline skill does not write it; the author does. Every key is optional, and a
+key that is not defined here is left alone.
+
+| Key | Value |
+|---|---|
+| `banned` | A list of phrasings that are not to appear in the article: objects with a `phrase` and a `reason`, both non-empty strings (issue #118) |
+| `destinations` | The document each part is written into: an object whose keys are parts and whose values are `{"tex": <main file>, "jsonl": <ledger>}`, paths from the directory of `article.json` (issue #120) |
+| `length` | The limit on the article's length: an object with `limit`, a whole number of words from 1 to 999999999, and optionally `parts`, the parts the limit counts, a list of one or more of `main`, `appendix`, `supplement`; without `parts` it counts `main` (issue #119) |
+
+```json
+{"banned": [{"phrase": "clearly shows", "reason": "say what the data show"}]}
+```
+
+**Banned phrasings.** `propositions write prepare` reads the file from the outline directory
+when a paragraph is written from an outline, and otherwise from the directory of the ledger,
+and copies it as an input of the run. `write check` reports every banned phrasing in the text
+the run adds (the new paragraph; for a rewrite, every file of the manuscript) as a problem, and
+`write commit` then writes nothing: the author rewords the text, or changes the list and
+prepares again. `propositions phrasing --tex <main file> --article <file>` compares a whole
+manuscript, for a list that changed after text was written. The comparison is literal: letter
+case does not count, a run of white space with its line breaks is one space, a LaTeX comment is
+not compared, and a phrasing does not run across an empty line. It finds the words, not the
+claim: the same thing said in other words is not found.
+
+**Destinations.** The parts of an article can be different documents: the main text, an
+appendix, an online supplement, each with its own main file, ledger and structure sidecars.
+`destinations` says, for a part, which document it is written into (issue #120): the main file
+(`tex`) and the ledger (`jsonl`), as paths from the directory of `article.json`. Two parts can
+name the same document, as an appendix in the main text's input tree does. A section goes to
+its own `part`, else to the part of the section it is under, else to `main`. With
+`destinations`, `write prepare --outline` refuses a paragraph unless the main file and ledger it
+is given are the destination of its section's part, and says which two files to give; `write
+commit` records the part in `outline-trace.jsonl`. A rewrite (`write prepare --rewrite`) is of
+one document: `outline-map.jsonl` lists the records whose sections go to that document, and the
+trace records of the other documents are kept as they were. The whole outline still has to
+stand as approved. `propositions outline trace` checks the records of the document whose ledger
+it is given and lists the others, and `propositions outline length <directory> --written`
+counts each part from its own document. What is not done: a rewrite cannot move content from
+one document to another (a proposition of one ledger replaced by a proposition of another), and
+no check follows a reference from one document into another. Without `destinations`
+everything is one document, as before.
+
+```json
+{"destinations": {"main": {"tex": "../main.tex", "jsonl": "main.jsonl"}, "supplement": {"tex": "../supplement/supplement.tex", "jsonl": "../supplement/propositions/main.jsonl"}}}
+```
+
+**Lengths.** A section record can carry `length`, its target in words, and `article.json` the
+limit of the article. `propositions outline length <directory>` prints, for each section that
+is not dropped, its part and its target, then the sum of the targets of each part and, against
+the limit, the sum over the parts the limit counts; a target is counted once when a section and
+a section above it both carry one, and a section whose subsections plan more than it does is
+marked. With `--jsonl <ledger> --tex <main file>` it also counts what was written: the words of
+each paragraph that `outline-trace.jsonl` ties to a paragraph record, added up by section (the
+sections under it included) and by part. A line over its target or its limit is marked. The
+command only reports: it exits with 0 whatever the lengths are, and no other command refuses
+text because of its length. The count is an estimate for planning, not the count of any
+journal: comments, mathematics, command names, and the arguments of commands that take names
+(labels, references, citations, included files) are not counted; a run of letters and digits
+is one word, and each Chinese character, kana or hangul syllable is one. Pages are not counted,
+and text that was not written from the outline has no trace record and is not counted either.
+
+```json
+{"banned": [], "length": {"limit": 8000, "parts": ["main"]}}
+```
+
 ## What this version leaves open
 
-Five questions about the design were raised with this format and are not
+Three questions about the design were raised with this format and are not
 answered by it.
 
 - **How an outline paragraph is tied to a paragraph of the structure sidecar.**
   Answered for text written from the outline: `outline-trace.jsonl` names the
   first proposition of each written paragraph (see "Writing text from the
   outline"). Text that was not written from the outline has no tie.
-- **Whether commitments can be planned on the outline.** The structure
-  sidecars record which sentence opens a commitment and which discharges it.
-  The outline has no key for either: it cannot say that a paragraph will open
-  or discharge a commitment (issue #116).
 - **Whether the points of one paragraph are related to each other.** A
   paragraph's points are an ordered list and nothing more. `uses` says that a
   record relies on an earlier record or point; it does not say how.
@@ -1271,8 +1386,3 @@ answered by it.
   passage by a label or by opening words that occur once. Two passages of one
   file that are the same to their end have neither, and derive stops on them
   (issue #84).
-- **Whether the outline shows an included file that derive did not read.**
-  Derive names such a file to the author and records nothing for it, so the
-  outline itself does not show that part of the original is missing. Two ways
-  of recording it were tried and each stopped derive on some manuscript
-  (issue #117).

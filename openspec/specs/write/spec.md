@@ -132,7 +132,7 @@ code:
 ---
 ### Requirement: A paragraph written from an outline record is gated on its approval and traced
 
-`propositions write prepare --outline <directory> --outline-paragraph <id>` SHALL read the three outline files once each (each has to be a regular file, not a link) and judge the outline from those bytes, which are also the bytes it copies and hashes. It SHALL stage nothing unless the outline passes `propositions outline check`, exactly one paragraph record has that id, the record does not carry `dropped`, and its section stands as approved (as `propositions outline status` says). `--outline` and `--outline-paragraph` go together. It refuses an outline file or `outline-trace.jsonl` that is one of the four files the paragraph changes. `prepare` records the id, its section, the line of `outline-approvals.jsonl` that holds the last approval with an entry for that section, and the state of `outline-trace.jsonl` in the outline directory; it copies the three outline files under `outline/` of the staging directory as files that are not written back, so a change to them, or to their copies, after `prepare` makes `check` and `commit` refuse. `write check` SHALL require that the first proposition added to the ledger is exactly one line of the staged ledger, live, and starts in the added lines of the file that gets the paragraph. `write commit` SHALL refuse, writing nothing, when `outline-trace.jsonl` changed after `prepare` (or anything, a dangling link included, appeared at its path when there was nothing), when it already names that proposition, and when the outline record no longer gives the section and approval line `prepare` recorded, judged again from the outline files `write.json` names (which have to be the files recorded as not written back); and after writing the four files it appends one line to that file (creating it when there was none): `{"outline": <id>, "first_prop": <id of the first proposition added to the ledger>, "section": <section id>, "approval_line": <line>}`. A failure there is reported as a failure after writing started. As for the other files, two commits that write the same trace at the same moment are not kept apart: the second can find the trace changed only after it has written its four files.
+`propositions write prepare --outline <directory> --outline-paragraph <id>` SHALL read the three outline files once each (each has to be a regular file, not a link) and judge the outline from those bytes, which are also the bytes it copies and hashes. It SHALL stage nothing unless the outline passes `propositions outline check`, exactly one paragraph record has that id, the record does not carry `dropped`, and its section stands as approved (as `propositions outline status` says). `--outline` and `--outline-paragraph` go together. It refuses an outline file or `outline-trace.jsonl` that is one of the four files the paragraph changes. `prepare` records the id, its section, the line of `outline-approvals.jsonl` that holds the last approval with an entry for that section, and the state of `outline-trace.jsonl` in the outline directory; it copies the three outline files under `outline/` of the staging directory as files that are not written back, so a change to them, or to their copies, after `prepare` makes `check` and `commit` refuse. `write check` SHALL require that the first proposition added to the ledger is exactly one line of the staged ledger, live, and starts in the added lines of the file that gets the paragraph. `write commit` SHALL refuse, writing nothing, when `outline-trace.jsonl` changed after `prepare` (or anything, a dangling link included, appeared at its path when there was nothing), when it already names that proposition (with destinations in `article.json`, in a record of a part of the same document), and when the outline record no longer gives the section and approval line `prepare` recorded, judged again from the outline files `write.json` names (which have to be the files recorded as not written back); and after writing the four files it appends one line to that file (creating it when there was none): `{"outline": <id>, "first_prop": <id of the first proposition added to the ledger>, "section": <section id>, "approval_line": <line>}`. A failure there is reported as a failure after writing started. As for the other files, two commits that write the same trace at the same moment are not kept apart: the second can find the trace changed only after it has written its four files.
 
 #### Scenario: A paragraph is written from an approved outline record
 
@@ -169,14 +169,22 @@ code:
   - Sources/PropositionsKit/WriteFromOutline.swift
 -->
 
+
+<!-- @trace
+source: idd-120-fix2
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
 ---
 ### Requirement: A whole manuscript is rewritten from an outline approved as a whole
 
 `propositions write prepare --rewrite --outline <directory>` SHALL stage a rewrite of the whole manuscript. It takes neither `--outline-paragraph` nor `--heading` (exit 2). It reads the three outline files once and stages nothing unless the outline passes `propositions outline check` and stands as approved as a whole: every section stands as approved, the order of sections stands as approved, no section is removed since its approval, and no paragraph record names no section (as `propositions outline status` says). It copies every file of the input tree; the files other than the main file are recorded, with their SHA-256, as files a rewrite may change. Every file the run writes has to be named once (an included file cannot also be a sidecar) and none may be `_meta.json`, an outline file or `outline-trace.jsonl`. It prints `rewrite: every file of the input tree may change; list the outline records in <the map file>` in place of the line of a new paragraph. A `write.json` that holds the fields of both modes is refused.
 
-`write check` on a rewrite SHALL report, and exit with 1 when any holds: a file of an input of the run (`_meta.json`, an outline file) or its copy changed; a staged file of the manuscript is not UTF-8; a line of either ledger writes a key twice, or a line of the original ledger has no id or shares its id with another line; a line of the original ledger is not exactly one line of the staged ledger (by id); such a line changed in anything other than `location`, `cites` and `retired`; a line that was retired changed its retirement; a new line is retired, or its id names several lines; the staged discourse sidecar is not one JSON object per line, or the staged structure is not JSON (both read as strict UTF-8); a live proposition of the staged ledger is located outside the staged input tree; the staging directory holds no `outline-map.jsonl`, or a line of it is not an object with exactly the keys `outline` and `first_prop`, names no paragraph record of the outline that is not dropped, names a proposition that is not exactly one live line of the staged ledger, names a proposition that does not start a paragraph (its line follows neither a blank line nor a sectioning line), or repeats an outline record or a proposition; a paragraph record of the outline that is not dropped is not listed. That a paragraph says what its record plans is the author's to confirm, not this check's. The order of the ledger's lines may change. It prints `rewrite: <n> file(s) changed, <n> new proposition(s), <n> outline record(s) listed`.
+`write check` on a rewrite SHALL report, and exit with 1 when any holds: a file of an input of the run (`_meta.json`, an outline file) or its copy changed; a staged file of the manuscript is not UTF-8; a line of either ledger writes a key twice, or a line of the original ledger has no id or shares its id with another line; a line of the original ledger is not exactly one line of the staged ledger (by id); such a line changed in anything other than `location`, `cites` and `retired`; a line that was retired changed its retirement; a new line is retired, or its id names several lines; the staged discourse sidecar is not one JSON object per line, or the staged structure is not JSON (both read as strict UTF-8); a live proposition of the staged ledger is located outside the staged input tree; the staging directory holds no `outline-map.jsonl`, or a line of it is not an object with exactly the keys `outline` and `first_prop`, names no paragraph record of the outline that is not dropped, names a proposition that is not exactly one live line of the staged ledger, names a proposition that does not start a paragraph (its line follows neither a blank line nor a sectioning line), or repeats an outline record or a proposition; a paragraph record of the outline that is not dropped is not listed. When `article.json` names destinations, the records that have to be listed, and may be, are those whose sections go to the document rewritten, as the requirement on destinations says. That a paragraph says what its record plans is the author's to confirm, not this check's. The order of the ledger's lines may change. It prints `rewrite: <n> file(s) changed, <n> new proposition(s), <n> outline record(s) listed`.
 
-`write commit` on a rewrite SHALL read the outline files and `outline-map.jsonl` once, judge, check and build the trace from those bytes before anything is written, and SHALL write nothing when a file of the tree, the ledger or a sidecar changed after `prepare`, `outline-trace.jsonl` changed (or appeared), or the outline no longer stands as approved as a whole; it then keeps a copy of every original in `backup/`, the old `outline-trace.jsonl` included, with `backup/restore.jsonl` naming the destination of each copy (and that the trace was absent, when it was); writes, among the main file, the other files of the tree, the ledger, the discourse sidecar and the structure sidecar, those whose bytes changed; and writes `outline-trace.jsonl` anew with one record per line of `outline-map.jsonl`, in its order, in the format of the capability `article-outline`: the old records name paragraphs of the text the rewrite replaces.
+`write commit` on a rewrite SHALL read the outline files and `outline-map.jsonl` once, judge, check and build the trace from those bytes before anything is written, and SHALL write nothing when a file of the tree, the ledger or a sidecar changed after `prepare`, `outline-trace.jsonl` changed (or appeared), or the outline no longer stands as approved as a whole; it then keeps a copy of every original in `backup/`, the old `outline-trace.jsonl` included, with `backup/restore.jsonl` naming the destination of each copy (and that the trace was absent, when it was); writes, among the main file, the other files of the tree, the ledger, the discourse sidecar and the structure sidecar, those whose bytes changed; and writes `outline-trace.jsonl` anew with one record per line of `outline-map.jsonl`, in its order, in the format of the capability `article-outline`: the old records name paragraphs of the text the rewrite replaces. When `article.json` names destinations, the old records of the other documents are kept, byte for byte, before the new ones.
 
 #### Scenario: A manuscript is rewritten from its revised outline
 
@@ -224,4 +232,275 @@ code:
   - Sources/PropositionsKit/WriteRewrite.swift
   - propositions-projects.code-workspace
   - Sources/PropositionsKit/WriteParagraph.swift
+-->
+
+
+<!-- @trace
+source: idd-120-fix2
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The banned phrasings of an article are refused in the text a run adds
+
+`article.json` is an optional file that holds what is true of the whole article. It SHALL be a JSON object. Its key `banned`, when present, SHALL be a list of objects, each with a `phrase` and a `reason` that are non-empty strings; a `phrase` holds at least one character that is not white space and no control character. Keys this requirement does not define are left alone.
+
+`propositions write prepare` SHALL look for `article.json` in the outline directory when the run has one (`--outline`), and otherwise in the directory of the ledger. When nothing is there, the run goes on as without the file. When the file is there, prepare reads it once, refuses (exit 2) when it is not a regular file or not in the format above, and copies it into the staging directory as `article/article.json`, an input of the run: `write check` reports, and `write commit` refuses, when the file or its copy changed after prepare.
+
+A text holds a banned phrasing when the phrasing occurs in it under this comparison: letter case does not count; a run of white space, a line break included, counts as one space; the text from a `%` that is not escaped to the end of its line is not compared; both sides are compared in Unicode normalisation form C; and a phrasing does not run across an empty line. The comparison is literal: a phrasing is not a pattern.
+
+`write check` SHALL report each banned phrasing in the text the run adds as a problem, and exit with 1: for one paragraph, the lines added to the staged manuscript file; for a rewrite, every staged file of the input tree. Each report names the file, the line the phrasing starts on, the phrasing and its reason. `write commit` writes nothing while one is reported.
+
+`propositions phrasing --tex <main file> --article <file>` SHALL make the same comparison over every file of the main file's input tree, print one line per occurrence and then `<n> occurrence(s) of <k> banned phrasing(s) in <m> file(s)`, and exit with 0 when there is none, 1 when there is one, and 2 when a file cannot be read or `article.json` is not in the format.
+
+#### Scenario: A new paragraph that holds a banned phrasing is not written
+
+- **WHEN** `article.json` beside the ledger bans a phrasing and the staged paragraph holds it
+- **THEN** `check` names the line, the phrasing and the reason and exits with 1, and `commit` writes nothing
+
+##### Example: a paragraph that holds a banned phrasing is refused
+
+- **GIVEN** the structure fixture, and `article.json` beside the ledger with `{"banned": [{"phrase": "very  Large", "reason": "the effect is reported with its size"}]}`
+- **WHEN** after `write prepare`, the paragraph `The effect was very` / `large.` is added over two lines with its proposition and record, and `write check` and `write commit` run
+- **THEN** `check` exits with 1 and prints `main.tex:L32: the banned phrasing "very  Large" (the effect is reported with its size)`; `commit` exits with 2 and `main.tex` is unchanged
+
+##### Example: a comment, another paragraph and other text do not make a phrasing
+
+- **GIVEN** the banned phrasing `very large`
+- **WHEN** the lines `The effect was very % large`, then `big.`, and the lines `It was very`, an empty line, `large.` are compared
+- **THEN** no occurrence is reported; `It was VERY` / `  large.` on two lines is one occurrence, on the first of the two lines; and `\%` does not start a comment
+
+##### Example: article.json changed after prepare, or not in the format
+
+- **GIVEN** the structure fixture and an `article.json` beside the ledger
+- **WHEN** `write prepare` runs with `{"banned": [{"phrase": " ", "reason": "x"}]}`, with `{"banned": {}}`, and with `[]`; and, with a file in the format, the file is changed after prepare and `write check` runs
+- **THEN** each of the three prepares exits with 2 and names `article.json`; the check exits with 1 and says the file changed after prepare
+
+##### Example: a rewrite is compared over every file of the tree
+
+- **GIVEN** the rewrite of the example "a manuscript is rewritten from an outline approved as a whole", with `article.json` in the outline directory banning words that an untouched paragraph of `main.tex` holds
+- **WHEN** `write check` runs
+- **THEN** it exits with 1 and names that line of `main.tex`
+
+##### Example: phrasing scans the input tree
+
+- **GIVEN** a main file that inputs `sections/intro.tex`, the banned phrasings `clearly shows` and `it is obvious`, and `Clearly  shows` on line 2 of the included file only
+- **WHEN** `propositions phrasing --tex main.tex --article article.json` runs, and again after that line is removed
+- **THEN** the first prints `sections/intro.tex:L2: the banned phrasing "clearly shows" (…)` and `1 occurrence(s) of 2 banned phrasing(s) in 2 file(s)` and exits with 1; the second prints `0 occurrence(s) of 2 banned phrasing(s) in 2 file(s)` and exits with 0; with `--article` naming no file it exits with 2
+
+<!-- @trace
+source: idd-118-banned-phrasings
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: A paragraph written from an outline opens and discharges what its record plans
+
+When the outline plans commitments (a record that is not dropped carries `opens` or `discharges`), `propositions write check` SHALL compare each written paragraph with its record and report every difference as a problem (exit 1), so that `write commit` writes nothing: a commitment the record plans to open that the paragraph does not open; a commitment the paragraph opens that the record does not plan; a commitment opened with a kind other than the planned one; a commitment the record plans to discharge that the paragraph does not discharge; and one the paragraph discharges that the record does not plan. Commitments are compared by id.
+
+What a paragraph opens and discharges is read from the staged discourse sidecar: for one paragraph, the records added to it for the propositions added to the ledger; for a rewrite, the records of the live propositions from the one `outline-map.jsonl` names for the record up to the one it names next in reading order. The record is read from the copy of the outline that prepare made.
+
+An outline that plans no commitment is not compared.
+
+#### Scenario: A paragraph that opens something else is not written
+
+- **WHEN** the record plans to open one commitment and the staged paragraph opens another
+- **THEN** `check` reports both differences and exits with 1, and `commit` writes nothing
+
+##### Example: a paragraph is compared with the commitments its record plans
+
+- **GIVEN** the structure fixture and an approved outline whose record `p-1` carries `"opens": [{"id": "c-fw-scale", "kind": "future_work"}]`
+- **WHEN** after `write prepare --outline … --outline-paragraph p-1`, the paragraph is drafted with a discourse record that carries `"opens": [{"id": "c-fw-scale", "kind": "future_work"}]`, and `write check` runs; and again with a discourse record that carries `"opens": [{"id": "c-fw-scale", "kind": "plan"}, {"id": "c-other", "kind": "aim"}], "discharges": ["c-fw-interval"]`
+- **THEN** the first check exits with 0; the second exits with 1 and reports that `c-fw-scale` is planned as `future_work` and opened as `plan`, that the paragraph opens `c-other` and discharges `c-fw-interval`, neither of which `p-1` plans; `commit` then exits with 2
+
+##### Example: a record with no planned commitment, in an outline that plans some
+
+- **GIVEN** the same outline, where `p-1` carries no key and another record carries `opens`
+- **WHEN** the paragraph for `p-1` is drafted with a discourse record that opens `c-other`, and `write check` runs
+- **THEN** it exits with 1 and reports that the paragraph opens `c-other`, which `p-1` does not plan
+
+##### Example: an outline that plans no commitment is not compared
+
+- **GIVEN** the same outline with no `opens` and no `discharges` on any record
+- **WHEN** the paragraph for `p-1` is drafted with a discourse record that opens `c-other`, and `write check` runs
+- **THEN** it exits with 0
+
+##### Example: a rewrite is compared paragraph by paragraph
+
+- **GIVEN** the rewrite of the example "a manuscript is rewritten from an outline approved as a whole", where the outline's `p-1` plans every commitment the fixture's discourse sidecar opens and discharges before the last paragraph, and `p-2` plans `"opens": [{"id": "c-fw-interval", "kind": "future_work"}]`
+- **WHEN** the staged discourse sidecar gives the new proposition the record `{"prop_id": …, "opens": [{"id": "c-fw-interval", "kind": "future_work"}]}` and `write check` runs; and again without that record
+- **THEN** the first exits with 0; the second exits with 1 and reports that `p-2` plans to open `c-fw-interval` and its paragraph does not
+
+<!-- @trace
+source: idd-116-planned-commitments
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: Prepare says which included files of the section were not read
+
+When a paragraph is written from an outline record, `propositions write prepare` SHALL print on standard error, for each entry of `unread` of the record's section and of each section above it, one line that begins with `[unread]` and names the section, the file and the reason. For a rewrite it SHALL print one such line for each entry of every section record that is not dropped. The lines do not change the exit code.
+
+#### Scenario: A gap of the outline is said before text is written
+
+- **WHEN** the section a paragraph is written into carries `unread`
+- **THEN** prepare stages the copies and names the file that was not read
+
+##### Example: prepare names the unread files of the section and of the section above it
+
+- **GIVEN** the structure fixture and an approved outline in which `s-a` carries `"unread": [{"file": "generated/numbers", "why": "ignored by git"}]`, `s-a1` is under `s-a` and holds the record `p-1`, and `s-b` carries another `unread` entry
+- **WHEN** `write prepare --outline … --outline-paragraph p-1` runs
+- **THEN** it exits with 0, and standard error holds exactly one `[unread]` line, `[unread] section s-a: the included file generated/numbers was not read when the outline was derived (ignored by git); the outline does not say what it holds`
+
+##### Example: a rewrite names every unread file
+
+- **GIVEN** an outline approved as a whole whose section carries two `unread` entries for the same file
+- **WHEN** `write prepare --rewrite --outline …` runs
+- **THEN** it exits with 0 and standard error holds two `[unread]` lines
+
+<!-- @trace
+source: idd-117-unread-includes
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: Text written from an outline goes to the document of its section's part
+
+`article.json` MAY carry `destinations`, an object whose keys are parts (`main`, `appendix`, `supplement`), each once, and whose values are objects with `tex` and `jsonl`: the main file and the ledger of the document the part is written into, as paths from the directory of `article.json` that do not begin with `/`. Two parts MAY name the same document. An object that names no part, or an entry that is not in this format, is not in the format of `article.json`.
+
+When the `article.json` of the outline directory has `destinations`, `propositions write prepare --outline <directory> --outline-paragraph <id>` SHALL stage nothing (exit 2) unless the part of the record's section (its own `part`, else that of the section it is under, else `main`) has a destination and the main file and ledger given are that destination; the refusal names the part and, when it has a destination, the two files to give. `write commit` then writes the record of `outline-trace.jsonl` with a fifth key, `part`.
+
+`write prepare --rewrite --outline <directory>` SHALL then stage nothing unless the main file and ledger given are the destination of at least one part and every section that is not dropped goes to a part that has a destination. The rewrite is of that document only: `outline-map.jsonl` has to list exactly the paragraph records, not dropped, whose sections go to its parts; a line that names a record of another document is reported. `write commit` writes the trace as the records of the old trace that belong to other parts, as they were, followed by the records of the map, each with its `part`. A trace record without `part` belongs to `main`.
+
+Without `article.json`, or without `destinations` in it, the commands behave as before and no record carries `part`.
+
+#### Scenario: A paragraph of the supplement is not written into the main text
+
+- **WHEN** a section's part is `supplement` and the files given are the main text's
+- **THEN** prepare refuses and names the supplement's main file and ledger
+
+##### Example: a paragraph goes to the document of its part
+
+- **GIVEN** the structure fixture as the main text, a second document `supp/supp.tex` with an empty ledger, an approved outline with section `s-a` (record `p-1`) and section `s-sup` (`part` `supplement`, record `p-s`), and `article.json` in the outline directory naming the main text for `main` and the second document for `supplement`
+- **WHEN** `write prepare --outline … --outline-paragraph p-s` runs with the main text's files, then with the supplement's files followed by a draft and `write commit`; and then `p-1` is written with the main text's files
+- **THEN** the first prepare exits with 2 and names `supp/supp.tex` and its ledger; the others succeed; `outline-trace.jsonl` holds the record of `p-s` with `"part": "supplement"` and the record of `p-1` with `"part": "main"`
+
+##### Example: a part without a destination
+
+- **GIVEN** the same outline with a section whose `part` is `appendix`, and `destinations` that names `main` and `supplement` only
+- **WHEN** `write prepare` runs for a record of that section, and `write prepare --rewrite` for the main text
+- **THEN** both exit with 2 and say that `article.json` names no destination for the part `appendix`
+
+##### Example: a rewrite of one document keeps the trace of the other
+
+- **GIVEN** the same two documents and outline, approved as a whole, with a trace that holds one record of `p-s` with `"part": "supplement"`
+- **WHEN** the main text is rewritten as in the example "a manuscript is rewritten from an outline approved as a whole", with `outline-map.jsonl` listing the two records of `s-a`; and, in another run, with a third line for `p-s`
+- **THEN** the first check exits with 0 and commit leaves a trace of three records: the supplement's record as it was, then the two of `s-a` with `"part": "main"`; the second check exits with 1 and reports the line for `p-s`
+
+##### Example: destinations that are not in the format
+
+- **GIVEN** `article.json` with `{"destinations": {}}`, with `{"destinations": {"online": {"tex": "a.tex", "jsonl": "a.jsonl"}}}`, with `{"destinations": {"main": {"tex": "/abs/main.tex", "jsonl": "a.jsonl"}}}`, and with `{"destinations": {"main": {"tex": "a.tex"}}}`
+- **WHEN** each is read
+- **THEN** each is refused, and the message names `article.json` and `destinations`
+
+<!-- @trace
+source: idd-120-destinations
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The comparison with banned phrasings is not passed over
+
+The comparison of a text with a banned phrasing SHALL treat two spellings that differ only in letter case as the same, also where a language writes the cases with different letters (`ß` and `SS`, the two lower-case sigmas). White space at the beginning or the end of a phrase is one space there: the phrase ` cat ` occurs where `cat` stands between two spaces, a line break counting as one, and not inside `concatenate`. Every occurrence is reported, also one that overlaps another. A `%` begins a comment whatever follows it, a combining mark included. A report names the main file by its own file name.
+
+`propositions write check` and `write commit` SHALL refuse (exit 2) a staging directory in which prepare copied an `article.json` or an outline and whose `write.json` no longer names it.
+
+On a rewrite, `write check` SHALL report as a problem a staged manuscript whose input tree holds a file that prepare did not copy, or whose input tree cannot be read: a rewrite cannot add a file to the input tree.
+
+#### Scenario: A list cannot be switched off by editing write.json
+
+- **WHEN** the entry for `article.json` is removed from `write.json` after prepare
+- **THEN** check and commit exit with 2
+
+##### Example: how the comparison folds case, ends and overlaps
+
+- **GIVEN** the banned phrasings `Straße`, ` cat ` and `ana`
+- **WHEN** the lines `Die STRASSE ist lang.`, `We concatenate lists.`, `A cat` / `sat.`, `banana` and `Unrelated %` followed by a combining acute accent and ` strasse` are compared
+- **THEN** the first holds `Straße`; the second holds nothing; the third holds ` cat `, reported on its first line; the fourth holds `ana` twice; the fifth holds nothing
+
+##### Example: write.json that no longer names what prepare copied
+
+- **GIVEN** a run prepared with an `article.json` beside the ledger, and another prepared from an outline record
+- **WHEN** the key `article` is removed from the first `write.json`, the key `outline` from the second, and `write check` and `write commit` run
+- **THEN** all four exit with 2 and say to prepare again
+
+##### Example: a rewrite that adds an included file
+
+- **GIVEN** the rewrite of the example "a manuscript is rewritten from an outline approved as a whole"
+- **WHEN** the staged `main.tex` gets a line `\input{extra}`, a file `extra.tex` is put beside it in the staging directory, and `write check` runs
+- **THEN** it exits with 1 and reports that the staged manuscript includes `extra.tex`, which prepare did not copy
+
+##### Example: the main file is reported under its own name
+
+- **GIVEN** a manuscript whose main file is `supp.tex`, with an empty ledger, and `article.json` beside the ledger banning `extra analysis`
+- **WHEN** a paragraph that holds the phrasing is drafted and `write check` runs
+- **THEN** the report begins with `supp.tex:L`
+
+<!-- @trace
+source: idd-118-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+---
+### Requirement: The parts of a run are taken from article.json, not from write.json
+
+On a rewrite, `propositions write check` and `write commit` SHALL work out again, from the staged copy of `article.json` and the main file and ledger of the run, the parts whose destination the document is, and report as a problem (commit: write nothing) a `write.json` that names other parts, or parts when `article.json` names no destinations.
+
+When a paragraph is written from an outline with destinations, a proposition id that `outline-trace.jsonl` already names in a record of a part of another document SHALL NOT stop the commit; one that it names in a record of a part of the same document does, as before.
+
+The trace records a rewrite keeps SHALL be written byte for byte as they were, each with the line ending it had. The one exception: a kept record that had no line ending (the last line of the old file) gets one line feed when a record follows it, so that the file stays one record per line.
+
+A destination is the document given when its `tex` and `jsonl` name the same files as the main file and ledger given, by the names the file system gives them, links followed in the order of the path. A `tex` or `jsonl` that holds a control character is not in the format of `article.json`.
+
+#### Scenario: write.json cannot widen a rewrite to another document
+
+- **WHEN** `write.json` of a rewrite of the main text is edited to name the part `supplement` too
+- **THEN** check reports it and commit writes nothing
+
+##### Example: a write.json that names another part
+
+- **GIVEN** the rewrite of the main text of the example "a rewrite of one document keeps the trace of the other", prepared and drafted
+- **WHEN** the `parts` of `rewrite` in `write.json` are changed to `["main", "supplement"]`, and `write check` and `write commit` run
+- **THEN** check exits with 1 and says that `write.json` does not name the parts `article.json` gives; commit exits with 2 and the trace is unchanged
+
+##### Example: the same id in another document, and kept records as they were
+
+- **GIVEN** the two documents, with a trace that holds one record of the supplement, ending in CR LF, whose `first_prop` is the id the main text's new paragraph will use
+- **WHEN** the paragraph `p-1` is written into the main text and committed; and, in another run, the main text is rewritten and committed
+- **THEN** the first commit exits with 0; after the rewrite the first bytes of the trace are the supplement's record with its CR LF
+
+<!-- @trace
+source: idd-120-fix1
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
+-->
+
+<!-- @trace
+source: idd-120-fix3
+updated: 2026-11-22
+code:
+  - propositions-projects.code-workspace
 -->

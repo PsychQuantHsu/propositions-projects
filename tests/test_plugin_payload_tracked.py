@@ -507,6 +507,7 @@ OBL_INVENTORY = (
     "coverage:text",
     "order:ledger",
     "order:cites",
+    "ledger:replaced-by",
     *(f"audit:R{n}" for n in range(1, 4)),
     *(f"proofread:L{n}" for n in range(1, 6)),
     *(f"proofread:E{n}" for n in range(1, 8)),

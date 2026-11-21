@@ -18,7 +18,7 @@ The propositions skill SHALL provide an onboarding operation (Operation D) that,
 #### Scenario: profile recorded at scaffold time
 
 - **WHEN** the user selects `empirical` when Operation D asks for the ledger profile and confirms the dry-run listing
-- **THEN** the created `_meta.json` contains `"schema_version": "1.7"` and `"profile": "empirical"`
+- **THEN** the created `_meta.json` contains `"schema_version": "1.8"` and `"profile": "empirical"`
 
 #### Scenario: refuse to overwrite an existing ledger
 

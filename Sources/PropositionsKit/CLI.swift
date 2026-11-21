@@ -33,6 +33,22 @@ public enum PropositionsCLI {
                 return AuditRun.run(.citations, manuscriptRoot: audit.common.manuscriptRoot, tex: audit.common.tex,
                                     format: audit.common.reportFormat, workingDirectory: workingDirectory)
             }
+            if let retire = command as? RetireOptions {
+                return ReviseRun.retire(jsonl: retire.jsonl, retirements: retire.retire, since: retire.since,
+                                        mechanism: retire.mechanism, match: retire.match, reason: retire.reason,
+                                        ref: retire.ref, write: retire.write, workingDirectory: workingDirectory)
+            }
+            if let check = command as? ReviseCheckOptions {
+                return ReviseRun.check(jsonl: check.jsonl, workingDirectory: workingDirectory)
+            }
+            if let redirect = command as? RedirectOptions {
+                return ReviseRun.redirect(jsonl: redirect.jsonl, tex: redirect.tex, write: redirect.write,
+                                          workingDirectory: workingDirectory)
+            }
+            if let relocate = command as? RelocateOptions {
+                return RelocateRun.run(jsonl: relocate.jsonl, tex: relocate.tex, write: relocate.write,
+                                       workingDirectory: workingDirectory)
+            }
             if let check = command as? OutlineCheckOptions {
                 return OutlineRun.check(directory: check.directory, workingDirectory: workingDirectory)
             }
@@ -61,6 +77,15 @@ public enum PropositionsCLI {
         if words.first == "cite-order" { return Root.helpMessage(for: CiteOrderOptions.self) }
         if words.first == "ledger-order" { return Root.helpMessage(for: LedgerOrderOptions.self) }
         if words.first == "paragraphs" { return Root.helpMessage(for: ParagraphsOptions.self) }
+        if words.first == "revise" {
+            switch words.dropFirst().first {
+            case "relocate": return Root.helpMessage(for: RelocateOptions.self)
+            case "retire": return Root.helpMessage(for: RetireOptions.self)
+            case "check": return Root.helpMessage(for: ReviseCheckOptions.self)
+            case "redirect": return Root.helpMessage(for: RedirectOptions.self)
+            default: return Root.helpMessage(for: ReviseOptions.self)
+            }
+        }
         if words.first == "audit" {
             switch words.dropFirst().first {
             case "symbols": return Root.helpMessage(for: AuditSymbolsOptions.self)
@@ -87,7 +112,7 @@ struct Root: ParsableCommand {
         commandName: "propositions",
         abstract: "Mechanical checks for a propositions ledger.",
         version: PropositionsVersion.current,
-        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, OutlineOptions.self])
+        subcommands: [CiteOrderOptions.self, LedgerOrderOptions.self, ParagraphsOptions.self, AuditOptions.self, ReviseOptions.self, OutlineOptions.self])
 }
 
 struct CiteOrderOptions: ParsableCommand {
@@ -161,6 +186,113 @@ struct ParagraphsOptions: ParsableCommand {
 
     @Option(help: "A structure sidecar whose sections the paragraphs must not cross.")
     var structure: String?
+}
+
+struct ReviseOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "revise",
+        abstract: "Bring a ledger up to a revised manuscript.",
+        subcommands: [RelocateOptions.self, RetireOptions.self, ReviseCheckOptions.self, RedirectOptions.self])
+}
+
+struct RelocateOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "relocate",
+        abstract: "Find each proposition's text in the revised manuscript, and write where it now stands.",
+        discussion: """
+            A dry run unless --write is given. Each proposition that is not retired is looked for in \
+            every file of the main file's \\input tree, as written, then with runs of white space \
+            read as one. It is in place, moved (a new location), rewrapped (a new text with other \
+            line breaks, and a new location), ambiguous (in several places outside the file its \
+            location names) or missing. Only moved and rewrapped lines are written again.
+            Exit codes: 0 every proposition in place, or written with nothing left; 1 something \
+            would change, or a proposition is ambiguous or missing; 2 a file cannot be read, a \
+            line is not JSON, a proposition has no text, or an argument is wrong.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+
+    @Option(help: "The manuscript's main file.")
+    var tex: String
+
+    @Flag(help: "Write the new locations and texts.")
+    var write = false
+}
+
+struct RetireOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "retire",
+        abstract: "Mark propositions retired, each with the propositions that replace it.",
+        discussion: """
+            A dry run unless --write is given. Each --retire names a proposition, and after `=` the \
+            ids that replace it, separated by commas; none means it was deleted. It gets a retired \
+            block with since, mechanism, match, reason, ref when given, and replaced_by (schema \
+            v1.8). Every id has to name one live proposition; nothing is written otherwise.
+            Exit codes: 0 written, or nothing to change; 1 a dry run; 2 an argument is wrong, an \
+            id names no live proposition, or the ledger cannot be read.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+
+    @Option(help: "<id> or <id>=<new id>,<new id>. Repeat for each proposition.")
+    var retire: [String] = []
+
+    @Option(help: "The date the passage left the paper, YYYY-MM-DD.")
+    var since: String
+
+    @Option(help: "comment_env, line_comment or removed.")
+    var mechanism = "removed"
+
+    @Option(help: "exact or by_reading.")
+    var match = "exact"
+
+    @Option(help: "One line on why.")
+    var reason: String
+
+    @Option(help: "The issue or commit that retired it.")
+    var ref: String?
+
+    @Flag(help: "Write the ledger.")
+    var write = false
+}
+
+struct ReviseCheckOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "check",
+        abstract: "Check that every replaced_by names live propositions of the ledger.",
+        discussion: """
+            Reports each id of a replaced_by that is not a proposition of the ledger, is retired, \
+            or is the retired proposition itself, and counts the retirements that are replaced, \
+            deleted (an empty list) and without replaced_by.
+            Exit codes: 0 no problem; 1 at least one; 2 the ledger cannot be read.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+}
+
+struct RedirectOptions: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "redirect",
+        abstract: "Point the citations of retired propositions at the propositions that replace them.",
+        discussion: """
+            A dry run unless --write is given. A citation of a retired proposition becomes its \
+            replacements, those that do not come before the citing proposition in reading order \
+            left out; one without replacements is dropped. Other citations are left as they are.
+            Exit codes: 0 written, or nothing to change; 1 a dry run that would change the ledger; \
+            2 a file cannot be read, a line is not JSON, or an argument is wrong.
+            """)
+
+    @Option(help: "The ledger.")
+    var jsonl: String
+
+    @Option(help: "The manuscript's main file.")
+    var tex: String
+
+    @Flag(help: "Write the ledger.")
+    var write = false
 }
 
 struct AuditOptions: ParsableCommand {

@@ -328,6 +328,7 @@ findings, or leaves records, about units under an id of its own.
 | `records:V1` to `V6` | `validate-verification.py` | `docs/VERIFICATION.md` |
 | `coverage:text` | `check-extraction-coverage.py` | The extract skill |
 | `order:ledger` | The dry run of `propositions ledger-order` | The construct-batch skill |
+| `ledger:replaced-by` | `propositions revise check`, a command of the Swift package at the root of the repository, which reports each `retired.replaced_by` (schema v1.8) that does not name a live proposition | `docs/SCHEMA.md`, `retired` |
 | `order:cites` | `propositions cite-order`, a command of the Swift package at the root of the repository. A plugin session fetches the binary on macOS; where the pinned binary is not there the check does not run, and the entry is unverified | The spec `citation-order` |
 | `audit:R1`, `R2`, `R3` | `propositions audit symbols`, `propositions audit citations` and `audit-code-manuscript.py`, in that order. `audit:R2` stands for both rules of the citation audit, which it labels R2 and R2-bis | `rules/manuscript-consistency-audit.md` |
 | `proofread:L1` to `L5`, `proofread:E1` to `E7` | The per-proposition walk of the proofread skill | The proofread skill |

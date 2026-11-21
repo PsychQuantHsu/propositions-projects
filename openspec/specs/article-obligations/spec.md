@@ -214,7 +214,7 @@ code:
 ---
 ### Requirement: A check is named only when it is implemented
 
-`check` SHALL be either `gap` or one id from the inventory below. The inventory is closed, has 46 ids, and is the normative list; what its members have in common is that each reports findings, or leaves records, about units under an id of its own.
+`check` SHALL be either `gap` or one id from the inventory below. The inventory is closed, has 47 ids, and is the normative list; what its members have in common is that each reports findings, or leaves records, about units under an id of its own.
 
 - `ledger:R1`, `ledger:R1.5`, `ledger:R2`, `ledger:R3`, `ledger:R4`, `ledger:R7`, `ledger:R8`, `ledger:R9`, `ledger:R10`, `ledger:R11`, `ledger:R12`, `ledger:R13`, reported by the ledger validator;
 - `ledger:profile`, the ledger validator's check that a profile declared in the ledger's `_meta.json` is one it accepts under the ledger's schema version; it reports nothing for a ledger that declares none;
@@ -222,6 +222,7 @@ code:
 - `records:V1` to `records:V6`, reported by the verification records validator;
 - `coverage:text`, the extraction coverage check;
 - `order:ledger`, the dry run of `propositions ledger-order`, which reports whether the ledger's line order is the reading order;
+- `ledger:replaced-by`, the `revise check` command of the `propositions` command-line tool, which reports each `retired.replaced_by` that does not name a live proposition;
 - `order:cites`, the `cite-order` command of the `propositions` command-line tool, which warns about every citation of a proposition that comes later in reading order;
 - `audit:R1`, `audit:R2`, `audit:R3`, the three passes of the cross-artifact audit (`propositions audit symbols`, `propositions audit citations` and `audit-code-manuscript.py`);
 - `proofread:L1` to `proofread:L5` and `proofread:E1` to `proofread:E7`, the layers listed in the per-proposition walk of the proofread skill.
@@ -255,101 +256,26 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected 
 
 
 <!-- @trace
-source: retire-python-ports
+source: idd-56-retire
 updated: 2026-11-21
 code:
-  - plugins/propositions/scripts/audit-citations.py
-  - plugins/propositions/skills/construct/references/vocabulary.md
-  - plugins/propositions/.claude-plugin/plugin.json
-  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-dry-run.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-location-past-the-end.json
-  - tests/fixtures/retired-python/derive-paragraphs/no-proposition.json
-  - tests/fixtures/retired-python/derive-paragraphs/ids-that-need-escaping.json
-  - tests/fixtures/retired-python/reorder-ledger/another-file-write.json
-  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-write.json
-  - tests/fixtures/retired-python/reorder-ledger/indented-lines-write.json
-  - plugins/propositions/scripts/derive-paragraphs.py
-  - tests/fixtures/retired-python/derive-paragraphs/a-row-with-white-space-outside-json-s-before-the-object.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-structure-sidecar-that-starts-with-a-byte-order-mark.json
-  - tests/PropositionsKitTests/RetiredPython.swift
-  - propositions-projects.code-workspace
-  - tests/fixtures/retired-python/derive-paragraphs/no-location.json
-  - docs/SCHEMA.md
-  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-splits-a-paragraph.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-location-from-the-root-of-the-file-system.json
-  - tests/fixtures/retired-python/derive-paragraphs/retired-propositions-and-empty-lines-are-passed-over.json
-  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-write.json
-  - tests/fixtures/structure/README.md
-  - tests/fixtures/retired-python/reorder-ledger/only-comments-dry-run.json
-  - plugins/propositions/skills/construct-batch/SKILL.md
-  - tests/fixtures/retired-python/derive-paragraphs/an-input-of-the-main-file-that-leads-nowhere.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-structure-that-is-not-json.json
-  - tests/fixtures/retired-python/reorder-ledger/a-line-that-is-not-json-dry-run.json
-  - plugins/propositions/skills/manuscript-audit/SKILL.md
-  - tests/fixtures/retired-python/reorder-ledger/no-location-write.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-location-that-cannot-be-parsed.json
-  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-dry-run.json
-  - plugins/propositions/scripts/reorder-ledger.py
-  - .claude-plugin/marketplace.json
-  - tests/fixtures/retired-python/derive-paragraphs/the-main-file-written-with-a-dot-before-it.json
-  - plugins/propositions/rules/manuscript-consistency-audit.md
-  - tests/fixtures/retired-python/reorder-ledger/indented-lines-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-write.json
-  - tests/fixtures/retired-python/reorder-ledger/lines-that-follow-their-predecessor-dry-run.json
-  - tests/PropositionsKitTests/LedgerOrderTests.swift
-  - plugins/propositions/docs/PLAYBOOK.md
-  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-write.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-location-in-another-file.json
-  - tests/PropositionsKitTests/ParagraphsTests.swift
-  - plugins/propositions/scripts/run-audit.sh
-  - tests/fixtures/retired-python/derive-paragraphs/a-section-start-in-another-spelling-of-the-same-letters.json
-  - tests/conftest.py
-  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-write.json
   - plugins/propositions/docs/OBLIGATIONS.md
-  - tests/fixtures/retired-python/derive-paragraphs/a-location-on-a-blank-line.json
-  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/two-lines-out-of-order-write.json
-  - plugins/propositions/skills/construct/SKILL.md
-  - plugins/propositions/scripts/migrate-structure-v2.py
-  - plugins/propositions/scripts/audit-symbols.py
-  - tests/fixtures/retired-python/reorder-ledger/a-key-written-twice-write.json
-  - tests/fixtures/retired-python/reorder-ledger/a-range-and-no-final-newline-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-dry-run.json
-  - plugins/propositions/README.md
-  - tests/fixtures/retired-python/reorder-ledger/a-comment-whose-slashes-carry-a-combining-mark-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-write.json
-  - tests/fixtures/retired-python/reorder-ledger/another-file-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-write.json
-  - tests/fixtures/retired-python/reorder-ledger/an-empty-ledger-write.json
-  - tests/fixtures/retired-python/reorder-ledger/white-space-that-python-strips-and-does-not-split-at-write.json
-  - tests/fixtures/retired-python/derive-paragraphs/the-ledger-s-order-is-kept--not-the-reading-order.json
-  - tests/fixtures/retired-python/derive-paragraphs/sections-that-is-an-object.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-structure-without-sections.json
-  - plugins/propositions/docs/STRUCTURE.md
-  - tests/fixtures/retired-python/derive-paragraphs/carriage-returns-in-the-manuscript.json
-  - tests/fixtures/retired-python/reorder-ledger/a-location-that-cannot-be-parsed-dry-run.json
-  - README.md
-  - tests/fixtures/retired-python/derive-paragraphs/a-ledger-that-starts-with-a-byte-order-mark.json
-  - tests/fixtures/retired-python/reorder-ledger/no-location-dry-run.json
-  - tests/fixtures/retired-python/reorder-ledger/only-comments-write.json
-  - tests/fixtures/retired-python/reorder-ledger/text-outside-ascii-write.json
-  - tests/fixtures/retired-python/reorder-ledger/in-order--two-on-one-line-dry-run.json
+  - Sources/PropositionsKit/Relocate.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - tests/PropositionsKitTests/RelocateTests.swift
+  - tests/PropositionsKitTests/ReviseLedgerTests.swift
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/propositions/SKILL.md
+  - Sources/PropositionsKit/JSONValue.swift
+  - propositions-projects.code-workspace
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - plugins/propositions/templates/ledger/_meta.template.json
+  - Sources/PropositionsKit/CLI.swift
+  - Sources/PropositionsKit/Revise.swift
   - CLAUDE.md
-  - plugins/propositions/hooks/cli.lock
-  - tests/fixtures/retired-python/derive-paragraphs/a-line-that-is-not-json.json
-  - tests/fixtures/retired-python/reorder-ledger/ties-and-moves-dry-run.json
-  - tests/fixtures/retired-python/derive-paragraphs/blank-lines-separate-paragraphs.json
-  - tests/fixtures/retired-python/derive-paragraphs/a-row-that-is-white-space-outside-json-s-only.json
-  - tests/fixtures/retired-python/derive-paragraphs/paragraphs-without-a-proposition-are-skipped.json
+  - docs/SCHEMA.md
 tests:
   - tests/test_plugin_payload_tracked.py
-  - tests/test_structure_tools.py
-  - tests/test_run_audit.sh
-  - tests/test_audit_citations.py
-  - tests/test_audit_symbols.py
-  - tests/test_root_shims.py
-  - tests/test_derive_paragraphs.py
 -->
 
 ---

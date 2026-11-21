@@ -4,9 +4,10 @@
 當時 #33 剛合併，又多了三支 Python 工具和第一個外部依賴 PyYAML。
 
 **現況（2026-11-21 量）**：根目錄有一個 Swift package（#46）：`PropositionsKit`、`propositions`、`tschema-check`
-與測試 target，共 32 個 Swift 檔。`propositions` 的子命令：引用方向（`cite-order`，#46）、綱要三個檔的格式、狀態與
+與測試 target，共 38 個 Swift 檔。`propositions` 的子命令：引用方向（`cite-order`，#46）、綱要三個檔的格式、狀態與
 來源指標（`outline check`、`status`、`locators`，#78）、帳冊的行序（`ledger-order`，#59）、段落清單（`paragraphs`，#77）
-與兩支稽核（`audit symbols`、`citations`，#69）。binary 0.2.0（2026-11-21 發布）有這些子命令，propositions plugin 在
+與兩支稽核（`audit symbols`、`citations`，#69）；binary 0.2.0（2026-11-21 發布）有以上這些子命令。改版重抽的四個子命令（`revise relocate`、
+`retire`、`check`、`redirect`，#56）不在 0.2.0 裡，還沒有發布，skill 也還沒有呼叫。propositions plugin 在
 session 開始時用 hook 取得 `hooks/cli.lock` 鎖定的這一版（只有 macOS；`hooks/fetch-cli.sh`），skill 經由
 `hooks/run-cli.sh` 呼叫：`propositions` 的 Operation A 呼叫 `cite-order`，`construct` 呼叫 `paragraphs`，
 `construct-batch` 呼叫 `ledger-order`，`manuscript-audit` 讓 `run-audit.sh` 呼叫兩支稽核。綱要的子命令還沒有 skill 呼叫（#102）。
@@ -249,5 +250,5 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 ## 語言組成（2026-11-21 量，只計受追蹤的檔）
 
-Swift 32、Python 72（其中 6 個是〈例外〉第 5 類的退役提示）、shell 6（其中 3 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
+Swift 38、Python 72（其中 6 個是〈例外〉第 5 類的退役提示）、shell 6（其中 3 個是〈例外〉第 1 類的殼層），另有 SKILL.md 裡的 Python 程式區塊 3 段。量法是用 `git ls-files` 依副檔名
 計數，再加上 `grep -n "<<'PY'"` 找到的程式區塊。這些數字會隨移植下降，引用時重新量，不要照抄這一行。

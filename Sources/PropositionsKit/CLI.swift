@@ -49,6 +49,7 @@ public enum PropositionsCLI {
                 return WriteParagraphRun.prepare(jsonl: prepare.jsonl, tex: prepare.tex, structure: prepare.structure,
                                                  discourse: prepare.discourse, stage: prepare.stage, heading: prepare.heading,
                                                  outline: prepare.outline, outlineParagraph: prepare.outlineParagraph,
+                                                 rewrite: prepare.rewrite,
                                                  workingDirectory: workingDirectory)
             }
             if let check = command as? WriteCheckOptions {
@@ -233,6 +234,11 @@ struct WritePrepareOptions: ParsableCommand {
             paragraph record's section has to stand as approved; the outline's files are copied \
             under outline/ and may not change, and commit appends a record to \
             outline-trace.jsonl in the outline directory.
+            With --rewrite and --outline, the whole outline has to stand as approved; every file of \
+            the input tree may change, the ledger keeps every proposition (only location and cites \
+            may change, and retired may be added), and the staging directory has to hold \
+            outline-map.jsonl, one line per paragraph record written, which commit copies into \
+            outline-trace.jsonl.
             Exit codes: 0 staged; 2 a file cannot be read, the staging directory is not empty, \
             the paragraph has nowhere to go, or the outline record cannot be written from.
             """)
@@ -260,6 +266,9 @@ struct WritePrepareOptions: ParsableCommand {
 
     @Option(name: .customLong("outline-paragraph"), help: "The id of the outline's paragraph record the paragraph is written from.")
     var outlineParagraph: String?
+
+    @Flag(help: "Rewrite the whole manuscript from the outline given with --outline, which has to stand as approved as a whole.")
+    var rewrite = false
 }
 
 struct OutlineTraceOptions: ParsableCommand {

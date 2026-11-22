@@ -56,8 +56,9 @@ rules keeps it for the Write and Edit tools (issue 85 asks whether the list shou
 narrower).
 
 When the author asks for manuscript text to be written or rewritten to match the outline, say
-that writing from an outline is not one of this skill's actions and that no skill of this plugin
-does it yet (issue 51). Do not write the text.
+that writing from an outline is not one of this skill's actions: the write mode and the
+reorganize mode of `/propositions:prop-construct` do it, from an outline that stands as approved.
+Do not write the text.
 
 ## What this skill keeps, and what it does not
 
@@ -594,6 +595,19 @@ F="$SEC"
       (.[] | select(($para | not) and (.r | type == "object"))
            | select(.r | has("part") and (.part as $x | any("main", "appendix", "supplement"; . == $x) | not))
            | "line \(.l): part is not one of main, appendix, supplement"),
+      (.[] | select(($para | not) and (.r | type == "object"))
+           | select(.r | has("length") and ((.length | type) != "number" or .length < 1 or .length > 999999999 or .length != (.length | floor)))
+           | "line \(.l): length is not a whole number from 1 to 999999999"),
+      (.[] | select(($para | not) and (.r | type == "object"))
+           | select(.r | has("unread") and ((.unread | type) != "array" or (.unread | length) == 0 or any(.unread[]; type != "object" or (.file | type) != "string" or (.file | length) == 0 or (.why | type) != "string" or (.why | length) == 0)))
+           | "line \(.l): unread is not a list of one or more files that were not read, each with a file and a why"),
+      (.[] | select($para and (.r | type == "object"))
+           | select(.r | (has("opens") and ((.opens | type) != "array" or (.opens | length) == 0 or any(.opens[]; type != "object" or ((.id | type) != "string") or (.id | test("^[a-z0-9][a-z0-9-]{0,63}$") | not) or (.kind as $k | any("question", "aim", "hypothesis", "plan", "announcement", "setup", "future_work"; . == $k) | not))))
+                        or (has("discharges") and ((.discharges | type) != "array" or (.discharges | length) == 0 or any(.discharges[]; type != "string" or (test("^[a-z0-9][a-z0-9-]{0,63}$") | not)))))
+           | "line \(.l): opens or discharges is not a list of commitments in the format"),
+      (.[] | select($para and (.r | type == "object"))
+           | select(.r | has("dropped") and (has("opens") or has("discharges")))
+           | "line \(.l): a record that carries dropped carries opens or discharges"),
       (.[] | select($para and (.r | type == "object"))
            | select(.r | has("edits") and ((.edits | type) != "string" or (.edits | length) == 0 or .carry != true))
            | "line \(.l): edits is not a non-empty string on a record that carries carry"),
@@ -622,14 +636,22 @@ file, their points; in the paragraph file, `points`, where a record has it, is a
 `edits` is a non-empty string on a record that carries `carry`, and no locator (two locators with the same `file` and the same `label`, or with
 no `label` and the same `starts`, are the same one) is in both the `from` and the
 `replaces` of a record. In both files, `moved_to` is a non-empty string on a record that carries
-`dropped`; in the section file, `part` is one of `main`, `appendix` and `supplement`. The
+`dropped`; in the section file, `part` is one of `main`, `appendix` and `supplement`, `length`
+is a whole number from 1 to 999999999, and `unread` is a list of one or more objects with a
+`file` and a `why`; in the paragraph file, `opens` and `discharges` are lists of commitments in
+the format (`docs/OUTLINE.md`, "Planned commitments") and are not on a record that carries
+`dropped`. That every discharge follows its opening, and that a commitment is opened once, is
+not checked here: `propositions outline check` does, and so does `write prepare` before any text
+is written from the outline. The
 shape of a key that a section record carries and this skill does not define is not checked, a
 key named `points` included; the control-character test still reads every string and every key
 name. A file with no record prints `EMPTY`, which is never a pass. An empty section file is
-always a mistake. An empty paragraph file is a mistake except in two cases, and only these two:
+always a mistake. An empty paragraph file is a mistake except in three cases, and only these three:
 the outline the author gave to draft has sections and no paragraph yet, so this skill wrote no
 paragraph record on purpose; or the author, through revise, left out every paragraph record and
-none of them had `from` or `replaces`, so each was deleted. In those cases say in the report that the
+none of them had `from` or `replaces`, so each was deleted; or derive read no paragraph and no
+block because the text is in included files that were not read, and the section records carry
+those files in `unread` (derive, step 7). In those cases say in the report that the
 paragraph file is empty, and go on. A derive of
 a manuscript that has paragraphs never leaves the paragraph file empty.
 
@@ -849,10 +871,14 @@ while a command runs.
    that file is read when it exists and is a file the skill reads, and is a missing file when it does not exist, the usual case for a figure, a table or a style file kept under its own name. Tell the author which files were
    not read, and go on. A figure or a table that comes
    from such a file is still one record that carries `carry`, named in the file that includes
-   it. Any other included file that was not read gets nothing in the outline: no record, no
-   locator, no point, no `note`. Name it to the author, here and again when the outline is
-   shown (step 8) and in the report; the
-   outline itself does not show the gap (whether it should is open, issue 51). `ok files listed`
+   it. Any other included file that was not read is recorded on a section record, in `unread`
+   (issue 117): one entry `{"file": <the name as the include command writes it>, "why": <the
+   reason, in a few words>}` for each include command, on the record of the section the command
+   stands in (the subsection, when it stands in one; the first section record, when it stands
+   before the first section). A file that is included twice is two entries. It gets nothing
+   else: no paragraph record, no locator, no point, no `note`. Name it to the author, here and
+   again when the outline is shown (step 8) and in the report: the outline keeps that a file
+   was not read there, not what it holds. `ok files listed`
    ends a complete list. A `STOP` line in its place: the list is not
    complete; stop and say what was printed above it.
 3. For each section and subsection, and for the abstract, write one section record: an `id`
@@ -865,7 +891,8 @@ while a command runs.
    (AskUserQuestion, together with any other question of this action), and write it as the
    author gives it. When the author gives none, stop, as step 7 says for its third case.
    Before asking for any section, see whether step 7's third case holds (the files read hold
-   no paragraph and no block at all): when it does, do not ask, and stop at once as step 7 says.
+   no paragraph and no block at all, and no included file was left unread): when it does, do
+   not ask, and stop at once as step 7 says.
    When a section whose sentence the author gave ends with no paragraph record, of its own or
    of a section under it, the premise check reports it under its fifth kind each time it runs:
    tell the author why.
@@ -920,21 +947,26 @@ while a command runs.
      one of the two places, or give the passage a label when it is a block that can carry one.
    - A file that derive read and that the locator commands do not accept: the count prints
      nothing for it, or the listing reports its name. Say what the commands printed.
-   - The files derive read hold no paragraph and no block at all, so the paragraph file
-     would be empty. A paragraph counts when derive read any of its text; a block (a theorem-like
-     statement, a proof, a figure, a table or a displayed formula) counts when derive read the
-     environment or the delimiters that hold it, even when its content is in a file that was
-     not read (step 2). Derive also stops, in the same way, for a section whose text is all in
-     included files that were not read when the author gives no sentence for it (step 3). The case itself
-     can be seen before anything is staged, and the missing sentence as soon as the author
-     answers: stop then, without writing the staged files. Name the files that were not read; the
-     author can make them readable (track them, or move them into the repository) and derive
-     again. A manuscript that has headings and nothing under them has no such file: say that
-     draft builds an outline from its headings.
+   - The files derive read hold no paragraph and no block at all, and no included file was
+     left unread, so there is nothing to outline. A paragraph counts when derive read any of
+     its text; a block (a theorem-like statement, a proof, a figure, a table or a displayed
+     formula) counts when derive read the environment or the delimiters that hold it, even when
+     its content is in a file that was not read (step 2). This can be seen before anything is
+     staged: stop then, without writing the staged files, and say that draft builds an outline
+     from the headings of a manuscript that has headings and nothing under them.
+
+   One case that used to stop derive no longer does. When the files read hold no paragraph and
+   no block at all because the text is in included files that were not read, the section
+   records carry those files in `unread` (step 2) and the staged paragraph file is empty: this
+   is the third case in which `EMPTY` is accepted for it (the write check names all three).
+   Derive still stops for a section whose text is all in files that were not read when the
+   author gives no sentence for it (step 3): stop as soon as the author answers, without
+   writing the staged files, and name the files; the author can make them readable (track
+   them, or move them into the repository) and derive again.
 8. Show the outline to the author: each section with its `says`, and under it each paragraph's
    points, with carried blocks marked. Derive writes no `edits` and no `replaces`: a finished manuscript has no change or replacement to record. Say how many sections, paragraph records and carried
-   blocks there are, and name every included file that was not read: what it says is not in
-   the outline.
+   blocks there are, and name every included file that was not read, with the section whose
+   record carries it in `unread`: what it says is not in the outline.
 9. Ask whether to write the files into `OUTDIR` (AskUserQuestion). Only after the author agrees:
 
    ```bash
@@ -966,7 +998,10 @@ while a command runs.
    file the author points to. When the
    author's outline has sections and no paragraph yet, write no
    paragraph record: the staged paragraph file is empty, and this is one of the two cases in
-   which `EMPTY` is accepted for it (the write check names both).
+   which `EMPTY` is accepted for it (the write check names all three).
+   When the author gives a length target for a section, or says which commitments a paragraph
+   opens or discharges, write `length`, `opens` and `discharges` as revise says ("Length
+   targets", "Planned commitments"). Write none of them unasked.
 3. Do not invent content. A point that would report a result, a number or a citation the author
    has not supplied says what will be reported without stating it ("A simulation will report how
    the two methods compare."), and carries `pending` naming what is still missing.
@@ -1056,9 +1091,36 @@ call, and the guard has to hold then too. No `ok outline directory`: do not read
   `moved_to` is never deleted by the rules below, whether or not it has `from` or `replaces`:
   it stays on its line with `dropped`. When the author takes it back into this article, remove
   `dropped` and `moved_to` together.
+- **Planned commitments.** When the author says which commitments a paragraph opens or
+  discharges, write them on its record: `opens`, a list of `{"id": <commitment id>, "kind":
+  <kind>}`, and `discharges`, a list of commitment ids (`docs/OUTLINE.md`, "Planned
+  commitments"). An id is lower-case letters, digits and hyphens, as the structure sidecars
+  write it (`c-q-spacing`); choose one that no record opens yet. A commitment is opened by one
+  record; a discharge names a commitment that the same record or a record on an earlier line
+  opens; a record of the abstract opens none. Do not plan a commitment the author did not ask
+  for: derive writes neither key, and an outline with neither key on any record is not compared
+  with the text. A record that is given `dropped` loses both keys: ask the author first which
+  record opens or discharges those commitments instead, and tell the author about every record
+  that still discharges a commitment nothing opens any more. In a merge the record that
+  replaces the merged records carries the `opens` and the `discharges` of all of them, each
+  commitment once; in a split, ask which of the new records carries each. After any change to
+  these keys, read the paragraph file once more for the two rules the write check does not
+  test: no commitment is opened by two records that are not dropped, and every discharge is on
+  the line of its opening or after it. Correct what breaks them before showing the outline.
+- **Length targets.** When the author gives a target for a section, write it as `length`, a
+  whole number of words, on the section record. The limit of the whole article is not in the
+  outline files: it is the `length` of `article.json`, which the author writes
+  (`docs/OUTLINE.md`, "article.json"); this skill does not write that file.
+- **Included files that were not read.** `unread` stays with its section record. When two
+  sections are merged, the record that replaces them carries the `unread` entries of both. A
+  section that is given `dropped` keeps its `unread`. Remove an entry only when the author says
+  the file is now read or is not part of the article; when the file became readable, derive
+  that section again from the manuscript, if the author asks, and add its paragraph records.
 - **Which part of the article a section is in.** When the author says a section is in the
   appendix or in the supplementary material, give its section record `part`: `appendix` or
-  `supplement`. `main`, or no `part`, is the main text. No other value is written.
+  `supplement`. A section without `part` is in the part of the section it is under, and in the
+  main text when it is under none; write `main` on a subsection only to take it out of the part
+  of the section above it. No other value is written.
 - **Something another article establishes.** Each article has its own outline directory. When
   a paragraph of this article relies on a record of another article's outline in the same
   repository, name it in `uses`, or in the `basis` of the point, as
@@ -1150,13 +1212,17 @@ jq -n -r --rawfile a "$([ -e "$APP" ] && printf '%s' "$APP" || printf '%s' /dev/
       | "paragraph records that name no section\t\($o | length)\(if ($o | length) > 0 then "\t" + ($o | tojson) else "" end)"),
     "points that carry pending\t\([$pars[] | .points[]? | objects | select(has("pending"))] | length)",
     "records that carry dropped\t\([$secs[], $pars[] | select(has("dropped"))] | length)",
+    ([$secs[] | select(has("unread") and (has("dropped") | not)) | .id] as $u
+      | "sections that carry unread\t\($u | length)\(if ($u | length) > 0 then "\t" + ($u | tojson) else "" end)"),
     "ok status"
 '
 ```
 
 It prints one line for each section, one for the order of sections, one for the sections
 removed since their approval, one for the paragraph records that name no section, the two
-counts, and `ok status`. A section counts as removed since its approval when the order of
+counts, one for the sections that carry `unread` (included files that were not read when the
+outline was derived: when it is not 0, name those sections and their files to the author), and
+`ok status`. A section counts as removed since its approval when the order of
 sections does not stand as approved, the section is not in the section file, and its latest
 approved copy is in the last approval of the whole outline or in an approval record after that
 one; with no approval of the whole outline on record, any approved copy counts. Once an
@@ -1502,8 +1568,9 @@ End every action that wrote a file with: what was written and where; the result 
 check, with the sentence that no other check of the format exists until issue 78, apart from
 resolving the locators; which sections
 stand as approved; how many points carry `pending` and how many records carry `dropped`; for
-derive, the included files that were not read; and the next action. When the outline stands as approved, say that writing text from it is not available
-in this plugin yet (issue 51).
+derive, the included files that were not read; and the next action. When the outline stands as approved, say that text is written from it with
+`/propositions:prop-construct` ("照綱要寫" for one paragraph at a time, "重組草稿" for a finished
+manuscript).
 
 ## Hard rules
 

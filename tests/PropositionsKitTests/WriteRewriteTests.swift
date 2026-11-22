@@ -126,6 +126,38 @@ struct WriteRewriteTests {
         #expect(result.stdout.contains { $0.contains("writes a key twice") })
     }
 
+    @Test func `A key written twice inside a nested object of a ledger line is reported with its line`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        try edit(box, "stage/ledger/main.jsonl") {
+            $0.replacingOccurrences(of: #""reason": "rewritten""#, with: #""reason": "rewritten", "reason": "other""#)
+        }
+        let result = run(["check", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains { $0.hasPrefix("line ") && $0.contains("of the staged ledger writes a key twice") })
+        #expect(WriteRewrite.writesAKeyTwice(try JSONValue.parse(#"{"a": [{"b": 1, "b": 2}]}"#)))
+        #expect(!WriteRewrite.writesAKeyTwice(try JSONValue.parse(#"{"a": [{"b": 1}, {"b": 2}]}"#)))
+    }
+
+    @Test func `The rewrite checks read the bytes they are handed, not the file again`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let main = box.url.appendingPathComponent("stage/manuscript/main.tex")
+        let ledger = try Data(contentsOf: box.url.appendingPathComponent("stage/ledger/main.jsonl"))
+        let onDisk = try String(contentsOf: main, encoding: .utf8)
+        // The bytes handed to the check put the new proposition mid-paragraph; the file on disk does not.
+        var lines = onDisk.components(separatedBy: "\n")
+        lines[28] = "Joined to the paragraph."
+        let handed = lines.joined(separator: "\n")
+        let reader: (URL) -> String? = { $0.lastPathComponent == "main.tex" ? handed : try? String(contentsOf: $0, encoding: .utf8) }
+        let fromDisk = WriteRewrite.locations(stagedMain: main, read: { try? String(contentsOf: $0, encoding: .utf8) }, ledger: ledger, mapped: [Self.new])
+        let fromHanded = WriteRewrite.locations(stagedMain: main, read: reader, ledger: ledger, mapped: [Self.new])
+        #expect(fromDisk.isEmpty)
+        #expect(fromHanded.contains { $0.contains("does not start a paragraph") })
+    }
+
     @Test func `A rewrite writes the trace anew and keeps the old one with a restore list`() throws {
         let box = try setUp()
         _ = try box.write(#"{"outline": "p-9", "first_prop": "x", "section": "s-z", "approval_line": 1}"# + "\n", to: "paper/outline/outline-trace.jsonl")

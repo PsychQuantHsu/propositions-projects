@@ -53,6 +53,13 @@ public struct ReadingOrder: Sendable {
     public let skippedImports: [String]
 
     public init(mainFile: URL) throws {
+        try self.init(mainFile: mainFile, read: { try? String(contentsOf: $0, encoding: .utf8) })
+    }
+
+    /// The tree read through `read`, which gives the text of a file of the tree (issue 131: a
+    /// check reads the bytes it was handed, not the file again). A file is still looked up on disk
+    /// to find out whether it exists.
+    public init(mainFile: URL, read: (URL) -> String?) throws {
         let main = mainFile.resolvingSymlinksInPath().standardizedFileURL
         let root = main.deletingLastPathComponent()
         var prefixes: [String: [Int]] = [:]
@@ -64,7 +71,7 @@ public struct ReadingOrder: Sendable {
             if stack.count > ReadingOrder.maxDepth {
                 throw InputTreeError.tooDeep(file: name, limit: ReadingOrder.maxDepth)
             }
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            guard let text = read(url) else {
                 throw InputTreeError.unreadable(file: name)
             }
             var environment: String?  // the verbatim-like environment the scan is inside, if any

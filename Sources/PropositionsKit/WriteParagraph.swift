@@ -599,6 +599,17 @@ public enum WriteParagraph {
         return report
     }
 
+    /// The text of a staged file of the tree, from the bytes `load` read; any other file from disk.
+    static func stagedReader(_ manifest: Manifest, _ payload: Payload) -> (URL) -> String? {
+        func key(_ path: String) -> String { URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path }
+        var bytes: [String: Data] = [key(manifest.stagedMain): payload.staged["manuscript"]!]
+        for file in manifest.rewriteFiles ?? [] { if let data = payload.rewriteStaged[file.original] { bytes[key(file.staged)] = data } }
+        return { url in
+            if let data = bytes[url.resolvingSymlinksInPath().standardizedFileURL.path] { return String(data: data, encoding: .utf8) }
+            return try? String(contentsOf: url, encoding: .utf8)
+        }
+    }
+
     /// The check of a rewrite: every file of the tree may change (and has to be UTF-8); the ledger
     /// keeps every proposition (see `WriteRewrite.ledger`); the sidecars are JSON and left to the
     /// structure validator; `outline-map.jsonl` lists every paragraph record of the outline.
@@ -615,7 +626,10 @@ public enum WriteParagraph {
         // A rewrite cannot add a file: commit writes the files prepare copied, and no other.
         let prepared = Set([URL(fileURLWithPath: manifest.stagedMain).lastPathComponent]
             + (manifest.rewriteFiles ?? []).map { $0.staged.hasPrefix(stagedRoot) ? String($0.staged.dropFirst(stagedRoot.count)) : $0.staged })
-        if let order = try? ReadingOrder(mainFile: URL(fileURLWithPath: manifest.stagedMain)) {
+        // Every check below reads the staged bytes `load` read once, the bytes `commit` writes
+        // (issue 131); a file prepare did not copy is read from disk only to name it.
+        let read = stagedReader(manifest, payload)
+        if let order = try? ReadingOrder(mainFile: URL(fileURLWithPath: manifest.stagedMain), read: read) {
             for name in order.files where !prepared.contains(name) {
                 report.problems.append("the staged manuscript includes \(CiteOrder.visible(name)), which prepare did not copy: a rewrite cannot add a file to the input tree")
             }
@@ -646,12 +660,12 @@ public enum WriteParagraph {
             report.problems += map.problems
             report.newRecords = map.records.count
             mapped = map.records.map(\.1)
-            report.problems += WriteRewrite.commitments(records: map.records, outline: outline, stagedMain: URL(fileURLWithPath: manifest.stagedMain),
+            report.problems += WriteRewrite.commitments(records: map.records, outline: outline, stagedMain: URL(fileURLWithPath: manifest.stagedMain), read: read,
                                                          ledger: payload.staged["ledger"]!, discourse: payload.staged["discourse"]!)
         } else {
             report.problems.append(payload.outlineProblem ?? "the outline cannot be read")
         }
-        report.problems += WriteRewrite.locations(stagedMain: URL(fileURLWithPath: manifest.stagedMain),
+        report.problems += WriteRewrite.locations(stagedMain: URL(fileURLWithPath: manifest.stagedMain), read: read,
                                                    ledger: payload.staged["ledger"]!, mapped: mapped)
         let changed = (payload.staged["manuscript"]! != payload.originals["manuscript"]!.data ? 1 : 0)
             + payload.rewriteStaged.filter { payload.rewriteOriginals[$0.key]?.data != $0.value }.count

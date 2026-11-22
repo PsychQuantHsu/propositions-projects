@@ -71,6 +71,21 @@ public enum WriteRewrite {
         .object(Revise.deduplicated(members).filter { !changeable.contains($0.key) })
     }
 
+    /// Whether an object anywhere in the value, at any depth and inside arrays, writes a key
+    /// twice; keys are compared scalar by scalar, as `Revise.deduplicated` compares them (issue 131).
+    static func writesAKeyTwice(_ value: JSONValue) -> Bool {
+        switch value {
+        case .object(let members):
+            var seen = Set<[UInt32]>()
+            for member in members where !seen.insert(ReviseLedger.key(member.key)).inserted { return true }
+            return members.contains { writesAKeyTwice($0.value) }
+        case .array(let items):
+            return items.contains(where: writesAKeyTwice)
+        default:
+            return false
+        }
+    }
+
     /// The problems of the ledger, and the ids of the live propositions it adds.
     static func ledger(old: Data, new: Data) -> (problems: [String], added: [String]) {
         guard let before = try? ReviseLedger.lines(old), let after = try? ReviseLedger.lines(new) else {
@@ -81,8 +96,8 @@ public enum WriteRewrite {
         for line in after { if let id = line.id { byID[ReviseLedger.key(id), default: []].append(line) } }
         if after.contains(where: { $0.id == nil }) { problems.append("a line of the staged ledger has no id") }
         for (name, lines) in [("ledger", before), ("staged ledger", after)] {
-            if lines.contains(where: { ($0.members.map { Revise.deduplicated($0).count != $0.count }) ?? false }) {
-                problems.append("a line of the \(name) writes a key twice")
+            for line in lines where line.members.map({ writesAKeyTwice(.object($0)) }) ?? false {
+                problems.append("line \(line.number) of the \(name) writes a key twice")
             }
         }
         if before.contains(where: { $0.id == nil }) { problems.append("a line of the ledger has no id: a rewrite needs every proposition named") }
@@ -193,8 +208,8 @@ public enum WriteRewrite {
 
     /// Every live proposition of the staged ledger has to be located in the staged tree, and each
     /// mapped proposition has to start a paragraph: its line follows a blank line or a sectioning line.
-    static func locations(stagedMain: URL, ledger: Data, mapped: [String]) -> [String] {
-        guard let order = try? ReadingOrder(mainFile: stagedMain), let rows = try? ReviseLedger.lines(ledger) else {
+    static func locations(stagedMain: URL, read: (URL) -> String?, ledger: Data, mapped: [String]) -> [String] {
+        guard let order = try? ReadingOrder(mainFile: stagedMain, read: read), let rows = try? ReviseLedger.lines(ledger) else {
             return ["the staged manuscript or ledger cannot be read to check locations"]
         }
         let directory = stagedMain.deletingLastPathComponent()
@@ -214,7 +229,7 @@ public enum WriteRewrite {
             guard mapped.contains(where: { WriteFromOutline.same($0, id) }) else { continue }
             let name = location.file.flatMap { $0 == "main.tex" ? nil : ReadingOrder.normalise($0) }
             let url = name.map { directory.appendingPathComponent($0) } ?? stagedMain
-            let lines = LatexLine.splitLines(String(decoding: (LedgerOrder.read(url)?.data ?? Data()), as: UTF8.self))
+            let lines = LatexLine.splitLines(read(url) ?? "")
             // A paragraph starts after a blank line, or right after a sectioning line.
             let i = location.start - 1
             let starts = i < lines.count && !LedgerOrder.stripped(lines[i]).isEmpty
@@ -229,9 +244,10 @@ public enum WriteRewrite {
     /// What each written paragraph opens and discharges, against what its outline record plans
     /// (issue 116). The propositions of a paragraph are the live ones from the proposition the
     /// map names up to the one the map names next, in reading order.
-    static func commitments(records: [(String, String)], outline: Outline, stagedMain: URL, ledger: Data, discourse: Data) -> [String] {
+    static func commitments(records: [(String, String)], outline: Outline, stagedMain: URL, read: (URL) -> String?,
+                            ledger: Data, discourse: Data) -> [String] {
         guard OutlineCommitments.plansAny(outline.paragraphs.compactMap(\.value)),
-              let order = try? ReadingOrder(mainFile: stagedMain), let rows = try? ReviseLedger.lines(ledger) else { return [] }
+              let order = try? ReadingOrder(mainFile: stagedMain, read: read), let rows = try? ReviseLedger.lines(ledger) else { return [] }
         var placed: [(position: [Int], id: String)] = []
         for row in rows where !row.isRetired {
             guard let id = row.id, let location = row.location, let position = order.position(file: location.file, line: location.start) else { continue }

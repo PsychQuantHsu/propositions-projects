@@ -643,8 +643,10 @@ derived, for every section; tell the author before rewriting, as in O3. With `de
 `$OUTDIR/article.json`, a rewrite is of one document: give the main file, ledger and sidecars of
 that document, and rewrite only the sections that go to it (a section goes to its own `part`,
 else to the part of the section it is under, else to `main`). The sections of another document
-are rewritten in a run of their own. Content cannot be moved from one document to another this
-way: say so and stop when the revised outline asks for it. `prepare` also refuses when any
+are rewritten in a run of their own. When the revised outline moves content from one document to
+another, rewrite in two runs (issue 133): first the document that receives it, so that its ledger
+holds the new propositions, committed; then the document that gives it up, whose retirements name
+those propositions in the other ledger (G4). Tell the author the order before the first run. `prepare` also refuses when any
 section that is not dropped goes to a part for which `article.json` names no destination, even a
 section of another document: stop and tell the author which part needs one.
 
@@ -667,6 +669,11 @@ to R6 there, and R8 for the new propositions) on the staged ledger and the stage
   dropped. Say which propositions are retired and with what.
 - Run its commands on the staged paths (`--jsonl <staged ledger> --tex <staged main file>`), never
   on the ledger.
+- When the passage moved to another document (the second of the two runs), its replacements are
+  the propositions that the first run wrote in that document's ledger: write each one
+  `<ledger>#<id>`, the path relative to the directory of the original ledger (not of the staged
+  copy), and give `revise retire` and `revise check` `--ledger-dir "<directory of the original
+  ledger>"`. A citation is not carried into the other ledger: `redirect` drops it and says so.
 
 **G5 — Rebuild the sidecars, in the copies.** The paragraphs changed, so `discourse.jsonl` and
 `structure.json` are annotated again for the new text, as annotate mode does (A2 to A4), in the
@@ -683,7 +690,7 @@ the records whose sections go to the document being rewritten.
 "${CLI[@]}" write check --stage "$STAGE"
 python3 "$VALIDATOR" --jsonl "<staged ledger>" --meta "$STAGE/ledger/_meta.json" --tex "<staged main file>"
 python3 "$VSTRUCT" --jsonl "<staged ledger>" --structure "<staged structure.json>" --discourse "<staged discourse.jsonl>"
-"${CLI[@]}" revise check --jsonl "<staged ledger>"
+"${CLI[@]}" revise check --jsonl "<staged ledger>" --ledger-dir "<directory of the original ledger>"
 "${CLI[@]}" cite-order --jsonl "<staged ledger>" --tex "<staged main file>"
 ```
 

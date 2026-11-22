@@ -36,10 +36,10 @@ public enum PropositionsCLI {
             if let retire = command as? RetireOptions {
                 return ReviseRun.retire(jsonl: retire.jsonl, retirements: retire.retire, since: retire.since,
                                         mechanism: retire.mechanism, match: retire.match, reason: retire.reason,
-                                        ref: retire.ref, write: retire.write, workingDirectory: workingDirectory)
+                                        ref: retire.ref, ledgerDir: retire.ledgerDir, write: retire.write, workingDirectory: workingDirectory)
             }
             if let check = command as? ReviseCheckOptions {
-                return ReviseRun.check(jsonl: check.jsonl, workingDirectory: workingDirectory)
+                return ReviseRun.check(jsonl: check.jsonl, ledgerDir: check.ledgerDir, workingDirectory: workingDirectory)
             }
             if let redirect = command as? RedirectOptions {
                 return ReviseRun.redirect(jsonl: redirect.jsonl, tex: redirect.tex, write: redirect.write,
@@ -391,7 +391,10 @@ struct RetireOptions: ParsableCommand {
             A dry run unless --write is given. Each --retire names a proposition, and after `=` the \
             ids that replace it, separated by commas; none means it was deleted. It gets a retired \
             block with since, mechanism, match, reason, ref when given, and replaced_by (schema \
-            v1.8). Every id has to name one live proposition; nothing is written otherwise.
+            v1.8). A replacement in another ledger, after the passage moved to another \
+            document, is written <ledger>#<id>, the path relative to this ledger's directory, and \
+            recorded as {"ledger", "id"} (schema v1.9). Every id has to name one live proposition, \
+            of this ledger or of the one named; nothing is written otherwise.
             Exit codes: 0 written, or nothing to change; 1 a dry run; 2 an argument is wrong, an \
             id names no live proposition, or the ledger cannot be read.
             """)
@@ -399,8 +402,11 @@ struct RetireOptions: ParsableCommand {
     @Option(help: "The ledger.")
     var jsonl: String
 
-    @Option(help: "<id> or <id>=<new id>,<new id>. Repeat for each proposition.")
+    @Option(help: "<id> or <id>=<new id>,<new id>; a new id in another ledger is <ledger>#<id>. Repeat for each proposition.")
     var retire: [String] = []
+
+    @Option(help: "The directory a <ledger>#<id> path is relative to, when --jsonl is a copy (default: the ledger's own).")
+    var ledgerDir: String?
 
     @Option(help: "The date the passage left the paper, YYYY-MM-DD.")
     var since: String
@@ -428,12 +434,17 @@ struct ReviseCheckOptions: ParsableCommand {
         discussion: """
             Reports each id of a replaced_by that is not a proposition of the ledger, is retired, \
             or is the retired proposition itself, and counts the retirements that are replaced, \
-            deleted (an empty list) and without replaced_by.
+            deleted (an empty list) and without replaced_by. An item {"ledger", "id"} is looked up \
+            in that ledger (schema v1.9): one that cannot be read, or that is this ledger, is a \
+            problem too.
             Exit codes: 0 no problem; 1 at least one; 2 the ledger cannot be read.
             """)
 
     @Option(help: "The ledger.")
     var jsonl: String
+
+    @Option(help: "The directory the ledger paths are relative to, when --jsonl is a copy (default: the ledger's own).")
+    var ledgerDir: String?
 }
 
 struct RedirectOptions: ParsableCommand {

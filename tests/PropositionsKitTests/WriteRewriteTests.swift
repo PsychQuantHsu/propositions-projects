@@ -158,6 +158,21 @@ struct WriteRewriteTests {
         #expect(fromHanded.contains { $0.contains("does not start a paragraph") })
     }
 
+    // spec-example: write / a rewrite retires a passage moved to another document
+    @Test func `A rewrite checks a replacement in another ledger from the original ledger's directory`() throws {
+        let box = try setUp()
+        _ = try box.write(#"{"id": "s1", "text": "Moved.", "location": "supp.tex:L1", "cites": []}"# + "\n", to: "paper/supp/supp.jsonl")
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let other = { (id: String) in #""replaced_by": [{"ledger": "../supp/supp.jsonl", "id": "\#(id)"}]"# }
+        try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: #""replaced_by": ["\#(Self.new)"]"#, with: other("s1")) }
+        #expect(run(["check", "--stage", "stage"], in: box).exitCode == 0)
+        try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: other("s1"), with: other("s9")) }
+        let result = run(["check", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains { $0.contains("is replaced by ../supp/supp.jsonl#s9, which is no proposition of that ledger") })
+    }
+
     @Test func `A rewrite writes the trace anew and keeps the old one with a restore list`() throws {
         let box = try setUp()
         _ = try box.write(#"{"outline": "p-9", "first_prop": "x", "section": "s-z", "approval_line": 1}"# + "\n", to: "paper/outline/outline-trace.jsonl")

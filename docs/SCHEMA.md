@@ -150,7 +150,7 @@ manuscript's argument explicit as a DAG of cite-able atomic claims (Locke's
 
 ### Versioning
 
-`_meta.json` 含 `schema_version: "1.8"`(v1.0 = pre-#77 single-file JSON;v1.1 =
+`_meta.json` 含 `schema_version: "1.9"`(v1.0 = pre-#77 single-file JSON;v1.1 =
 post-#77 JSONL + _meta sidecar + sentence_index/clause_index fields;v1.2 =
 post-`migrate-prop-id-to-stable-uuid` UUID v7 identity contract,P/C-prefix 改
 成 view-time derivation;**v1.3** = `sentence_index` / `clause_index` 移除,
@@ -159,7 +159,7 @@ proposition ordering 改用 JSONL 檔案行序;**v1.4** = `retired` 欄位新增
 本 canonical 於 add-manuscript-onboarding change 回收);**v1.5** =
 `retired.superseded_mechanism` 欄位新增;**v1.6** = multi-file manuscript 支援:
 `location` 允許檔名前綴(見 §Multi-file manuscripts)+ `_meta.json` 選填
-`source.parts` 快照);**v1.7** = `_meta.json` 選填 `profile`(`default` | `empirical`),決定 R11/R12 接受的詞彙(見 §Profiles (v1.7+));**v1.8** = `retired.replaced_by` 欄位新增(改版重抽記錄取代句,#56;選填,舊版帳冊不必遷移)— schema 改動要 bump version + migration note。
+`source.parts` 快照);**v1.7** = `_meta.json` 選填 `profile`(`default` | `empirical`),決定 R11/R12 接受的詞彙(見 §Profiles (v1.7+));**v1.8** = `retired.replaced_by` 欄位新增(改版重抽記錄取代句,#56;選填,舊版帳冊不必遷移);**v1.9** = `replaced_by` 的一項可以是 `{"ledger", "id"}`,指到另一份帳冊的命題(內容搬到另一份文件時,#133;舊版帳冊不必遷移)— schema 改動要 bump version + migration note。
 
 ## File layout
 
@@ -324,7 +324,7 @@ audit trail, and leaving it unmarked makes the ledger silently over-claim.
 | `reason` | ✅ | One line, human-readable |
 | `ref` | ⚠️ | Issue / commit that retired it |
 | `superseded_mechanism` (v1.5+) | ⚠️ | Present when a later edit changed the disabled text's status again (e.g. `comment_env` content later deleted outright → mechanism becomes `removed`); records the prior mechanism for the audit trail |
-| `replaced_by` (v1.8+) | ⚠️ | The ids of the live propositions that replace this one after a revision, in order; `[]` when the passage was deleted with nothing in its place. Absent: not recorded (a retirement made before v1.8, or by hand). Written by `propositions revise retire`, checked by `propositions revise check` (`ledger:replaced-by`); the Python validator does not read it |
+| `replaced_by` (v1.8+) | ⚠️ | The ids of the live propositions that replace this one after a revision, in order; `[]` when the passage was deleted with nothing in its place. From v1.9 an item may instead be `{"ledger": <path>, "id": <id>}`: a live proposition of another ledger, the path relative to this ledger's directory, for a passage moved to another document (`revise retire --retire old=<path>#<id>`); `revise check` reads that ledger, and `revise redirect` does not carry a citation into it. Absent: not recorded (a retirement made before v1.8, or by hand). Written by `propositions revise retire`, checked by `propositions revise check` (`ledger:replaced-by`); the Python validator does not read it |
 
 `mechanism` enum: `comment_env`(inside `\begin{comment}…\end{comment}` — R1 passes,normalize 不剝 comment 環境)/ `line_comment`(`%` 行註解 — R1 fails)/ `removed`(source 已刪 — R1 fails)。R1-visibility 不對稱是 validator artifact,正是 `retired` 記 mechanism 而非 boolean 的理由。
 

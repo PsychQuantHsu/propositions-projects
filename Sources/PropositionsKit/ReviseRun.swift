@@ -12,6 +12,14 @@ public enum ReviseRun {
         LedgerOrder.read(resolve(jsonl, directory))
     }
 
+    /// The other ledgers named by `<ledger>#<id>`, relative to `ledgerDir` when given (the place of
+    /// the original when `jsonl` is a copy), else to the ledger's own directory (issue 133).
+    static func others(_ jsonl: String, ledgerDir: String?, _ directory: URL) -> ReviseLedger.OtherLedgers {
+        let ledger = resolve(jsonl, directory)
+        let base = ledgerDir.map { resolve($0, directory) } ?? ledger.deletingLastPathComponent()
+        return ReviseLedger.OtherLedgers(directory: base, itself: [ledger, base.appendingPathComponent(ledger.lastPathComponent)])
+    }
+
     /// Writes the ledger when `write` is set and it changed. A dry run that would change it exits
     /// with 1; a write, and a run that changes nothing, with 0.
     static func finish(_ out: [String], new: Data, snapshot: LedgerOrder.Snapshot, jsonl: String, write: Bool,
@@ -32,14 +40,15 @@ public enum ReviseRun {
     /// Exit codes: 0 written; 1 a dry run; 2 an argument is wrong, an id does not name one live
     /// proposition, a replacement is not a live proposition, or the ledger cannot be read.
     public static func retire(jsonl: String, retirements: [String], since: String, mechanism: String, match: String,
-                              reason: String, ref: String?, write: Bool, workingDirectory: URL) -> CommandResult {
+                              reason: String, ref: String?, ledgerDir: String? = nil, write: Bool, workingDirectory: URL) -> CommandResult {
         guard !retirements.isEmpty else { return refuse("name at least one proposition with --retire") }
         guard let snapshot = readLedger(jsonl, workingDirectory) else {
             return refuse("ledger not found, or not a regular file that can be read: \(CiteOrder.visible(jsonl))")
         }
         do {
             let (new, out) = try ReviseLedger.retire(snapshot.data, retirements: try retirements.map(ReviseLedger.retirement),
-                                                     since: since, mechanism: mechanism, match: match, reason: reason, ref: ref)
+                                                     since: since, mechanism: mechanism, match: match, reason: reason, ref: ref,
+                                                     others: others(jsonl, ledgerDir: ledgerDir, workingDirectory))
             return finish(out, new: new, snapshot: snapshot, jsonl: jsonl, write: write, directory: workingDirectory)
         } catch let failure as Revise.Failure {
             return refuse(failure.message)
@@ -50,12 +59,12 @@ public enum ReviseRun {
 
     /// Exit codes: 0 every `replaced_by` names live propositions; 1 at least one does not; 2 the
     /// ledger cannot be read.
-    public static func check(jsonl: String, workingDirectory: URL) -> CommandResult {
+    public static func check(jsonl: String, ledgerDir: String? = nil, workingDirectory: URL) -> CommandResult {
         guard let snapshot = readLedger(jsonl, workingDirectory) else {
             return refuse("ledger not found, or not a regular file that can be read: \(CiteOrder.visible(jsonl))")
         }
         do {
-            let result = try ReviseLedger.check(snapshot.data)
+            let result = try ReviseLedger.check(snapshot.data, others: others(jsonl, ledgerDir: ledgerDir, workingDirectory))
             let summary = "\(result.replaced) replaced, \(result.deleted) deleted, \(result.unrecorded) without replaced_by, "
                 + "\(result.problems.count) problem(s)"
             return CommandResult(stdout: result.problems + [summary], exitCode: result.problems.isEmpty ? 0 : 1)

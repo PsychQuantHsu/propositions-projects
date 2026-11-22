@@ -16,6 +16,7 @@ In annotation mode the skill SHALL first run `validate-propositions.py` on the l
 - **THEN** the skill stops before drafting sidecars and names `propositions:prop-extract` as the next step
 
 ---
+
 ### Requirement: Annotation writes sidecars only after validation and confirmation
 
 The skill SHALL start the paragraph plan from the output of `propositions paragraphs`, run through the plugin's launcher (when the pinned binary is not there, the skill lists the paragraphs by hand and says so), then draft `structure.json` and `discourse.jsonl` in a staging location outside the ledger directory: a head and relation for every record that is not a paragraph root, a move for every record, a head and relation for every paragraph that is not its section's root paragraph, a type for every paragraph, and a `parent` for every section that sits under another section. It SHALL run `validate-structure.py` on the staged files until it exits 0, then show the user a summary containing the count of each relation, the count of each move and each paragraph type, the number of records whose head comes before them and after them, the number of paragraphs, every commitment with the positions that open and discharge it, the section list with roles and parents, every S7 and S8 warning, and the median length of the sentence part of the right frontier reported by `structure-metrics.py`. The skill SHALL write the sidecars into the ledger directory only after the user confirms, and SHALL NOT modify `main.jsonl` at any point.
@@ -40,6 +41,7 @@ The skill SHALL start the paragraph plan from the output of `propositions paragr
 - **WHEN** no move in the vocabulary fits a sentence
 - **THEN** the skill stops and reports the sentence's position instead of choosing a near value
 
+---
 
 <!-- @trace
 source: retire-python-ports
@@ -139,7 +141,6 @@ tests:
   - tests/test_derive_paragraphs.py
 -->
 
----
 ### Requirement: Next mode proposes at most three candidates without writing
 
 In next mode the skill SHALL run `validate-structure.py --partial` and `structure-state.py --at end`, report the current section's role, the current paragraph, the right frontier, the pending records and the open commitments in the order the state query gives, and propose at most three candidate next propositions. When pending records exist, the first candidate SHALL be a proposition that serves as the head of every pending record. Each candidate SHALL state the frontier node it attaches to, or the pending records it heads, or that it starts a new paragraph; the relation and connective that join it there; which open commitment it advances, if any; its expected `claim_type`; and its expected move, which SHALL be a value from `catalog/vocabulary.yaml` or the words `none fits` with a statement of what the proposition does. The skill SHALL NOT write to the manuscript, the ledger or the sidecars in next mode.
@@ -169,6 +170,7 @@ In next mode the skill SHALL run `validate-structure.py --partial` and `structur
 - **WHEN** no value in `catalog/vocabulary.yaml` fits what a candidate does
 - **THEN** the candidate states `none fits` and what the proposition does, and no near value is chosen
 
+---
 
 <!-- @trace
 source: add-next-mode-move-hint
@@ -177,7 +179,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Construction requests route to the construct skill
 
 The skill's description SHALL claim requests about an article's overall structure, its commitments to the reader, the relation between consecutive propositions, how the sentences of a paragraph relate to each other, and what to write next, and SHALL direct requests to split text into propositions to `propositions:prop-extract`. The `propositions:prop-extract` and `propositions:prop-ledger` descriptions SHALL NOT claim construction requests.
@@ -193,6 +194,7 @@ The skill's description SHALL claim requests about an article's overall structur
 - **THEN** the request matches `propositions:prop-construct`
 
 ---
+
 ### Requirement: Explain mode reads out how sentences relate
 
 When the user asks how the sentences of a paragraph or section relate, the skill SHALL run `structure-explain.py` on that paragraph or section and show its output, then say in plain language what the paragraph does and which sentence the others hang on. When the user asks about one sentence's connections, the skill SHALL run `structure-links.py sentence` on it. The skill SHALL NOT write any file in explain mode. When the requested text has no sidecars, the skill SHALL say so and offer annotation mode.
@@ -208,6 +210,7 @@ When the user asks how the sentences of a paragraph or section relate, the skill
 - **THEN** the skill says the sidecars are missing and offers annotation mode without writing anything
 
 ---
+
 ### Requirement: Next mode takes a move hint from the link catalog
 
 Before proposing candidates, the skill SHALL read the move of the last proposition of the draft with `structure-links.py sentence`, and SHALL run `structure-links.py catalog` on that move with `--kind next` and `--format json` and with neither `--type` nor `--label`. The skill SHALL add the observed counts per next value, with `END` counted as a value, and SHALL report up to three values with the highest totals as the hint; a tie SHALL keep the order in which the values first appear in the listing. The skill SHALL state that the hint lists observed paths and is not a rule. The hint SHALL NOT change the order of the candidates, the rule for the first candidate, the attachment of any candidate or the relation of any candidate. A candidate's move SHALL NOT be required to appear in the hint, and the skill SHALL NOT warn when it does not. `END` SHALL NOT be stated as a candidate's move, and the hint SHALL NOT constrain the move of a candidate that starts a new paragraph.
@@ -247,6 +250,7 @@ Before proposing candidates, the skill SHALL read the move of the last propositi
 - **WHEN** `structure-state.py` runs with and without `links.csv` present
 - **THEN** its output is the same
 
+---
 
 <!-- @trace
 source: add-next-mode-move-hint
@@ -255,7 +259,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Next mode completes without a hint
 
 When the last proposition has no move, when the catalog holds no `next` path from that move, or when either query exits non-zero, the skill SHALL say so in one line, SHALL give no hint, and SHALL complete next mode with every candidate still stating an expected move. Both queries SHALL work on a draft that passes `validate-structure.py --partial`, including a draft with records whose head is `pending`.
@@ -275,6 +278,8 @@ When the last proposition has no move, when the catalog holds no `next` path fro
 - **WHEN** `structure-links.py sentence` reads the last proposition of a draft whose last record has head `pending`
 - **THEN** it exits 0 and reports that proposition's move
 
+---
+
 <!-- @trace
 source: add-next-mode-move-hint
 updated: 2026-11-06
@@ -282,7 +287,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Write mode writes one paragraph through the write commands, behind one confirmation
 
 The construct skill SHALL have a write mode that adds one paragraph at the end of a draft, after the paragraph that holds the last live proposition in reading order. Next mode is unchanged and still writes nothing; a request that does not say a paragraph is to be written is next mode.
@@ -298,6 +302,8 @@ No executable check: the mode is instructions that a model follows; the commands
 - **WHEN** the author asks to write the next paragraph into the draft and confirms what is shown
 - **THEN** the skill writes it through `propositions write commit` and reports what was written, where the originals are, and every placeholder left
 
+---
+
 <!-- @trace
 source: idd-49-skill-mode
 updated: 2026-11-21
@@ -310,7 +316,6 @@ code:
   - plugins/propositions/hooks/cli.lock
 -->
 
----
 ### Requirement: Write mode writes from an approved outline record, read back by a reader
 
 The write mode of the construct skill SHALL, when the author asks to write from the outline, take its plan from one paragraph record of the outline: by default the first record in the paragraph file that does not carry `dropped`, whose section stands as approved (`propositions outline status`), and that `outline-trace.jsonl` does not name (`propositions outline trace`); another record only when the author names it. When there is none, the skill stops and says that the section has to be approved with the outline skill. The paragraph says the record's points in order and nothing the points do not say; a point with `pending` gets `{PENDING: <its pending text>}`; a record that carries `carry` is the block its `from` names, copied with only the changes its `edits` lists; the first record of a section whose heading is not in the draft comes with that heading line (`write prepare --heading`). `write prepare` runs with `--outline` and `--outline-paragraph`.
@@ -323,6 +328,8 @@ No executable check: the mode is instructions that a model follows; the commands
 
 - **WHEN** the author asks to write from an outline whose first untraced record is in an approved section, and confirms what is shown
 - **THEN** the skill writes it through `write commit` with `--outline`, shows the reader's findings before asking, and `outline trace` lists the record afterwards
+
+---
 
 <!-- @trace
 source: idd-51-skill-mode
@@ -337,7 +344,6 @@ code:
   - CLAUDE.md
 -->
 
----
 ### Requirement: Reorganize mode rewrites a finished manuscript from its revised outline
 
 The construct skill SHALL have a reorganize mode that rewrites a finished manuscript from an outline revised and approved as a whole with the outline skill, through `propositions write prepare --rewrite`, behind one confirmation. It stops unless `propositions outline status` shows every section and the order of sections standing as approved. In the staged copies it writes the sections in the outline's order, each paragraph from one record: a record that carries `carry` is its `from` block copied with only its `edits`; any other says its points, keeping as written each sentence of its `from` passages that still says a point; `pending` points get placeholders; what is not a paragraph (preamble, title, bibliography) stays. It brings the staged ledger up with the extraction skill's revision mode, retiring a proposition that is not found again with the new propositions of the record whose `from` names its passage as replacements (none when no record names it); rebuilds the two structure sidecars by annotate mode; writes `outline-map.jsonl`; runs `write check`, the ledger validator, the structure validator, `revise check` and `cite-order` on the copies; dispatches `propositions:outline-point-reader` for each paragraph written from a record that does not carry `carry`; shows the author the diff of every changed file, the counts of propositions found again, retired and added, the placeholders and the readers' findings; asks once; and runs `write commit` on confirmation, reporting where the originals are (`backup/restore.jsonl`) and running `outline trace` after it. A change to the copies after the question runs the gates and the readers again and asks again.
@@ -348,6 +354,8 @@ No executable check: the mode is instructions that a model follows; the commands
 
 - **WHEN** the author asks to reorganize a finished draft whose revised outline stands as approved as a whole, and confirms what is shown
 - **THEN** the skill writes the rewritten manuscript, the ledger and the sidecars through `write commit`, and `outline trace` lists one record per paragraph record
+
+---
 
 <!-- @trace
 source: idd-115-skill-mode
@@ -361,14 +369,13 @@ code:
   - plugins/propositions/.claude-plugin/plugin.json
 -->
 
----
 ### Requirement: Write mode and reorganize mode follow the article file, the plan of commitments and the destinations
 
 In write mode, the construct skill SHALL read the `banned` list of the staged `article.json`, when `write prepare` copied one, before it writes the paragraph, and not write those phrasings; when `write check` reports one, it rewords the paragraph and does not change `article.json`.
 
 When it writes from an outline record, the skill SHALL: make the paragraph open and discharge exactly what the record's `opens` and `discharges` plan, with those ids and kinds in the records it adds, and nothing when another record of the outline plans commitments and this one does not; tell the author, before writing, each `[unread]` line that `write prepare` printed; when `write prepare` says the section goes to a part and names the files of another document, run it again with those files and the sidecars beside that ledger, and stop when `article.json` names no destination for the part; and, after the commit, when the outline or `article.json` carries a `length`, run `propositions outline length` (with `--written` when there are destinations) and report the section's line, the parts and the limit.
 
-In reorganize mode the skill SHALL, with destinations, rewrite one document in a run: only the sections that go to it, with `outline-map.jsonl` listing only their records; and stop when the revised outline moves content from one document to another.
+In reorganize mode the skill SHALL, with destinations, rewrite one document in a run: only the sections that go to it, with `outline-map.jsonl` listing only their records; and, when the revised outline moves content from one document to another, rewrite in two runs: first the document that receives it, then the document that gives it up, whose retirements name the new propositions as `{"ledger", "id"}` replacements and whose `revise` commands on the staged ledger get `--ledger-dir` with the directory of the original ledger (the capabilities `write` and `revise`).
 
 No executable check: the modes are instructions that a model follows; the commands they run are tested under the capabilities `write` and `article-outline`.
 
@@ -382,4 +389,20 @@ source: idd-120-skills
 updated: 2026-11-22
 code:
   - propositions-projects.code-workspace
+-->
+
+<!-- @trace
+source: idd-133-fix2
+updated: 2026-11-23
+code:
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/skills/prop-extract/SKILL.md
+  - Sources/PropositionsKit/Version.swift
+  - Sources/PropositionsKit/ReviseOtherLedger.swift
+  - propositions-projects.code-workspace
+  - Sources/PropositionsKit/CLI.swift
+  - tests/PropositionsKitTests/ReviseOtherLedgerTests.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - CLAUDE.md
 -->

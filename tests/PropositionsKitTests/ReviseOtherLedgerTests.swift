@@ -84,6 +84,37 @@ struct ReviseOtherLedgerTests {
         #expect(result.stderr.first?.contains("run revise check") == true)
     }
 
+    @Test func `Redirect on a staged copy resolves the other ledger from --ledger-dir`() throws {
+        let (box, _) = try ledgers()
+        #expect(run(Self.retire("old=supp/supp.jsonl#s1") + ["--write"], in: box).exitCode == 0)
+        _ = try box.write(try String(contentsOf: box.url.appendingPathComponent("main.jsonl"), encoding: .utf8), to: "stage/ledger/main.jsonl")
+        _ = try box.write(Rows.main, to: "stage/main.tex")
+        let arguments = ["redirect", "--jsonl", "stage/ledger/main.jsonl", "--tex", "stage/main.tex"]
+        #expect(run(arguments, in: box).exitCode == 2)
+        let result = run(arguments + ["--ledger-dir", "."], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains("drop c: old is replaced only in another ledger (supp/supp.jsonl#s1), which a citation cannot cross"))
+    }
+
+    @Test func `Redirect does not judge a retirement nothing cites`() throws {
+        let (box, _) = try ledgers()
+        // gone2 is cited by d; retire b, which nothing cites, with a replacement in a ledger that is missing.
+        _ = try box.write(Rows.rows.map { $0 + "\n" }.joined().replacingOccurrences(of: #""text": "Second.", "location": "main.tex:L2", "cites": []}"#,
+            with: #""text": "Second.", "location": "main.tex:L2", "cites": [], "retired": {"since": "2026-11-23", "mechanism": "removed", "match": "exact", "reason": "x", "replaced_by": [{"ledger": "none/none.jsonl", "id": "z"}]}}"#), to: "main.jsonl")
+        #expect(run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex"], in: box).exitCode != 2)
+    }
+
+    @Test func `A symlink to a hard link of this ledger counts as this ledger`() throws {
+        let (box, _) = try ledgers()
+        let fm = FileManager.default
+        try fm.createDirectory(at: box.url.appendingPathComponent("e"), withIntermediateDirectories: true)
+        try fm.linkItem(at: box.url.appendingPathComponent("main.jsonl"), to: box.url.appendingPathComponent("e/hl.jsonl"))
+        try fm.createSymbolicLink(atPath: box.url.appendingPathComponent("supp/x.jsonl").path, withDestinationPath: "../e/hl.jsonl")
+        let result = run(Self.retire("old=supp/x.jsonl#b"), in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.first?.contains("names this ledger") == true)
+    }
+
     @Test func `A malformed item is a problem, not an id`() throws {
         let (box, _) = try ledgers()
         _ = try box.write(Rows.row("a", "main.tex:L1", "First.") + "\n"

@@ -661,7 +661,7 @@ title, the bibliography, `\end{document}`. Change an included file only when the
 text into or out of it.
 
 **G4 — Bring the ledger up, in the copies.** Run the revision mode of `/propositions:prop-extract` (R1
-to R6 there, and R8 for the new propositions) on the staged ledger and the staged main file, with these two choices:
+to R6 there, and R8 for the new propositions) on the staged ledger and the staged main file, with these choices:
 
 - In its retire step, the replacements of a proposition that is not found again are the new
   propositions of the paragraph whose record names, in `from`, the passage the proposition stood
@@ -672,8 +672,9 @@ to R6 there, and R8 for the new propositions) on the staged ledger and the stage
 - When the passage moved to another document (the second of the two runs), its replacements are
   the propositions that the first run wrote in that document's ledger: write each one
   `<ledger>#<id>`, the path relative to the directory of the original ledger (not of the staged
-  copy), and give `revise retire` and `revise check` `--ledger-dir "<directory of the original
-  ledger>"`. A citation is not carried into the other ledger: `redirect` drops it and says so.
+  copy), and give `revise retire`, `revise redirect` and `revise check` `--ledger-dir "<directory
+  of the original ledger>"`, in this run and in every later rewrite of this document. A citation
+  is not carried into the other ledger: `redirect` drops it and says so.
 
 **G5 — Rebuild the sidecars, in the copies.** The paragraphs changed, so `discourse.jsonl` and
 `structure.json` are annotated again for the new text, as annotate mode does (A2 to A4), in the

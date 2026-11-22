@@ -77,7 +77,7 @@ public enum ReviseRun {
 
     /// Exit codes: 0 written, or nothing to redirect; 1 a dry run that would change the ledger;
     /// 2 a file cannot be read, a line is not JSON, or an argument is wrong.
-    public static func redirect(jsonl: String, tex: String, write: Bool, workingDirectory: URL) -> CommandResult {
+    public static func redirect(jsonl: String, tex: String, ledgerDir: String? = nil, write: Bool, workingDirectory: URL) -> CommandResult {
         guard let snapshot = readLedger(jsonl, workingDirectory) else {
             return refuse("ledger not found, or not a regular file that can be read: \(CiteOrder.visible(jsonl))")
         }
@@ -86,7 +86,7 @@ public enum ReviseRun {
         do {
             let order: ReadingOrder
             do { order = try ReadingOrder(mainFile: main) } catch { throw Revise.Failure(message: CiteOrder.visible("\(error)")) }
-            let (new, out, unplaced) = try ReviseLedger.redirect(snapshot.data, order: order, others: others(jsonl, ledgerDir: nil, workingDirectory))
+            let (new, out, unplaced) = try ReviseLedger.redirect(snapshot.data, order: order, others: others(jsonl, ledgerDir: ledgerDir, workingDirectory))
             let notes = unplaced.map { "[warn] \($0) has no location in the input tree: the replacements it cites are not checked for order" }
             return finish(out, new: new, snapshot: snapshot, jsonl: jsonl, write: write, directory: workingDirectory, notes: notes)
         } catch let failure as Revise.Failure {

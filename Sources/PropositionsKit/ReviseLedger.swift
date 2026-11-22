@@ -220,6 +220,7 @@ enum ReviseLedger {
         var replacements: [[UInt32]: [String]] = [:]
         // Replacements in another ledger: a citation cannot follow them (issue 133).
         var elsewhere: [[UInt32]: [String]] = [:]
+        var checkLater: [[UInt32]: [(Replacement, String, String, Int)]] = [:]
         var retiredIDs = Set<[UInt32]>()
         var places: [[UInt32]: [Int]] = [:]
         for line in all {
@@ -233,10 +234,10 @@ enum ReviseLedger {
                 }
                 let parsed = items.compactMap { $0 }
                 let ids = parsed.compactMap { item -> String? in if case .here(let new) = item { return new }; return nil }
-                for item in parsed {
-                    if case .there(let ledger, let other) = item, let why = others.why(ledger, other) {
-                        throw Revise.Failure(message: "\(item.shown), which replaces \(CiteOrder.visible(id)) (line \(line.number)), \(why); run revise check")
-                    }
+                // Checked only when a live proposition cites this retirement (the citation loop below).
+                checkLater[key(id)] = parsed.compactMap { item in
+                    if case .there(let ledger, let other) = item { return (item, ledger, other, line.number) }
+                    return nil
                 }
                 elsewhere[key(id)] = parsed.compactMap { item -> String? in if case .there = item { return item.shown }; return nil }
                 for new in ids {
@@ -275,6 +276,11 @@ enum ReviseLedger {
                 guard retiredIDs.contains(key(cited)) else {
                     if kept.insert(key(cited)).inserted { result.append(cited) }
                     continue
+                }
+                for (item, ledger, other, number) in checkLater[key(cited)] ?? [] {
+                    if let why = others.why(ledger, other) {
+                        throw Revise.Failure(message: "\(item.shown), which replaces \(shown) (line \(number)), \(why); run revise check")
+                    }
                 }
                 let away = elsewhere[key(cited)] ?? []
                 guard let list = replacements[key(cited)], !list.isEmpty else {

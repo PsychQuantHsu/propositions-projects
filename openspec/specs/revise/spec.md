@@ -55,6 +55,8 @@ It exits with 0 when every proposition is in place, or when `--write` wrote ever
 
 ---
 
+---
+
 <!-- @trace
 source: idd-56-fix1
 updated: 2026-11-21
@@ -86,6 +88,8 @@ The command SHALL refuse, with exit 2, one line on standard error that starts wi
 - **GIVEN** a ledger of seven propositions, among them `old`, `b`, `c` and `gone2`
 - **WHEN** `propositions revise retire --retire old=b,c --retire gone2 --since 2026-11-21 --reason "revised draft"` runs, then again with `--write`
 - **THEN** the dry run prints `retire old: replaced by b, c` and `retire gone2: deleted, no replacement` and exits with 1; after writing, the line of `old` ends with `"retired": {"since": "2026-11-21", "mechanism": "removed", "match": "exact", "reason": "revised draft", "replaced_by": ["b", "c"]}`, the line of `gone2` with the same block and `"replaced_by": []`, the five other lines are as they were, and `propositions revise check` prints `1 replaced, 1 deleted, 0 without replaced_by, 0 problem(s)`
+
+---
 
 ---
 
@@ -137,6 +141,8 @@ code:
 
 ---
 
+---
+
 <!-- @trace
 source: idd-56-fix1
 updated: 2026-11-21
@@ -184,6 +190,8 @@ It prints a line for each citation it drops (`drop <citing>: …`), each it redi
 - **GIVEN** the ledger of the retirement example after writing, in which `c` (line 3 of the manuscript) cites `old` and `a`, `d` (line 4) cites `gone2` and `old`, and `e` (line 1) cites `old`, where `old` is replaced by `b` (line 2) and `c`
 - **WHEN** `propositions revise redirect --write` runs
 - **THEN** `c` cites `b` and `a`, `d` cites `b` and `c`, `e` cites nothing, the other lines are as they were, the command prints one line for each citation dropped or redirected and `written: main.jsonl`, exits with 0, and a second dry run prints `nothing to change`
+
+---
 
 ---
 
@@ -245,11 +253,11 @@ code:
 
 A `replaced_by` item SHALL be either a string, an id of the same ledger, or an object with exactly the keys `ledger` and `id`, each a non-empty string, naming a live proposition of another ledger; `ledger` is a path relative to the directory of the ledger that holds the retirement, not absolute (schema v1.9). Ledgers written before v1.9 need no migration.
 
-`propositions revise retire` SHALL take such a replacement written `<ledger>#<id>` after `=` (the last `#` splits the two, so an id of this ledger that holds `#` cannot be named on the command line), record it as that object, and refuse, with exit 2 and nothing written, one whose ledger cannot be read, whose id is not exactly one live line of that ledger, whose path is absolute or empty, or whose ledger is this ledger: the same path, or the same file (device and inode, so a hard link counts). `--ledger-dir <directory>` gives the directory the paths are relative to when `--jsonl` names a copy that keeps the original's file name (a copy under another name is not recognised as this ledger); without it they are relative to the ledger's own directory.
+`propositions revise retire` SHALL take such a replacement written `<ledger>#<id>` after `=` (the last `#` splits the two, so an id of this ledger that holds `#` cannot be named on the command line), record it as that object, and refuse, with exit 2 and nothing written, one whose ledger cannot be read, whose id is not exactly one live line of that ledger, whose path is absolute or empty, or whose ledger is this ledger: the same path, or the same file (device and inode after symlinks are resolved, so a hard link counts, reached directly or through a symlink). `--ledger-dir <directory>` gives the directory the paths are relative to when `--jsonl` names a copy that keeps the original's file name (a copy under another name is not recognised as this ledger); without it they are relative to the ledger's own directory.
 
-`propositions revise check` SHALL read each ledger an object names, once, and report as a problem an object whose ledger cannot be read, whose id is not exactly one live line of that ledger, or whose ledger is this ledger, and an item that is neither a string nor such an object. It takes `--ledger-dir` as `retire` does.
+`propositions revise check` SHALL read each ledger an object names, once, and report as a problem an object whose ledger cannot be read, whose id is not exactly one live line of that ledger, or whose ledger is this ledger, and an item that is neither a string nor such an object. It takes `--ledger-dir` as `retire` does, and so does `redirect`.
 
-`propositions revise redirect` SHALL NOT carry a citation into another ledger, and SHALL refuse, with exit 2, an object item of a cited retirement that `check` would report: a citation of a retired proposition whose replacements are all in other ledgers is dropped, and the line that reports it names them; when some replacements are in this ledger, the citation follows those, and a line notes the others.
+`propositions revise redirect` SHALL NOT carry a citation into another ledger, and SHALL refuse, with exit 2, an object item of a cited retirement that `check` would report (a retirement nothing cites is not judged): a citation of a retired proposition whose replacements are all in other ledgers is dropped, and the line that reports it names them; when some replacements are in this ledger, the citation follows those, and a line notes the others.
 
 #### Scenario: A passage moved to another document
 
@@ -302,4 +310,20 @@ code:
   - propositions-projects.code-workspace
   - tests/PropositionsKitTests/WriteRewriteTests.swift
   - plugins/propositions/skills/prop-ledger/SKILL.md
+-->
+
+<!-- @trace
+source: idd-133-fix2
+updated: 2026-11-23
+code:
+  - Sources/PropositionsKit/ReviseLedger.swift
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/skills/prop-extract/SKILL.md
+  - Sources/PropositionsKit/Version.swift
+  - Sources/PropositionsKit/ReviseOtherLedger.swift
+  - propositions-projects.code-workspace
+  - Sources/PropositionsKit/CLI.swift
+  - tests/PropositionsKitTests/ReviseOtherLedgerTests.swift
+  - Sources/PropositionsKit/ReviseRun.swift
+  - CLAUDE.md
 -->

@@ -42,7 +42,7 @@ public enum PropositionsCLI {
                 return ReviseRun.check(jsonl: check.jsonl, ledgerDir: check.ledgerDir, workingDirectory: workingDirectory)
             }
             if let redirect = command as? RedirectOptions {
-                return ReviseRun.redirect(jsonl: redirect.jsonl, tex: redirect.tex, write: redirect.write,
+                return ReviseRun.redirect(jsonl: redirect.jsonl, tex: redirect.tex, ledgerDir: redirect.ledgerDir, write: redirect.write,
                                           workingDirectory: workingDirectory)
             }
             if let prepare = command as? WritePrepareOptions {
@@ -464,6 +464,9 @@ struct RedirectOptions: ParsableCommand {
 
     @Option(help: "The manuscript's main file.")
     var tex: String
+
+    @Option(help: "The directory a {\"ledger\", \"id\"} path is relative to, when --jsonl is a copy with the original's file name (default: the ledger's own).")
+    var ledgerDir: String?
 
     @Flag(help: "Write the ledger.")
     var write = false

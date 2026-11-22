@@ -67,7 +67,7 @@ extension ReviseLedger {
         init(directory: URL, itself: [URL]) {
             self.directory = directory
             self.itself = Set(itself.map(OtherLedgers.place))
-            self.itselfFiles = Set(itself.compactMap(OtherLedgers.file))
+            self.itselfFiles = Set(itself.compactMap { OtherLedgers.file($0.resolvingSymlinksInPath()) })
         }
 
         static func place(_ url: URL) -> String { url.resolvingSymlinksInPath().standardizedFileURL.path }
@@ -83,7 +83,7 @@ extension ReviseLedger {
         func why(_ path: String, _ id: String) -> String? {
             let url = directory.appendingPathComponent(path)
             let place = Self.place(url)
-            if itself.contains(place) || Self.file(url).map(itselfFiles.contains) == true { return "names this ledger: write the id alone" }
+            if itself.contains(place) || Self.file(url.resolvingSymlinksInPath()).map(itselfFiles.contains) == true { return "names this ledger: write the id alone" }
             if read.index(forKey: place) == nil {
                 // updateValue keeps a ledger that cannot be read as a nil entry; a subscript would drop it.
                 read.updateValue(LedgerOrder.read(url).flatMap { try? ReviseLedger.lines($0.data) }.map(census), forKey: place)

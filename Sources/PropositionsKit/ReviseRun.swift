@@ -86,7 +86,7 @@ public enum ReviseRun {
         do {
             let order: ReadingOrder
             do { order = try ReadingOrder(mainFile: main) } catch { throw Revise.Failure(message: CiteOrder.visible("\(error)")) }
-            let (new, out, unplaced) = try ReviseLedger.redirect(snapshot.data, order: order)
+            let (new, out, unplaced) = try ReviseLedger.redirect(snapshot.data, order: order, others: others(jsonl, ledgerDir: nil, workingDirectory))
             let notes = unplaced.map { "[warn] \($0) has no location in the input tree: the replacements it cites are not checked for order" }
             return finish(out, new: new, snapshot: snapshot, jsonl: jsonl, write: write, directory: workingDirectory, notes: notes)
         } catch let failure as Revise.Failure {

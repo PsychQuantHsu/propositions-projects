@@ -405,7 +405,7 @@ struct RetireOptions: ParsableCommand {
     @Option(help: "<id> or <id>=<new id>,<new id>; a new id in another ledger is <ledger>#<id>. Repeat for each proposition.")
     var retire: [String] = []
 
-    @Option(help: "The directory a <ledger>#<id> path is relative to, when --jsonl is a copy (default: the ledger's own).")
+    @Option(help: "The directory a <ledger>#<id> path is relative to, when --jsonl is a copy with the original's file name (default: the ledger's own).")
     var ledgerDir: String?
 
     @Option(help: "The date the passage left the paper, YYYY-MM-DD.")
@@ -430,7 +430,7 @@ struct RetireOptions: ParsableCommand {
 struct ReviseCheckOptions: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "check",
-        abstract: "Check that every replaced_by names live propositions of the ledger.",
+        abstract: "Check that every replaced_by names live propositions, of the ledger or of the one it names.",
         discussion: """
             Reports each id of a replaced_by that is not a proposition of the ledger, is retired, \
             or is the retired proposition itself, and counts the retirements that are replaced, \
@@ -443,7 +443,7 @@ struct ReviseCheckOptions: ParsableCommand {
     @Option(help: "The ledger.")
     var jsonl: String
 
-    @Option(help: "The directory the ledger paths are relative to, when --jsonl is a copy (default: the ledger's own).")
+    @Option(help: "The directory the ledger paths are relative to, when --jsonl is a copy with the original's file name (default: the ledger's own).")
     var ledgerDir: String?
 }
 

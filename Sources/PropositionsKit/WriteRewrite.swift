@@ -89,16 +89,20 @@ public enum WriteRewrite {
     /// Each `{"ledger", "id"}` replacement of a proposition this rewrite retires has to name one live
     /// proposition of that ledger, the path read from the directory of the original ledger, since the
     /// staged copy lives elsewhere (issue 133). Retirements already in the ledger are not judged again.
-    static func otherLedgers(old: Data, new: Data, ledger: URL) -> [String] {
+    static func otherLedgers(old: Data, new: Data, ledger: URL, staged: URL) -> [String] {
         guard let before = try? ReviseLedger.lines(old), let after = try? ReviseLedger.lines(new) else { return [] }
         let wasRetired = Set(before.filter(\.isRetired).compactMap(\.id).map(ReviseLedger.key))
-        let others = ReviseLedger.OtherLedgers(directory: ledger.deletingLastPathComponent(), itself: [ledger])
+        let others = ReviseLedger.OtherLedgers(directory: ledger.deletingLastPathComponent(), itself: [ledger, staged])
         var problems: [String] = []
         for line in after where line.isRetired {
             guard let id = line.id, !wasRetired.contains(ReviseLedger.key(id)),
                   let items = line.retired?.members?.last(where: { $0.key == "replaced_by" })?.value.array else { continue }
             for item in items {
-                guard let replacement = ReviseLedger.replacement(item), case .there(let path, let other) = replacement else { continue }
+                guard let replacement = ReviseLedger.replacement(item) else {
+                    problems.append("the replaced_by of \(CiteOrder.visible(id)) holds a value that is neither an id nor {\"ledger\", \"id\"}")
+                    continue
+                }
+                guard case .there(let path, let other) = replacement else { continue }
                 if let why = others.why(path, other) {
                     problems.append("\(CiteOrder.visible(id)) is replaced by \(replacement.shown), which \(why)")
                 }

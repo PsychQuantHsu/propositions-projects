@@ -647,7 +647,8 @@ public enum WriteParagraph {
         let ledger = WriteRewrite.ledger(old: payload.originals["ledger"]!.data, new: payload.staged["ledger"]!)
         report.problems += ledger.problems
         report.problems += WriteRewrite.otherLedgers(old: payload.originals["ledger"]!.data, new: payload.staged["ledger"]!,
-                                                     ledger: URL(fileURLWithPath: manifest.originals["ledger"]!))
+                                                     ledger: URL(fileURLWithPath: manifest.originals["ledger"]!),
+                                                     staged: URL(fileURLWithPath: manifest.staged["ledger"]!))
         report.newPropositions = ledger.added.count
         report.firstNew = ledger.added.first
         if String(data: payload.staged["discourse"]!, encoding: .utf8) == nil || (try? ReviseLedger.lines(payload.staged["discourse"]!)) == nil {

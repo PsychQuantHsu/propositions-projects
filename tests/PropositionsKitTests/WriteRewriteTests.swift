@@ -173,6 +173,38 @@ struct WriteRewriteTests {
         #expect(result.stdout.contains { $0.contains("is replaced by ../supp/supp.jsonl#s9, which is no proposition of that ledger") })
     }
 
+    @Test func `The rewrite check judges the bytes load read, though the file changes after`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let stage = box.url.appendingPathComponent("stage")
+        let manifest = try WriteParagraph.manifest(stage)
+        let payload = try WriteParagraph.load(manifest)
+        // After load, the staged main file changes on disk so that the new proposition is mid-paragraph.
+        try edit(box, "stage/manuscript/main.tex") { text in
+            var lines = text.components(separatedBy: "\n")
+            lines[28] = "Joined to the paragraph."
+            return lines.joined(separator: "\n")
+        }
+        #expect(!WriteParagraph.rewriteCheck(manifest, payload).problems.contains { $0.contains("does not start a paragraph") })
+        #expect(WriteParagraph.rewriteCheck(manifest, try WriteParagraph.load(manifest)).problems.contains { $0.contains("does not start a paragraph") })
+    }
+
+    @Test func `A malformed replacement or one naming this ledger's staged copy is a problem of the rewrite`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let replaced = #""replaced_by": ["\#(Self.new)"]"#
+        for (item, why) in [(#"{"ledger": "../supp/supp.jsonl", "id": "s1", "x": 1}"#, "neither an id nor"),
+                            (#"{"ledger": "../../stage/ledger/main.jsonl", "id": "\#(Self.new)"}"#, "names this ledger")] {
+            try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: replaced, with: #""replaced_by": [\#(item)]"#) }
+            let result = run(["check", "--stage", "stage"], in: box)
+            #expect(result.exitCode == 1)
+            #expect(result.stdout.contains { $0.contains(why) }, "\(result.stdout)")
+            try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: #""replaced_by": [\#(item)]"#, with: replaced) }
+        }
+    }
+
     @Test func `A rewrite writes the trace anew and keeps the old one with a restore list`() throws {
         let box = try setUp()
         _ = try box.write(#"{"outline": "p-9", "first_prop": "x", "section": "s-z", "approval_line": 1}"# + "\n", to: "paper/outline/outline-trace.jsonl")

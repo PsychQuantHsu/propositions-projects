@@ -58,22 +58,32 @@ extension ReviseLedger {
     final class OtherLedgers {
         /// The directory the paths are relative to: that of the ledger, or the one given for a copy.
         let directory: URL
-        /// The places that are this ledger itself.
+        /// The places that are this ledger itself, by path and by file (device and inode, so that a
+        /// hard link counts too).
         let itself: Set<String>
+        let itselfFiles: Set<[UInt64]>
         private var read: [String: (live: [[UInt32]: Int], retired: [[UInt32]: Int])?] = [:]
 
         init(directory: URL, itself: [URL]) {
             self.directory = directory
             self.itself = Set(itself.map(OtherLedgers.place))
+            self.itselfFiles = Set(itself.compactMap(OtherLedgers.file))
         }
 
         static func place(_ url: URL) -> String { url.resolvingSymlinksInPath().standardizedFileURL.path }
+
+        static func file(_ url: URL) -> [UInt64]? {
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let device = (attributes[.systemNumber] as? NSNumber)?.uint64Value,
+                  let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value else { return nil }
+            return [device, inode]
+        }
 
         /// Why `id` does not name exactly one live proposition of the ledger at `path`, or `nil`.
         func why(_ path: String, _ id: String) -> String? {
             let url = directory.appendingPathComponent(path)
             let place = Self.place(url)
-            if itself.contains(place) { return "names this ledger: write the id alone" }
+            if itself.contains(place) || Self.file(url).map(itselfFiles.contains) == true { return "names this ledger: write the id alone" }
             if read.index(forKey: place) == nil {
                 // updateValue keeps a ledger that cannot be read as a nil entry; a subscript would drop it.
                 read.updateValue(LedgerOrder.read(url).flatMap { try? ReviseLedger.lines($0.data) }.map(census), forKey: place)

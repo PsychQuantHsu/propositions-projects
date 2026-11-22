@@ -214,7 +214,7 @@ enum ReviseLedger {
     /// replace it, in their order, those already cited and those that come later in reading order
     /// left out; a citation of a retired proposition without a replacement is dropped. Other
     /// citations are left as they are.
-    static func redirect(_ data: Data, order: ReadingOrder) throws -> (Data, [String], unplaced: [String]) {
+    static func redirect(_ data: Data, order: ReadingOrder, others: OtherLedgers) throws -> (Data, [String], unplaced: [String]) {
         let all = try lines(data)
         let counts = census(all)
         var replacements: [[UInt32]: [String]] = [:]
@@ -233,6 +233,11 @@ enum ReviseLedger {
                 }
                 let parsed = items.compactMap { $0 }
                 let ids = parsed.compactMap { item -> String? in if case .here(let new) = item { return new }; return nil }
+                for item in parsed {
+                    if case .there(let ledger, let other) = item, let why = others.why(ledger, other) {
+                        throw Revise.Failure(message: "\(item.shown), which replaces \(CiteOrder.visible(id)) (line \(line.number)), \(why); run revise check")
+                    }
+                }
                 elsewhere[key(id)] = parsed.compactMap { item -> String? in if case .there = item { return item.shown }; return nil }
                 for new in ids {
                     if let why = unresolved(new, counts) {

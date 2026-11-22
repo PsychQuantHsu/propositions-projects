@@ -189,7 +189,7 @@ separate so an extraction failure never pollutes a clean scaffold).
    - Copy templates from [`../../templates/ledger/`](../../templates/ledger/README.md), filling
      `{{TEX_PATH}}` (main file, relative to repo root), `{{ANCHOR_COMMIT}}`
      (`git -C <repo> rev-parse --short HEAD`), `{{SCAFFOLD_DATE}}`, `{{LEDGER_DIR}}`,
-     `{{PROFILE}}` (`default` or `empirical`; the template is schema 1.9).
+     `{{PROFILE}}` (`default` or `empirical`; the template is schema 1.8).
    - Copy **pinned snapshots** of the canonical contracts *at scaffold time*:
      `docs/SCHEMA.md` → ledger `SCHEMA.md`, `docs/EXTRACTION-PROMPT.md` → ledger
      `EXTRACTION-PROMPT.md`. The templates directory deliberately carries no copy of

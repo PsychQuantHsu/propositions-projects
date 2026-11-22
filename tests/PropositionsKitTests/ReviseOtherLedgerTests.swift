@@ -71,6 +71,19 @@ struct ReviseOtherLedgerTests {
         #expect(run(["check", "--jsonl", "stage/ledger/main.jsonl", "--ledger-dir", "."], in: box).exitCode == 0)
     }
 
+    @Test func `A hard link of this ledger counts as this ledger, and redirect checks the other ledger`() throws {
+        let (box, _) = try ledgers()
+        try FileManager.default.linkItem(at: box.url.appendingPathComponent("main.jsonl"), to: box.url.appendingPathComponent("supp/link.jsonl"))
+        let linked = run(Self.retire("old=supp/link.jsonl#b"), in: box)
+        #expect(linked.exitCode == 2)
+        #expect(linked.stderr.first?.contains("names this ledger") == true)
+        #expect(run(Self.retire("old=supp/supp.jsonl#s1") + ["--write"], in: box).exitCode == 0)
+        try FileManager.default.removeItem(at: box.url.appendingPathComponent("supp/supp.jsonl"))
+        let result = run(["redirect", "--jsonl", "main.jsonl", "--tex", "main.tex"], in: box)
+        #expect(result.exitCode == 2)
+        #expect(result.stderr.first?.contains("run revise check") == true)
+    }
+
     @Test func `A malformed item is a problem, not an id`() throws {
         let (box, _) = try ledgers()
         _ = try box.write(Rows.row("a", "main.tex:L1", "First.") + "\n"

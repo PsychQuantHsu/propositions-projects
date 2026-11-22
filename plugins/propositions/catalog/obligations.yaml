@@ -66,7 +66,7 @@ entries:
   - id: index.replacements-hold
     class: precondition
     unit: article
-    criterion: "Every proposition named in a retirement's replaced_by is a live proposition of the ledger, other than the retired one."
+    criterion: "Every proposition named in a retirement's replaced_by is a live proposition of the ledger, other than the retired one, or, for an item {ledger, id}, of the ledger it names."
     check: ledger:replaced-by
     verified_by: [mechanical]
     on_warning: judge

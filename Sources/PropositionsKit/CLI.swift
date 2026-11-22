@@ -454,9 +454,14 @@ struct RedirectOptions: ParsableCommand {
         discussion: """
             A dry run unless --write is given. A citation of a retired proposition becomes its \
             replacements, those that do not come before the citing proposition in reading order \
-            left out; one without replacements is dropped. Other citations are left as they are.
+            left out; one without replacements is dropped. Other citations are left as they are. \
+            A citation is not carried into another ledger: one whose replacements are all \
+            {"ledger", "id"} items is dropped, and a note names the items of another ledger when \
+            some replacements are in this one. With --ledger-dir, those paths are read from the \
+            original's directory, as revise check reads them.
             Exit codes: 0 written, or nothing to change; 1 a dry run that would change the ledger; \
-            2 a file cannot be read, a line is not JSON, or an argument is wrong.
+            2 a file cannot be read, a line is not JSON, an argument is wrong, or an item of a cited \
+            retirement names no live proposition of the ledger it names.
             """)
 
     @Option(help: "The ledger.")

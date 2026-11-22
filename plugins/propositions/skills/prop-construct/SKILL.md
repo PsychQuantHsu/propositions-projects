@@ -674,7 +674,13 @@ to R6 there, and R8 for the new propositions) on the staged ledger and the stage
   `<ledger>#<id>`, the path relative to the directory of the original ledger (not of the staged
   copy), and give `revise retire`, `revise redirect` and `revise check` `--ledger-dir "<directory
   of the original ledger>"`, in this run and in every later rewrite of this document. A citation
-  is not carried into the other ledger: `redirect` drops it and says so.
+  is not carried into the other ledger: `redirect` drops it and says so. The propositions of a
+  moved paragraph are those of the other ledger from the `first_prop` the first run traced for
+  it, in reading order, up to the next traced paragraph.
+- When `revise check` reports an item of another ledger that is retired (the receiving document
+  retired it later), no command can change that retirement and the rewrite refuses to: stop and
+  tell the author that the retirement in the original ledger has to be edited by hand, outside
+  a rewrite, before this document can be rewritten.
 
 **G5 — Rebuild the sidecars, in the copies.** The paragraphs changed, so `discourse.jsonl` and
 `structure.json` are annotated again for the new text, as annotate mode does (A2 to A4), in the

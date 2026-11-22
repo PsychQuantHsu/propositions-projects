@@ -53,10 +53,6 @@ It exits with 0 when every proposition is in place, or when `--write` wrote ever
 
 ---
 
----
-
----
-
 <!-- @trace
 source: idd-56-fix1
 updated: 2026-11-21
@@ -88,8 +84,6 @@ The command SHALL refuse, with exit 2, one line on standard error that starts wi
 - **GIVEN** a ledger of seven propositions, among them `old`, `b`, `c` and `gone2`
 - **WHEN** `propositions revise retire --retire old=b,c --retire gone2 --since 2026-11-21 --reason "revised draft"` runs, then again with `--write`
 - **THEN** the dry run prints `retire old: replaced by b, c` and `retire gone2: deleted, no replacement` and exits with 1; after writing, the line of `old` ends with `"retired": {"since": "2026-11-21", "mechanism": "removed", "match": "exact", "reason": "revised draft", "replaced_by": ["b", "c"]}`, the line of `gone2` with the same block and `"replaced_by": []`, the five other lines are as they were, and `propositions revise check` prints `1 replaced, 1 deleted, 0 without replaced_by, 0 problem(s)`
-
----
 
 ---
 
@@ -141,8 +135,6 @@ code:
 
 ---
 
----
-
 <!-- @trace
 source: idd-56-fix1
 updated: 2026-11-21
@@ -190,8 +182,6 @@ It prints a line for each citation it drops (`drop <citing>: …`), each it redi
 - **GIVEN** the ledger of the retirement example after writing, in which `c` (line 3 of the manuscript) cites `old` and `a`, `d` (line 4) cites `gone2` and `old`, and `e` (line 1) cites `old`, where `old` is replaced by `b` (line 2) and `c`
 - **WHEN** `propositions revise redirect --write` runs
 - **THEN** `c` cites `b` and `a`, `d` cites `b` and `c`, `e` cites nothing, the other lines are as they were, the command prints one line for each citation dropped or redirected and `written: main.jsonl`, exits with 0, and a second dry run prints `nothing to change`
-
----
 
 ---
 

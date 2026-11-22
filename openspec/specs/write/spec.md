@@ -49,8 +49,6 @@ The paragraph, its propositions and its records are made in the copies (the skil
 
 ---
 
----
-
 <!-- @trace
 source: idd-49-write
 updated: 2026-11-21
@@ -105,8 +103,6 @@ When the ledger has no live proposition, `propositions write prepare` SHALL plac
 
 ---
 
----
-
 <!-- @trace
 source: idd-51-write-from-outline
 updated: 2026-11-21
@@ -138,8 +134,6 @@ code:
 
 ---
 
----
-
 <!-- @trace
 source: idd-51-fix1
 updated: 2026-11-21
@@ -164,8 +158,6 @@ code:
 - **GIVEN** the structure fixture and an outline with sections `s-a` and `s-b`, paragraph records `p-1` (in `s-a`) and `p-3` (in `s-b`), and one approval record, on line 1, with an entry for `s-a` only
 - **WHEN** `write prepare` runs with `--outline-paragraph p-3`, then with `--outline` alone, then with `--outline-paragraph p-1`, the paragraph and one proposition are made, and `write commit` runs
 - **THEN** the first exits with 2 and says that the section does not stand as approved; the second exits with 2; the third and the commit exit with 0, and `outline-trace.jsonl` is `{"outline": "p-1", "first_prop": "019a3c5e-7a00-7000-8000-00000000000d", "section": "s-a", "approval_line": 1}` and a line feed
-
----
 
 ---
 
@@ -345,8 +337,6 @@ A text holds a banned phrasing when the phrasing occurs in it under this compari
 
 ---
 
----
-
 <!-- @trace
 source: idd-118-banned-phrasings
 updated: 2026-11-22
@@ -393,8 +383,6 @@ An outline that plans no commitment is not compared.
 
 ---
 
----
-
 <!-- @trace
 source: idd-116-planned-commitments
 updated: 2026-11-22
@@ -422,8 +410,6 @@ When a paragraph is written from an outline record, `propositions write prepare`
 - **GIVEN** an outline approved as a whole whose section carries two `unread` entries for the same file
 - **WHEN** `write prepare --rewrite --outline …` runs
 - **THEN** it exits with 0 and standard error holds two `[unread]` lines
-
----
 
 ---
 
@@ -475,8 +461,6 @@ Without `article.json`, or without `destinations` in it, the commands behave as 
 
 ---
 
----
-
 <!-- @trace
 source: idd-120-destinations
 updated: 2026-11-22
@@ -523,8 +507,6 @@ On a rewrite, `write check` SHALL report as a problem a staged manuscript whose 
 
 ---
 
----
-
 <!-- @trace
 source: idd-118-fix1
 updated: 2026-11-22
@@ -558,8 +540,6 @@ A destination is the document given when its `tex` and `jsonl` name the same fil
 - **GIVEN** the two documents, with a trace that holds one record of the supplement, ending in CR LF, whose `first_prop` is the id the main text's new paragraph will use
 - **WHEN** the paragraph `p-1` is written into the main text and committed; and, in another run, the main text is rewritten and committed
 - **THEN** the first commit exits with 0; after the rewrite the first bytes of the trace are the supplement's record with its CR LF
-
----
 
 ---
 

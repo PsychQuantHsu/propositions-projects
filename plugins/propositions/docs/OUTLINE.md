@@ -1345,9 +1345,10 @@ one document: `outline-map.jsonl` lists the records whose sections go to that do
 trace records of the other documents are kept as they were. The whole outline still has to
 stand as approved. `propositions outline trace` checks the records of the document whose ledger
 it is given and lists the others, and `propositions outline length <directory> --written`
-counts each part from its own document. What is not done: a rewrite cannot move content from
-one document to another (a proposition of one ledger replaced by a proposition of another), and
-no check follows a reference from one document into another. Without `destinations`
+counts each part from its own document. Content moves from one document to another in two
+rewrites (issue 133): first the document that receives it, then the document that gives it up,
+whose retirements name the new propositions as `{"ledger", "id"}` replacements (schema v1.9). No
+citation, and no other check, follows a reference from one document into another. Without `destinations`
 everything is one document, as before.
 
 ```json

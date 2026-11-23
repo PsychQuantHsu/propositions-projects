@@ -22,7 +22,7 @@ quotes two entries as examples and no more.
 |---|---|---|
 | `id` | always | `<prefix>.<name>`, unique. The prefix is `index` for a precondition and the group for an obligation |
 | `class` | always | `precondition` or `obligation` — see [Two classes](#two-classes) |
-| `group` | obligations only | One of the seven groups — see [Seven groups](#seven-groups) |
+| `group` | obligations only | One of the eight groups — see [Eight groups](#eight-groups) |
 | `unit` | always | What the entry is decided for: `proposition` or `article` |
 | `applies` | optional | Which units the entry applies to — see [Applicability](#applicability) |
 | `criterion` | always | One line saying what has to hold. The definition of the check stays in the check's own document |
@@ -112,7 +112,7 @@ There is no third class. A finding that is reported for information only has an
 entry of its own, in whichever class fits what would be corrected if someone
 acted on it, and its warning rule says that it is information.
 
-## Seven groups
+## Eight groups
 
 Each obligation belongs to one group. A group protects one thing and answers to
 at most one axiom of the `che-axiom-systems` plugin. The table names the axiom
@@ -121,12 +121,18 @@ and does not restate it.
 | Group | Protects | Axiom |
 |---|---|---|
 | `dependence` | Every sentence depends only on what has already appeared | `academic-writing/A1_no_forward_dependence` |
+| `motivation` | Every element arrives after the text before it has raised the question it answers | `academic-writing/A2_motivated_by_prefix` |
 | `commitment` | Every commitment made to the reader is kept | not written yet |
 | `support` | Every claim is carried by the grounds given for it | not written yet |
 | `consistency` | No two statements of the article conflict | not written yet |
 | `truth` | What the article says is true, and its numbers and citations can be traced to a source | not written yet |
 | `placement` | Content sits in the section whose role fits it | not written yet |
 | `completeness` | The manuscript holds nothing left unfinished | not written yet, and possibly none |
+
+`motivation` is a property of the sequence rather than of one sentence: an example, a definition
+or a result can be true, cited and backward-dependent and still arrive before the reader holds the
+question it answers. It is a group of its own rather than part of `placement`, which is about the
+section a piece of content belongs in, not about when it appears (issue 139).
 
 The table is checked whether or not `che-axiom-systems` is installed: the
 criteria a check can act on live here, the principles live there.

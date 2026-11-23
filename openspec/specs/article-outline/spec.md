@@ -205,6 +205,7 @@ No string in a section record or a paragraph record, the name of a key included,
 - **WHEN** the format check reads the three files
 - **THEN** it reports nothing
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -213,7 +214,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A section record says in one sentence what the section says
 
 Each line of `outline-sections.jsonl` SHALL be a section record with these keys.
@@ -271,6 +271,7 @@ A section record that carries `dropped` is not part of the article. It stays in 
 - **WHEN** the format check reads each
 - **THEN** it reports the one line of each, with the file, the line number and what is wrong
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -279,7 +280,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A paragraph record holds at least one point
 
 Each line of `outline-paragraphs.jsonl` SHALL be a paragraph record with these keys.
@@ -386,6 +386,7 @@ An outline is one article. When a manuscript is cut into several articles, each 
 - **WHEN** the format check reads each
 - **THEN** it reports for the first that the records of `s-a` are not on consecutive lines, for the second that `s-a` comes before `s-b` in the section file and after it here, and nothing for the third
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -394,7 +395,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A locator names a passage by a label or by its opening words
 
 A locator SHALL be an object with these keys.
@@ -481,6 +481,7 @@ The file a locator names is allowed to be outside the manuscript, such as a note
 - **WHEN** `propositions outline locators` resolves seventeen locators
 - **THEN** the label `thm:a`, the opening words of the second proof across its line break, and opening words written with extra white space resolve; `\begin{proof}`, "It repeats." and `a a` occur twice; words that are not there and a `starts` of one space occur 0 times; `twice` occurs twice and `thm:b` not at all; and a missing file, `../outside.tex`, `/etc/hosts`, `.git/HEAD`, `secret.env`, a directory, and a locator with neither `label` nor `starts` are each reported with the record that names them
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -489,7 +490,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: An approval record stores what the author approved
 
 Each line of `outline-approvals.jsonl` SHALL be an approval record with these keys and no others.
@@ -514,6 +514,7 @@ An entry of `sections` SHALL be an object with two keys: `section`, a copy of a 
 - **WHEN** the format check reads each
 - **THEN** it reports that line with what is wrong; a `statement` that holds a line break is not reported
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -522,7 +523,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A section stands as approved while it equals its latest approved copy
 
 A section **stands as approved** when the last approval record that has an entry for it holds a `section` copy equal to the current section record and `paragraphs` copies equal, one for one and in the same order, to the current paragraph records naming that section. Two records are equal when they are the same JSON value: the order of keys does not count, `1` and `1.0` are the same number, and every key counts, defined by this capability or not. Two numbers that differ are different however long they are: the skill does not run with a tool that reads 9007199254740993 and 9007199254740992 as the same number. A section for which no approval record has an entry does not stand as approved.
@@ -639,6 +639,7 @@ The status SHALL be decided by the command `propositions outline status`, whose 
 - **WHEN** the status is asked, and asked again after an approval of the whole outline that holds `s-a` only
 - **THEN** the first answer lists `s-b` as removed since its approval, and the second lists nothing and says that the order of sections stands as approved
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -647,7 +648,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Only the author's explicit statement in the current message approves
 
 The approve action SHALL append an approval record only when both of these hold: the skill has shown the sections concerned, as they now are, earlier in the same conversation; and the author, in the message the skill is answering, states in words the author typed that the outline or those sections are approved.
@@ -770,6 +770,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** the skill recorded an approval of `s-a` an hour ago, has now shown `s-b`, and the author has not replied
 - **THEN** nothing the skill wrote down for the approval of `s-a` can be appended as an approval of `s-b`
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -778,7 +779,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A premise check runs before an outline is shown for approval
 
 Each time before the approve action shows sections for approval, the skill SHALL have those sections checked. The check SHALL begin with the checks the skill runs after a write, on the section file and the paragraph file it examines: a file that was changed by hand can hold a line that is not a record. When one of them fails, the skill reports the file and the lines, counts nothing and starts no agent. A paragraph file with no record is not reported as passing and does not stop the check: an outline can have sections and no paragraph record yet, so the skill says that the file is empty and goes on. The check reports findings of these six kinds and no others.
@@ -838,6 +838,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** a paragraph record has a locator whose `file` leads to a file outside the repository
 - **THEN** the check reports a finding of the kind "locator does not resolve" that names the record, and that file is not read and not quoted
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -846,7 +847,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Derive and draft build an outline without inventing content
 
 The derive action SHALL read a finished manuscript and produce one section record for each of its sections and one paragraph record for each of its paragraphs and blocks. It reads the manuscript's main file by its real path, after confirming again that the file meets the conditions this capability sets for it. It SHALL follow the files that the manuscript includes, whose names end in `.tex` in any letter case, only when they are regular files inside the repository that git lists (tracked, or not tracked and not ignored) and whose path holds no line break and, below the root, no other character that a locator's `file` is not allowed to hold. Any other included file is named to the author and not read: one outside the repository, a symbolic link, a file reached through a directory that is a symbolic link, a file inside a `.git` directory in any letter case, a file git ignores, a file git gives no answer for (one in or under a directory laid out like a git repository), a file whose path holds such a character, or a missing file. An include whose name does not end in `.tex` in any letter case names the file with `.tex` added (`\input{fig.tikz}` names `fig.tikz.tex`): that file is read when it exists and is a file the skill reads, and is a missing file when it does not exist, the usual case for a figure, a table or a style file kept under its own name. A figure or a table that comes from an included file that was not read is still the one record that carries `carry` for the figure or the table, named in the file that includes it. Any other included file that was not read SHALL be recorded in `unread` on the section record of the section its include command stands in (the first section record when the command stands before the first section), one entry for each include command, and get nothing else in the outline: no paragraph record, no locator, no point and no `note`; the action names it and that section to the author. An include command `\input{x}` or `\include{x}` names the file `x` when `x` ends in `.tex` in any letter case, and `x.tex` otherwise, taken from the directory of the main file; it is read only when it is a file the skill reads, and the skill SHALL NOT look for it anywhere else. On a file system that ignores letter case the same file in another letter case is the same file. A command inside a LaTeX comment includes nothing. When the files the action read hold no paragraph and no block at all and no included file was left unread, the action SHALL stop, show no outline and write nothing to the repository; it SHALL stop before it asks the author for any section's `says`. When they hold none because the text is in included files that were not read, the action goes on: the section records carry those files in `unread`, and the paragraph file is empty. A paragraph counts when the action read any of its text; a block (a theorem-like statement, a proof, a figure, a table or a displayed formula) counts when the action read the environment or the delimiters that hold it, even when its content is in a file that was not read. When the action stops for this reason and the manuscript has headings and nothing under them, it also says that draft builds an outline from headings. When the action does not stop for this reason and all the text of a section is in included files that were not read, the action SHALL ask the author for the section's `says` and SHALL stop when the author gives none; when such a section ends with no paragraph record, of its own or of a section under it, the action tells the author that the premise check reports it for that reason. An abstract that has no heading of its own gets the `heading` "Abstract". Prose that comes before the first heading and is not the abstract gets one section record, whose `heading` is the title of the article; the skill tells the author that this section has no heading of its own in the manuscript, and asks what to put in `heading` when the manuscript gives no title. A theorem-like statement, a proof, a figure, a table, and a displayed formula or derivation that has a blank line before it and a blank line after it each become one record that carries `carry`, whose point is a complete sentence stating what the block states or shows. Any other displayed formula or derivation belongs to a paragraph's record: with no blank line on either side, the record of the paragraph it stands in; with a blank line on one side only, the record of the paragraph on the other side. Every paragraph record the action produces SHALL have `from` naming the passage it comes from, and every point SHALL state only what that passage states. A theorem-like statement, a figure or a table is named by its own label; the label of a section names the whole section and SHALL NOT be used for a record. The action writes no `lines` and no `commit`, and the `file` of every locator it writes is the name of the file from the root, as the first requirement defines it. Before it shows the outline, the action SHALL confirm for every locator it wrote that the locator resolves: the text of its `label` and its `starts`, whichever it has, each occur exactly once in the file it names. When a passage that has no label of its own has a text that, to its end, occurs a second time in the same file, as another passage that reads the same or inside a longer one, no locator names it: the action SHALL stop, tell the author which passages they are, show no outline and write nothing to the repository, and SHALL NOT take opening words from the passage that follows. It stops the same way when a file it read is not accepted as a locator's file. A manuscript that has paragraphs SHALL NOT give an empty paragraph file.
@@ -972,6 +972,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** the derive action reads a paragraph whose third sentence is interrupted by a displayed, labelled equation, with no blank line before or after the equation, and goes on after it
 - **THEN** the outline has one paragraph record for the paragraph, without `carry`, whose `from` names the paragraph by its opening words and not by the label of the equation
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -980,7 +981,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
-
 <!-- @trace
 source: idd-117-fix1
 updated: 2026-11-22
@@ -988,7 +988,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Revising keeps ids stable and never loses a source
 
 The revise action SHALL change the outline files only as the author instructs.
@@ -1060,6 +1059,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** the author has the section `s-method` left out, the section `s-method-data` names it as `parent`, and the author has not said what happens to `s-method-data`
 - **THEN** the skill asks whether `s-method-data` is left out too or goes under another section, and afterwards no section record that is part of the article names a `parent` that carries `dropped` or is no longer in the file
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -1068,7 +1068,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: The outline skill writes only the three outline files
 
 The skill `/propositions:prop-outline` SHALL have six actions: derive, draft, revise, check, approve and status. In the repository it SHALL write no file other than the three outline files: not the manuscript, not the ledger, not the structure sidecars and not the verification records. Temporary files it keeps outside the repository are not covered by this rule. The directory that holds them SHALL be one the skill made for this repository: it exists, is outside the repository, belongs to the user, has mode 700, and holds a note of the root it was made for. A directory that fails one of these is not used. The skill does not look at access-control lists. The skill SHALL NOT make that directory inside the repository: when the machine's temporary directory is inside the repository, or cannot be entered, the skill stops before it makes anything, except in the case of known limit 10 below. The directory of the outline files SHALL be the repository's root or a directory under it once every symbolic link in its path, the last part included, is resolved; it SHALL NOT be inside a `.git` directory in any letter case, its path SHALL hold, below the root, no character that a locator's `file` is not allowed to hold, and it SHALL be a directory or not exist yet, in which case the directory that is to hold it SHALL exist and be a directory. A symbolic link that leads to a place that does not exist stops the skill. The skill SHALL confirm both directories again in every command that reads or writes an outline file, and, in the revise action, before its first edit and again after every reply of the author. The skill SHALL NOT read or write an outline file that is itself a symbolic link. A symbolic link in the path of the directory is a different case: it is resolved, and what counts is where it leads. It SHALL NOT change or remove a line of `outline-approvals.jsonl`. The check action and the status action SHALL write nothing to the repository.
@@ -1167,6 +1166,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** a write leaves the paragraph records `p-1` and `p-10`, and no `id` repeats
 - **THEN** the skill reports no repeated `id`
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -1175,7 +1175,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: The explanatory document describes the outline
 
 `plugins/propositions/docs/OUTLINE.md` SHALL describe what the repository is, the three files and every key of their records, the locator, the three conditions (a section stands as approved, the order of sections stands as approved, the outline stands as approved) and what a paragraph record that names no section does to the last of them, what counts as an approval and the five things that do not, the six kinds of finding of the premise check and the agent that judges five of them, and the six actions of the skill.
@@ -1189,6 +1188,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** a reader who has only the document is given the three files of an outline
 - **THEN** the reader can say for each section whether it stands as approved, and whether the order of sections and the outline stand as approved
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -1197,7 +1197,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
-
 <!-- @trace
 source: idd-117-fix1
 updated: 2026-11-22
@@ -1205,7 +1204,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Text from the manuscript and the author never becomes part of a command
 
 The skill SHALL NOT write text taken from the manuscript, from an outline file or from the author into the text of a command. Such text (the opening words of a passage, a sentence, an `id`, the name of a file a locator gives, the author's approving words) SHALL reach a command only from a file that the command reads. A command that hands such a value on to a tool SHALL hand it on so that the shell interprets no character of it. A path the skill does write in a command SHALL be written so that the shell interprets no character of it. The paths the skill writes in its commands are the root, the outline directory, the stage directory, the directory that holds the manuscript, the manuscript's main file, and a file the author points to in draft or revise (a source, or an outline of the author's own), which the skill checks the way it checks the main file before it reads it. Each SHALL begin with `/`: a path among them that is empty or not written out in full stops the skill, and so does a path that holds a single quote; for a file the author points to in draft or revise, such a path stops the skill for that file only: the skill SHALL NOT read the file and asks the author to paste its text instead. The one exception is the manuscript's main file in the command that compares a ledger with it: left empty there, it means that there is no manuscript yet. The command that sets the root takes the directory where the manuscript will be in its place, so its path is never empty there. The paths of the ledgers' `_meta.json` files SHALL reach a command only from a list in the stage directory, not written into the command. The task message the skill gives to the agent of the premise check is held to the same rule: it holds paths the skill made, and none of that text.
@@ -1251,6 +1249,7 @@ No executable check: this requirement is about what the skill does in a conversa
 - **WHEN** the tool that the skill's checks use is not installed
 - **THEN** the skill stops, says which tool is missing, and reports no write as done
 
+---
 
 <!-- @trace
 source: idd-78-outline-checks
@@ -1259,7 +1258,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Commands check an outline mechanically
 
 The command-line tool SHALL have three subcommands that read the outline files of a directory and write nothing.
@@ -1283,6 +1281,8 @@ The skill does not call these commands yet: the binary the plugin fetches is the
 - **GIVEN** an outline whose approvals file exists and cannot be read
 - **WHEN** `propositions outline status` is run
 - **THEN** it exits with 2 and says that it cannot read the file; it does not say that the sections were never approved
+
+---
 
 <!-- @trace
 source: idd-78-fix3
@@ -1312,7 +1312,6 @@ tests:
   - tests/test_plugin_payload_tracked.py
 -->
 
----
 ### Requirement: outline-trace.jsonl records which outline record each written paragraph came from
 
 The outline directory MAY hold a fourth file, `outline-trace.jsonl`, written only by `propositions write commit` (the capability `write`). Each line is one paragraph written from the outline: `outline`, the id of the paragraph record; `first_prop`, the id of the first proposition of the written paragraph; `section`, the id of the record's section; and `approval_line`, the line of `outline-approvals.jsonl` that held the approval the section stood on. When `article.json` names destinations, a line also holds `part`, the part its section went to; a line without it belongs to `main`. It is the only tie between a paragraph record and written text: the ids of paragraph records and the ids of paragraphs in `structure.json` have the same shape and are unrelated. The ledger and the structure sidecars do not change format for it.
@@ -1330,6 +1329,8 @@ The outline directory MAY hold a fourth file, `outline-trace.jsonl`, written onl
 - **WHEN** `propositions outline trace` runs
 - **THEN** it exits with 1 and reports that line 2 records a proposition already recorded on line 1, that `p-9` is no paragraph record, that `nobody` is no proposition of the ledger, and that line 4 is not a record
 
+---
+
 <!-- @trace
 source: idd-51-write-from-outline
 updated: 2026-11-21
@@ -1344,7 +1345,6 @@ code:
   - tests/PropositionsKitTests/WriteFromOutlineTests.swift
 -->
 
-
 <!-- @trace
 source: idd-120-fix2
 updated: 2026-11-22
@@ -1352,7 +1352,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A paragraph record can plan the commitments its paragraph opens and discharges
 
 A paragraph record MAY carry `opens`, a list of one or more objects, each with an `id` and a `kind`, and `discharges`, a list of one or more commitment ids. A commitment id SHALL be written as the structure sidecars write it (a lower-case letter or digit, then up to 63 lower-case letters, digits or hyphens), and a `kind` SHALL be one of `question`, `aim`, `hypothesis`, `plan`, `announcement`, `setup`, `future_work`. Both keys are part of the record: a change to either means its section no longer stands as approved.
@@ -1378,6 +1377,8 @@ An outline plans commitments when a record that is not dropped carries either ke
 - **WHEN** `propositions outline check` runs on each
 - **THEN** each is reported: the list or entry that is not in the format, the commitment opened more than once, the commitment discharged twice, the discharge that nothing earlier opens, the dropped record, and the record of the abstract
 
+---
+
 <!-- @trace
 source: idd-116-planned-commitments
 updated: 2026-11-22
@@ -1385,7 +1386,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A section can carry a length target, and a command reports lengths against targets and the limit
 
 A section record MAY carry `length`, a whole number from 1 to 999999999: the target length of the section, in words, the sections under it included. `propositions outline check` SHALL report a `length` that is not such a number. `length` is part of the record: a change to it means the section no longer stands as approved.
@@ -1434,6 +1434,8 @@ With `--jsonl <ledger>` and `--tex <main file>` (which go together), it SHALL al
 - **WHEN** `propositions outline check` runs on each outline, and `propositions outline length` on a directory with each `article.json`
 - **THEN** the check reports `length is not a whole number from 1 to 999999999` for each record, and `outline length` exits with 2 and names `article.json` for each file
 
+---
+
 <!-- @trace
 source: idd-119-section-lengths
 updated: 2026-11-22
@@ -1441,7 +1443,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A section record can list the included files that were not read
 
 A section record MAY carry `unread`, a list of one or more objects, each with a `file` and a `why` that are non-empty strings: an included file that was not read when the outline was derived, named as the include command writes it, and the reason it was not read. The entry belongs to the record of the section the include command stands in. One file MAY be listed more than once, in one record or in several: an entry is not a locator and does not have to name one place. `unread` is part of the record: a change to it means the section no longer stands as approved.
@@ -1473,6 +1474,8 @@ A section record MAY carry `unread`, a list of one or more objects, each with a 
 - **WHEN** `propositions outline status` runs
 - **THEN** it prints `sections that carry unread	0`
 
+---
+
 <!-- @trace
 source: idd-117-unread-includes
 updated: 2026-11-22
@@ -1480,7 +1483,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: The trace and the length report follow the destinations of the parts
 
 A record of `outline-trace.jsonl` MAY carry a fifth key, `part`, one of `main`, `appendix`, `supplement`: the part its section went to when `article.json` named destinations. A record without it belongs to `main`.
@@ -1500,6 +1502,8 @@ When the `article.json` of the outline directory has `destinations`, `propositio
 - **WHEN** `propositions outline trace <directory> --jsonl <the main text's ledger>` runs, then with a ledger that no destination names, then `propositions outline length <directory> --written`, then `outline length` with `--jsonl` and `--tex`
 - **THEN** the first prints the record of `p-s` as `in the document of the part supplement`, the record of `p-1` with its location, and `2 record(s), 0 problem(s)`, and exits with 0; the second exits with 2; the third prints `written` counts above zero for `s-a` and for `s-sup` and a line for each of the parts `main` and `supplement`; the fourth exits with 2 and says to use `--written`
 
+---
+
 <!-- @trace
 source: idd-120-destinations
 updated: 2026-11-22
@@ -1507,7 +1511,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: The length report counts each written paragraph once and stops on a file it cannot read
 
 In the word count, a command that takes a name is followed by its optional arguments in square brackets and one argument in braces, white space allowed before each; they are not counted, and a group after them is text. An equation environment ends at its `\end`, white space allowed before the brace. The punctuation of the kana and Han blocks is not a word, a half-width kana is one, and a number sign that is not a digit (a fraction) is not part of a word.
@@ -1533,6 +1536,8 @@ A paragraph SHALL be counted once however many trace records name its propositio
 - **WHEN** `propositions outline length <directory> --jsonl <ledger> --tex <main file>` runs; and again after the main file is replaced by bytes that are not UTF-8
 - **THEN** the first prints `"s-a"	main	target -	written 13	1 of 1 record(s)`; the second exits with 2 and prints no report
 
+---
+
 <!-- @trace
 source: idd-119-fix1
 updated: 2026-11-22
@@ -1540,7 +1545,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: The length report reads each part from its own ledger
 
 `propositions outline length <directory> --written` SHALL look up the trace records of a part in the ledger and main file that part's destination names, also when two parts name the same main file with different ledgers.
@@ -1556,6 +1560,8 @@ code:
 - **WHEN** `propositions outline length <directory> --written` runs
 - **THEN** the line of `s-x` holds `written 13	1 of 1 record(s)` and no line says a record was not found
 
+---
+
 <!-- @trace
 source: idd-120-fix1
 updated: 2026-11-22
@@ -1563,7 +1569,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: The outline skill writes the keys for unread files, planned commitments and length targets
 
 In derive, the outline skill SHALL record each included file that was not read, other than one whose content is a figure or a table, on the section record of the section its include command stands in (the first section record when the command stands before the first section), as one entry of `unread` for each include command, and give it no paragraph record, locator, point or note. It names each such file and its section to the author when the outline is shown and in the report. When the files read hold no paragraph and no block because the text is in such files, derive accepts an empty paragraph file; it still stops when a section whose text is all in such files gets no sentence from the author, and when the files read hold no paragraph and no block and no included file was left unread.
@@ -1581,9 +1586,37 @@ No executable check: the actions are instructions that a model follows. The two 
 - **WHEN** derive reads a manuscript whose sections hold only includes of files git ignores, and the author gives a sentence for each section
 - **THEN** the section records carry `unread`, the paragraph file is empty, and the skill shows the outline and names the files
 
+---
+
 <!-- @trace
 source: idd-120-skills
 updated: 2026-11-22
 code:
   - propositions-projects.code-workspace
+-->
+
+### Requirement: Draft and revise keep each example after its question
+
+When it drafts an outline, the skill SHALL order the points so that each point giving an example, a definition or a result comes after a point that raises the question it answers (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`), or SHALL tell the author that nothing before it raises one. When a revision the author asks for moves such a point ahead of the point that raises its question, or removes that point, the skill SHALL tell the author before writing; the order stays the author's.
+
+No executable check: this is a judgment of meaning, and the premise check (`propositions:outline-checker`) has no kind for it yet. Adding one is issue 141.
+
+#### Scenario: An idea list that opens on an example
+
+- **WHEN** the author's ideas for a section begin with a worked example
+- **THEN** the drafted outline puts a point that raises the example's question before it, or the skill tells the author that no point does
+
+<!-- @trace
+source: idd-139-motivation-group
+updated: 2026-11-23
+code:
+  - CLAUDE.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/README.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
 -->

@@ -406,6 +406,13 @@ with the author, in one question (AskUserQuestion), what the paragraph does: wha
 to, which commitments it advances, and its claims. A claim that changes what the paper argues is
 the author's to make; when the author has not made it, write a placeholder for it.
 
+Each example, definition or result comes after the text that raises the question it answers:
+in this paragraph, before it, or in the paragraph before (the obligation group `motivation`,
+axiom `academic-writing/A2_motivated_by_prefix`; issue 139). A paragraph that would open on an
+example or a result opens instead on the sentence that names the question it answers, or the
+author is told that nothing before it raises one. This is checked when the paragraph is written
+and shown (W8); no command checks it yet (issue 141).
+
 Never invent a result, a number or a citation. Write each as a placeholder
 `{PENDING: <what is to be supplied>}`. It needs no macro, compiles as it is and shows in the PDF.
 A citation key may be used only when it is in the manuscript's bibliography file; any other
@@ -545,7 +552,9 @@ asks for it by its id.
 **O2 — Instead of W2.** The paragraph says the record's points, in their order, and nothing that
 the points do not say. A point with `pending` gets a placeholder `{PENDING: <the pending text>}`
 for what it names. A record that carries `carry` is the block its `from` names, copied character
-for character, with only the changes its `edits` lists. A citation is the key a point's `basis` or
+for character, with only the changes its `edits` lists. The rule of W2 on what comes first holds
+here too: when a point gives an example or a result whose question no earlier point raises, say so
+at W8 instead of reordering the record's points, which are the outline's. A citation is the key a point's `basis` or
 the manuscript's bibliography gives; any other is a placeholder. When the record is the first of
 its section and the section's heading is not in the draft yet, the paragraph comes with the
 heading line, written from the section record's `heading`.

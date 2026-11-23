@@ -38,6 +38,7 @@ The article obligations table states, one entry at a time, what a manuscript's l
 - **WHEN** the format check runs
 - **THEN** it reports a problem that names `index.text-in-manuscript` and `example`
 
+---
 
 <!-- @trace
 source: idd-47-fix5
@@ -46,7 +47,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Entries are preconditions or obligations
 
 `class` SHALL be `precondition` or `obligation`. There is no third class.
@@ -88,6 +88,7 @@ The table SHALL hold the precondition `index.profile-fits-manuscript`, which sta
 - **WHEN** the entries whose `check` is `ledger:R3` are listed
 - **THEN** there are at least two: an obligation in the group `dependence` stating that citations form no cycle, with `on_warning: judge`, and an entry for the uncited proposition with `on_warning: info`
 
+---
 
 <!-- @trace
 source: idd-47-fix5
@@ -96,29 +97,29 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Obligations are grouped by principle
 
-`groups` SHALL list exactly these seven groups, in this order: `dependence`, `commitment`, `support`, `consistency`, `truth`, `placement`, `completeness`. Each group SHALL have `id`, `zh` (a Traditional Chinese label) and `does` (one English sentence saying what the group protects). `axiom` is optional and, when present, SHALL name one axiom of the che-axiom-systems plugin as `<domain>/<axiom id>`. A group SHALL name at most one axiom. The group `dependence` SHALL name `academic-writing/A1_no_forward_dependence`. The file SHALL NOT restate the text of an axiom.
+`groups` SHALL list exactly these eight groups, in this order: `dependence`, `motivation`, `commitment`, `support`, `consistency`, `truth`, `placement`, `completeness`. Each group SHALL have `id`, `zh` (a Traditional Chinese label) and `does` (one English sentence saying what the group protects). `axiom` is optional and, when present, SHALL name one axiom of the che-axiom-systems plugin as `<domain>/<axiom id>`. A group SHALL name at most one axiom. The group `dependence` SHALL name `academic-writing/A1_no_forward_dependence`, and the group `motivation` SHALL name `academic-writing/A2_motivated_by_prefix` (issue 139: every example, definition or result arrives after the text before it has raised the question it answers; a property of the sequence, which no other group covers). The file SHALL NOT restate the text of an axiom.
 
-Every obligation entry SHALL name one of the seven groups in `group`. A precondition entry SHALL NOT have `group`.
+Every obligation entry SHALL name one of the eight groups in `group`. A precondition entry SHALL NOT have `group`.
 
 #### Scenario: An obligation without a group is refused
 
 - **WHEN** an entry has `class: obligation` and no `group`
 - **THEN** the guard fails and its message names the entry id
 
-#### Scenario: An eighth group is refused
+#### Scenario: A ninth group is refused
 
 - **WHEN** `groups` has an item with the id `style`
 - **THEN** the guard fails and its message names `style`
 
-##### Example: an eighth group
+##### Example: a ninth group
 
-- **GIVEN** a table whose `groups` holds the seven groups and an eighth item with the id `style`
+- **GIVEN** a table whose `groups` holds the eight groups and a ninth item with the id `style`
 - **WHEN** the format check runs
 - **THEN** it reports a problem that names `style`
 
+---
 
 <!-- @trace
 source: add-article-obligations
@@ -127,7 +128,21 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
+<!-- @trace
+source: idd-139-motivation-group
+updated: 2026-11-23
+code:
+  - CLAUDE.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/README.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
 ### Requirement: Applicability is a list of field values
 
 `applies` is optional. When present it SHALL be a mapping whose keys come from this closed set: `profile`, `claim_type`, `evidence_class`, `cites`, `opens`, `section_role`. Each value SHALL be a non-empty list. A proposition satisfies `applies` when, for every key present, its own value is in the list:
@@ -203,6 +218,7 @@ Every entry whose `check` is one of `proofread:E1` to `proofread:E7`, and each o
 - **WHEN** the format check runs
 - **THEN** it reports a problem that names `index.text-in-manuscript` and `lemma`
 
+---
 
 <!-- @trace
 source: idd-47-fix8
@@ -211,7 +227,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: A check is named only when it is implemented
 
 `check` SHALL be either `gap` or one id from the inventory below. The inventory is closed, has 47 ids, and is the normative list; what its members have in common is that each reports findings, or leaves records, about units under an id of its own.
@@ -254,6 +269,7 @@ For a gap, `unit`, `verified_by` and `on_warning` say how the entry is expected 
 - **WHEN** the entry `dependence.cites-backward` is read
 - **THEN** it has `class: obligation`, `group: dependence`, `unit: proposition`, `applies` with `cites: [present]` and no other key, `check: order:cites`, no `owner`, `verified_by: [mechanical]` and `on_warning: judge`
 
+---
 
 <!-- @trace
 source: idd-49-write
@@ -270,7 +286,6 @@ tests:
   - tests/test_plugin_payload_tracked.py
 -->
 
----
 ### Requirement: Every implemented check and every vocabulary value is accounted for
 
 Every id in the inventory SHALL be the `check` of at least one entry. For each of the fields `claim_type`, `evidence_class`, `opens` and `section_role`, every value of its vocabulary SHALL be named by at least one entry's `applies` under that key, or be listed in `unconstrained`, and never both. Each item of `unconstrained` SHALL have `field`, `value` and `why` (one line saying why no entry singles the value out).
@@ -296,6 +311,7 @@ Every id in the inventory SHALL be the `check` of at least one entry. For each o
 - **WHEN** the accounting check runs
 - **THEN** it reports a problem that names `claim_type` and `conjecture`
 
+---
 
 <!-- @trace
 source: add-article-obligations
@@ -304,7 +320,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Each entry states how it is verified
 
 `verified_by` SHALL be a non-empty list. It SHALL be either exactly `[mechanical]` or a list drawn from the six built-in verification methods of `plugins/propositions/docs/VERIFICATION.md` (`proofread`, `lean`, `exact_certificate`, `cas`, `cross_model`, `human`); every listed method is required.
@@ -376,6 +391,7 @@ The criterion of each of the four states the condition that its warning reports,
 | `completeness.bibliography-entries-cited`, `check: audit:R2` | obligation | info |
 | the entry whose `check` is `ledger:R1.5` | precondition | judge |
 
+---
 
 <!-- @trace
 source: idd-47-fix6
@@ -384,7 +400,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: Each entry has one of four outcomes for a unit
 
 `plugins/propositions/docs/OBLIGATIONS.md` SHALL define the outcome of an entry for one unit as exactly one of four:
@@ -458,6 +473,7 @@ No executable check: these are definitions, and no program computes an outcome i
 - **WHEN** an entry has `check: gap` and a unit satisfies its `applies`
 - **THEN** the outcome is `unverified`
 
+---
 
 <!-- @trace
 source: idd-47-fix6
@@ -466,7 +482,6 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
 ### Requirement: An article is sound only when every applicable entry passes
 
 `plugins/propositions/docs/OBLIGATIONS.md` SHALL define a sound article as one for which every entry has the outcome `passed` or `not_applicable` for every unit, and SHALL add no condition outside the table. A verdict against a proposition from a method that no entry lists SHALL count through an entry of its own, `truth.not-refuted`, which states that no method's most recent verdict on the proposition is `refuted` or `partial`, where an `unresolved` or `not_attempted` record replaces no earlier verdict; that entry SHALL be a gap owned by issue 62 until a check reports it, and how a method's records are ordered is left to that issue. The document SHALL state that an `unverified` outcome counts against soundness in the same way as `failed`, and that while any precondition entry is `failed` or `unverified` the outcomes of obligation entries are not to be trusted until the ledger, sidecars or records are corrected; those outcomes are left as computed. It SHALL state what a report names: for each outcome that is `failed` or `unverified`, the entry and the unit, and for a gap the issue in its `owner`. A report names a proposition by its id, and by its line in the ledger when the proposition has no id that is a non-empty string or shares its id with another proposition that is not retired. What else a report lists is left to issue 71.
@@ -499,6 +514,7 @@ No executable check: soundness is a definition that the document states for read
 - **WHEN** two propositions that are not retired share an id and an entry is `unverified` for each of them
 - **THEN** a report names each of the two by its line in the ledger
 
+---
 
 <!-- @trace
 source: retire-python-ports
@@ -598,10 +614,9 @@ tests:
   - tests/test_derive_paragraphs.py
 -->
 
----
 ### Requirement: The explanatory document describes the table without restating it
 
-`plugins/propositions/docs/OBLIGATIONS.md` SHALL describe the keys of the data file, the two classes and how to tell them apart, the seven groups and their axioms, how applicability is stated and the cases in which a value cannot be read, which checks count as implemented and why the excluded ones are excluded, what the fields of a gap mean, which entries need an external source and why that mark is a key of its own, the two values of `on_warning`, that `info` covers only the warning an entry was reviewed for and that a unit can pass one of the four `info` entries while its criterion does not hold, the four outcomes, the seven points that the outcome rules have to keep, the three outcomes that the table decides by itself, as rules of which the first that fits decides, and that the second of them holds also when a check printed something about the unit, which rules it leaves to issue 71, why no entry passes yet, soundness, the reasons no article is sound yet, and how to add or change an entry. It SHALL NOT list the entries: it SHALL mention at most two entry ids, as examples.
+`plugins/propositions/docs/OBLIGATIONS.md` SHALL describe the keys of the data file, the two classes and how to tell them apart, the eight groups and their axioms (and why `motivation` is a group of its own rather than part of `placement`), how applicability is stated and the cases in which a value cannot be read, which checks count as implemented and why the excluded ones are excluded, what the fields of a gap mean, which entries need an external source and why that mark is a key of its own, the two values of `on_warning`, that `info` covers only the warning an entry was reviewed for and that a unit can pass one of the four `info` entries while its criterion does not hold, the four outcomes, the seven points that the outcome rules have to keep, the three outcomes that the table decides by itself, as rules of which the first that fits decides, and that the second of them holds also when a check printed something about the unit, which rules it leaves to issue 71, why no entry passes yet, soundness, the reasons no article is sound yet, and how to add or change an entry. It SHALL NOT list the entries: it SHALL mention at most two entry ids, as examples.
 
 No executable check for this list beyond what the guard requirement names. A search for a phrase shows that a sentence is present and not that the document explains the thing, and no such search is written for the rest of the list. An independent reader decides cases about outcomes and about the scope of the table from the data file and the document alone; the cases, the reader's answers and the commit they were decided against are recorded on issue 47. What the list asks beyond those cases is checked by review only.
 
@@ -629,6 +644,7 @@ No executable check for this list beyond what the guard requirement names. A sea
 - **WHEN** a reader looks up why the proofread layer E9 is a gap
 - **THEN** the document says that the walk of the proofread skill does not list E8, E9 and E10, so a verdict does not show that they were read
 
+---
 
 <!-- @trace
 source: idd-47-fix7
@@ -637,7 +653,21 @@ code:
   - propositions-projects.code-workspace
 -->
 
----
+<!-- @trace
+source: idd-139-motivation-group
+updated: 2026-11-23
+code:
+  - CLAUDE.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/README.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
 ### Requirement: A guard checks the table
 
 The repository SHALL have automated tests that fail when the data file or the document breaks one of the following: the closed keys, the two classes and their prefixes, the groups, applicability, the inventory and owners, the accounting of checks and vocabulary values, `verified_by` and `on_warning`, the entries that need an outside source, the entries the maintainer reviewed, the limit on entry ids in the document, the four outcomes, the issue numbers, the key `external_source` and the two statements that the document has to carry (why the layers E8 to E10 are gaps, and what the `owner` of a gap is), and what `docs/VERIFICATION.md` has to say. What else the requirements above ask of the document is not checked by the guard. A key that is present SHALL hold what the key requires: the guard SHALL refuse `applies` or `axiom` written with no value. When the file is not a mapping, or a value has a type its key does not allow, the guard SHALL report a problem that says so and SHALL NOT end in an unhandled error. The guard SHALL refuse a data file in which one mapping holds the same key twice, because a YAML loader keeps the last value and drops the first without a message. Each failure message SHALL name the entry, value or check concerned. The tests are cases in `tests/test_plugin_payload_tracked.py` whose names start with `test_obligations_`; a change to this capability SHALL add no test file and no script module. A change is accepted only when these cases pass; a skipped case does not count.

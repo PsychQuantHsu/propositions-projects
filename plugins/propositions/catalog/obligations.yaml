@@ -777,7 +777,7 @@ unconstrained:
     why: "What an axiom has to be is part of the claim-type fit entry, which applies to every claim type."
   - field: claim_type
     value: claim
-    why: "A result and a derivation step are both claims; the motivation entry cannot separate them (issue 141)."
+    why: "No check states a requirement for this claim type alone; the motivation entry cannot separate a result from a derivation step (issue 141)."
   - field: claim_type
     value: hypothesis
     why: "No check states a requirement that holds for this claim type alone."

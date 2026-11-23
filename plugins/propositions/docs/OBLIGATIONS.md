@@ -135,8 +135,8 @@ question it answers. It is a group of its own rather than part of `placement`, w
 section a piece of content belongs in, not about when it appears (#139). Its one entry covers
 definitions, examples and results, and only the axiom's first half: that something earlier asks
 for the element. It does not cover figures, tables, quotations or notation that is not a
-definition, nor the axiom's second half (that the sentence introducing the element says which
-question it answers), so an entry that passes does not show that the group's principle holds. In
+definition, nor the axiom's second half (that the element, or the sentence just before it, names the
+question it answers, or that it comes right after the sentence that raises it), so an entry that passes does not show that the group's principle holds. In
 a default-profile ledger a result and a step of a derivation are both `claim`, and the claim type
 cannot tell them apart, so the entry does not cover those results either: listing `claim` would
 make every derived sentence answer to it, including the ones the axiom says are not elements. Its

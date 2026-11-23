@@ -411,7 +411,7 @@ code:
 
 ### Requirement: Write mode puts each example, definition and result after its question
 
-In write mode, when it writes from an outline record, and in reorganize mode, the skill SHALL write each example, definition or result after text that raises the question it answers: earlier in the paragraph, or in the text before the paragraph (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`). When nothing before an example, a definition or a result raises its question, the skill SHALL write the sentence that raises it first or tell the author that nothing does; when writing from an outline record, whose points fix the order, it SHALL tell the author instead of reordering the points. What it tells the author, and each sentence it wrote to raise such a question, is shown with the paragraph (in reorganize mode, with the rewrite), before the author confirms the write.
+In write mode (including when it writes from an outline record) and in reorganize mode, the skill SHALL, for each example, definition or result it writes, do one of two things: place it after text that raises the question it answers, earlier in the paragraph or anywhere before it (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`); or, when nothing before it raises that question, write the sentence that raises it first or tell the author that nothing does. A sentence written to raise a question SHALL only restate what the agreed paragraph already argues; one that would state a choice, a gap or a claim the author has not made is a placeholder. When writing from an outline record, whose points fix the order, the skill SHALL tell the author instead of reordering the points. What it tells the author, and each sentence it wrote to raise such a question, is shown with the paragraph (in reorganize mode, with the rewrite), before the author confirms the write.
 
 No executable check: whether a sentence raises the question an example answers is a judgment of meaning. The check for the obligation is issue 141.
 
@@ -457,6 +457,18 @@ code:
   - plugins/propositions/skills/prop-outline/SKILL.md
   - propositions-projects.code-workspace
   - plugins/propositions/skills/prop-construct/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix3
+updated: 2026-11-23
+code:
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/catalog/obligations.yaml
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

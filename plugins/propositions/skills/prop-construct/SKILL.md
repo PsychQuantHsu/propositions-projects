@@ -410,7 +410,11 @@ Each example, definition or result comes after text that raises the question it 
 in the paragraph, or anywhere in the text before it (the obligation group `motivation`, axiom
 `academic-writing/A2_motivated_by_prefix`; issue 139). When nothing before an example, a
 definition or a result raises its question, write the sentence that raises it first, or tell the
-author that nothing does (W8). No command checks this yet (issue 141).
+author that nothing does (W8). The sentence may only restate what the paragraph agreed in this
+step already argues; a sentence that would state a choice, a gap or a claim the author has not
+made is a placeholder, as above. Unlike an outline point, which is written into the plan without
+showing the text, this sentence is shown at W8 before anything is written. No command checks this
+yet (issue 141).
 
 Never invent a result, a number or a citation. Write each as a placeholder
 `{PENDING: <what is to be supplied>}`. It needs no macro, compiles as it is and shows in the PDF.

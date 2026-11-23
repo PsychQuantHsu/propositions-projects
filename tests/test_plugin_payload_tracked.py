@@ -1359,6 +1359,14 @@ def obligations() -> dict:
     return _load_obligations_text(OBLIGATIONS.read_text(encoding="utf-8"))
 
 
+def test_obligations_motivation_applies_is_locked(obligations):
+    """The round-1 regression of #139 (claim added to the motivation entry) is reported."""
+    import copy
+    table = copy.deepcopy(obligations)
+    _obl_entry(table, "motivation.called-for-by-prefix")["applies"] = {"claim_type": ["definition", "example", "result", "claim"]}
+    assert _names(_reviewed_problems(table), ["motivation.called-for-by-prefix", "applies"])
+
+
 def test_obligations_table_has_no_problem(obligations):
     vocabulary = _obligation_vocabulary()
     problems = (

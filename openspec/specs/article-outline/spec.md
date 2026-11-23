@@ -1604,7 +1604,7 @@ No executable check: this is a judgment of meaning, and the premise check (`prop
 #### Scenario: An idea list that opens on an example
 
 - **WHEN** the author's ideas for a section begin with a worked example
-- **THEN** the drafted outline puts a point that raises the example's question before it, or the skill tells the author that no point does
+- **THEN** the drafted outline places the example after a point of the author's that raises its question, or the skill tells the author that no point does and asks for one, writing none itself
 
 <!-- @trace
 source: idd-139-motivation-group
@@ -1643,6 +1643,18 @@ code:
   - plugins/propositions/skills/prop-outline/SKILL.md
   - propositions-projects.code-workspace
   - plugins/propositions/skills/prop-construct/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix3
+updated: 2026-11-23
+code:
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/catalog/obligations.yaml
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

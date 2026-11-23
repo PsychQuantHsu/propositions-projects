@@ -9,8 +9,8 @@
 與兩支稽核（`audit symbols`、`citations`，#69）；binary 0.2.0（2026-11-21 發布）有以上這些子命令。改版重抽的四個子命令（`revise relocate`、
 `retire`、`check`、`redirect`，#56）在 binary 0.3.0 裡（2026-11-21 發布），由 `/propositions:prop-extract` 的「改版重抽」模式呼叫。寫入一段的
 `write prepare`、`check`、`commit`（#49）在 binary 0.4.0 裡（2026-11-21 發布），由 `/propositions:prop-construct` 的寫入模式呼叫。照綱要寫的部分（#51：`write prepare --outline`、
-`outline trace`）在 binary 0.5.0 裡（2026-11-21 發布），也由 `construct` 的寫入模式呼叫。整份重寫的 `write prepare --rewrite`（#115）在 binary 0.6.0 裡，由 `construct` 的重組模式呼叫。全文的禁用說法（`phrasing`，#118）、承諾的規劃與比對（#116）、長度（`outline length`，#119）、沒讀的檔（#117）與多份去處（#120）在 binary 0.7.0 裡（2026-11-22 發布），由 `prop-construct` 與 `prop-outline` 使用。propositions plugin 在
-session 開始時用 hook 取得 `hooks/cli.lock` 鎖定的版本（現在是 0.7.0）（只有 macOS；`hooks/fetch-cli.sh`），skill 經由
+`outline trace`）在 binary 0.5.0 裡（2026-11-21 發布），也由 `construct` 的寫入模式呼叫。整份重寫的 `write prepare --rewrite`（#115）在 binary 0.6.0 裡，由 `construct` 的重組模式呼叫。全文的禁用說法（`phrasing`，#118）、承諾的規劃與比對（#116）、長度（`outline length`，#119）、沒讀的檔（#117）與多份去處（#120）在 binary 0.7.0 裡（2026-11-22 發布），由 `prop-construct` 與 `prop-outline` 使用。重組只讀一次暫存位元組、巢狀的重複鍵（#131），以及 `replaced_by` 指到另一份帳冊的命題（`revise retire`、`check`、`redirect` 的 `<帳冊>#<id>` 與 `--ledger-dir`，#133）在 binary 0.8.0 裡（2026-11-23 發布）；0.8.1（同日發布）補上 `redirect` 的 `--ledger-dir`，由 `prop-construct` 的重組模式與 `prop-extract` 的改版重抽使用。propositions plugin 在
+session 開始時用 hook 取得 `hooks/cli.lock` 鎖定的版本（現在是 0.8.1）（只有 macOS；`hooks/fetch-cli.sh`），skill 經由
 `hooks/run-cli.sh` 呼叫：`propositions` 的 Operation A 呼叫 `cite-order`，`construct` 呼叫 `paragraphs`，
 `construct-batch` 呼叫 `ledger-order`，`manuscript-audit` 讓 `run-audit.sh` 呼叫兩支稽核。綱要的 `check`、`status`、`locators` 還沒有 skill 呼叫（#102）；`construct` 的寫入模式呼叫 `outline status` 與 `outline trace`。
 被取代的四支 Python 版（`reorder-ledger.py`、`derive-paragraphs.py`、`audit-symbols.py`、`audit-citations.py`）

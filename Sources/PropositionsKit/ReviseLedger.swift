@@ -64,10 +64,11 @@ enum ReviseLedger {
 
     struct Retirement: Equatable {
         let id: String
-        let replacedBy: [String]
+        let replacedBy: [Replacement]
     }
 
-    /// Parses `<id>` or `<id>=<new id>,<new id>`.
+    /// Parses `<id>` or `<id>=<new id>,<new id>`; a new id written `<ledger>#<id>` names a
+    /// proposition of another ledger (issue 133).
     /// The bare id is a deletion; after `=`, every id has to be written: `old=` and `old=b,,c` are refused.
     static func retirement(_ argument: String) throws -> Retirement {
         guard let equals = argument.firstIndex(of: "=") else { return Retirement(id: argument, replacedBy: []) }
@@ -76,7 +77,7 @@ enum ReviseLedger {
         guard !ids.contains(where: \.isEmpty) else {
             throw Revise.Failure(message: "--retire \(CiteOrder.visible(argument)) has an empty id after `=`; write the bare id for a deletion")
         }
-        return Retirement(id: String(argument[..<equals]), replacedBy: ids)
+        return Retirement(id: String(argument[..<equals]), replacedBy: try ids.map { try replacement(argument: $0) })
     }
 
     static let mechanisms = ["comment_env", "line_comment", "removed"]
@@ -95,7 +96,7 @@ enum ReviseLedger {
     }
 
     static func retire(_ data: Data, retirements: [Retirement], since: String, mechanism: String, match: String,
-                       reason: String, ref: String?) throws -> (Data, [String]) {
+                       reason: String, ref: String?, others: OtherLedgers) throws -> (Data, [String]) {
         guard isDate(since) else { throw Revise.Failure(message: "--since \(CiteOrder.visible(since)) is not a YYYY-MM-DD date") }
         guard mechanisms.contains(mechanism) else { throw Revise.Failure(message: "--mechanism is one of \(mechanisms.joined(separator: ", "))") }
         guard matches.contains(match) else { throw Revise.Failure(message: "--match is one of \(matches.joined(separator: ", "))") }
@@ -122,8 +123,14 @@ enum ReviseLedger {
                 throw Revise.Failure(message: byID[key(item.id)] == nil ? "no proposition \(name)" : "\(name) is the id of several lines")
             }
             guard !found[0].isRetired else { throw Revise.Failure(message: "\(name) is already retired") }
-            for new in item.replacedBy {
-                let shown = CiteOrder.visible(new)
+            for replacement in item.replacedBy {
+                let shown = replacement.shown
+                guard case .here(let new) = replacement else {
+                    if case .there(let ledger, let id) = replacement, let why = others.why(ledger, id) {
+                        throw Revise.Failure(message: "\(shown), named to replace \(name), \(why)")
+                    }
+                    continue
+                }
                 guard key(new) != key(item.id) else { throw Revise.Failure(message: "\(name) cannot replace itself") }
                 guard !retiring.contains(key(new)) else {
                     throw Revise.Failure(message: "\(shown), named to replace \(name), is retired by this run")
@@ -146,10 +153,10 @@ enum ReviseLedger {
                 out.append(line.raw)
                 continue
             }
-            let entry = block + [JSONMember(key: "replaced_by", value: .array(item.replacedBy.map { .string($0) }))]
+            let entry = block + [JSONMember(key: "replaced_by", value: .array(item.replacedBy.map(\.json)))]
             out.append(Self.line(line, with: Revise.setting(members, "retired", to: .object(entry))))
             report.append(item.replacedBy.isEmpty ? "retire \(CiteOrder.visible(id)): deleted, no replacement"
-                : "retire \(CiteOrder.visible(id)): replaced by \(item.replacedBy.map(CiteOrder.visible).joined(separator: ", "))")
+                : "retire \(CiteOrder.visible(id)): replaced by \(item.replacedBy.map(\.shown).joined(separator: ", "))")
         }
         return (out, report)
     }
@@ -158,7 +165,7 @@ enum ReviseLedger {
 
     /// What a ledger's `replaced_by` lists say: a problem for each id that does not name a live
     /// proposition, and how many retirements are replaced, deleted, or not recorded.
-    static func check(_ data: Data) throws -> (problems: [String], replaced: Int, deleted: Int, unrecorded: Int) {
+    static func check(_ data: Data, others: OtherLedgers) throws -> (problems: [String], replaced: Int, deleted: Int, unrecorded: Int) {
         let all = try lines(data)
         let counts = census(all)
         var problems: [String] = []
@@ -176,9 +183,16 @@ enum ReviseLedger {
             if items.isEmpty { deleted += 1; continue }
             var good = true
             for item in items {
-                guard let new = item.string else {
-                    problems.append("line \(line.number): the replaced_by of \(name) holds a value that is not an id")
+                guard let replacement = replacement(item) else {
+                    problems.append("line \(line.number): the replaced_by of \(name) holds a value that is neither an id nor {\"ledger\", \"id\"}")
                     good = false
+                    continue
+                }
+                guard case .here(let new) = replacement else {
+                    if case .there(let ledger, let id) = replacement, let why = others.why(ledger, id) {
+                        problems.append("line \(line.number): \(name) is replaced by \(replacement.shown), which \(why)")
+                        good = false
+                    }
                     continue
                 }
                 if key(new) == key(line.id ?? "") {
@@ -200,10 +214,13 @@ enum ReviseLedger {
     /// replace it, in their order, those already cited and those that come later in reading order
     /// left out; a citation of a retired proposition without a replacement is dropped. Other
     /// citations are left as they are.
-    static func redirect(_ data: Data, order: ReadingOrder) throws -> (Data, [String], unplaced: [String]) {
+    static func redirect(_ data: Data, order: ReadingOrder, others: OtherLedgers) throws -> (Data, [String], unplaced: [String]) {
         let all = try lines(data)
         let counts = census(all)
         var replacements: [[UInt32]: [String]] = [:]
+        // Replacements in another ledger: a citation cannot follow them (issue 133).
+        var elsewhere: [[UInt32]: [String]] = [:]
+        var checkLater: [[UInt32]: [(Replacement, String, String, Int)]] = [:]
         var retiredIDs = Set<[UInt32]>()
         var places: [[UInt32]: [Int]] = [:]
         for line in all {
@@ -212,10 +229,17 @@ enum ReviseLedger {
                 retiredIDs.insert(key(id))
                 guard let list = line.retired?.members?.last(where: { $0.key == "replaced_by" })?.value else { continue }
                 // A list that is not one of ids naming one live proposition each is refused, not read as none.
-                guard let items = list.array, items.allSatisfy({ $0.string != nil }) else {
+                guard let items = list.array?.map(replacement), items.allSatisfy({ $0 != nil }) else {
                     throw Revise.Failure(message: "the replaced_by of \(CiteOrder.visible(id)) (line \(line.number)) is not a list of ids; run revise check")
                 }
-                let ids = items.compactMap(\.string)
+                let parsed = items.compactMap { $0 }
+                let ids = parsed.compactMap { item -> String? in if case .here(let new) = item { return new }; return nil }
+                // Checked only when a live proposition cites this retirement (the citation loop below).
+                checkLater[key(id)] = parsed.compactMap { item in
+                    if case .there(let ledger, let other) = item { return (item, ledger, other, line.number) }
+                    return nil
+                }
+                elsewhere[key(id)] = parsed.compactMap { item -> String? in if case .there = item { return item.shown }; return nil }
                 for new in ids {
                     if let why = unresolved(new, counts) {
                         throw Revise.Failure(message: "\(CiteOrder.visible(new)), which replaces \(CiteOrder.visible(id)) (line \(line.number)), \(why); run revise check")
@@ -253,9 +277,19 @@ enum ReviseLedger {
                     if kept.insert(key(cited)).inserted { result.append(cited) }
                     continue
                 }
+                for (item, ledger, other, number) in checkLater[key(cited)] ?? [] {
+                    if let why = others.why(ledger, other) {
+                        throw Revise.Failure(message: "\(item.shown), which replaces \(shown) (line \(number)), \(why); run revise check")
+                    }
+                }
+                let away = elsewhere[key(cited)] ?? []
                 guard let list = replacements[key(cited)], !list.isEmpty else {
-                    report.append("drop \(name): \(shown) is retired and has no replacement")
+                    report.append(away.isEmpty ? "drop \(name): \(shown) is retired and has no replacement"
+                        : "drop \(name): \(shown) is replaced only in another ledger (\(away.joined(separator: ", "))), which a citation cannot cross")
                     continue
+                }
+                if !away.isEmpty {
+                    report.append("note \(name): \(shown) is also replaced in another ledger (\(away.joined(separator: ", "))), which a citation cannot cross")
                 }
                 var added: [String] = []
                 for new in list {

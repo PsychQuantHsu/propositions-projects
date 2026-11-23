@@ -126,6 +126,85 @@ struct WriteRewriteTests {
         #expect(result.stdout.contains { $0.contains("writes a key twice") })
     }
 
+    @Test func `A key written twice inside a nested object of a ledger line is reported with its line`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        try edit(box, "stage/ledger/main.jsonl") {
+            $0.replacingOccurrences(of: #""reason": "rewritten""#, with: #""reason": "rewritten", "reason": "other""#)
+        }
+        let result = run(["check", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains { $0.hasPrefix("line ") && $0.contains("of the staged ledger writes a key twice") })
+        #expect(WriteRewrite.writesAKeyTwice(try JSONValue.parse(#"{"a": [{"b": 1, "b": 2}]}"#)))
+        #expect(!WriteRewrite.writesAKeyTwice(try JSONValue.parse(#"{"a": [{"b": 1}, {"b": 2}]}"#)))
+    }
+
+    @Test func `The rewrite checks read the bytes they are handed, not the file again`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let main = box.url.appendingPathComponent("stage/manuscript/main.tex")
+        let ledger = try Data(contentsOf: box.url.appendingPathComponent("stage/ledger/main.jsonl"))
+        let onDisk = try String(contentsOf: main, encoding: .utf8)
+        // The bytes handed to the check put the new proposition mid-paragraph; the file on disk does not.
+        var lines = onDisk.components(separatedBy: "\n")
+        lines[28] = "Joined to the paragraph."
+        let handed = lines.joined(separator: "\n")
+        let reader: (URL) -> String? = { $0.lastPathComponent == "main.tex" ? handed : try? String(contentsOf: $0, encoding: .utf8) }
+        let fromDisk = WriteRewrite.locations(stagedMain: main, read: { try? String(contentsOf: $0, encoding: .utf8) }, ledger: ledger, mapped: [Self.new])
+        let fromHanded = WriteRewrite.locations(stagedMain: main, read: reader, ledger: ledger, mapped: [Self.new])
+        #expect(fromDisk.isEmpty)
+        #expect(fromHanded.contains { $0.contains("does not start a paragraph") })
+    }
+
+    // spec-example: write / a rewrite retires a passage moved to another document
+    @Test func `A rewrite checks a replacement in another ledger from the original ledger's directory`() throws {
+        let box = try setUp()
+        _ = try box.write(#"{"id": "s1", "text": "Moved.", "location": "supp.tex:L1", "cites": []}"# + "\n", to: "paper/supp/supp.jsonl")
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let other = { (id: String) in #""replaced_by": [{"ledger": "../supp/supp.jsonl", "id": "\#(id)"}]"# }
+        try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: #""replaced_by": ["\#(Self.new)"]"#, with: other("s1")) }
+        #expect(run(["check", "--stage", "stage"], in: box).exitCode == 0)
+        try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: other("s1"), with: other("s9")) }
+        let result = run(["check", "--stage", "stage"], in: box)
+        #expect(result.exitCode == 1)
+        #expect(result.stdout.contains { $0.contains("is replaced by ../supp/supp.jsonl#s9, which is no proposition of that ledger") })
+    }
+
+    @Test func `The rewrite check judges the bytes load read, though the file changes after`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let stage = box.url.appendingPathComponent("stage")
+        let manifest = try WriteParagraph.manifest(stage)
+        let payload = try WriteParagraph.load(manifest)
+        // After load, the staged main file changes on disk so that the new proposition is mid-paragraph.
+        try edit(box, "stage/manuscript/main.tex") { text in
+            var lines = text.components(separatedBy: "\n")
+            lines[28] = "Joined to the paragraph."
+            return lines.joined(separator: "\n")
+        }
+        #expect(!WriteParagraph.rewriteCheck(manifest, payload).problems.contains { $0.contains("does not start a paragraph") })
+        #expect(WriteParagraph.rewriteCheck(manifest, try WriteParagraph.load(manifest)).problems.contains { $0.contains("does not start a paragraph") })
+    }
+
+    @Test func `A malformed replacement or one naming this ledger's staged copy is a problem of the rewrite`() throws {
+        let box = try setUp()
+        #expect(run(Self.prepare, in: box).exitCode == 0)
+        try rewrite(box)
+        let replaced = #""replaced_by": ["\#(Self.new)"]"#
+        for (item, why) in [(#"{"ledger": "../supp/supp.jsonl", "id": "s1", "x": 1}"#, "neither an id nor"),
+                            (#"{"ledger": "../../stage/ledger/main.jsonl", "id": "\#(Self.new)"}"#, "names this ledger")] {
+            try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: replaced, with: #""replaced_by": [\#(item)]"#) }
+            let result = run(["check", "--stage", "stage"], in: box)
+            #expect(result.exitCode == 1)
+            #expect(result.stdout.contains { $0.contains(why) }, "\(result.stdout)")
+            try edit(box, "stage/ledger/main.jsonl") { $0.replacingOccurrences(of: #""replaced_by": [\#(item)]"#, with: replaced) }
+        }
+    }
+
     @Test func `A rewrite writes the trace anew and keeps the old one with a restore list`() throws {
         let box = try setUp()
         _ = try box.write(#"{"outline": "p-9", "first_prop": "x", "section": "s-z", "approval_line": 1}"# + "\n", to: "paper/outline/outline-trace.jsonl")

@@ -25,6 +25,10 @@ groups:
     zh: 依賴
     does: Every sentence depends only on what has already appeared.
     axiom: academic-writing/A1_no_forward_dependence
+  - id: motivation
+    zh: 引出
+    does: Every element arrives after the text before it has raised the question it answers.
+    axiom: academic-writing/A2_motivated_by_prefix
   - id: commitment
     zh: 承諾
     does: Every commitment made to the reader is kept.
@@ -396,6 +400,25 @@ entries:
     verified_by: [mechanical]
     on_warning: judge
 
+  # ---- Motivation ----
+
+  # A property of the sequence, not of one sentence: an example, a definition or
+  # a result can be true, cited and backward-dependent and still arrive before
+  # the reader holds the question it answers (issue 139). A result in a
+  # default-profile ledger is a `claim`, and so is every step of a derivation:
+  # the claim type cannot tell them apart, so default-profile results are not
+  # covered here (issue 141); `result` exists in the empirical profile only.
+  - id: motivation.called-for-by-prefix
+    class: obligation
+    group: motivation
+    unit: proposition
+    applies:
+      claim_type: [definition, example, result]
+    criterion: "An earlier sentence of the article asks for, or makes the reader need, what this proposition supplies."
+    check: gap
+    owner: 141
+    verified_by: [proofread, cross_model]
+
   # ---- Commitment ----
 
   - id: commitment.kept
@@ -753,13 +776,10 @@ unconstrained:
     value: axiom
     why: "What an axiom has to be is part of the claim-type fit entry, which applies to every claim type."
   - field: claim_type
-    value: definition
-    why: "What a definition has to be is part of the claim-type fit entry, which applies to every claim type."
+    value: claim
+    why: "No check states a requirement for this claim type alone; the motivation entry cannot separate a result from a derivation step (issue 141)."
   - field: claim_type
     value: hypothesis
-    why: "No check states a requirement that holds for this claim type alone."
-  - field: claim_type
-    value: claim
     why: "No check states a requirement that holds for this claim type alone."
   - field: claim_type
     value: case_split
@@ -774,14 +794,8 @@ unconstrained:
     value: commentary
     why: "What a commentary has to be is part of the claim-type fit entry, which applies to every claim type."
   - field: claim_type
-    value: example
-    why: "No check states a requirement that holds for this claim type alone."
-  - field: claim_type
     value: scope_qualifier
     why: "No check states a requirement that holds for this claim type alone."
-  - field: claim_type
-    value: result
-    why: "The empirical layers apply by evidence class, to the propositions that rest on data, not by claim type."
   - field: claim_type
     value: interpretation
     why: "The empirical layers apply by evidence class, to the propositions that rest on data, not by claim type."

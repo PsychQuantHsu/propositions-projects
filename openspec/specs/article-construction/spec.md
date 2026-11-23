@@ -384,6 +384,8 @@ No executable check: the modes are instructions that a model follows; the comman
 - **WHEN** the next record's section has `part` `supplement`, `article.json` names a destination for it, and the author asks to write from the outline
 - **THEN** the skill prepares with the supplement's main file, ledger and sidecars, and the trace record carries `"part": "supplement"`
 
+---
+
 <!-- @trace
 source: idd-120-skills
 updated: 2026-11-22
@@ -405,4 +407,68 @@ code:
   - tests/PropositionsKitTests/ReviseOtherLedgerTests.swift
   - Sources/PropositionsKit/ReviseRun.swift
   - CLAUDE.md
+-->
+
+### Requirement: Write mode puts each example, definition and result after its question
+
+In write mode (including when it writes from an outline record) and in reorganize mode, the skill SHALL, for each example, definition or result it writes, do one of two things: place it after text that raises the question it answers, earlier in the paragraph or anywhere before it (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`); or, when nothing before it raises that question, write the sentence that raises it first or tell the author that nothing does. A sentence written to raise a question SHALL only restate what the agreed paragraph already argues; one that would state a choice, a gap or a claim the author has not made is a placeholder. When writing from an outline record, whose points fix the order, the skill SHALL tell the author instead of reordering the points. What it tells the author, and each sentence it wrote to raise such a question, is shown with the paragraph (in reorganize mode, with the rewrite), before the author confirms the write.
+
+No executable check: whether a sentence raises the question an example answers is a judgment of meaning. The check for the obligation is issue 141.
+
+#### Scenario: A paragraph planned to open on an example
+
+- **WHEN** the paragraph agreed with the author would open on a worked example whose question no earlier text raises
+- **THEN** the skill writes the sentence that raises the question first, or tells the author that nothing before the example raises it
+
+<!-- @trace
+source: idd-139-motivation-group
+updated: 2026-11-23
+code:
+  - CLAUDE.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/README.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix1
+updated: 2026-11-23
+code:
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+  - propositions-projects.code-workspace
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix2
+updated: 2026-11-23
+code:
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/prop-outline/SKILL.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/skills/prop-construct/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix3
+updated: 2026-11-23
+code:
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/catalog/obligations.yaml
+tests:
+  - tests/test_plugin_payload_tracked.py
 -->

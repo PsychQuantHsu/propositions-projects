@@ -477,8 +477,10 @@ OBL_ENTRY_KEYS = (
 )
 OBL_REQUIRED_KEYS = ("id", "class", "unit", "criterion", "check", "verified_by")
 OBL_GROUP_KEYS = ("id", "zh", "does", "axiom")
-OBL_GROUPS = ("dependence", "commitment", "support", "consistency", "truth", "placement", "completeness")
+OBL_GROUPS = ("dependence", "motivation", "commitment", "support", "consistency", "truth", "placement", "completeness")
 OBL_DEPENDENCE_AXIOM = "academic-writing/A1_no_forward_dependence"
+OBL_MOTIVATION_AXIOM = "academic-writing/A2_motivated_by_prefix"
+OBL_MOTIVATION_APPLIES = {"claim_type": ["definition", "example", "result"]}
 OBL_CLASSES = ("precondition", "obligation")
 OBL_UNITS = ("proposition", "article")
 OBL_APPLIES_KEYS = ("profile", "claim_type", "evidence_class", "cites", "opens", "section_role")
@@ -534,8 +536,9 @@ OBL_PINNED_GAPS = {
     "index.structure-faithful": ("precondition", 66),
     "index.profile-fits-manuscript": ("precondition", 70),
     "truth.cited-work-agrees": ("obligation", 50),
+    "motivation.called-for-by-prefix": ("obligation", 141),
 }
-OBL_REQUIRED_OWNERS = (50, 55, 62, 66, 70, 81)
+OBL_REQUIRED_OWNERS = (50, 55, 62, 66, 70, 81, 141)
 # The entries whose check has to consult a source outside the manuscript's
 # repository. The mark is a key of its own, not a value of verified_by: two of
 # the four are decided by a reading, and the mark has to outlive the gap.
@@ -615,9 +618,9 @@ def _group_problems(groups) -> list[str]:
     ids = [group.get("id") if isinstance(group, dict) else None for group in groups]
     for group_id in ids:
         if group_id not in OBL_GROUPS:
-            problems.append(f"group {group_id!r} is not one of the seven groups")
+            problems.append(f"group {group_id!r} is not one of the eight groups")
     if tuple(ids) != OBL_GROUPS:
-        problems.append(f"groups are not the seven in order: {', '.join(OBL_GROUPS)}")
+        problems.append(f"groups are not the eight in order: {', '.join(OBL_GROUPS)}")
     for position, group in enumerate(groups, 1):
         if not isinstance(group, dict):
             problems.append(f"group {position} is not a mapping")
@@ -635,6 +638,8 @@ def _group_problems(groups) -> list[str]:
             problems.append(f"group {group_id!r}: axiom {axiom!r} is not <domain>/<axiom id>")
         if group_id == "dependence" and axiom != OBL_DEPENDENCE_AXIOM:
             problems.append(f"group 'dependence': axiom is not {OBL_DEPENDENCE_AXIOM}")
+        if group_id == "motivation" and axiom != OBL_MOTIVATION_AXIOM:
+            problems.append(f"group 'motivation': axiom is not {OBL_MOTIVATION_AXIOM}")
     return problems
 
 
@@ -664,7 +669,7 @@ def _entry_problems(entry: dict, vocabulary, methods) -> list[str]:
         if prefix != "index":
             problems.append("the id of a precondition starts with index.")
     elif group not in OBL_GROUPS:
-        problems.append(f"an obligation needs a group among the seven, found {group!r}")
+        problems.append(f"an obligation needs a group among the eight, found {group!r}")
     elif prefix != group:
         problems.append(f"the id of an obligation starts with its group, {group}.")
 
@@ -876,6 +881,9 @@ def _reviewed_problems(table) -> list[str]:
                 f"entry {entry_id!r}: class {entry.get('class')!r}, check {entry.get('check')!r}, owner "
                 f"{entry.get('owner')!r}; the spec asks for a {kind} that is a gap owned by issue {owner}"
             )
+    motivation = by_id.get("motivation.called-for-by-prefix")
+    if motivation is not None and motivation.get("applies") != OBL_MOTIVATION_APPLIES:
+        problems.append(f"entry 'motivation.called-for-by-prefix': applies is not {OBL_MOTIVATION_APPLIES}")
     for entry in unwalked:
         verified_by = entry.get("verified_by")
         verified_by = verified_by if isinstance(verified_by, list) else []
@@ -943,6 +951,7 @@ def _small_table() -> dict:
     """A table that breaks no format rule; each refusal case changes one thing in it."""
     groups = [{"id": group, "zh": "組", "does": "Protects one thing."} for group in OBL_GROUPS]
     groups[0]["axiom"] = OBL_DEPENDENCE_AXIOM
+    groups[1]["axiom"] = OBL_MOTIVATION_AXIOM
     return {
         "groups": groups,
         "entries": [
@@ -1009,18 +1018,20 @@ OBL_FORMAT_REFUSALS = [
     ("external_source that is not true", _set(INDEX_ROW, external_source="yes"), [INDEX_ROW, "external_source"]),
     ("external_source set to false", _set(INDEX_ROW, external_source=False), [INDEX_ROW, "external_source"]),
     ("applies given as null", _set(INDEX_ROW, applies=None), [INDEX_ROW, "applies"]),
-    ("axiom given as null", lambda t: t["groups"][2].update(axiom=None), ["support", "axiom"]),
+    ("axiom given as null", lambda t: t["groups"][3].update(axiom=None), ["support", "axiom"]),
     ("third class", _set(INDEX_ROW, **{"class": "information"}), [INDEX_ROW, "information"]),
     ("precondition without the index prefix", _set(INDEX_ROW, id="info.text"), ["info.text", "index"]),
     ("obligation without its group prefix", _set(MODEL_ROW, id="truth.cites-imply"), ["truth.cites-imply", "support"]),
     ("obligation without a group", _drop(MODEL_ROW, "group"), [MODEL_ROW, "group"]),
     ("precondition with a group", _set(INDEX_ROW, group="support"), [INDEX_ROW, "group"]),
-    # spec-example: article-obligations / an eighth group
-    ("eighth group", lambda t: t["groups"].append({"id": "style", "zh": "文", "does": "Protects style."}), ["style"]),
+    # spec-example: article-obligations / a ninth group
+    ("ninth group", lambda t: t["groups"].append({"id": "style", "zh": "文", "does": "Protects style."}), ["style"]),
     ("groups out of order", lambda t: t["groups"].reverse(), ["groups", "order"]),
-    ("group without its Chinese label", lambda t: t["groups"][2].pop("zh"), ["support", "zh"]),
+    ("group without its Chinese label", lambda t: t["groups"][3].pop("zh"), ["support", "zh"]),
     ("dependence names another axiom", lambda t: t["groups"][0].update(axiom="academic-writing/A2_other"),
      ["dependence", OBL_DEPENDENCE_AXIOM]),
+    ("motivation names another axiom", lambda t: t["groups"][1].update(axiom="academic-writing/A1_no_forward_dependence"),
+     ["motivation", OBL_MOTIVATION_AXIOM]),
     # spec-example: article-obligations / a claim type that no profile accepts
     ("value outside the vocabulary", _set(INDEX_ROW, applies={"claim_type": ["lemma"]}), [INDEX_ROW, "lemma"]),
     ("optional sidecar field as a key", _set(INDEX_ROW, applies={"move": ["define"]}), [INDEX_ROW, "move"]),
@@ -1155,7 +1166,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (50, 62, 66, 70, 81):   # 55 is in the small table
+    for owner in (owner for owner in OBL_REQUIRED_OWNERS if owner != 55):   # 55 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
     for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
         assert _names(problems, [entry_id, "external_source"]), problems
@@ -1346,6 +1357,14 @@ def test_obligations_loader_refuses_a_key_given_twice():
 def obligations() -> dict:
     assert OBLIGATIONS.is_file(), f"missing {_rel(OBLIGATIONS)}"
     return _load_obligations_text(OBLIGATIONS.read_text(encoding="utf-8"))
+
+
+def test_obligations_motivation_applies_is_locked(obligations):
+    """The round-1 regression of #139 (claim added to the motivation entry) is reported."""
+    import copy
+    table = copy.deepcopy(obligations)
+    _obl_entry(table, "motivation.called-for-by-prefix")["applies"] = {"claim_type": ["definition", "example", "result", "claim"]}
+    assert _names(_reviewed_problems(table), ["motivation.called-for-by-prefix", "applies"])
 
 
 def test_obligations_table_has_no_problem(obligations):

@@ -406,6 +406,16 @@ with the author, in one question (AskUserQuestion), what the paragraph does: wha
 to, which commitments it advances, and its claims. A claim that changes what the paper argues is
 the author's to make; when the author has not made it, write a placeholder for it.
 
+Each example, definition or result comes after text that raises the question it answers: earlier
+in the paragraph, or anywhere in the text before it (the obligation group `motivation`, axiom
+`academic-writing/A2_motivated_by_prefix`; issue 139). When nothing before an example, a
+definition or a result raises its question, write the sentence that raises it first, or tell the
+author that nothing does (W8). The sentence may only restate what the paragraph agreed in this
+step already argues; a sentence that would state a choice, a gap or a claim the author has not
+made is a placeholder, as above. Unlike an outline point, which is written into the plan without
+showing the text, this sentence is shown at W8 before anything is written. No command checks this
+yet (issue 141).
+
 Never invent a result, a number or a citation. Write each as a placeholder
 `{PENDING: <what is to be supplied>}`. It needs no macro, compiles as it is and shows in the PDF.
 A citation key may be used only when it is in the manuscript's bibliography file; any other
@@ -494,6 +504,8 @@ Show the author:
 - the new paragraph as it will stand in the manuscript, with its line numbers;
 - the new propositions as a table (location, claim_type, evidence_class, first words);
 - the new records (head, relation, move, commitments);
+- each example, definition or result of the paragraph whose question nothing before it raises
+  (W2), or that there is none, and each sentence written to raise such a question;
 - the placeholders and their lines;
 - `diff -u` of each of the four files against its copy.
 
@@ -545,7 +557,9 @@ asks for it by its id.
 **O2 — Instead of W2.** The paragraph says the record's points, in their order, and nothing that
 the points do not say. A point with `pending` gets a placeholder `{PENDING: <the pending text>}`
 for what it names. A record that carries `carry` is the block its `from` names, copied character
-for character, with only the changes its `edits` lists. A citation is the key a point's `basis` or
+for character, with only the changes its `edits` lists. The rule of W2 on what comes first holds
+here too: when a point gives an example, a definition or a result whose question nothing earlier
+raises, say so at W8 instead of reordering the record's points, which are the outline's. A citation is the key a point's `basis` or
 the manuscript's bibliography gives; any other is a placeholder. When the record is the first of
 its section and the section's heading is not in the draft yet, the paragraph comes with the
 heading line, written from the section record's `heading`.
@@ -656,7 +670,8 @@ block its `from` names, copied character for character with only the changes its
 other record says its points, in order: where a sentence of the passages its `from` names still
 says a point, keep that sentence as it is written, so that its proposition is found again in G4.
 A point with `pending` gets `{PENDING: <the pending text>}`; results, numbers and citations follow
-the rules of O2. Keep what is not a paragraph as it was: the preamble, `\begin{document}`, the
+the rules of O2, and so does what comes first (an example, a definition or a result whose question
+nothing earlier raises is told to the author in G8). Keep what is not a paragraph as it was: the preamble, `\begin{document}`, the
 title, the bibliography, `\end{document}`. Change an included file only when the outline moves
 text into or out of it.
 
@@ -716,6 +731,8 @@ that paragraph in two files of the staging directory; dispatch them together. Th
   ledger, the two sidecars);
 - how many propositions were found again, retired (and with which replacements), and added;
 - the placeholders and their lines;
+- each example, definition or result whose question nothing before it raises (G3), or that there
+  is none;
 - the readers' findings, record by record.
 
 Ask once (AskUserQuestion): write it, change something, or stop. A change to the copies runs G7

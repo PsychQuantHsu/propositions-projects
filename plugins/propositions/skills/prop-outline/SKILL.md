@@ -1005,6 +1005,13 @@ while a command runs.
 3. Do not invent content. A point that would report a result, a number or a citation the author
    has not supplied says what will be reported without stating it ("A simulation will report how
    the two methods compare."), and carries `pending` naming what is still missing.
+   Order the points so that each example, definition or result comes after a point that raises
+   the question it answers (the obligation group `motivation`, axiom
+   `academic-writing/A2_motivated_by_prefix`; issue 139). When the author's ideas give an example,
+   a definition or a result before anything raises its question, tell the author and ask for the
+   point that raises it; do not write that point yourself (it would be content the author did
+   not give). The premise check has no kind for this
+   yet (issue 141).
 4. Stage, check, show, ask and write as in derive, steps 7 to 10, except that `EMPTY` is
    accepted for the paragraph file in the case step 2 describes. When no record has a locator,
    the list of "Locators: do they resolve" is empty and there is nothing to resolve. When a
@@ -1033,6 +1040,11 @@ draft, step 2: only after the manuscript check accepts it. Run the call
 again after every reply of the author, before the next edit: the reply arrives in a later
 call, and the guard has to hold then too. No `ok outline directory`: do not read or edit.
 
+- **What comes first.** When an edit moves a point that gives an example, a definition or a
+  result ahead of the point that raises its question, moves the point that raises it after the
+  element, or removes that point, tell the author
+  before writing: the order is theirs, but the outline would then carry the defect of the
+  obligation group `motivation` (draft, step 3).
 - **Ids are stable.** A record and a point keep their `id` when their content changes and when
   they move. Merging and splitting replace records: the records that are merged, and the record
   that is split, leave the file, and the records that replace them are new. A new record or

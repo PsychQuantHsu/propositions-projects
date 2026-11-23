@@ -535,8 +535,9 @@ OBL_PINNED_GAPS = {
     "index.structure-faithful": ("precondition", 66),
     "index.profile-fits-manuscript": ("precondition", 70),
     "truth.cited-work-agrees": ("obligation", 50),
+    "motivation.called-for-by-prefix": ("obligation", 141),
 }
-OBL_REQUIRED_OWNERS = (50, 55, 62, 66, 70, 81)
+OBL_REQUIRED_OWNERS = (50, 55, 62, 66, 70, 81, 141)
 # The entries whose check has to consult a source outside the manuscript's
 # repository. The mark is a key of its own, not a value of verified_by: two of
 # the four are decided by a reading, and the mark has to outlive the gap.

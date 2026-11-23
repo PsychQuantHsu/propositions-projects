@@ -406,12 +406,11 @@ with the author, in one question (AskUserQuestion), what the paragraph does: wha
 to, which commitments it advances, and its claims. A claim that changes what the paper argues is
 the author's to make; when the author has not made it, write a placeholder for it.
 
-Each example, definition or result comes after the text that raises the question it answers:
-in this paragraph, before it, or in the paragraph before (the obligation group `motivation`,
-axiom `academic-writing/A2_motivated_by_prefix`; issue 139). A paragraph that would open on an
-example or a result opens instead on the sentence that names the question it answers, or the
-author is told that nothing before it raises one. This is checked when the paragraph is written
-and shown (W8); no command checks it yet (issue 141).
+Each example, definition or result comes after text that raises the question it answers: earlier
+in the paragraph, or anywhere in the text before it (the obligation group `motivation`, axiom
+`academic-writing/A2_motivated_by_prefix`; issue 139). When nothing before an example, a
+definition or a result raises its question, write the sentence that raises it first, or tell the
+author that nothing does (W8). No command checks this yet (issue 141).
 
 Never invent a result, a number or a citation. Write each as a placeholder
 `{PENDING: <what is to be supplied>}`. It needs no macro, compiles as it is and shows in the PDF.
@@ -501,6 +500,8 @@ Show the author:
 - the new paragraph as it will stand in the manuscript, with its line numbers;
 - the new propositions as a table (location, claim_type, evidence_class, first words);
 - the new records (head, relation, move, commitments);
+- each example, definition or result of the paragraph whose question nothing before it raises
+  (W2), or that there is none;
 - the placeholders and their lines;
 - `diff -u` of each of the four files against its copy.
 
@@ -553,8 +554,8 @@ asks for it by its id.
 the points do not say. A point with `pending` gets a placeholder `{PENDING: <the pending text>}`
 for what it names. A record that carries `carry` is the block its `from` names, copied character
 for character, with only the changes its `edits` lists. The rule of W2 on what comes first holds
-here too: when a point gives an example or a result whose question no earlier point raises, say so
-at W8 instead of reordering the record's points, which are the outline's. A citation is the key a point's `basis` or
+here too: when a point gives an example, a definition or a result whose question nothing earlier
+raises, say so at W8 instead of reordering the record's points, which are the outline's. A citation is the key a point's `basis` or
 the manuscript's bibliography gives; any other is a placeholder. When the record is the first of
 its section and the section's heading is not in the draft yet, the paragraph comes with the
 heading line, written from the section record's `heading`.

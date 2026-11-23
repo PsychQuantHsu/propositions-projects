@@ -1601,6 +1601,8 @@ When it drafts an outline, the skill SHALL order the points so that each point g
 
 No executable check: this is a judgment of meaning, and the premise check (`propositions:outline-checker`) has no kind for it yet. Adding one is issue 141.
 
+When the author's ideas give a definition before anything raises the need for it, the same holds.
+
 #### Scenario: An idea list that opens on an example
 
 - **WHEN** the author's ideas for a section begin with a worked example
@@ -1617,6 +1619,19 @@ code:
   - plugins/propositions/catalog/obligations.yaml
   - plugins/propositions/README.md
   - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix1
+updated: 2026-11-23
+code:
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+  - propositions-projects.code-workspace
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

@@ -411,7 +411,7 @@ code:
 
 ### Requirement: Write mode puts each example, definition and result after its question
 
-In write mode, and when it writes from an outline record, the skill SHALL write each example, definition or result after text that raises the question it answers: earlier in the paragraph, or in the text before the paragraph (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`). When nothing before it raises one, the skill SHALL open the paragraph on the sentence that names the question, or, when writing from an outline record whose points fix the order, SHALL say so when it shows the paragraph instead of reordering the record's points.
+In write mode, and when it writes from an outline record, the skill SHALL write each example, definition or result after text that raises the question it answers: earlier in the paragraph, or in the text before the paragraph (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`). When nothing before an example, a definition or a result raises its question, the skill SHALL write the sentence that raises it first or tell the author that nothing does; when writing from an outline record, whose points fix the order, it SHALL tell the author instead of reordering the points. What it tells the author is shown with the paragraph, before the author confirms the write.
 
 No executable check: whether a sentence raises the question an example answers is a judgment of meaning. The check for the obligation is issue 141.
 
@@ -431,6 +431,19 @@ code:
   - plugins/propositions/catalog/obligations.yaml
   - plugins/propositions/README.md
   - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix1
+updated: 2026-11-23
+code:
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+  - propositions-projects.code-workspace
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

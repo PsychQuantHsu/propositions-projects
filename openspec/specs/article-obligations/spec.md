@@ -99,7 +99,7 @@ code:
 
 ### Requirement: Obligations are grouped by principle
 
-`groups` SHALL list exactly these eight groups, in this order: `dependence`, `motivation`, `commitment`, `support`, `consistency`, `truth`, `placement`, `completeness`. Each group SHALL have `id`, `zh` (a Traditional Chinese label) and `does` (one English sentence saying what the group protects). `axiom` is optional and, when present, SHALL name one axiom of the che-axiom-systems plugin as `<domain>/<axiom id>`. A group SHALL name at most one axiom. The group `dependence` SHALL name `academic-writing/A1_no_forward_dependence`, and the group `motivation` SHALL name `academic-writing/A2_motivated_by_prefix` (issue 139: every example, definition or result arrives after the text before it has raised the question it answers; a property of the sequence, which no other group covers). The file SHALL NOT restate the text of an axiom.
+`groups` SHALL list exactly these eight groups, in this order: `dependence`, `motivation`, `commitment`, `support`, `consistency`, `truth`, `placement`, `completeness`. Each group SHALL have `id`, `zh` (a Traditional Chinese label) and `does` (one English sentence saying what the group protects). `axiom` is optional and, when present, SHALL name one axiom of the che-axiom-systems plugin as `<domain>/<axiom id>`. A group SHALL name at most one axiom. The group `dependence` SHALL name `academic-writing/A1_no_forward_dependence`, and the group `motivation` SHALL name `academic-writing/A2_motivated_by_prefix` (issue 139: every example, definition or result arrives after the text before it has raised the question it answers; a property of the sequence, which no other group covers). The group `motivation` SHALL hold the obligation `motivation.called-for-by-prefix`, which applies to the claim types `definition`, `example`, `claim` and `result` (a result is a `claim` in the default profile) and whose check is a gap owned by issue 141. The file SHALL NOT restate the text of an axiom.
 
 Every obligation entry SHALL name one of the eight groups in `group`. A precondition entry SHALL NOT have `group`.
 
@@ -139,6 +139,19 @@ code:
   - plugins/propositions/catalog/obligations.yaml
   - plugins/propositions/README.md
   - plugins/propositions/skills/prop-outline/SKILL.md
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix1
+updated: 2026-11-23
+code:
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/prop-construct/SKILL.md
+  - plugins/propositions/skills/prop-outline/SKILL.md
+  - propositions-projects.code-workspace
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

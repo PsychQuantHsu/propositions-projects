@@ -132,7 +132,12 @@ and does not restate it.
 `motivation` is a property of the sequence rather than of one sentence: an example, a definition
 or a result can be true, cited and backward-dependent and still arrive before the reader holds the
 question it answers. It is a group of its own rather than part of `placement`, which is about the
-section a piece of content belongs in, not about when it appears (issue 139).
+section a piece of content belongs in, not about when it appears (issue 139). Its one entry
+covers definitions, examples and claims or results, and only the axiom's first half: that
+something earlier asks for the element. It does not cover figures, tables, quotations or
+notation that is not a definition, nor the axiom's second half (that the sentence introducing the
+element says which question it answers), so an entry that passes does not show that the group's
+principle holds. Its check is a gap owned by issue 141.
 
 The table is checked whether or not `che-axiom-systems` is installed: the
 criteria a check can act on live here, the principles live there.

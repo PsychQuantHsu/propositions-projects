@@ -1007,9 +1007,10 @@ while a command runs.
    the two methods compare."), and carries `pending` naming what is still missing.
    Order the points so that each example, definition or result comes after a point that raises
    the question it answers (the obligation group `motivation`, axiom
-   `academic-writing/A2_motivated_by_prefix`; issue 139). When the author's ideas open a section
-   or a paragraph on an example or a result, put the point that raises its question first, or
-   tell the author that nothing before it raises one.
+   `academic-writing/A2_motivated_by_prefix`; issue 139). When the author's ideas give an example,
+   a definition or a result before anything raises its question, put the point that raises it
+   first, or tell the author that nothing before it does. The premise check has no kind for this
+   yet (issue 141).
 4. Stage, check, show, ask and write as in derive, steps 7 to 10, except that `EMPTY` is
    accepted for the paragraph file in the case step 2 describes. When no record has a locator,
    the list of "Locators: do they resolve" is empty and there is nothing to resolve. When a

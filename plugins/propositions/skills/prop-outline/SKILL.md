@@ -1008,8 +1008,9 @@ while a command runs.
    Order the points so that each example, definition or result comes after a point that raises
    the question it answers (the obligation group `motivation`, axiom
    `academic-writing/A2_motivated_by_prefix`; issue 139). When the author's ideas give an example,
-   a definition or a result before anything raises its question, put the point that raises it
-   first, or tell the author that nothing before it does. The premise check has no kind for this
+   a definition or a result before anything raises its question, tell the author and ask for the
+   point that raises it; do not write that point yourself (it would be content the author did
+   not give). The premise check has no kind for this
    yet (issue 141).
 4. Stage, check, show, ask and write as in derive, steps 7 to 10, except that `EMPTY` is
    accepted for the paragraph file in the case step 2 describes. When no record has a locator,
@@ -1040,7 +1041,8 @@ again after every reply of the author, before the next edit: the reply arrives i
 call, and the guard has to hold then too. No `ok outline directory`: do not read or edit.
 
 - **What comes first.** When an edit moves a point that gives an example, a definition or a
-  result ahead of the point that raises its question, or removes that point, tell the author
+  result ahead of the point that raises its question, moves the point that raises it after the
+  element, or removes that point, tell the author
   before writing: the order is theirs, but the outline would then carry the defect of the
   obligation group `motivation` (draft, step 3).
 - **Ids are stable.** A record and a point keep their `id` when their content changes and when

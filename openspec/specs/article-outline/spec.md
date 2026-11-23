@@ -1597,11 +1597,9 @@ code:
 
 ### Requirement: Draft and revise keep each example after its question
 
-When it drafts an outline, the skill SHALL order the points so that each point giving an example, a definition or a result comes after a point that raises the question it answers (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`), or SHALL tell the author that nothing before it raises one. When a revision the author asks for moves such a point ahead of the point that raises its question, or removes that point, the skill SHALL tell the author before writing; the order stays the author's.
+When it drafts an outline, the skill SHALL order the points so that each point giving an example, a definition or a result comes after a point that raises the question it answers (the obligation group `motivation`, axiom `academic-writing/A2_motivated_by_prefix`), or SHALL tell the author that nothing before it raises one and ask for the point; it SHALL NOT write that point itself. When a revision the author asks for moves such a point ahead of the point that raises its question, moves that point after it, or removes that point, the skill SHALL tell the author before writing; the order stays the author's.
 
 No executable check: this is a judgment of meaning, and the premise check (`propositions:outline-checker`) has no kind for it yet. Adding one is issue 141.
-
-When the author's ideas give a definition before anything raises the need for it, the same holds.
 
 #### Scenario: An idea list that opens on an example
 
@@ -1632,6 +1630,19 @@ code:
   - plugins/propositions/skills/prop-construct/SKILL.md
   - plugins/propositions/skills/prop-outline/SKILL.md
   - propositions-projects.code-workspace
+tests:
+  - tests/test_plugin_payload_tracked.py
+-->
+
+<!-- @trace
+source: idd-139-fix2
+updated: 2026-11-23
+code:
+  - plugins/propositions/docs/OBLIGATIONS.md
+  - plugins/propositions/catalog/obligations.yaml
+  - plugins/propositions/skills/prop-outline/SKILL.md
+  - propositions-projects.code-workspace
+  - plugins/propositions/skills/prop-construct/SKILL.md
 tests:
   - tests/test_plugin_payload_tracked.py
 -->

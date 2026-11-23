@@ -480,6 +480,7 @@ OBL_GROUP_KEYS = ("id", "zh", "does", "axiom")
 OBL_GROUPS = ("dependence", "motivation", "commitment", "support", "consistency", "truth", "placement", "completeness")
 OBL_DEPENDENCE_AXIOM = "academic-writing/A1_no_forward_dependence"
 OBL_MOTIVATION_AXIOM = "academic-writing/A2_motivated_by_prefix"
+OBL_MOTIVATION_APPLIES = {"claim_type": ["definition", "example", "result"]}
 OBL_CLASSES = ("precondition", "obligation")
 OBL_UNITS = ("proposition", "article")
 OBL_APPLIES_KEYS = ("profile", "claim_type", "evidence_class", "cites", "opens", "section_role")
@@ -880,6 +881,9 @@ def _reviewed_problems(table) -> list[str]:
                 f"entry {entry_id!r}: class {entry.get('class')!r}, check {entry.get('check')!r}, owner "
                 f"{entry.get('owner')!r}; the spec asks for a {kind} that is a gap owned by issue {owner}"
             )
+    motivation = by_id.get("motivation.called-for-by-prefix")
+    if motivation is not None and motivation.get("applies") != OBL_MOTIVATION_APPLIES:
+        problems.append(f"entry 'motivation.called-for-by-prefix': applies is not {OBL_MOTIVATION_APPLIES}")
     for entry in unwalked:
         verified_by = entry.get("verified_by")
         verified_by = verified_by if isinstance(verified_by, list) else []
@@ -1162,7 +1166,7 @@ def test_obligations_reviewed_entries_are_required():
     for entry_id in OBL_INFO_REVIEWED_ENTRIES:
         assert _names(problems, [entry_id, "info"]), problems
     assert _names(problems, ["structure:S5"]), problems
-    for owner in (50, 62, 66, 70, 81):   # 55 is in the small table
+    for owner in (owner for owner in OBL_REQUIRED_OWNERS if owner != 55):   # 55 is in the small table
         assert _names(problems, [f"owner {owner}"]), problems
     for entry_id in OBL_EXTERNAL_SOURCE_ENTRIES:
         assert _names(problems, [entry_id, "external_source"]), problems

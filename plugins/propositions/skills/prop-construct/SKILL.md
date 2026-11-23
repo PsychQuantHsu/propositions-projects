@@ -501,7 +501,7 @@ Show the author:
 - the new propositions as a table (location, claim_type, evidence_class, first words);
 - the new records (head, relation, move, commitments);
 - each example, definition or result of the paragraph whose question nothing before it raises
-  (W2), or that there is none;
+  (W2), or that there is none, and each sentence written to raise such a question;
 - the placeholders and their lines;
 - `diff -u` of each of the four files against its copy.
 
@@ -666,7 +666,8 @@ block its `from` names, copied character for character with only the changes its
 other record says its points, in order: where a sentence of the passages its `from` names still
 says a point, keep that sentence as it is written, so that its proposition is found again in G4.
 A point with `pending` gets `{PENDING: <the pending text>}`; results, numbers and citations follow
-the rules of O2. Keep what is not a paragraph as it was: the preamble, `\begin{document}`, the
+the rules of O2, and so does what comes first (an example, a definition or a result whose question
+nothing earlier raises is told to the author in G8). Keep what is not a paragraph as it was: the preamble, `\begin{document}`, the
 title, the bibliography, `\end{document}`. Change an included file only when the outline moves
 text into or out of it.
 
@@ -726,6 +727,8 @@ that paragraph in two files of the staging directory; dispatch them together. Th
   ledger, the two sidecars);
 - how many propositions were found again, retired (and with which replacements), and added;
 - the placeholders and their lines;
+- each example, definition or result whose question nothing before it raises (G3), or that there
+  is none;
 - the readers' findings, record by record.
 
 Ask once (AskUserQuestion): write it, change something, or stop. A change to the copies runs G7

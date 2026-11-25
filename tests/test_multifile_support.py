@@ -6,7 +6,7 @@ Covers spec `multifile-manuscript-support`:
 - File-qualified location syntax (prefixed R1/R13, backward-compatible unprefixed,
   prefix on sub-v1.6 ledger fails loudly)
 - Location prefix outside the input tree fails
-- `_meta.json` `source.parts` non-authoritative snapshot refresh
+- `_meta.json` `source.parts` snapshot: read-only, a difference is a warning (issue 146)
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ def write_ledger(
     return jsonl_path, meta_path
 
 
-def run_validator(jsonl_path: Path, meta_path: Path, tex_path: Path):
+def run_validator(jsonl_path: Path, meta_path: Path, tex_path: Path, *extra: str):
     return subprocess.run(
         [
             sys.executable,
@@ -82,6 +82,7 @@ def run_validator(jsonl_path: Path, meta_path: Path, tex_path: Path):
             str(meta_path),
             "--tex",
             str(tex_path),
+            *extra,
         ],
         capture_output=True,
         text=True,
@@ -196,32 +197,115 @@ def test_r1_matches_across_file_union(tmp_path):
     assert "R1" not in [line for line in out.splitlines() if "[FAIL]" in line]
 
 
-# ---------- source.parts snapshot ----------
+# ---------- source.parts snapshot (read-only, issue 146) ----------
+
+SNAPSHOT_WARN = "[WARN] source.parts"
 
 
-def test_parts_snapshot_refreshed_after_run(tmp_path):
+def set_parts(meta: Path, parts) -> bytes:
+    """Give `_meta.json` a `source.parts` (None: no key) and return its bytes."""
+    doc = json.loads(meta.read_text())
+    if parts is not None:
+        doc["source"]["parts"] = parts
+    meta.write_text(json.dumps(doc, indent=2) + "\n")
+    return meta.read_bytes()
+
+
+def snapshot_lines(res) -> list[str]:
+    return [line for line in res.stdout.splitlines() if line.startswith(SNAPSHOT_WARN)]
+
+
+def test_stale_snapshot_is_reported_not_rewritten(tmp_path):
+    # spec-example: multifile-manuscript-support / a stale snapshot is reported and not rewritten
     main = make_multifile_repo(tmp_path)
     jsonl, meta = write_ledger(tmp_path, [base_prop()])
-    run_validator(jsonl, meta, main)
-    refreshed = json.loads(meta.read_text())
-    assert refreshed["source"]["parts"] == [
-        "parts/part1.tex",
-        "parts/part2-theory.tex",
-    ]
+    before = set_parts(meta, ["parts/part1.tex"])
+    res = run_validator(jsonl, meta, main)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert meta.read_bytes() == before
+    lines = snapshot_lines(res)
+    assert len(lines) == 1, res.stdout
+    assert "parts/part1.tex" in lines[0] and "parts/part2-theory.tex" in lines[0]
 
 
-def test_single_file_run_adds_no_parts_key(tmp_path):
-    """No churn on single-file ledgers (Hsu case): absent parts stays absent."""
+# An axiom is not an orphan (R3), so under --strict the only warning left is the snapshot's.
+QUIET_PROP = {"claim_type": "axiom"}
+
+
+def test_strict_fails_on_stale_snapshot(tmp_path):
+    # spec-example: multifile-manuscript-support / strict fails on a stale snapshot
+    main = make_multifile_repo(tmp_path)
+    jsonl, meta = write_ledger(tmp_path, [base_prop(**QUIET_PROP)])
+    before = set_parts(meta, ["parts/part1.tex"])
+    res = run_validator(jsonl, meta, main, "--strict")
+    assert res.returncode == 1, res.stdout + res.stderr
+    assert "=== 1 WARNING(s) ===" in res.stdout, res.stdout
+    assert meta.read_bytes() == before
+
+
+def test_current_snapshot_gives_no_warning(tmp_path):
+    # spec-example: multifile-manuscript-support / a current snapshot gives no warning
+    main = make_multifile_repo(tmp_path)
+    jsonl, meta = write_ledger(tmp_path, [base_prop(**QUIET_PROP)])
+    before = set_parts(meta, ["parts/part1.tex", "parts/part2-theory.tex"])
+    res = run_validator(jsonl, meta, main, "--strict")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert snapshot_lines(res) == []
+    assert meta.read_bytes() == before
+
+
+def single_file(tmp_path: Path) -> tuple[Path, Path, Path]:
     main = tmp_path / "main.tex"
     main.write_text(f"{MAIN_SENTENCE}\n")
     jsonl, meta = write_ledger(
         tmp_path,
         [base_prop(text=MAIN_SENTENCE, location="L1", asserts=["paper scope"])],
     )
+    return main, jsonl, meta
+
+
+def test_single_file_without_parts_stays_quiet(tmp_path):
+    # spec-example: multifile-manuscript-support / a single-file ledger without the key stays quiet
+    main, jsonl, meta = single_file(tmp_path)
+    before = meta.read_bytes()
     res = run_validator(jsonl, meta, main)
     assert res.returncode == 0, res.stdout + res.stderr
-    refreshed = json.loads(meta.read_text())
-    assert "parts" not in refreshed["source"]
+    assert snapshot_lines(res) == []
+    assert meta.read_bytes() == before
+
+
+def test_single_file_with_leftover_parts_is_warned(tmp_path):
+    # spec-example: multifile-manuscript-support / a single-file ledger with leftover parts is warned
+    main, jsonl, meta = single_file(tmp_path)
+    before = set_parts(meta, ["parts/old.tex"])
+    res = run_validator(jsonl, meta, main)
+    lines = snapshot_lines(res)
+    assert len(lines) == 1, res.stdout
+    assert "no part files" in lines[0]
+    assert meta.read_bytes() == before
+    assert json.loads(meta.read_text())["source"]["parts"] == ["parts/old.tex"]
+
+
+def test_source_not_an_object_gives_no_warning(tmp_path):
+    main = make_multifile_repo(tmp_path)
+    jsonl, meta = write_ledger(tmp_path, [base_prop()])
+    doc = json.loads(meta.read_text()); doc["source"] = "main.tex"
+    meta.write_text(json.dumps(doc) + "\n")
+    before = meta.read_bytes()
+    res = run_validator(jsonl, meta, main)
+    assert snapshot_lines(res) == []
+    assert meta.read_bytes() == before
+
+
+def test_invalid_meta_json_is_a_parse_error_and_unchanged(tmp_path):
+    main = make_multifile_repo(tmp_path)
+    jsonl, meta = write_ledger(tmp_path, [base_prop()])
+    meta.write_text('{"source": {"parts": [}\n')
+    before = meta.read_bytes()
+    res = run_validator(jsonl, meta, main)
+    assert res.returncode == 2, res.stdout + res.stderr
+    assert "parse error" in res.stderr
+    assert meta.read_bytes() == before
 
 
 # ---------- Operation B (refresh) file-aware ----------

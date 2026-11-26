@@ -49,9 +49,9 @@ The validator and the location-refresh script SHALL resolve the manuscript's fil
 ---
 ### Requirement: Meta records the resolved parts as a non-authoritative snapshot
 
-`_meta.json` SHALL support an optional `source.parts` string array: the part files of the input tree, as paths relative to the main file's directory. Operation D, which creates `_meta.json` after the author confirms a dry run, MAY record it. The validator SHALL NOT write `_meta.json`; running it with `--meta` SHALL leave the file unchanged byte for byte (issue 146). Consumers SHALL treat the live input-tree resolution, not `source.parts`, as authoritative.
+`_meta.json` SHALL support an optional `source.parts` string array: a snapshot of the part files of the input tree. No tool writes it; the author records and updates it by hand. The validator SHALL NOT write `_meta.json`; running it with `--meta` SHALL leave the file unchanged byte for byte (issue 146). Consumers SHALL treat the live input-tree resolution, not `source.parts`, as authoritative.
 
-The validator SHALL compare the snapshot with the resolved tree whenever `--meta` names a readable `_meta.json` whose `source` is an object. The snapshot differs when the tree has parts and `source.parts` is not that list in document order, or when the tree has no parts and `source.parts` is present and not empty. A difference SHALL be one warning, printed as a line that begins `[WARN] source.parts` and names every part file resolved now (or says there are none), and counted with the other warnings, so that `--strict` fails. A `_meta.json` without `source.parts` for a single-file manuscript, or with an empty list, SHALL produce no warning. A `_meta.json` that is not valid JSON SHALL stop the run as a parse error (exit 2), as the ledger loader reads it first; a `source` that is not an object SHALL produce no warning. In both cases the file SHALL be unchanged.
+The validator SHALL compare the snapshot with the resolved tree whenever `--meta` names a readable `_meta.json` whose `source` is an object and whose `source.parts` is present and not `null`. The snapshot differs when it is not the list of part files the tree resolves, in document order, in the form the validator writes in a `location` prefix (for a tree without part files, the empty list). A difference SHALL be one warning, printed as a line that begins `[WARN] source.parts` and names every part file resolved now (or says there are none), and counted with the other warnings, so that `--strict` fails. A missing or `null` `source.parts` is no snapshot and SHALL produce no warning. A `_meta.json` that is not valid JSON SHALL stop the run as a parse error (exit 2), as the ledger loader reads it first; a `source` that is not an object SHALL produce no warning. In both cases the file SHALL be unchanged.
 
 #### Scenario: Measuring leaves the meta file as it was
 
@@ -76,6 +76,12 @@ The validator SHALL compare the snapshot with the resolved tree whenever `--meta
 - **WHEN** the validator runs with `--meta`
 - **THEN** no output line begins `[WARN] source.parts`
 
+##### Example: a multi-file ledger without the key stays quiet
+
+- **GIVEN** the same manuscript and a `_meta.json` whose `source` has no `parts`, as Operation D scaffolds it
+- **WHEN** the validator runs with `--strict` and nothing else warns
+- **THEN** it exits 0, no output line begins `[WARN] source.parts`, and `_meta.json` is unchanged
+
 ##### Example: a single-file ledger without the key stays quiet
 
 - **GIVEN** a single-file manuscript and a `_meta.json` whose `source` has no `parts`
@@ -93,9 +99,18 @@ The validator SHALL compare the snapshot with the resolved tree whenever `--meta
 source: idd-146-validator-meta-read-only
 updated: 2026-11-25
 code:
-  - propositions-projects.code-workspace
   - plugins/propositions/.claude-plugin/plugin.json
   - .claude-plugin/marketplace.json
+  - docs/SCHEMA.md
+  - plugins/propositions/scripts/validate-propositions.py
+tests:
+  - tests/test_multifile_support.py
+-->
+<!-- @trace
+source: idd-146-fix1
+updated: 2026-11-27
+code:
+  - plugins/propositions/README.md
   - docs/SCHEMA.md
   - plugins/propositions/scripts/validate-propositions.py
 tests:

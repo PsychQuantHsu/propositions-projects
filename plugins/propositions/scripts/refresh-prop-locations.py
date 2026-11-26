@@ -175,6 +175,45 @@ def find_prop_span(
     return occurrences[0]
 
 
+def widen_to_text(
+    span: tuple[int, int], text: str, tex_lines: list[str], normalize_fn
+) -> tuple[int, int]:
+    """Grow a located span over the prop's own delimiter lines (issue 110).
+
+    `find_prop_span` returns the smallest span whose normalized text contains
+    the prop. A line that normalizes to nothing on its own — a lone `\\]`,
+    `\\[`, `$$`, `\\begin{equation}` — never makes a window contain more, so a
+    prop that ends (or starts) with one comes back a line short. Extend the
+    end downwards, and the start upwards, across such lines only, and only
+    when the prop's own last (first) non-blank line is the line reached;
+    otherwise keep the span. A prop whose text is not verbatim keeps the
+    span `find_prop_span` gave.
+    """
+    own = [line.strip() for line in text.split("\n") if line.strip()]
+    if not own:
+        return span
+    start, end = span
+
+    def silent(n: int) -> bool:
+        return not normalize_fn(tex_lines[n - 1]).strip()
+
+    if tex_lines[end - 1].strip() != own[-1]:
+        k = end
+        while k < len(tex_lines) and k - start + 1 < MAX_SPAN and silent(k + 1):
+            k += 1
+            if tex_lines[k - 1].strip() == own[-1]:
+                end = k
+                break
+    if tex_lines[start - 1].strip() != own[0]:
+        k = start
+        while k > 1 and end - k + 1 < MAX_SPAN and silent(k - 1):
+            k -= 1
+            if tex_lines[k - 1].strip() == own[0]:
+                start = k
+                break
+    return start, end
+
+
 def read_tex_lines(path: Path) -> tuple[str, list[str]]:
     """(text, lines) of one manuscript file, as every `location` this tool writes counts them.
 
@@ -303,19 +342,21 @@ def refresh_jsonl(
             new_lines.append(p)
             continue
 
-        actual_start, actual_end = span
+        actual_start, actual_end = widen_to_text(span, text, tex_lines, normalize)
         new_loc = (
             f"{loc_prefix}:L{actual_start}-L{actual_end}"
             if actual_end > actual_start
             else f"{loc_prefix}:L{actual_start}"
         )
 
-        if new_loc != p.get("location", ""):
+        old_loc = p.get("location", "")
+        if new_loc != old_loc:
             updated += 1
             if not dry_run:
                 p["location"] = new_loc
+            # The old location, read before it is replaced (issue 110).
             print(
-                f"✓ {p['id'][:8]}: {p.get('location','?')} → {new_loc}",
+                f"✓ {p['id'][:8]}: {old_loc or '?'} → {new_loc}",
                 file=sys.stderr,
             )
         new_lines.append(p)

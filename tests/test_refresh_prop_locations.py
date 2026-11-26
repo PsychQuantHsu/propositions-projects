@@ -333,6 +333,7 @@ def test_emph_macro_spanning_line_anchors(tmp_path: Path):
 #    (the bare \[ / \] delimiter lines normalize to empty and are skipped)
 # --------------------------------------------------------------------------
 def test_display_math_block_prop_locates(tmp_path: Path):
+    # spec-example: location-refresh / text without the delimiter lines keeps its span
     """A prop spanning a `\\[ ... \\]` display-math block resolves to the real
     span. The bare `\\[` / `\\]` delimiter lines normalize to empty and are
     skipped by build_line_search_space, so they neither break the match nor
@@ -463,3 +464,29 @@ def test_fda3_deep_prop_anchors_to_content_line(tmp_path: Path):
         f"deep prop must anchor to the exact content line L21, never a blank; "
         f"got {_read_props(jsonl)[0]['location']!r}; stderr: {result.stderr}"
     )
+
+
+# --------------------------------------------------------------------------
+# Issue 110 — a proposition's own lone delimiter lines stay in its location
+# --------------------------------------------------------------------------
+def test_closing_delimiter_line_is_kept(tmp_path: Path):
+    # spec-example: location-refresh / the closing delimiter line is kept
+    lines = ["\\documentclass{article}", "\\begin{document}", "Some text before.",
+             "Let", "\\[", " x=1,", " \\qquad y=2.", "\\]", "After.", "\\end{document}"]
+    prop = _prop("20", "\n".join(lines[3:8]), "main.tex:L4-L8")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4-L8", result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+def test_opening_delimiter_line_is_kept(tmp_path: Path):
+    # spec-example: location-refresh / the opening delimiter line is kept
+    lines = ["Before.", "\\[", " a=b.", "\\]", "After."]
+    prop = _prop("21", "\n".join(lines[1:4]), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L4", result.stderr
+    assert "L1 → main.tex:L2-L4" in result.stderr, result.stderr

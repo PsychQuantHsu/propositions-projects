@@ -52,7 +52,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
 ## 例外：可以不是 Swift 的程式碼
 
-這是封閉列舉，只有五類，不得依性質相似類推出第六類。
+這是封閉列舉，只有六類，不得依性質相似類推出第七類。
 
 1. **Swift binary 還不存在、或使用端沒有 binary 時才需要的殼層。** 這一類只有三種：
    - plugin 取得並啟動 binary 的殼層：propositions plugin 的 `hooks/fetch-cli.sh`（SessionStart hook）與
@@ -122,6 +122,16 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 
    **退場條件**：維護者決定不再需要這些提示時（例如釘著舊 tag 的稿件 repo 都已更新），刪掉它們與這一條。
    `migrate-structure-v2.py` 原本載入 `derive-paragraphs.py`，它用到的段落函式已原樣搬進它自己的檔，不再載入退役的檔。
+6. **指名的一條檢查：`validate-propositions.py` 的 `source.parts` 快照警告（#146）。** 這是封閉清單，目前只有這一條：
+   - `main()` 裡比對 `_meta.json` 的 `source.parts` 與解析到的 `\input` 樹；有快照而不一致時，印一行
+     `[WARN] source.parts` 並計入 warning（`--strict` 因此失敗）。
+
+   它取代的是同一處既有的行為：#146 之前 validator 在不一致時改寫 `_meta.json`，比對本來就在；#146 把寫入拿掉，
+   改成回報。照第 2 類 (c)(d) 這是新的輸出與新的檢查規則，所以另記在這裡。維護者 2026-11-27 選「記一條指名的
+   例外」（#146 verify 第 1 輪第 2 列）。這一條可以修 bug；不得在它旁邊加別的檢查，也不得以「它也只是改了既有
+   比對的結果」為由比照新增。
+
+   **退場條件**：validator 移植成 Swift 之後，這條檢查搬進 `PropositionsKit`（照〈規則〉的表），然後刪掉這一條。
 
 ## 不適用
 
@@ -249,6 +259,7 @@ repo 根目錄的 `Package.swift` 宣告了上表的 targets（#46 建立）；�
 | 2026-11-19 | #46 建立 Swift package 與第一條 Swift 檢查（引用方向）。有三件事因此在 Python 與 Swift 各寫了一份：判斷 `retired` 區塊是否格式正確、讀 `location`、數稿件檔的行。#46 的驗證指出 Python 那邊讀稿件的函式彼此不一致（數行有 `splitlines` 與照換行切兩種，`main.tex:` 的意思 `parse_location_v16` 與 R15 相反），Swift 版第一次修正時照錯了對象 | **三件事各有一個對齊的對象**：`retired` 照驗證器的 `retired_problem`，`location` 照 `parse_location_v16`，數行照寫 `location` 的工具 `refresh-prop-locations.py` 的 `read_tex_lines`（行在 LF、CR、CRLF 結束）。`tests/PropositionsKitTests/ParityTests.swift` 直接載入這三個 Python 函式、拿同一組輸入餵兩邊比對，改其中一邊而另一邊沒跟上時會失敗；改這三個 Python 函式時同一個變更要改 `Sources/PropositionsKit/`。`\input` 樹 Swift 版用自己的規則讀（寫在規格 `citation-order`），不是 `resolve_input_tree` 的副本（#94） |
 | 2026-11-20 | #46 的 binary 發布之後，維護者決定 plugin 用 SessionStart hook 取得它（「照你的建議，先做第 1 題」）。實作時的試跑把 binary 寫進了另一個 plugin 的資料目錄：shell 環境裡留著那個 plugin 的 `CLAUDE_PLUGIN_DATA` | 〈例外〉第 1 類改成現在的寫法。hook 只寫進名稱是 `propositions` 或以 `propositions-` 開頭的資料目錄，有測試。**skill 裡不要直接信任 shell 環境的 `CLAUDE_PLUGIN_DATA`**：Bash 工具的環境沒有這個 plugin 的值，有的話是別的 plugin 的；路徑要寫在 SKILL.md 的內文裡，由 Claude Code 載入時代換 |
 | 2026-11-21 | binary 0.2.0 發布後，維護者決定被 Swift 取代的四支 Python 版直接退役，看到 Python 版就引導改用 Swift 版（#69 的決定） | 加〈例外〉第 5 類「退役提示」，四支換成提示並以 2 結束，`cli.lock`、skill 與 `run-audit.sh` 換到 0.2.0；Swift 的比對測試改讀退役前錄下的輸出（`tests/fixtures/retired-python/`）。**不要把退役提示改回會做事的 Python**：要的是引導，不是兩份實作 |
+| 2026-11-27 | #146 把 validator 改成只讀，`source.parts` 與 `\input` 樹不一致時改為一條計入 `--strict` 的 warning。Diagnosis 主張這只是改了既有比對的結果、不算新檢查；verify 第 1 輪的 Devil's Advocate 指出這正是第 2 類要擋的依性質相似類推 | 維護者選「記一條指名的例外」：加〈例外〉第 6 類，只涵蓋這一條。**不要因為「只是改了既有程式的結果」就認定不算新功能**：舊的比對不產生 finding、不影響結束碼，新的會 |
 
 ## 語言組成（2026-11-21 量，只計受追蹤的檔）
 

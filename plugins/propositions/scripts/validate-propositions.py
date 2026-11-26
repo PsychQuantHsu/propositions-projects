@@ -1497,22 +1497,18 @@ def main():
     # source.parts snapshot check (non-authoritative; SCHEMA.md §Multi-file).
     # The validator only reads `_meta.json` (issue 146): measuring a ledger must
     # not change it. A snapshot that differs from the resolved tree is one
-    # warning naming the files resolved now. A single-file tree differs only
-    # when an existing key is non-empty — no noise on legacy ledgers like the
-    # Hsu case.
+    # warning naming the files resolved now. A missing or null `parts` is no
+    # snapshot: no tool writes the field (the Operation D template has none), so
+    # warning on its absence would never stop. The warning is a named exception
+    # in .claude/rules/swift-is-the-implementation-language.md (category 6).
     snapshot_warnings: list[tuple[str, str]] = []
     if use_jsonl and meta_path is not None and meta_path.exists():
         try:
             meta_doc = json.loads(meta_path.read_text(encoding="utf-8"))
             src = meta_doc.get("source") if isinstance(meta_doc, dict) else None
-            if isinstance(src, dict):
-                if parts_rel:
-                    stale = src.get("parts") != parts_rel
-                elif "parts" in src:
-                    stale = src.get("parts") != []
-                else:
-                    stale = False
-                if stale:
+            snapshot = src.get("parts") if isinstance(src, dict) else None
+            if snapshot is not None:
+                if snapshot != parts_rel:
                     now = ", ".join(parts_rel) if parts_rel else "the tree has no part files"
                     snapshot_warnings.append(
                         (

@@ -254,6 +254,17 @@ def test_current_snapshot_gives_no_warning(tmp_path):
     assert meta.read_bytes() == before
 
 
+def test_multifile_without_parts_key_stays_quiet(tmp_path):
+    # spec-example: multifile-manuscript-support / a multi-file ledger without the key stays quiet
+    main = make_multifile_repo(tmp_path)
+    jsonl, meta = write_ledger(tmp_path, [base_prop(**QUIET_PROP)])  # no parts, as Operation D scaffolds it
+    before = meta.read_bytes()
+    res = run_validator(jsonl, meta, main, "--strict")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert snapshot_lines(res) == []
+    assert meta.read_bytes() == before
+
+
 def single_file(tmp_path: Path) -> tuple[Path, Path, Path]:
     main = tmp_path / "main.tex"
     main.write_text(f"{MAIN_SENTENCE}\n")
@@ -284,6 +295,16 @@ def test_single_file_with_leftover_parts_is_warned(tmp_path):
     assert "no part files" in lines[0]
     assert meta.read_bytes() == before
     assert json.loads(meta.read_text())["source"]["parts"] == ["parts/old.tex"]
+
+
+def test_single_file_null_parts_is_no_snapshot(tmp_path):
+    main, jsonl, meta = single_file(tmp_path)
+    doc = json.loads(meta.read_text()); doc["source"]["parts"] = None
+    meta.write_text(json.dumps(doc) + "\n")
+    before = meta.read_bytes()
+    res = run_validator(jsonl, meta, main)
+    assert snapshot_lines(res) == []
+    assert meta.read_bytes() == before
 
 
 def test_source_not_an_object_gives_no_warning(tmp_path):

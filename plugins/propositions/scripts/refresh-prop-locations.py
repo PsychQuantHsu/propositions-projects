@@ -185,9 +185,12 @@ def widen_to_text(
     `\\[`, `$$`, `\\begin{equation}` — never makes a window contain more, so a
     prop that ends (or starts) with one comes back a line short. Extend the
     end downwards, and the start upwards, across such lines only, and only
-    when the prop's own last (first) non-blank line is the line reached;
-    otherwise keep the span. A prop whose text is not verbatim keeps the
-    span `find_prop_span` gave.
+    when the prop's own last (first) non-blank line is the line reached.
+    The widened span is kept only when its non-blank lines, stripped, are
+    exactly the prop's own (verify round 1 of issue 110): a prop whose text is
+    not verbatim would otherwise be widened onto a neighbouring delimiter, or
+    across a blank line into the next paragraph, with no warning. In every
+    other case the span `find_prop_span` gave is kept.
     """
     own = [line.strip() for line in text.split("\n") if line.strip()]
     if not own:
@@ -211,7 +214,10 @@ def widen_to_text(
             if tex_lines[k - 1].strip() == own[0]:
                 start = k
                 break
-    return start, end
+    if (start, end) == span:
+        return span
+    widened = [line.strip() for line in tex_lines[start - 1:end] if line.strip()]
+    return (start, end) if widened == own else span
 
 
 def read_tex_lines(path: Path) -> tuple[str, list[str]]:
@@ -352,11 +358,13 @@ def refresh_jsonl(
         old_loc = p.get("location", "")
         if new_loc != old_loc:
             updated += 1
+            # The stored location as it was, read before it is replaced
+            # (issue 110); `?` only when the key is missing.
+            shown = p.get("location", "?")
             if not dry_run:
                 p["location"] = new_loc
-            # The old location, read before it is replaced (issue 110).
             print(
-                f"✓ {p['id'][:8]}: {old_loc or '?'} → {new_loc}",
+                f"✓ {p['id'][:8]}: {shown} → {new_loc}",
                 file=sys.stderr,
             )
         new_lines.append(p)

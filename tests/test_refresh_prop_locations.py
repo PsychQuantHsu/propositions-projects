@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "refresh-prop-locations.py"
 
@@ -490,3 +492,60 @@ def test_opening_delimiter_line_is_kept(tmp_path: Path):
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L4", result.stderr
     assert "L1 → main.tex:L2-L4" in result.stderr, result.stderr
+
+
+def test_neighbouring_display_delimiter_is_not_taken(tmp_path: Path):
+    # spec-example: location-refresh / a neighbouring display delimiter is not taken
+    lines = ["$$", "a", "$$", "b", "After."]
+    prop = _prop("22", "$$\nb\n$$", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_paragraph_is_not_widened_into_the_next(tmp_path: Path):
+    # spec-example: location-refresh / a paragraph is not widened into the next one
+    lines = ["We have b.", "", "\\[", "\\]"]
+    prop = _prop("23", "We have b.\n\\]", "L3")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1", result.stderr
+
+
+@pytest.mark.parametrize(
+    "display",
+    [
+        ["\\begin{equation}", " x=1,", " y=2.", "\\end{equation}"],
+        ["\\begin{equation*}", " x=1,", " y=2.", "\\end{equation*}"],
+        ["\\begin{align*}", " x&=1,", " y&=2.", "\\end{align*}"],
+        ["\\[", "\\begin{cases}", " x=1, & y", "\\end{cases}", "\\]"],
+    ],
+)
+def test_other_closing_lines_are_kept(tmp_path: Path, display):
+    # spec-example: location-refresh / other closing lines are kept
+    lines = ["Before."] + display + ["After."]
+    prop = _prop("24", "\n".join(display), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == f"main.tex:L2-L{1 + len(display)}", result.stderr
+
+
+def test_widening_stops_at_max_span(tmp_path: Path):
+    content = [f"Line number {i} of a long display, word{i}." for i in range(1, 41)]
+    lines = content + ["\\]", "After."]
+    prop = _prop("25", "\n".join(content + ["\\]"]), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    # 40 content lines fill MAX_SPAN: the closing line cannot be added.
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L40", result.stderr
+
+
+def test_empty_stored_location_is_printed_as_empty(tmp_path: Path):
+    prop = _prop("26", "Only line.", "")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "Only line.\n")
+    result = _run(jsonl, tex_path)
+    assert ":  → main.tex:L1" in result.stderr, result.stderr

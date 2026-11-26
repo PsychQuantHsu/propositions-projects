@@ -62,6 +62,11 @@ public struct ReadingOrder: Sendable {
     public init(mainFile: URL, read: (URL) -> String?) throws {
         let main = mainFile.resolvingSymlinksInPath().standardizedFileURL
         let root = main.deletingLastPathComponent()
+        // Paths are compared as `String`s, and `String` equality is canonical equivalence, so
+        // `é.tex` written as one code point or as `e` plus a combining accent is one key. That is
+        // deliberate (issue 105): APFS, in both its variants, and HFS+ treat the two names as one
+        // file, and this binary runs only on macOS. Comparing bytes instead would break a tree whose
+        // `\input` spells a name in one form and whose `location` spells it in the other.
         var prefixes: [String: [Int]] = [:]
         var files: [String] = [main.lastPathComponent]
         var skipped: [String] = []

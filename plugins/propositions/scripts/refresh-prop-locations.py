@@ -175,6 +175,33 @@ def find_prop_span(
     return occurrences[0]
 
 
+_TEX_COMMENT = re.compile(r"(?:^|[^\\])(?:\\\\)*%")
+
+
+def _window_matches(window: list[str], own: list[str], first_silent: bool, last_silent: bool) -> bool:
+    """Whether manuscript lines `window` hold the prop's stripped lines `own`.
+
+    The first line may begin with other text (a sentence starts partway
+    through a line) and the last may end with other text; every other line,
+    blank lines included, is equal. On a side whose own line is a lone
+    delimiter, the rest of the manuscript line must hold neither a TeX
+    comment before the delimiter nor the same delimiter again: such a
+    delimiter belongs to other text (verify round 3 of issue 110).
+    """
+    lines = [line.strip() for line in window]
+    if lines[1:-1] != own[1:-1]:
+        return False
+    if not lines[0].endswith(own[0]) or not lines[-1].startswith(own[-1]):
+        return False
+    head = lines[0][: len(lines[0]) - len(own[0])]
+    if first_silent and head and (_TEX_COMMENT.search(head) or own[0] in head):
+        return False
+    tail = lines[-1][len(own[-1]):]
+    if last_silent and tail and own[-1] in tail:
+        return False
+    return True
+
+
 def widen_to_text(
     span: tuple[int, int], text: str, tex_lines: list[str], normalize_fn
 ) -> tuple[int, int]:
@@ -185,60 +212,33 @@ def widen_to_text(
     `\\[`, `$$`, `\\begin{equation}` — never makes a window contain more, so a
     prop that ends (or starts) with one comes back a line short.
 
-    Only towards such a line of the prop's own: when the prop's last non-blank
-    line normalizes to nothing, the end moves down across lines that normalize
-    to nothing and stops at the first line that equals it or starts with it
-    (`\\] Then B.`); the start moves up the same way towards the prop's first
-    line, stopping at a line that equals it or ends with it. The widened span
-    is kept only when its stripped lines match the prop's: the first ends with
-    the prop's first line (a sentence starts partway through a line), the last
-    starts with the prop's last line, and every other line, blank lines
-    included, is equal (verify rounds 1 and 2: anything looser moved a
-    location silently onto a neighbouring delimiter or across a paragraph
-    break). In every other case the span `find_prop_span` gave is kept.
+    A widened span has to match the prop line by line, so it has exactly as
+    many lines as the prop. The windows of that length that contain the span
+    are tried, nearest the span's start first, extending only a side whose own
+    line normalizes to nothing; the first that `_window_matches` is kept. A
+    walk that stopped at the first line looking like the boundary picked
+    comment lines and other text's delimiters, and gave up on a repeated
+    closing line (verify rounds 1 to 3). No match keeps the span.
     """
     own = [line.strip() for line in text.split("\n")]
     while own and not own[0]:
         own.pop(0)
     while own and not own[-1]:
         own.pop()
-    if not own:
-        return span
     start, end = span
-
-    def silent(n: int) -> bool:
-        return not normalize_fn(tex_lines[n - 1]).strip()
-
-    if not normalize_fn(own[-1]).strip() and tex_lines[end - 1].strip() != own[-1]:
-        k = end
-        while k < len(tex_lines) and k - start + 1 < MAX_SPAN:
-            below = tex_lines[k].strip()  # line k + 1
-            if below == own[-1] or below.startswith(own[-1]):
-                end = k + 1
-                break
-            if not silent(k + 1):
-                break
-            k += 1
-    if not normalize_fn(own[0]).strip() and tex_lines[start - 1].strip() != own[0]:
-        k = start
-        while k > 1 and end - k + 1 < MAX_SPAN:
-            above = tex_lines[k - 2].strip()  # line k - 1
-            if above == own[0] or above.endswith(own[0]):
-                start = k - 1
-                break
-            if not silent(k - 1):
-                break
-            k -= 1
-    if (start, end) == span:
+    count = len(own)
+    if count == 0 or count > MAX_SPAN or end - start + 1 >= count:
         return span
-    widened = [line.strip() for line in tex_lines[start - 1:end]]
-    if (
-        len(widened) == len(own)
-        and widened[0].endswith(own[0])
-        and widened[-1].startswith(own[-1])
-        and widened[1:-1] == own[1:-1]
-    ):
-        return start, end
+    first_silent = not normalize_fn(own[0]).strip()
+    last_silent = not normalize_fn(own[-1]).strip()
+    for first in range(start, end - count, -1):
+        last = first + count - 1
+        if first < 1 or last < end or last > len(tex_lines):
+            continue
+        if (first < start and not first_silent) or (last > end and not last_silent):
+            continue
+        if _window_matches(tex_lines[first - 1:last], own, first_silent, last_silent):
+            return first, last
     return span
 
 

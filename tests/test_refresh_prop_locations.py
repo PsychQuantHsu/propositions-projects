@@ -520,7 +520,6 @@ def test_paragraph_is_not_widened_into_the_next(tmp_path: Path):
         ["\\begin{equation}", " x=1,", " y=2.", "\\end{equation}"],
         ["\\begin{equation*}", " x=1,", " y=2.", "\\end{equation*}"],
         ["\\begin{align*}", " x&=1,", " y&=2.", "\\end{align*}"],
-        ["\\[", "\\begin{cases}", " x=1, & y", "\\end{cases}", "\\]"],
     ],
 )
 def test_other_closing_lines_are_kept(tmp_path: Path, display):
@@ -562,15 +561,34 @@ def test_proposition_starting_partway_through_a_line(tmp_path: Path):
     assert "updated: 0" in result.stderr, result.stderr
 
 
-@pytest.mark.parametrize("closing", ["\\] Then B.", "\\] % end"])
-def test_closing_line_that_carries_more_text(tmp_path: Path, closing):
-    # spec-example: location-refresh / a closing line that carries more text
+def _closing_case(tmp_path: Path, closing: str):
     lines = ["A. Let", "\\[", "x=1.", closing]
     prop = _prop("28", "Let\n\\[\nx=1.\n\\]", "L1")
     jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
     result = _run(jsonl, tex_path)
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L4", result.stderr
+
+
+def test_closing_line_with_a_trailing_comment(tmp_path: Path):
+    # spec-example: location-refresh / a closing line with a trailing comment
+    _closing_case(tmp_path, "\\] % end")
+
+
+def test_display_that_ends_in_two_silent_lines(tmp_path: Path):
+    # spec-example: location-refresh / a display that ends in two silent lines
+    display = ["\\[", "\\begin{cases}", " x=1, & y", "\\end{cases}", "\\]"]
+    lines = ["Before."] + display + ["After."]
+    prop = _prop("30", "\n".join(display), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L6", result.stderr
+
+
+def test_closing_line_that_carries_more_text(tmp_path: Path):
+    # spec-example: location-refresh / a closing line that carries more text
+    _closing_case(tmp_path, "\\] Then B.")
 
 
 def test_blank_line_the_text_does_not_contain_is_not_crossed(tmp_path: Path):
@@ -581,3 +599,33 @@ def test_blank_line_the_text_does_not_contain_is_not_crossed(tmp_path: Path):
     result = _run(jsonl, tex_path)
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L1", result.stderr
+
+
+def test_delimiter_inside_a_comment_is_not_taken(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter inside a comment is not taken
+    lines = ["\\[", "% the opening delimiter is \\[", "x=1.", "\\]"]
+    prop = _prop("31", "\\[\nx=1.\n\\]", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L3", result.stderr
+
+
+def test_delimiter_that_closes_other_text_is_not_taken(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter that closes other text is not taken
+    lines = ["First $$a$$", "b", "$$"]
+    prop = _prop("32", "$$\nb\n$$", "L2")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2", result.stderr
+
+
+def test_repeated_closing_line_does_not_cut_the_span(tmp_path: Path):
+    # spec-example: location-refresh / a repeated closing line does not cut the span short
+    lines = ["\\begin{equation}", "x=1.", "\\end{equation}", "\\begin{equation}", "\\end{equation}"]
+    prop = _prop("33", "\n".join(lines), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L5", result.stderr

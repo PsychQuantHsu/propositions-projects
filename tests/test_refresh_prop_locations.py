@@ -549,3 +549,35 @@ def test_empty_stored_location_is_printed_as_empty(tmp_path: Path):
     jsonl, tex_path = _write_pair(tmp_path, [prop], "Only line.\n")
     result = _run(jsonl, tex_path)
     assert ":  → main.tex:L1" in result.stderr, result.stderr
+
+
+def test_proposition_starting_partway_through_a_line(tmp_path: Path):
+    # spec-example: location-refresh / a proposition that starts partway through a line
+    lines = ["Some text. Let", "\\[", " x=1.", "\\]", "After."]
+    prop = _prop("27", "Let\n\\[\n x=1.\n\\]", "main.tex:L1-L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L4", result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+@pytest.mark.parametrize("closing", ["\\] Then B.", "\\] % end"])
+def test_closing_line_that_carries_more_text(tmp_path: Path, closing):
+    # spec-example: location-refresh / a closing line that carries more text
+    lines = ["A. Let", "\\[", "x=1.", closing]
+    prop = _prop("28", "Let\n\\[\nx=1.\n\\]", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L4", result.stderr
+
+
+def test_blank_line_the_text_does_not_contain_is_not_crossed(tmp_path: Path):
+    # spec-example: location-refresh / a blank line the text does not contain is not crossed
+    lines = ["We have b.", "", "$$", "After."]
+    prop = _prop("29", "We have b.\n$$", "L3")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1", result.stderr

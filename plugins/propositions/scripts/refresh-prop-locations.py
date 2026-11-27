@@ -183,16 +183,25 @@ def widen_to_text(
     `find_prop_span` returns the smallest span whose normalized text contains
     the prop. A line that normalizes to nothing on its own — a lone `\\]`,
     `\\[`, `$$`, `\\begin{equation}` — never makes a window contain more, so a
-    prop that ends (or starts) with one comes back a line short. Extend the
-    end downwards, and the start upwards, across such lines only, and only
-    when the prop's own last (first) non-blank line is the line reached.
-    The widened span is kept only when its non-blank lines, stripped, are
-    exactly the prop's own (verify round 1 of issue 110): a prop whose text is
-    not verbatim would otherwise be widened onto a neighbouring delimiter, or
-    across a blank line into the next paragraph, with no warning. In every
-    other case the span `find_prop_span` gave is kept.
+    prop that ends (or starts) with one comes back a line short.
+
+    Only towards such a line of the prop's own: when the prop's last non-blank
+    line normalizes to nothing, the end moves down across lines that normalize
+    to nothing and stops at the first line that equals it or starts with it
+    (`\\] Then B.`); the start moves up the same way towards the prop's first
+    line, stopping at a line that equals it or ends with it. The widened span
+    is kept only when its stripped lines match the prop's: the first ends with
+    the prop's first line (a sentence starts partway through a line), the last
+    starts with the prop's last line, and every other line, blank lines
+    included, is equal (verify rounds 1 and 2: anything looser moved a
+    location silently onto a neighbouring delimiter or across a paragraph
+    break). In every other case the span `find_prop_span` gave is kept.
     """
-    own = [line.strip() for line in text.split("\n") if line.strip()]
+    own = [line.strip() for line in text.split("\n")]
+    while own and not own[0]:
+        own.pop(0)
+    while own and not own[-1]:
+        own.pop()
     if not own:
         return span
     start, end = span
@@ -200,24 +209,37 @@ def widen_to_text(
     def silent(n: int) -> bool:
         return not normalize_fn(tex_lines[n - 1]).strip()
 
-    if tex_lines[end - 1].strip() != own[-1]:
+    if not normalize_fn(own[-1]).strip() and tex_lines[end - 1].strip() != own[-1]:
         k = end
-        while k < len(tex_lines) and k - start + 1 < MAX_SPAN and silent(k + 1):
+        while k < len(tex_lines) and k - start + 1 < MAX_SPAN:
+            below = tex_lines[k].strip()  # line k + 1
+            if below == own[-1] or below.startswith(own[-1]):
+                end = k + 1
+                break
+            if not silent(k + 1):
+                break
             k += 1
-            if tex_lines[k - 1].strip() == own[-1]:
-                end = k
-                break
-    if tex_lines[start - 1].strip() != own[0]:
+    if not normalize_fn(own[0]).strip() and tex_lines[start - 1].strip() != own[0]:
         k = start
-        while k > 1 and end - k + 1 < MAX_SPAN and silent(k - 1):
-            k -= 1
-            if tex_lines[k - 1].strip() == own[0]:
-                start = k
+        while k > 1 and end - k + 1 < MAX_SPAN:
+            above = tex_lines[k - 2].strip()  # line k - 1
+            if above == own[0] or above.endswith(own[0]):
+                start = k - 1
                 break
+            if not silent(k - 1):
+                break
+            k -= 1
     if (start, end) == span:
         return span
-    widened = [line.strip() for line in tex_lines[start - 1:end] if line.strip()]
-    return (start, end) if widened == own else span
+    widened = [line.strip() for line in tex_lines[start - 1:end]]
+    if (
+        len(widened) == len(own)
+        and widened[0].endswith(own[0])
+        and widened[-1].startswith(own[-1])
+        and widened[1:-1] == own[1:-1]
+    ):
+        return start, end
+    return span
 
 
 def read_tex_lines(path: Path) -> tuple[str, list[str]]:

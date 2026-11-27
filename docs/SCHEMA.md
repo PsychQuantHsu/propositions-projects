@@ -344,8 +344,11 @@ audit trail, and leaving it unmarked makes the ledger silently over-claim.
 | prop `location` 的 `<relpath>` | 主檔所在目錄 | 與 `\input{parts/part2-theory}` 的寫法直接對得上 |
 | `_meta.json` `source.file` / `source.parts` | manuscript repo root | 不開 tex 也能定位稿件 |
 
-`source.parts`(選填,字串陣列)是 validator / Operation D 每次跑時重新解析並
-回寫的**非權威快照** — 權威永遠是 `\input` 樹的即時解析。location 檔名前綴指向
+`source.parts`(選填,字串陣列)是**非權威快照** — 權威永遠是 `\input` 樹的即時解析。
+沒有工具會寫入它,由作者手動記錄與更新;validator **只讀不寫**(帶 `--meta` 跑完,
+`_meta.json` 逐位元組不變,#146)。有快照而與 `\input` 樹不一致時印一行
+`[WARN] source.parts`,列出現在解析到的檔案,計入 warning(`--strict` 因此失敗);沒有
+這個鍵或值是 `null`,就是沒有快照,不比對也不警告。location 檔名前綴指向
 樹外檔案 → R13 FAIL(`file not in input tree`)。
 
 ### `claim_type` taxonomy

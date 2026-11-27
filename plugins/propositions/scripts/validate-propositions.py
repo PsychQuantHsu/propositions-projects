@@ -1494,33 +1494,31 @@ def main():
         tuple(declared) if set(declared) - {"proof"} else _R9_DEFAULT_ENV_TYPES
     )
 
-    # source.parts snapshot refresh (non-authoritative; SCHEMA.md §Multi-file).
-    # Only touch the sidecar when there is something to record: multi-file
-    # trees write the resolved list; a single-file tree only clears an
-    # existing stale key. Absent key + single-file → no write (zero churn on
-    # legacy ledgers like the Hsu case).
+    # source.parts snapshot check (non-authoritative; SCHEMA.md §Multi-file).
+    # The validator only reads `_meta.json` (issue 146): measuring a ledger must
+    # not change it. A snapshot that differs from the resolved tree is one
+    # warning naming the files resolved now. A missing or null `parts` is no
+    # snapshot: no tool writes the field (the Operation D template has none), so
+    # warning on its absence would never stop. The warning is a named exception
+    # in .claude/rules/swift-is-the-implementation-language.md (category 6).
+    snapshot_warnings: list[tuple[str, str]] = []
     if use_jsonl and meta_path is not None and meta_path.exists():
         try:
             meta_doc = json.loads(meta_path.read_text(encoding="utf-8"))
-            src = meta_doc.get("source")
-            if isinstance(src, dict):
-                if parts_rel:
-                    desired = parts_rel
-                    needs_write = src.get("parts") != desired
-                elif "parts" in src:
-                    desired = []
-                    needs_write = src.get("parts") != desired
-                else:
-                    needs_write = False
-                if needs_write:
-                    src["parts"] = desired
-                    meta_path.write_text(
-                        json.dumps(meta_doc, ensure_ascii=False, indent=1)
-                        + "\n",
-                        encoding="utf-8",
+            src = meta_doc.get("source") if isinstance(meta_doc, dict) else None
+            snapshot = src.get("parts") if isinstance(src, dict) else None
+            if snapshot is not None:
+                if snapshot != parts_rel:
+                    now = ", ".join(parts_rel) if parts_rel else "the tree has no part files"
+                    snapshot_warnings.append(
+                        (
+                            meta_path.name,
+                            f"snapshot differs from the \\input tree; now: {now} "
+                            f"(edit _meta.json by hand; the validator does not write it)",
+                        )
                     )
         except (json.JSONDecodeError, OSError) as e:
-            print(f"[warn] source.parts refresh skipped: {e}", file=sys.stderr)
+            print(f"[warn] source.parts check skipped: {e}", file=sys.stderr)
 
     print(f"=== validate-propositions ===")
     fmt = "JSONL" if use_jsonl else "JSON"
@@ -1745,6 +1743,11 @@ def main():
         )
         for prop_id, reason in r13_unanchorable:
             print(f"    {prop_id} — {reason}")
+
+    if snapshot_warnings:
+        all_warnings.extend([("source.parts", *w) for w in snapshot_warnings])
+        for _, msg in snapshot_warnings:
+            print(f"[WARN] source.parts — {msg}")
 
     print()
 

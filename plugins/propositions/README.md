@@ -25,6 +25,6 @@ Each manuscript's ledger carries its own `SCHEMA.md` (the spec travels with the 
 | v1.4 | `retired` field: R1 treats `line_comment` / `removed` as expected-absent (reported as `[R1-retired]`, non-blocking; a warning if the words are live again), keeps checking `comment_env`, and grants no exemption to a malformed block (every documented format is checked); R13 skips only props R1 confirmed absent |
 | v1.5 | Adds `retired.superseded_mechanism` (recorded, not validated) |
 | v1.7 | `_meta.json` `profile` (`default` / `empirical`) selects the R11/R12 vocabularies; a profile on a sub-v1.7 ledger or an unknown value → error. Ledgers without the field validate exactly as before |
-| v1.6 | Multi-file manuscripts: file-qualified `location` prefixes (`parts/foo.tex:L123`, resolved against the `\input`/`\include` tree), optional `_meta.json` `source.parts` snapshot; R1/R9/R13 become file-aware. Prefix on a sub-v1.6 ledger → R13 FAIL with upgrade hint |
+| v1.6 | Multi-file manuscripts: file-qualified `location` prefixes (`parts/foo.tex:L123`, resolved against the `\input`/`\include` tree), optional `_meta.json` `source.parts` snapshot, kept by hand: since plugin 0.22.1 the validator never writes `_meta.json` and, when a snapshot is present and differs from the tree, prints `[WARN] source.parts` (fails `--strict`) (#146); R1/R9/R13 become file-aware. Prefix on a sub-v1.6 ledger → R13 FAIL with upgrade hint |
 
 **Supported range: up to 1.7.** Newer schema versions than this table may validate incompletely; check the release notes before bumping a ledger's schema.

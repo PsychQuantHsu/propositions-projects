@@ -8,7 +8,7 @@ How `refresh-prop-locations.py` (Operation B) decides which lines a proposition'
 
 ### Requirement: A refreshed location covers the proposition's own delimiter lines
 
-When `refresh-prop-locations.py` locates a proposition, the written location SHALL include the proposition's own first and last lines even when they normalize to nothing on their own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}` or `\end{align*}`). After the windowed locator returns a span, the script SHALL extend the end downwards across lines that normalize to nothing towards a line equal, ignoring surrounding white space, to the proposition's last non-blank line, and SHALL extend the start upwards the same way towards the proposition's first non-blank line. A line that does not normalize to nothing SHALL stop the extension. The widened span SHALL be kept only when its non-blank lines, each stripped of surrounding white space, are exactly the proposition's own non-blank lines in order; otherwise, and when the extension reaches no such line, the span SHALL stay as the locator returned it. The span SHALL NOT grow beyond `MAX_SPAN` lines. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
+When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, and only when the proposition's last non-blank line normalizes to nothing, the script SHALL extend the end downwards across lines that normalize to nothing, stopping at the first line that equals the proposition's last line or starts with it (a closing line that carries more text, such as `\] Then B.`); it SHALL extend the start upwards in the same way towards the proposition's first non-blank line, stopping at a line that equals it or ends with it. A line that neither normalizes to nothing nor is such a line SHALL stop the extension. The widened span SHALL be kept only when its lines, each stripped of surrounding white space, match the proposition's lines between its first and last non-blank lines, in order and in number: the span's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. Otherwise, and when the extension reaches no such line, the span SHALL stay as the locator returned it. The span SHALL NOT grow beyond `MAX_SPAN` lines. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
 
 #### Scenario: A proposition ending in a display-math block
 
@@ -51,6 +51,24 @@ When `refresh-prop-locations.py` locates a proposition, the written location SHA
 - **WHEN** the script runs on it
 - **THEN** the location is `main.tex:L2-L5`
 
+##### Example: a proposition that starts partway through a line
+
+- **GIVEN** a `main.tex` whose lines are `Some text. Let`, `\[`, ` x=1.`, `\]` and `After.`, and a proposition whose text is `Let`, `\[`, ` x=1.`, `\]` and whose location is `main.tex:L1-L4`
+- **WHEN** the script runs on it
+- **THEN** the location stays `main.tex:L1-L4`, and the run reports 0 updated
+
+##### Example: a closing line that carries more text
+
+- **GIVEN** a `main.tex` whose lines are `A. Let`, `\[`, `x=1.` and `\] Then B.`, and a proposition whose text is `Let`, `\[`, `x=1.`, `\]`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L1-L4`
+
+##### Example: a blank line the text does not contain is not crossed
+
+- **GIVEN** a `main.tex` whose lines are `We have b.`, an empty line, `$$` and `After.`, and a proposition whose text is `We have b.` and `$$`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L1`
+
 <!-- @trace
 source: idd-110-delimiter-lines
 updated: 2026-11-27
@@ -66,6 +84,16 @@ source: idd-110-fix1
 updated: 2026-11-27
 code:
   - plugins/propositions/scripts/refresh-prop-locations.py
+tests:
+  - tests/test_refresh_prop_locations.py
+-->
+<!-- @trace
+source: idd-110-fix2
+updated: 2026-11-27
+code:
+  - .claude-plugin/marketplace.json
+  - plugins/propositions/scripts/refresh-prop-locations.py
+  - plugins/propositions/.claude-plugin/plugin.json
 tests:
   - tests/test_refresh_prop_locations.py
 -->

@@ -629,3 +629,28 @@ def test_repeated_closing_line_does_not_cut_the_span(tmp_path: Path):
     result = _run(jsonl, tex_path)
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L5", result.stderr
+
+
+def test_lone_dollars_keep_their_role(tmp_path: Path):
+    # spec-example: location-refresh / a lone $$ keeps its role
+    lines = ["$$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("34", "$$\nb\n$$", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_comment_that_mentions_the_delimiter_does_not_block(tmp_path: Path):
+    # spec-example: location-refresh / a comment that mentions the delimiter does not block
+    _closing_case(tmp_path, "\\] % see \\]")
+
+
+def test_line_break_with_an_optional_argument_is_not_a_delimiter(tmp_path: Path):
+    # spec-example: location-refresh / a line break with an optional argument is not a delimiter
+    lines = ["a\\\\[2pt] \\[", "x=1.", "\\]"]
+    prop = _prop("35", "\\[\nx=1.\n\\]", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L3", result.stderr

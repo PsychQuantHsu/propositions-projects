@@ -178,15 +178,49 @@ def find_prop_span(
 _TEX_COMMENT = re.compile(r"(?:^|[^\\])(?:\\\\)*%")
 
 
+def _code(line: str) -> str:
+    """`line` without its TeX comment (text after an unescaped `%`)."""
+    m = _TEX_COMMENT.search(line)
+    return line if m is None else line[: m.end() - 1]
+
+
+def _escaped(text: str, i: int) -> bool:
+    """Whether the character at `i` follows an odd number of backslashes."""
+    n = 0
+    while i - n - 1 >= 0 and text[i - n - 1] == "\\":
+        n += 1
+    return n % 2 == 1
+
+
+def _count_token(text: str, token: str) -> int:
+    """Occurrences of `token` in `text` that are not escaped (`\\[` is a line break)."""
+    count, i = 0, text.find(token)
+    while i != -1:
+        if not _escaped(text, i):
+            count += 1
+            i = text.find(token, i + len(token))
+        else:
+            i = text.find(token, i + 1)
+    return count
+
+
+def _dollars_before(tex_lines: list[str], line_no: int, col: int) -> int:
+    """`$$` outside comments and not escaped, before column `col` of line `line_no`."""
+    before = sum(_count_token(_code(line), "$$") for line in tex_lines[: line_no - 1])
+    return before + _count_token(_code(tex_lines[line_no - 1][:col]), "$$")
+
+
 def _window_matches(window: list[str], own: list[str], first_silent: bool, last_silent: bool) -> bool:
     """Whether manuscript lines `window` hold the prop's stripped lines `own`.
 
     The first line may begin with other text (a sentence starts partway
     through a line) and the last may end with other text; every other line,
     blank lines included, is equal. On a side whose own line is a lone
-    delimiter, the rest of the manuscript line must hold neither a TeX
-    comment before the delimiter nor the same delimiter again: such a
-    delimiter belongs to other text (verify round 3 of issue 110).
+    delimiter, that delimiter must be a real one (not after a TeX comment, not
+    preceded by an odd number of backslashes, as in `\\\\[2pt]`), and the
+    rest of the manuscript line, outside a comment, must not hold the same
+    delimiter again: such a delimiter belongs to other text (verify rounds 3
+    and 4 of issue 110).
     """
     lines = [line.strip() for line in window]
     if lines[1:-1] != own[1:-1]:
@@ -194,11 +228,31 @@ def _window_matches(window: list[str], own: list[str], first_silent: bool, last_
     if not lines[0].endswith(own[0]) or not lines[-1].startswith(own[-1]):
         return False
     head = lines[0][: len(lines[0]) - len(own[0])]
-    if first_silent and head and (_TEX_COMMENT.search(head) or own[0] in head):
+    if first_silent and head and (
+        _TEX_COMMENT.search(head) or _escaped(lines[0], len(head)) or _count_token(head, own[0])
+    ):
         return False
     tail = lines[-1][len(own[-1]):]
-    if last_silent and tail and own[-1] in tail:
+    if last_silent and tail and _count_token(_code(tail), own[-1]):
         return False
+    return True
+
+
+def _dollar_roles_hold(tex_lines: list[str], first: int, last: int, own: list[str]) -> bool:
+    """A `$$` side opens (even count before it) or closes (odd count) a display.
+
+    `$$` opens and closes with the same token, so a window whose first `$$`
+    closes the previous display looks, line by line, like a proposition's own
+    display (verify round 4 of issue 110).
+    """
+    if own[0] == "$$":
+        line = tex_lines[first - 1].rstrip()
+        if _dollars_before(tex_lines, first, len(line) - 2) % 2 != 0:
+            return False
+    if own[-1] == "$$":
+        line = tex_lines[last - 1]
+        if _dollars_before(tex_lines, last, len(line) - len(line.lstrip())) % 2 != 1:
+            return False
     return True
 
 
@@ -237,7 +291,9 @@ def widen_to_text(
             continue
         if (first < start and not first_silent) or (last > end and not last_silent):
             continue
-        if _window_matches(tex_lines[first - 1:last], own, first_silent, last_silent):
+        if _window_matches(
+            tex_lines[first - 1:last], own, first_silent, last_silent
+        ) and _dollar_roles_hold(tex_lines, first, last, own):
             return first, last
     return span
 

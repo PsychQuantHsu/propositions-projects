@@ -8,7 +8,7 @@ How `refresh-prop-locations.py` (Operation B) decides which lines a proposition'
 
 ### Requirement: A refreshed location covers the proposition's own delimiter lines
 
-When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, and only when the proposition's last non-blank line normalizes to nothing, the script SHALL extend the end downwards across lines that normalize to nothing, stopping at the first line that equals the proposition's last line or starts with it (a closing line that carries more text, such as `\] Then B.`); it SHALL extend the start upwards in the same way towards the proposition's first non-blank line, stopping at a line that equals it or ends with it. A line that neither normalizes to nothing nor is such a line SHALL stop the extension. The widened span SHALL be kept only when its lines, each stripped of surrounding white space, match the proposition's lines between its first and last non-blank lines, in order and in number: the span's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. Otherwise, and when the extension reaches no such line, the span SHALL stay as the locator returned it. The span SHALL NOT grow beyond `MAX_SPAN` lines. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
+When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, the script SHALL consider the windows of the manuscript that have exactly as many lines as the proposition's text has between its first and last non-blank lines, that contain the locator's span, and that extend the span only on a side whose own line normalizes to nothing, nearest the span's start first, and SHALL keep the first window whose lines, each stripped of surrounding white space, match the proposition's lines: the window's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. When a side whose own line normalizes to nothing is matched this way, the rest of that manuscript line SHALL hold neither an unescaped `%` (a TeX comment) before the delimiter nor the same delimiter again. When no window matches, or the proposition has more than `MAX_SPAN` lines, the span SHALL stay as the locator returned it. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
 
 #### Scenario: A proposition ending in a display-math block
 
@@ -51,6 +51,12 @@ When `refresh-prop-locations.py` locates a proposition whose text begins or ends
 - **WHEN** the script runs on it
 - **THEN** the location is `main.tex:L2-L5`
 
+##### Example: a display that ends in two silent lines
+
+- **GIVEN** a `main.tex` whose lines are `Before.`, `\[`, `\begin{cases}`, ` x=1, & y`, `\end{cases}`, `\]`, `After.`, and a proposition whose text is lines 2 to 6
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L2-L6`
+
 ##### Example: a proposition that starts partway through a line
 
 - **GIVEN** a `main.tex` whose lines are `Some text. Let`, `\[`, ` x=1.`, `\]` and `After.`, and a proposition whose text is `Let`, `\[`, ` x=1.`, `\]` and whose location is `main.tex:L1-L4`
@@ -63,11 +69,35 @@ When `refresh-prop-locations.py` locates a proposition whose text begins or ends
 - **WHEN** the script runs on it
 - **THEN** the location is `main.tex:L1-L4`
 
+##### Example: a closing line with a trailing comment
+
+- **GIVEN** the manuscript of the previous Example with its last line `\] % end`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L1-L4`
+
 ##### Example: a blank line the text does not contain is not crossed
 
 - **GIVEN** a `main.tex` whose lines are `We have b.`, an empty line, `$$` and `After.`, and a proposition whose text is `We have b.` and `$$`
 - **WHEN** the script runs on it
 - **THEN** the location is `main.tex:L1`
+
+##### Example: a delimiter inside a comment is not taken
+
+- **GIVEN** a `main.tex` whose lines are `\[`, `% the opening delimiter is \[`, `x=1.` and `\]`, and a proposition whose text is `\[`, `x=1.`, `\]`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L3`, not a span that starts on the comment line
+
+##### Example: a delimiter that closes other text is not taken
+
+- **GIVEN** a `main.tex` whose lines are `First $$a$$`, `b` and `$$`, and a proposition whose text is `$$`, `b`, `$$` and whose location is `L2`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L2`
+
+##### Example: a repeated closing line does not cut the span short
+
+- **GIVEN** a `main.tex` whose lines are `\begin{equation}`, `x=1.`, `\end{equation}`, `\begin{equation}` and `\end{equation}`, and a proposition whose text is those five lines
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L1-L5`
 
 <!-- @trace
 source: idd-110-delimiter-lines
@@ -94,6 +124,14 @@ code:
   - .claude-plugin/marketplace.json
   - plugins/propositions/scripts/refresh-prop-locations.py
   - plugins/propositions/.claude-plugin/plugin.json
+tests:
+  - tests/test_refresh_prop_locations.py
+-->
+<!-- @trace
+source: idd-110-fix3
+updated: 2026-11-27
+code:
+  - plugins/propositions/scripts/refresh-prop-locations.py
 tests:
   - tests/test_refresh_prop_locations.py
 -->

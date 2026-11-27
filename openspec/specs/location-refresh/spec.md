@@ -8,7 +8,7 @@ How `refresh-prop-locations.py` (Operation B) decides which lines a proposition'
 
 ### Requirement: A refreshed location covers the proposition's own delimiter lines
 
-When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, the script SHALL consider the windows of the manuscript that have exactly as many lines as the proposition's text has between its first and last non-blank lines, that contain the locator's span, and that extend the span only on a side whose own line normalizes to nothing, nearest the span's start first, and SHALL keep the first window whose lines, each stripped of surrounding white space, match the proposition's lines: the window's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. When a side whose own line normalizes to nothing is matched this way, the rest of that manuscript line SHALL hold neither an unescaped `%` (a TeX comment) before the delimiter nor the same delimiter again. When no window matches, or the proposition has more than `MAX_SPAN` lines, the span SHALL stay as the locator returned it. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
+When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, the script SHALL consider the windows of the manuscript that have exactly as many lines as the proposition's text has between its first and last non-blank lines, that contain the locator's span, and that extend the span only on a side whose own line normalizes to nothing, nearest the span's start first, and SHALL keep the first window whose lines, each stripped of surrounding white space, match the proposition's lines: the window's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. When a side whose own line normalizes to nothing is matched this way, the rest of that manuscript line SHALL hold neither an unescaped `%` (a TeX comment) before the delimiter nor the same delimiter again outside a comment; a delimiter preceded by an odd number of backslashes (as in `\\[2pt]`) is not a delimiter, neither as the matched one nor in the rest of the line. When the proposition's first line is `$$`, the number of `$$` before the window's first `$$` in the file, outside comments and not escaped, SHALL be even (it opens a display); when its last line is `$$`, the number before the window's last `$$` SHALL be odd (it closes one). When no window matches, or the proposition has more than `MAX_SPAN` lines, the span SHALL stay as the locator returned it. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
 
 #### Scenario: A proposition ending in a display-math block
 
@@ -99,6 +99,24 @@ When `refresh-prop-locations.py` locates a proposition whose text begins or ends
 - **WHEN** the script runs on it
 - **THEN** the location is `main.tex:L1-L5`
 
+##### Example: a lone $$ keeps its role
+
+- **GIVEN** a `main.tex` whose lines are `$$`, `a`, `$$`, `b`, `$$`, `c`, `$$`, and a proposition whose text is `$$`, `b`, `$$` (the display around `b` was removed from the manuscript) and whose location is `L1`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L4`, not `main.tex:L3-L5`, whose first line closes the `a` display
+
+##### Example: a comment that mentions the delimiter does not block
+
+- **GIVEN** a `main.tex` whose lines are `A. Let`, `\[`, `x=1.` and `\] % see \]`, and a proposition whose text is `Let`, `\[`, `x=1.`, `\]`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L1-L4`
+
+##### Example: a line break with an optional argument is not a delimiter
+
+- **GIVEN** a `main.tex` whose lines are `a\\[2pt] \[`, `x=1.` and `\]`, and a proposition whose text is `\[`, `x=1.`, `\]` and whose location is `L1`
+- **WHEN** the script runs on it
+- **THEN** the location is `main.tex:L1-L3`
+
 <!-- @trace
 source: idd-110-delimiter-lines
 updated: 2026-11-27
@@ -129,6 +147,14 @@ tests:
 -->
 <!-- @trace
 source: idd-110-fix3
+updated: 2026-11-27
+code:
+  - plugins/propositions/scripts/refresh-prop-locations.py
+tests:
+  - tests/test_refresh_prop_locations.py
+-->
+<!-- @trace
+source: idd-110-fix4
 updated: 2026-11-27
 code:
   - plugins/propositions/scripts/refresh-prop-locations.py

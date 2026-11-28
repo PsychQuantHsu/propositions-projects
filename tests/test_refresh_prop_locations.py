@@ -677,9 +677,11 @@ def test_delimiter_line_with_a_trailing_comment_keeps_its_side(tmp_path: Path):
 )
 def test_dollars_in_verbatim_text_do_not_change_the_count(tmp_path: Path, literal):
     # spec-example: location-refresh / a $$ in verbatim text does not change the count
+    # No blank line before the display: a blank line ends math mode, which
+    # would hide a literal `$$` read as code (verify round 7 of issue 110).
     display = ["Let", "$$", "x=1.", "$$"]
-    lines = literal + [""] + display
-    first = len(literal) + 2
+    lines = literal + display
+    first = len(literal) + 1
     location = f"main.tex:L{first}-L{first + 3}"
     prop = _prop("37", "\n".join(display), location)
     jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
@@ -722,17 +724,22 @@ def test_percent_sign_in_a_url_is_not_a_comment(tmp_path: Path):
     "literal",
     [
         ["Use \\lstinline!$$! here."],
+        ["Use \\lstinline[language=C]{$$} here."],
+        ["Use \\verb{$$} here."],
         ["See \\path|x$$y|."],
         ["See \\href{http://x/$$}{t}."],
+        ["See \\href{http://x/{y}$$}{t}."],
+        ["See \\href {http://x/$$}{t}."],
         ["See \\url|http://x/$$|."],
         ["\\begin{verbatim} $$ \\end{verbatim}"],
+        ["\\begin {verbatim} $$ \\end{verbatim}"],
         ["\\begin{verbatim}", "\\end{verbatimExtra} $$", "\\end{verbatim}"],
     ],
 )
 def test_literal_text_of_other_commands_does_not_change_the_count(tmp_path: Path, literal):
     # spec-example: location-refresh / literal text of other commands and one-line environments does not change the count
-    lines = literal + [""] + DISPLAY
-    first = len(literal) + 2
+    lines = literal + DISPLAY  # no blank line, which would end math mode
+    first = len(literal) + 1
     _unchanged_case(tmp_path, lines, DISPLAY, f"main.tex:L{first}-L{first + 3}")
 
 
@@ -744,3 +751,19 @@ def test_adjacent_inline_formulas_are_not_a_display_delimiter(tmp_path: Path):
     result = _run(jsonl, tex_path)
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L5", result.stderr
+
+
+def test_backslash_at_the_end_of_a_line_does_not_keep_math_mode_open(tmp_path: Path):
+    # spec-example: location-refresh / a backslash at the end of a line does not keep math mode open
+    lines = ["Text $p\\", ""] + DISPLAY
+    _unchanged_case(tmp_path, lines, DISPLAY, "main.tex:L3-L6")
+
+
+def test_optional_argument_of_lstinline_is_not_its_delimiter(tmp_path: Path):
+    # spec-example: location-refresh / an optional argument of \lstinline is not its delimiter
+    lines = ["Code \\lstinline[language=C]{x} and $$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("40", "$$\nb\n$$", "main.tex:L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr

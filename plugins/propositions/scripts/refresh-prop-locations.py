@@ -200,19 +200,44 @@ class _TexScan(NamedTuple):
     display_roles: dict[int, str]  # offset of each `$$` -> "open" or "close"
 
 
-def _skip_delimited(text: str, i: int, braces: bool) -> int:
-    """End of a literal argument starting at `i`: `{…}` when `braces`, otherwise
-    up to the next copy of the delimiter on the same line."""
+def _skip_group(text: str, i: int) -> int:
+    """End of the braced group that opens at `i` (`text[i] == "{"`): its matching
+    `}`, escaped `\\{` and `\\}` not counting; the end of the text if it never closes."""
+    depth, j, n = 0, i, len(text)
+    while j < n:
+        c = text[j]
+        if c == "\\":
+            j += 2
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return n
+
+
+def _skip_delimited(text: str, i: int) -> int:
+    """End of a literal argument starting at `i`: a braced group, or up to the
+    next copy of the delimiter on the same line."""
     if i >= len(text) or text[i] == "\n":
         return i
-    if braces and text[i] == "{":
-        j = text.find("}", i + 1)
-        return len(text) if j < 0 else j + 1
+    if text[i] == "{":
+        return _skip_group(text, i)
     j = text.find(text[i], i + 1)
     eol = text.find("\n", i + 1)
     if j < 0 or (0 <= eol < j):
         return len(text) if eol < 0 else eol
     return j + 1
+
+
+def _skip_spaces(text: str, i: int) -> int:
+    """TeX skips spaces after a control word before reading its argument."""
+    while i < len(text) and text[i] in " \t":
+        i += 1
+    return i
 
 
 def _scan_tex(tex_lines: list[str]) -> _TexScan:
@@ -253,20 +278,27 @@ def _scan_tex(tex_lines: list[str]) -> _TexScan:
             k = i + 1
             while k < n and text[k].isascii() and text[k].isalpha():
                 k += 1
-            if k == i + 1:
-                k = min(i + 2, n)
+            word = k > i + 1
+            if not word and text[k:k + 1] != "\n":
+                k = min(i + 2, n)  # a `\\` at a line end leaves the line end to the scan
             name = text[i + 1:k]
             controls.add(i)
             live[i:k] = b"\x01" * (k - i)
-            if name in ("verb", "lstinline"):
-                k += 1 if text[k:k + 1] == "*" else 0
-                k = _skip_delimited(text, k, braces=name == "lstinline")
+            a = _skip_spaces(text, k) if word else k
+            if name == "verb":
+                a += 1 if text[a:a + 1] == "*" else 0
+                k = _skip_delimited(text, a)
+            elif name == "lstinline":
+                if text[a:a + 1] == "[":
+                    close = text.find("]", a + 1)
+                    a = n if close < 0 else _skip_spaces(text, close + 1)
+                k = _skip_delimited(text, a)
             elif name in ("url", "path"):
-                k = _skip_delimited(text, k, braces=True)
+                k = _skip_delimited(text, a)
             elif name == "href":
-                k = _skip_delimited(text, k, braces=True) if text[k:k + 1] == "{" else k
+                k = _skip_group(text, a) if text[a:a + 1] == "{" else k
             elif name == "begin":
-                m = _ENV_ARG.match(text, k)
+                m = _ENV_ARG.match(text, a)
                 if m and m.group(1).rstrip("*") in _VERBATIM_ENVS:
                     end_token = "\\end{" + m.group(1) + "}"
                     j = text.find(end_token, m.end())

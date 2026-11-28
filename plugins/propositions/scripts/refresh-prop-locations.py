@@ -234,10 +234,42 @@ def _skip_delimited(text: str, i: int) -> int:
 
 
 def _skip_spaces(text: str, i: int) -> int:
-    """TeX skips spaces after a control word before reading its argument."""
-    while i < len(text) and text[i] in " \t":
+    """TeX skips spaces after a control word before reading its argument, and
+    one line end with the spaces after it, unless the next line is blank."""
+    n = len(text)
+    while i < n and text[i] in " \t":
         i += 1
+    if i < n and text[i] == "\n":
+        j = i + 1
+        while j < n and text[j] in " \t":
+            j += 1
+        if j < n and text[j] != "\n":
+            return j
     return i
+
+
+def _skip_bracket(text: str, i: int) -> int:
+    """End of the optional `[…]` that opens at `i`: the first `]` on its line
+    outside braces; the line end if there is none."""
+    depth, j, n = 0, i + 1, len(text)
+    while j < n and text[j] != "\n":
+        c = text[j]
+        if c == "\\":
+            j += 2
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}" and depth > 0:
+            depth -= 1
+        elif c == "]" and depth == 0:
+            return j + 1
+        j += 1
+    return j
+
+
+_TEXT_BOXES = frozenset(
+    {"text", "mbox", "hbox", "textrm", "textit", "textbf", "textsf", "texttt", "textnormal", "intertext"}
+)
 
 
 def _scan_tex(tex_lines: list[str]) -> _TexScan:
@@ -290,13 +322,16 @@ def _scan_tex(tex_lines: list[str]) -> _TexScan:
                 k = _skip_delimited(text, a)
             elif name == "lstinline":
                 if text[a:a + 1] == "[":
-                    close = text.find("]", a + 1)
-                    a = n if close < 0 else _skip_spaces(text, close + 1)
+                    a = _skip_spaces(text, _skip_bracket(text, a))
                 k = _skip_delimited(text, a)
             elif name in ("url", "path"):
                 k = _skip_delimited(text, a)
             elif name == "href":
+                if text[a:a + 1] == "[":
+                    a = _skip_spaces(text, _skip_bracket(text, a))
                 k = _skip_group(text, a) if text[a:a + 1] == "{" else k
+            elif name in _TEXT_BOXES and mode != "text" and text[a:a + 1] == "{":
+                k = _skip_group(text, a)  # text inside math: its `$` is not a delimiter
             elif name == "begin":
                 m = _ENV_ARG.match(text, a)
                 if m and m.group(1).rstrip("*") in _VERBATIM_ENVS:
@@ -470,6 +505,15 @@ def refresh_jsonl(
 
     Returns (props_total, props_updated, props_match_failed, props_anchor_failed).
     """
+    try:
+        return _refresh_jsonl(jsonl_path, tex_path, dry_run)
+    finally:
+        _SCANS.clear()  # the scans hold every manuscript's lines
+
+
+def _refresh_jsonl(
+    jsonl_path: Path, tex_path: Path, dry_run: bool
+) -> tuple[int, int, int, int]:
     validator = load_validator()
     normalize = validator.normalize_for_match
 

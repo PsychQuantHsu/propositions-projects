@@ -730,6 +730,9 @@ def test_percent_sign_in_a_url_is_not_a_comment(tmp_path: Path):
         ["See \\href{http://x/$$}{t}."],
         ["See \\href{http://x/{y}$$}{t}."],
         ["See \\href {http://x/$$}{t}."],
+        ["See \\href[page=2]{http://x/$$}{t}."],
+        ["See \\url", "{http://x/a$$b}."],
+        ["\\href", "{http://x/$$}{l}"],
         ["See \\url|http://x/$$|."],
         ["\\begin{verbatim} $$ \\end{verbatim}"],
         ["\\begin {verbatim} $$ \\end{verbatim}"],
@@ -767,3 +770,25 @@ def test_optional_argument_of_lstinline_is_not_its_delimiter(tmp_path: Path):
     result = _run(jsonl, tex_path)
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_bracket_inside_braces_does_not_end_the_options_of_lstinline(tmp_path: Path):
+    # spec-example: location-refresh / a bracket inside braces does not end the options of \lstinline
+    lines = ["Code \\lstinline[alsoletter={]}]!x! and $$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("41", "$$\nb\n$$", "main.tex:L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_two_inline_formulas_in_a_text_box_do_not_close_a_display(tmp_path: Path):
+    # spec-example: location-refresh / two inline formulas in a text box do not close a display
+    lines = ["$$ \\text{$a$$b$} $$"] + DISPLAY
+    _unchanged_case(tmp_path, lines, DISPLAY, "main.tex:L2-L5")
+
+
+def test_braced_verb_argument_ends_at_its_brace(tmp_path: Path):
+    # spec-example: location-refresh / a braced \verb argument ends at its brace
+    lines = ["Use \\verb{x} \\[", "x=1.", "\\]"]
+    _unchanged_case(tmp_path, lines, ["\\[", "x=1.", "\\]"], "main.tex:L1-L3")

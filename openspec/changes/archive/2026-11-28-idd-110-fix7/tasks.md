@@ -1,0 +1,4 @@
+## 1. Fix round 7 of issue 110
+
+- [x] 1.1 Tests: drop the blank line in the tests of "a $$ in verbatim text does not change the count" and "literal text of other commands and one-line environments does not change the count", add the new first lines of the latter, and add tests for "a backslash at the end of a line does not keep math mode open" and "an optional argument of \lstinline is not its delimiter", with spec-example markers; they fail against round 6 where the code is wrong.
+- [x] 1.2 Requirement "A refreshed location covers the proposition's own delimiter lines": in `plugins/propositions/scripts/refresh-prop-locations.py`, read an optional `[…]` for `\lstinline`, braced `\verb`, balanced groups, spaces after a control word, and a `\` at a line end without its newline; `pytest tests/test_refresh_prop_locations.py` passes.

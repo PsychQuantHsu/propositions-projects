@@ -1,0 +1,4 @@
+## 1. Fix round 8 of issue 110
+
+- [x] 1.1 Tests: new first lines of "literal text of other commands and one-line environments does not change the count" (`\href[page=2]`, `\url` and `\href` with the argument on the next line), and tests for "a bracket inside braces does not end the options of \lstinline", "two inline formulas in a text box do not close a display" and "a braced \verb argument ends at its brace", with spec-example markers.
+- [x] 1.2 Requirement "A refreshed location covers the proposition's own delimiter lines": in `plugins/propositions/scripts/refresh-prop-locations.py`, skip a line end after a control word, end `\lstinline` options at a `]` on the line outside braces, skip `\href`'s optional argument, skip text-box arguments in math mode, and clear the scan cache when `refresh_jsonl` returns; `pytest tests/test_refresh_prop_locations.py` passes.

@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "refresh-prop-locations.py"
 
@@ -333,6 +335,7 @@ def test_emph_macro_spanning_line_anchors(tmp_path: Path):
 #    (the bare \[ / \] delimiter lines normalize to empty and are skipped)
 # --------------------------------------------------------------------------
 def test_display_math_block_prop_locates(tmp_path: Path):
+    # spec-example: location-refresh / text without the delimiter lines keeps its span
     """A prop spanning a `\\[ ... \\]` display-math block resolves to the real
     span. The bare `\\[` / `\\]` delimiter lines normalize to empty and are
     skipped by build_line_search_space, so they neither break the match nor
@@ -463,3 +466,329 @@ def test_fda3_deep_prop_anchors_to_content_line(tmp_path: Path):
         f"deep prop must anchor to the exact content line L21, never a blank; "
         f"got {_read_props(jsonl)[0]['location']!r}; stderr: {result.stderr}"
     )
+
+
+# --------------------------------------------------------------------------
+# Issue 110 — a proposition's own lone delimiter lines stay in its location
+# --------------------------------------------------------------------------
+def test_closing_delimiter_line_is_kept(tmp_path: Path):
+    # spec-example: location-refresh / the closing delimiter line is kept
+    lines = ["\\documentclass{article}", "\\begin{document}", "Some text before.",
+             "Let", "\\[", " x=1,", " \\qquad y=2.", "\\]", "After.", "\\end{document}"]
+    prop = _prop("20", "\n".join(lines[3:8]), "main.tex:L4-L8")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4-L8", result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+def test_opening_delimiter_line_is_kept(tmp_path: Path):
+    # spec-example: location-refresh / the opening delimiter line is kept
+    lines = ["Before.", "\\[", " a=b.", "\\]", "After."]
+    prop = _prop("21", "\n".join(lines[1:4]), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L4", result.stderr
+    assert "L1 → main.tex:L2-L4" in result.stderr, result.stderr
+
+
+def test_neighbouring_display_delimiter_is_not_taken(tmp_path: Path):
+    # spec-example: location-refresh / a neighbouring display delimiter is not taken
+    lines = ["$$", "a", "$$", "b", "After."]
+    prop = _prop("22", "$$\nb\n$$", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_paragraph_is_not_widened_into_the_next(tmp_path: Path):
+    # spec-example: location-refresh / a paragraph is not widened into the next one
+    lines = ["We have b.", "", "\\[", "\\]"]
+    prop = _prop("23", "We have b.\n\\]", "L3")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1", result.stderr
+
+
+@pytest.mark.parametrize(
+    "display",
+    [
+        ["\\begin{equation}", " x=1,", " y=2.", "\\end{equation}"],
+        ["\\begin{equation*}", " x=1,", " y=2.", "\\end{equation*}"],
+        ["\\begin{align*}", " x&=1,", " y&=2.", "\\end{align*}"],
+    ],
+)
+def test_other_closing_lines_are_kept(tmp_path: Path, display):
+    # spec-example: location-refresh / other closing lines are kept
+    lines = ["Before."] + display + ["After."]
+    prop = _prop("24", "\n".join(display), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == f"main.tex:L2-L{1 + len(display)}", result.stderr
+
+
+def test_widening_stops_at_max_span(tmp_path: Path):
+    content = [f"Line number {i} of a long display, word{i}." for i in range(1, 41)]
+    lines = content + ["\\]", "After."]
+    prop = _prop("25", "\n".join(content + ["\\]"]), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    # 40 content lines fill MAX_SPAN: the closing line cannot be added.
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L40", result.stderr
+
+
+def test_empty_stored_location_is_printed_as_empty(tmp_path: Path):
+    prop = _prop("26", "Only line.", "")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "Only line.\n")
+    result = _run(jsonl, tex_path)
+    assert ":  → main.tex:L1" in result.stderr, result.stderr
+
+
+def test_proposition_starting_partway_through_a_line(tmp_path: Path):
+    # spec-example: location-refresh / a proposition that starts partway through a line
+    lines = ["Some text. Let", "\\[", " x=1.", "\\]", "After."]
+    prop = _prop("27", "Let\n\\[\n x=1.\n\\]", "main.tex:L1-L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L4", result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+def _closing_case(tmp_path: Path, closing: str):
+    lines = ["A. Let", "\\[", "x=1.", closing]
+    prop = _prop("28", "Let\n\\[\nx=1.\n\\]", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L4", result.stderr
+
+
+def test_closing_line_with_a_trailing_comment(tmp_path: Path):
+    # spec-example: location-refresh / a closing line with a trailing comment
+    _closing_case(tmp_path, "\\] % end")
+
+
+def test_display_that_ends_in_two_silent_lines(tmp_path: Path):
+    # spec-example: location-refresh / a display that ends in two silent lines
+    display = ["\\[", "\\begin{cases}", " x=1, & y", "\\end{cases}", "\\]"]
+    lines = ["Before."] + display + ["After."]
+    prop = _prop("30", "\n".join(display), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L6", result.stderr
+
+
+def test_closing_line_that_carries_more_text(tmp_path: Path):
+    # spec-example: location-refresh / a closing line that carries more text
+    _closing_case(tmp_path, "\\] Then B.")
+
+
+def test_blank_line_the_text_does_not_contain_is_not_crossed(tmp_path: Path):
+    # spec-example: location-refresh / a blank line the text does not contain is not crossed
+    lines = ["We have b.", "", "$$", "After."]
+    prop = _prop("29", "We have b.\n$$", "L3")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1", result.stderr
+
+
+def test_delimiter_inside_a_comment_is_not_taken(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter inside a comment is not taken
+    lines = ["\\[", "% the opening delimiter is \\[", "x=1.", "\\]"]
+    prop = _prop("31", "\\[\nx=1.\n\\]", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L3", result.stderr
+
+
+def test_delimiter_that_closes_other_text_is_not_taken(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter that closes other text is not taken
+    lines = ["First $$a$$", "b", "$$"]
+    prop = _prop("32", "$$\nb\n$$", "L2")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2", result.stderr
+
+
+def test_repeated_closing_line_does_not_cut_the_span(tmp_path: Path):
+    # spec-example: location-refresh / a repeated closing line does not cut the span short
+    lines = ["\\begin{equation}", "x=1.", "\\end{equation}", "\\begin{equation}", "\\end{equation}"]
+    prop = _prop("33", "\n".join(lines), "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L5", result.stderr
+
+
+def test_lone_dollars_keep_their_role(tmp_path: Path):
+    # spec-example: location-refresh / a lone $$ keeps its role
+    lines = ["$$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("34", "$$\nb\n$$", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_comment_that_mentions_the_delimiter_does_not_block(tmp_path: Path):
+    # spec-example: location-refresh / a comment that mentions the delimiter does not block
+    _closing_case(tmp_path, "\\] % see \\]")
+
+
+def test_line_break_with_an_optional_argument_is_not_a_delimiter(tmp_path: Path):
+    # spec-example: location-refresh / a line break with an optional argument is not a delimiter
+    lines = ["a\\\\[2pt] \\[", "x=1.", "\\]"]
+    prop = _prop("35", "\\[\nx=1.\n\\]", "L1")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L3", result.stderr
+
+
+def test_delimiter_line_with_a_trailing_comment_keeps_its_side(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter line with a trailing comment keeps its side
+    lines = ["Before.", "\\[ % start", "x=1.", "\\]", "After."]
+    prop = _prop("36", "\n".join(lines[1:4]), "main.tex:L2-L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L4", result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+@pytest.mark.parametrize(
+    "literal",
+    [
+        ["Use \\verb!$$! here."],
+        ["\\begin{verbatim}", "a $$ b", "\\end{verbatim}"],
+        ["See \\url{http://x/$$}."],
+    ],
+)
+def test_dollars_in_verbatim_text_do_not_change_the_count(tmp_path: Path, literal):
+    # spec-example: location-refresh / a $$ in verbatim text does not change the count
+    # No blank line before the display: a blank line ends math mode, which
+    # would hide a literal `$$` read as code (verify round 7 of issue 110).
+    display = ["Let", "$$", "x=1.", "$$"]
+    lines = literal + display
+    first = len(literal) + 1
+    location = f"main.tex:L{first}-L{first + 3}"
+    prop = _prop("37", "\n".join(display), location)
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == location, result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+def test_second_display_on_the_closing_line_does_not_block(tmp_path: Path):
+    # spec-example: location-refresh / a second display on the closing line does not block
+    _closing_case(tmp_path, "\\] Then \\[ y=2. \\]")
+
+
+def _unchanged_case(tmp_path: Path, lines: list[str], own: list[str], location: str):
+    prop = _prop("38", "\n".join(own), location)
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == location, result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+DISPLAY = ["Let", "$$", "x=1.", "$$"]
+
+
+def test_delimiter_in_a_verb_argument_does_not_start_a_verbatim_block(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter in a \verb argument does not start a verbatim block
+    lines = ["Use \\verb!\\begin{verbatim}! here.", ""] + DISPLAY
+    _unchanged_case(tmp_path, lines, DISPLAY, "main.tex:L3-L6")
+
+
+def test_percent_sign_in_a_url_is_not_a_comment(tmp_path: Path):
+    # spec-example: location-refresh / a percent sign in a URL is not a comment
+    lines = ["See \\url{http://x/a%20b} \\[", "x=1.", "\\]"]
+    _unchanged_case(tmp_path, lines, ["\\[", "x=1.", "\\]"], "main.tex:L1-L3")
+
+
+@pytest.mark.parametrize(
+    "literal",
+    [
+        ["Use \\lstinline!$$! here."],
+        ["Use \\lstinline[language=C]{$$} here."],
+        ["Use \\verb{$$} here."],
+        ["See \\path|x$$y|."],
+        ["See \\href{http://x/$$}{t}."],
+        ["See \\href{http://x/{y}$$}{t}."],
+        ["See \\href {http://x/$$}{t}."],
+        ["See \\href[page=2]{http://x/$$}{t}."],
+        ["See \\url", "{http://x/a$$b}."],
+        ["\\href", "{http://x/$$}{l}"],
+        ["See \\url|http://x/$$|."],
+        ["\\begin{verbatim} $$ \\end{verbatim}"],
+        ["\\begin {verbatim} $$ \\end{verbatim}"],
+        ["\\begin{verbatim}", "\\end{verbatimExtra} $$", "\\end{verbatim}"],
+    ],
+)
+def test_literal_text_of_other_commands_does_not_change_the_count(tmp_path: Path, literal):
+    # spec-example: location-refresh / literal text of other commands and one-line environments does not change the count
+    lines = literal + DISPLAY  # no blank line, which would end math mode
+    first = len(literal) + 1
+    _unchanged_case(tmp_path, lines, DISPLAY, f"main.tex:L{first}-L{first + 3}")
+
+
+def test_adjacent_inline_formulas_are_not_a_display_delimiter(tmp_path: Path):
+    # spec-example: location-refresh / adjacent inline formulas are not a display delimiter
+    lines = ["Inline $p$$q$ here.", "$$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("39", "$$\nb\n$$", "main.tex:L5")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L5", result.stderr
+
+
+def test_backslash_at_the_end_of_a_line_does_not_keep_math_mode_open(tmp_path: Path):
+    # spec-example: location-refresh / a backslash at the end of a line does not keep math mode open
+    lines = ["Text $p\\", ""] + DISPLAY
+    _unchanged_case(tmp_path, lines, DISPLAY, "main.tex:L3-L6")
+
+
+def test_optional_argument_of_lstinline_is_not_its_delimiter(tmp_path: Path):
+    # spec-example: location-refresh / an optional argument of \lstinline is not its delimiter
+    lines = ["Code \\lstinline[language=C]{x} and $$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("40", "$$\nb\n$$", "main.tex:L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_bracket_inside_braces_does_not_end_the_options_of_lstinline(tmp_path: Path):
+    # spec-example: location-refresh / a bracket inside braces does not end the options of \lstinline
+    lines = ["Code \\lstinline[alsoletter={]}]!x! and $$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("41", "$$\nb\n$$", "main.tex:L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L4", result.stderr
+
+
+def test_two_inline_formulas_in_a_text_box_do_not_close_a_display(tmp_path: Path):
+    # spec-example: location-refresh / two inline formulas in a text box do not close a display
+    lines = ["$$ \\text{$a$$b$} $$"] + DISPLAY
+    _unchanged_case(tmp_path, lines, DISPLAY, "main.tex:L2-L5")
+
+
+def test_braced_verb_argument_ends_at_its_brace(tmp_path: Path):
+    # spec-example: location-refresh / a braced \verb argument ends at its brace
+    lines = ["Use \\verb{x} \\[", "x=1.", "\\]"]
+    _unchanged_case(tmp_path, lines, ["\\[", "x=1.", "\\]"], "main.tex:L1-L3")

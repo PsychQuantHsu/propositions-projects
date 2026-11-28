@@ -31,6 +31,7 @@ import json
 import os
 import re
 import sys
+from typing import NamedTuple
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -175,6 +176,305 @@ def find_prop_span(
     return occurrences[0]
 
 
+_TEX_COMMENT = re.compile(r"(?:^|[^\\])(?:\\\\)*%")
+
+
+def _code(line: str) -> str:
+    """`line` without its TeX comment (text after an unescaped `%`)."""
+    m = _TEX_COMMENT.search(line)
+    return line if m is None else line[: m.end() - 1]
+
+
+_VERBATIM_ENVS = frozenset(
+    {"verbatim", "Verbatim", "BVerbatim", "lstlisting", "minted", "comment", "filecontents"}
+)
+_ENV_ARG = re.compile(r"\{([A-Za-z]+\*?)\}")
+
+
+class _TexScan(NamedTuple):
+    """What one left-to-right pass over a manuscript file found (issue 110)."""
+
+    line_starts: list[int]  # offset of each line in the joined text
+    live: bytearray  # 1 where a character is code: not a comment, not literal text
+    control_starts: frozenset[int]  # offsets where a control sequence starts
+    display_roles: dict[int, str]  # offset of each `$$` -> "open" or "close"
+
+
+def _skip_group(text: str, i: int) -> int:
+    """End of the braced group that opens at `i` (`text[i] == "{"`): its matching
+    `}`, escaped `\\{` and `\\}` not counting; the end of the text if it never closes."""
+    depth, j, n = 0, i, len(text)
+    while j < n:
+        c = text[j]
+        if c == "\\":
+            j += 2
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return n
+
+
+def _skip_delimited(text: str, i: int) -> int:
+    """End of a literal argument starting at `i`: a braced group, or up to the
+    next copy of the delimiter on the same line."""
+    if i >= len(text) or text[i] == "\n":
+        return i
+    if text[i] == "{":
+        return _skip_group(text, i)
+    j = text.find(text[i], i + 1)
+    eol = text.find("\n", i + 1)
+    if j < 0 or (0 <= eol < j):
+        return len(text) if eol < 0 else eol
+    return j + 1
+
+
+def _skip_spaces(text: str, i: int) -> int:
+    """TeX skips spaces after a control word before reading its argument, and
+    one line end with the spaces after it, unless the next line is blank."""
+    n = len(text)
+    while i < n and text[i] in " \t":
+        i += 1
+    if i < n and text[i] == "\n":
+        j = i + 1
+        while j < n and text[j] in " \t":
+            j += 1
+        if j < n and text[j] != "\n":
+            return j
+    return i
+
+
+def _skip_bracket(text: str, i: int) -> int:
+    """End of the optional `[…]` that opens at `i`: the first `]` on its line
+    outside braces; the line end if there is none."""
+    depth, j, n = 0, i + 1, len(text)
+    while j < n and text[j] != "\n":
+        c = text[j]
+        if c == "\\":
+            j += 2
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}" and depth > 0:
+            depth -= 1
+        elif c == "]" and depth == 0:
+            return j + 1
+        j += 1
+    return j
+
+
+_TEXT_BOXES = frozenset(
+    {"text", "mbox", "hbox", "textrm", "textit", "textbf", "textsf", "texttt", "textnormal", "intertext"}
+)
+
+
+def _scan_tex(tex_lines: list[str]) -> _TexScan:
+    """Read a manuscript file as TeX does, as far as delimiters need it.
+
+    Comments, control symbols (`\\\\`, `\\$`), the literal arguments of `\\verb`,
+    `\\lstinline`, `\\url`, `\\path` and the first of `\\href`, verbatim-like
+    environments up to their exact `\\end{…}`, and math mode (`$`, `$$`, `\\[…\\]`,
+    `\\(…\\)`; a blank line ends it). One pass replaces the regex masking of
+    verify round 5, whose order of rules kept missing nested cases (round 6).
+    """
+    text = "\n".join(tex_lines)
+    starts, pos = [], 0
+    for line in tex_lines:
+        starts.append(pos)
+        pos += len(line) + 1
+    n = len(text)
+    live = bytearray(n)
+    controls: set[int] = set()
+    roles: dict[int, str] = {}
+    mode = "text"  # text | inline | display | bracket | paren
+    i = 0
+    while i < n:
+        c = text[i]
+        if c == "%":
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if c == "\n":
+            j = i + 1
+            while j < n and text[j] in " \t":
+                j += 1
+            if j >= n or text[j] == "\n":
+                mode = "text"  # a blank line ends any math mode
+            i += 1
+            continue
+        if c == "\\":
+            k = i + 1
+            while k < n and text[k].isascii() and text[k].isalpha():
+                k += 1
+            word = k > i + 1
+            if not word and text[k:k + 1] != "\n":
+                k = min(i + 2, n)  # a `\\` at a line end leaves the line end to the scan
+            name = text[i + 1:k]
+            controls.add(i)
+            live[i:k] = b"\x01" * (k - i)
+            a = _skip_spaces(text, k) if word else k
+            if name == "verb":
+                a += 1 if text[a:a + 1] == "*" else 0
+                k = _skip_delimited(text, a)
+            elif name == "lstinline":
+                if text[a:a + 1] == "[":
+                    a = _skip_spaces(text, _skip_bracket(text, a))
+                k = _skip_delimited(text, a)
+            elif name in ("url", "path"):
+                k = _skip_delimited(text, a)
+            elif name == "href":
+                if text[a:a + 1] == "[":
+                    a = _skip_spaces(text, _skip_bracket(text, a))
+                k = _skip_group(text, a) if text[a:a + 1] == "{" else k
+            elif name in _TEXT_BOXES and mode != "text" and text[a:a + 1] == "{":
+                k = _skip_group(text, a)  # text inside math: its `$` is not a delimiter
+            elif name == "begin":
+                m = _ENV_ARG.match(text, a)
+                if m and m.group(1).rstrip("*") in _VERBATIM_ENVS:
+                    end_token = "\\end{" + m.group(1) + "}"
+                    j = text.find(end_token, m.end())
+                    if j < 0:
+                        k = n
+                    else:
+                        controls.add(j)
+                        live[j:j + len(end_token)] = b"\x01" * len(end_token)
+                        k = j + len(end_token)
+            elif name == "[" and mode == "text":
+                mode = "bracket"
+            elif name == "]" and mode == "bracket":
+                mode = "text"
+            elif name == "(" and mode == "text":
+                mode = "paren"
+            elif name == ")" and mode == "paren":
+                mode = "text"
+            i = k
+            continue
+        live[i] = 1
+        if c == "$":
+            double = text[i + 1:i + 2] == "$"
+            if mode == "text" and double:
+                roles[i], mode = "open", "display"
+            elif mode == "text":
+                mode = "inline"
+            elif mode == "inline":
+                mode = "text"
+            elif mode == "display" and double:
+                roles[i], mode = "close", "text"
+            if double and i in roles:
+                live[i + 1] = 1
+                i += 2
+                continue
+        i += 1
+    return _TexScan(starts, live, frozenset(controls), roles)
+
+
+# One scan per manuscript file (one list object per file in `refresh_jsonl`'s
+# locator cache), kept with the list so that a reused id() cannot match.
+_SCANS: dict[int, tuple[list[str], _TexScan]] = {}
+
+
+def _scan_for(tex_lines: list[str]) -> _TexScan:
+    hit = _SCANS.get(id(tex_lines))
+    if hit is not None and hit[0] is tex_lines:
+        return hit[1]
+    scan = _scan_tex(tex_lines)
+    _SCANS[id(tex_lines)] = (tex_lines, scan)
+    return scan
+
+
+def _delimiter_is_live(scan: _TexScan, line_no: int, col: int, own_line: str, role: str) -> bool:
+    """Whether the prop's lone delimiter line `own_line`, found at column `col`
+    of manuscript line `line_no`, is a real delimiter there."""
+    p = scan.line_starts[line_no - 1] + col
+    if _code(own_line).strip() == "$$":
+        return scan.display_roles.get(p) == role
+    if own_line.startswith("\\"):
+        return p in scan.control_starts
+    return p < len(scan.live) and scan.live[p] == 1
+
+
+def _window_matches(window: list[str], own: list[str]) -> bool:
+    """Whether manuscript lines `window` hold the prop's stripped lines `own`.
+
+    The first line may begin with other text (a sentence starts partway
+    through a line) and the last may end with other text; every other line,
+    blank lines included, is equal. Whether a lone delimiter is a real one is
+    `_sides_are_live`'s question.
+    """
+    lines = [line.strip() for line in window]
+    if lines[1:-1] != own[1:-1]:
+        return False
+    return lines[0].endswith(own[0]) and lines[-1].startswith(own[-1])
+
+
+def _sides_are_live(
+    tex_lines: list[str], first: int, last: int, own: list[str], first_silent: bool, last_silent: bool
+) -> bool:
+    """A side whose own line is a lone delimiter must hold a real one: code, not
+    a comment or literal text; a control sequence that starts there (`\\\\[2pt]` is
+    a line break); for `$$`, one that opens (first side) or closes (last side) a
+    display (verify rounds 3 to 6 of issue 110)."""
+    scan = _scan_for(tex_lines)
+    if first_silent:
+        line = tex_lines[first - 1].rstrip()
+        if not _delimiter_is_live(scan, first, len(line) - len(own[0]), own[0], "open"):
+            return False
+    if last_silent:
+        line = tex_lines[last - 1]
+        if not _delimiter_is_live(scan, last, len(line) - len(line.lstrip()), own[-1], "close"):
+            return False
+    return True
+
+
+def widen_to_text(
+    span: tuple[int, int], text: str, tex_lines: list[str], normalize_fn
+) -> tuple[int, int]:
+    """Grow a located span over the prop's own delimiter lines (issue 110).
+
+    `find_prop_span` returns the smallest span whose normalized text contains
+    the prop. A line that normalizes to nothing on its own — a lone `\\]`,
+    `\\[`, `$$`, `\\begin{equation}` — never makes a window contain more, so a
+    prop that ends (or starts) with one comes back a line short.
+
+    A widened span has to match the prop line by line, so it has exactly as
+    many lines as the prop. The windows of that length that contain the span
+    are tried, nearest the span's start first, extending only a side whose own
+    line normalizes to nothing; the first that `_window_matches` is kept. A
+    walk that stopped at the first line looking like the boundary picked
+    comment lines and other text's delimiters, and gave up on a repeated
+    closing line (verify rounds 1 to 3); whether a lone delimiter is real is
+    read from one pass over the file (`_scan_tex`). No match keeps the span.
+    """
+    own = [line.strip() for line in text.split("\n")]
+    while own and not own[0]:
+        own.pop(0)
+    while own and not own[-1]:
+        own.pop()
+    start, end = span
+    count = len(own)
+    if count == 0 or count > MAX_SPAN or end - start + 1 >= count:
+        return span
+    # Judged as a line that ends with a newline: normalization strips a
+    # comment only up to one, so `\\[ % start` alone would not count as silent.
+    first_silent = not normalize_fn(own[0] + "\n").strip()
+    last_silent = not normalize_fn(own[-1] + "\n").strip()
+    for first in range(start, end - count, -1):
+        last = first + count - 1
+        if first < 1 or last < end or last > len(tex_lines):
+            continue
+        if (first < start and not first_silent) or (last > end and not last_silent):
+            continue
+        if _window_matches(tex_lines[first - 1:last], own) and _sides_are_live(
+            tex_lines, first, last, own, first_silent, last_silent
+        ):
+            return first, last
+    return span
+
+
 def read_tex_lines(path: Path) -> tuple[str, list[str]]:
     """(text, lines) of one manuscript file, as every `location` this tool writes counts them.
 
@@ -205,6 +505,15 @@ def refresh_jsonl(
 
     Returns (props_total, props_updated, props_match_failed, props_anchor_failed).
     """
+    try:
+        return _refresh_jsonl(jsonl_path, tex_path, dry_run)
+    finally:
+        _SCANS.clear()  # the scans hold every manuscript's lines
+
+
+def _refresh_jsonl(
+    jsonl_path: Path, tex_path: Path, dry_run: bool
+) -> tuple[int, int, int, int]:
     validator = load_validator()
     normalize = validator.normalize_for_match
 
@@ -303,19 +612,23 @@ def refresh_jsonl(
             new_lines.append(p)
             continue
 
-        actual_start, actual_end = span
+        actual_start, actual_end = widen_to_text(span, text, tex_lines, normalize)
         new_loc = (
             f"{loc_prefix}:L{actual_start}-L{actual_end}"
             if actual_end > actual_start
             else f"{loc_prefix}:L{actual_start}"
         )
 
-        if new_loc != p.get("location", ""):
+        old_loc = p.get("location", "")
+        if new_loc != old_loc:
             updated += 1
+            # The stored location as it was, read before it is replaced
+            # (issue 110); `?` only when the key is missing.
+            shown = p.get("location", "?")
             if not dry_run:
                 p["location"] = new_loc
             print(
-                f"✓ {p['id'][:8]}: {p.get('location','?')} → {new_loc}",
+                f"✓ {p['id'][:8]}: {shown} → {new_loc}",
                 file=sys.stderr,
             )
         new_lines.append(p)

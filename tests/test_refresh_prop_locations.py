@@ -692,3 +692,55 @@ def test_dollars_in_verbatim_text_do_not_change_the_count(tmp_path: Path, litera
 def test_second_display_on_the_closing_line_does_not_block(tmp_path: Path):
     # spec-example: location-refresh / a second display on the closing line does not block
     _closing_case(tmp_path, "\\] Then \\[ y=2. \\]")
+
+
+def _unchanged_case(tmp_path: Path, lines: list[str], own: list[str], location: str):
+    prop = _prop("38", "\n".join(own), location)
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == location, result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+DISPLAY = ["Let", "$$", "x=1.", "$$"]
+
+
+def test_delimiter_in_a_verb_argument_does_not_start_a_verbatim_block(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter in a \verb argument does not start a verbatim block
+    lines = ["Use \\verb!\\begin{verbatim}! here.", ""] + DISPLAY
+    _unchanged_case(tmp_path, lines, DISPLAY, "main.tex:L3-L6")
+
+
+def test_percent_sign_in_a_url_is_not_a_comment(tmp_path: Path):
+    # spec-example: location-refresh / a percent sign in a URL is not a comment
+    lines = ["See \\url{http://x/a%20b} \\[", "x=1.", "\\]"]
+    _unchanged_case(tmp_path, lines, ["\\[", "x=1.", "\\]"], "main.tex:L1-L3")
+
+
+@pytest.mark.parametrize(
+    "literal",
+    [
+        ["Use \\lstinline!$$! here."],
+        ["See \\path|x$$y|."],
+        ["See \\href{http://x/$$}{t}."],
+        ["See \\url|http://x/$$|."],
+        ["\\begin{verbatim} $$ \\end{verbatim}"],
+        ["\\begin{verbatim}", "\\end{verbatimExtra} $$", "\\end{verbatim}"],
+    ],
+)
+def test_literal_text_of_other_commands_does_not_change_the_count(tmp_path: Path, literal):
+    # spec-example: location-refresh / literal text of other commands and one-line environments does not change the count
+    lines = literal + [""] + DISPLAY
+    first = len(literal) + 2
+    _unchanged_case(tmp_path, lines, DISPLAY, f"main.tex:L{first}-L{first + 3}")
+
+
+def test_adjacent_inline_formulas_are_not_a_display_delimiter(tmp_path: Path):
+    # spec-example: location-refresh / adjacent inline formulas are not a display delimiter
+    lines = ["Inline $p$$q$ here.", "$$", "a", "$$", "b", "$$", "c", "$$"]
+    prop = _prop("39", "$$\nb\n$$", "main.tex:L5")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L5", result.stderr

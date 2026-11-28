@@ -31,6 +31,7 @@ import json
 import os
 import re
 import sys
+from typing import NamedTuple
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -184,111 +185,180 @@ def _code(line: str) -> str:
     return line if m is None else line[: m.end() - 1]
 
 
-def _escaped(text: str, i: int) -> bool:
-    """Whether the character at `i` follows an odd number of backslashes."""
-    n = 0
-    while i - n - 1 >= 0 and text[i - n - 1] == "\\":
-        n += 1
-    return n % 2 == 1
+_VERBATIM_ENVS = frozenset(
+    {"verbatim", "Verbatim", "BVerbatim", "lstlisting", "minted", "comment", "filecontents"}
+)
+_ENV_ARG = re.compile(r"\{([A-Za-z]+\*?)\}")
 
 
-def _count_token(text: str, token: str) -> int:
-    """Occurrences of `token` in `text` that are not escaped (`\\[` is a line break)."""
-    count, i = 0, text.find(token)
-    while i != -1:
-        if not _escaped(text, i):
-            count += 1
-            i = text.find(token, i + len(token))
-        else:
-            i = text.find(token, i + 1)
-    return count
+class _TexScan(NamedTuple):
+    """What one left-to-right pass over a manuscript file found (issue 110)."""
+
+    line_starts: list[int]  # offset of each line in the joined text
+    live: bytearray  # 1 where a character is code: not a comment, not literal text
+    control_starts: frozenset[int]  # offsets where a control sequence starts
+    display_roles: dict[int, str]  # offset of each `$$` -> "open" or "close"
 
 
-_VERBATIM_ENVS = ("verbatim", "Verbatim", "BVerbatim", "lstlisting", "minted", "comment", "filecontents")
-_BEGIN_VERBATIM = re.compile(r"\\begin\{(" + "|".join(_VERBATIM_ENVS) + r")\*?\}")
-_LITERAL_ARG = re.compile(r"\\verb\*?([^A-Za-z\s*]).*?\1|\\url\{[^}]*\}")
+def _skip_delimited(text: str, i: int, braces: bool) -> int:
+    """End of a literal argument starting at `i`: `{…}` when `braces`, otherwise
+    up to the next copy of the delimiter on the same line."""
+    if i >= len(text) or text[i] == "\n":
+        return i
+    if braces and text[i] == "{":
+        j = text.find("}", i + 1)
+        return len(text) if j < 0 else j + 1
+    j = text.find(text[i], i + 1)
+    eol = text.find("\n", i + 1)
+    if j < 0 or (0 <= eol < j):
+        return len(text) if eol < 0 else eol
+    return j + 1
 
-# Masked lines and prefix counts of `$$`, per manuscript file (one list object
-# per file in `refresh_jsonl`'s locator cache); computed once per run.
-_DOLLAR_INDEX: dict[int, tuple[list[str], list[str], list[int]]] = {}
 
+def _scan_tex(tex_lines: list[str]) -> _TexScan:
+    """Read a manuscript file as TeX does, as far as delimiters need it.
 
-def _masked_lines(tex_lines: list[str]) -> list[str]:
-    """Each line with its comment, `\\verb` and `\\url` arguments and verbatim-like
-    environments blanked out, keeping its length so that columns still line up."""
-    out: list[str] = []
-    env: str | None = None
+    Comments, control symbols (`\\\\`, `\\$`), the literal arguments of `\\verb`,
+    `\\lstinline`, `\\url`, `\\path` and the first of `\\href`, verbatim-like
+    environments up to their exact `\\end{…}`, and math mode (`$`, `$$`, `\\[…\\]`,
+    `\\(…\\)`; a blank line ends it). One pass replaces the regex masking of
+    verify round 5, whose order of rules kept missing nested cases (round 6).
+    """
+    text = "\n".join(tex_lines)
+    starts, pos = [], 0
     for line in tex_lines:
-        if env is not None:
-            out.append(" " * len(line))
-            if "\\end{" + env in line:
-                env = None
+        starts.append(pos)
+        pos += len(line) + 1
+    n = len(text)
+    live = bytearray(n)
+    controls: set[int] = set()
+    roles: dict[int, str] = {}
+    mode = "text"  # text | inline | display | bracket | paren
+    i = 0
+    while i < n:
+        c = text[i]
+        if c == "%":
+            j = text.find("\n", i)
+            i = n if j < 0 else j
             continue
-        code = _code(line)
-        begin = _BEGIN_VERBATIM.search(code)
-        if begin is not None:
-            env = begin.group(1)
-            code = code[: begin.start()]
-        code = _LITERAL_ARG.sub(lambda m: " " * len(m.group(0)), code)
-        out.append(code + " " * (len(line) - len(code)))
-    return out
+        if c == "\n":
+            j = i + 1
+            while j < n and text[j] in " \t":
+                j += 1
+            if j >= n or text[j] == "\n":
+                mode = "text"  # a blank line ends any math mode
+            i += 1
+            continue
+        if c == "\\":
+            k = i + 1
+            while k < n and text[k].isascii() and text[k].isalpha():
+                k += 1
+            if k == i + 1:
+                k = min(i + 2, n)
+            name = text[i + 1:k]
+            controls.add(i)
+            live[i:k] = b"\x01" * (k - i)
+            if name in ("verb", "lstinline"):
+                k += 1 if text[k:k + 1] == "*" else 0
+                k = _skip_delimited(text, k, braces=name == "lstinline")
+            elif name in ("url", "path"):
+                k = _skip_delimited(text, k, braces=True)
+            elif name == "href":
+                k = _skip_delimited(text, k, braces=True) if text[k:k + 1] == "{" else k
+            elif name == "begin":
+                m = _ENV_ARG.match(text, k)
+                if m and m.group(1).rstrip("*") in _VERBATIM_ENVS:
+                    end_token = "\\end{" + m.group(1) + "}"
+                    j = text.find(end_token, m.end())
+                    if j < 0:
+                        k = n
+                    else:
+                        controls.add(j)
+                        live[j:j + len(end_token)] = b"\x01" * len(end_token)
+                        k = j + len(end_token)
+            elif name == "[" and mode == "text":
+                mode = "bracket"
+            elif name == "]" and mode == "bracket":
+                mode = "text"
+            elif name == "(" and mode == "text":
+                mode = "paren"
+            elif name == ")" and mode == "paren":
+                mode = "text"
+            i = k
+            continue
+        live[i] = 1
+        if c == "$":
+            double = text[i + 1:i + 2] == "$"
+            if mode == "text" and double:
+                roles[i], mode = "open", "display"
+            elif mode == "text":
+                mode = "inline"
+            elif mode == "inline":
+                mode = "text"
+            elif mode == "display" and double:
+                roles[i], mode = "close", "text"
+            if double and i in roles:
+                live[i + 1] = 1
+                i += 2
+                continue
+        i += 1
+    return _TexScan(starts, live, frozenset(controls), roles)
 
 
-def _dollar_index(tex_lines: list[str]) -> tuple[list[str], list[int]]:
-    hit = _DOLLAR_INDEX.get(id(tex_lines))
+# One scan per manuscript file (one list object per file in `refresh_jsonl`'s
+# locator cache), kept with the list so that a reused id() cannot match.
+_SCANS: dict[int, tuple[list[str], _TexScan]] = {}
+
+
+def _scan_for(tex_lines: list[str]) -> _TexScan:
+    hit = _SCANS.get(id(tex_lines))
     if hit is not None and hit[0] is tex_lines:
-        return hit[1], hit[2]
-    masked = _masked_lines(tex_lines)
-    before = [0]
-    for line in masked:
-        before.append(before[-1] + _count_token(line, "$$"))
-    _DOLLAR_INDEX[id(tex_lines)] = (tex_lines, masked, before)
-    return masked, before
+        return hit[1]
+    scan = _scan_tex(tex_lines)
+    _SCANS[id(tex_lines)] = (tex_lines, scan)
+    return scan
 
 
-def _dollars_before(tex_lines: list[str], line_no: int, col: int) -> int:
-    """`$$` before column `col` of line `line_no`, leaving out comments, escaped
-    dollars, `\\verb` and `\\url` arguments and verbatim-like environments."""
-    masked, before = _dollar_index(tex_lines)
-    return before[line_no - 1] + _count_token(masked[line_no - 1][:col], "$$")
+def _delimiter_is_live(scan: _TexScan, line_no: int, col: int, own_line: str, role: str) -> bool:
+    """Whether the prop's lone delimiter line `own_line`, found at column `col`
+    of manuscript line `line_no`, is a real delimiter there."""
+    p = scan.line_starts[line_no - 1] + col
+    if _code(own_line).strip() == "$$":
+        return scan.display_roles.get(p) == role
+    if own_line.startswith("\\"):
+        return p in scan.control_starts
+    return p < len(scan.live) and scan.live[p] == 1
 
 
-def _window_matches(window: list[str], own: list[str], first_silent: bool, last_silent: bool) -> bool:
+def _window_matches(window: list[str], own: list[str]) -> bool:
     """Whether manuscript lines `window` hold the prop's stripped lines `own`.
 
     The first line may begin with other text (a sentence starts partway
     through a line) and the last may end with other text; every other line,
-    blank lines included, is equal. On the opening side, when the prop's own
-    line is a lone delimiter, that delimiter must be a real one: not after a
-    TeX comment, not preceded by an odd number of backslashes (`\\\\[2pt]` is a
-    line break). Whether a `$$` opens or closes is `_dollar_roles_hold`'s
-    question (verify rounds 3 to 5 of issue 110).
+    blank lines included, is equal. Whether a lone delimiter is a real one is
+    `_sides_are_live`'s question.
     """
     lines = [line.strip() for line in window]
     if lines[1:-1] != own[1:-1]:
         return False
-    if not lines[0].endswith(own[0]) or not lines[-1].startswith(own[-1]):
-        return False
-    head = lines[0][: len(lines[0]) - len(own[0])]
-    if first_silent and head and (_TEX_COMMENT.search(head) or _escaped(lines[0], len(head))):
-        return False
-    return True
+    return lines[0].endswith(own[0]) and lines[-1].startswith(own[-1])
 
 
-def _dollar_roles_hold(tex_lines: list[str], first: int, last: int, own: list[str]) -> bool:
-    """A `$$` side opens (even count before it) or closes (odd count) a display.
-
-    `$$` opens and closes with the same token, so a window whose first `$$`
-    closes the previous display looks, line by line, like a prop's own
-    display (verify round 4 of issue 110).
-    """
-    if _code(own[0]).strip() == "$$":
+def _sides_are_live(
+    tex_lines: list[str], first: int, last: int, own: list[str], first_silent: bool, last_silent: bool
+) -> bool:
+    """A side whose own line is a lone delimiter must hold a real one: code, not
+    a comment or literal text; a control sequence that starts there (`\\\\[2pt]` is
+    a line break); for `$$`, one that opens (first side) or closes (last side) a
+    display (verify rounds 3 to 6 of issue 110)."""
+    scan = _scan_for(tex_lines)
+    if first_silent:
         line = tex_lines[first - 1].rstrip()
-        if _dollars_before(tex_lines, first, len(line) - len(own[0])) % 2 != 0:
+        if not _delimiter_is_live(scan, first, len(line) - len(own[0]), own[0], "open"):
             return False
-    if _code(own[-1]).strip() == "$$":
+    if last_silent:
         line = tex_lines[last - 1]
-        if _dollars_before(tex_lines, last, len(line) - len(line.lstrip())) % 2 != 1:
+        if not _delimiter_is_live(scan, last, len(line) - len(line.lstrip()), own[-1], "close"):
             return False
     return True
 
@@ -309,7 +379,8 @@ def widen_to_text(
     line normalizes to nothing; the first that `_window_matches` is kept. A
     walk that stopped at the first line looking like the boundary picked
     comment lines and other text's delimiters, and gave up on a repeated
-    closing line (verify rounds 1 to 3). No match keeps the span.
+    closing line (verify rounds 1 to 3); whether a lone delimiter is real is
+    read from one pass over the file (`_scan_tex`). No match keeps the span.
     """
     own = [line.strip() for line in text.split("\n")]
     while own and not own[0]:
@@ -330,9 +401,9 @@ def widen_to_text(
             continue
         if (first < start and not first_silent) or (last > end and not last_silent):
             continue
-        if _window_matches(
-            tex_lines[first - 1:last], own, first_silent, last_silent
-        ) and _dollar_roles_hold(tex_lines, first, last, own):
+        if _window_matches(tex_lines[first - 1:last], own) and _sides_are_live(
+            tex_lines, first, last, own, first_silent, last_silent
+        ):
             return first, last
     return span
 

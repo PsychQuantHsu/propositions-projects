@@ -8,7 +8,7 @@ How `refresh-prop-locations.py` (Operation B) decides which lines a proposition'
 
 ### Requirement: A refreshed location covers the proposition's own delimiter lines
 
-When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, the script SHALL consider the windows of the manuscript that have exactly as many lines as the proposition's text has between its first and last non-blank lines, that contain the locator's span, and that extend the span only on a side whose own line normalizes to nothing, nearest the span's start first, and SHALL keep the first window whose lines, each stripped of surrounding white space, match the proposition's lines: the window's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. A line normalizes to nothing when it does so as a line that ends with a newline, so a trailing comment (`\[ % start`) does not count. Whether a matched delimiter is real is read from one left-to-right pass over the manuscript file, as TeX reads it: text from an unescaped `%` to the end of the line is a comment; `\\`, `\$` and `\%` are control symbols; the arguments of `\verb` and `\lstinline` (up to the next copy of the delimiter on that line, or to `}` after `{`), of `\url` and `\path` (a braced argument, or up to the next copy of another delimiter on that line), the first argument of `\href`, and the body of a verbatim-like environment (`verbatim`, `Verbatim`, `BVerbatim`, `lstlisting`, `minted`, `comment`, `filecontents`, each with or without `*`, up to its exact `\end{…}`, on the same line or a later one) are literal text; outside them a `$` opens inline math unless the next character is `$`, which opens a display, a `$` in inline math closes it, a `$$` in a display closes it, a `$` inside `\[…\]` or `\(…\)` does not change the mode, and a blank line ends any math mode. These are the only literal commands and environments. When a side whose own line normalizes to nothing is matched this way, the matched delimiter SHALL be live in that pass: a control sequence starts at it, or, when that line without its comment is `$$`, a display opens there (on the first side) or closes there (on the last side). When no window matches, or the proposition has more than `MAX_SPAN` lines, the span SHALL stay as the locator returned it. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
+When `refresh-prop-locations.py` locates a proposition whose text begins or ends with a line that normalizes to nothing on its own (a lone `\[`, `\]`, `$$`, `\begin{equation}`, `\end{equation*}`, `\end{align*}` and the like), the written location SHALL include the manuscript line that holds that delimiter. After the windowed locator returns a span, the script SHALL consider the windows of the manuscript that have exactly as many lines as the proposition's text has between its first and last non-blank lines, that contain the locator's span, and that extend the span only on a side whose own line normalizes to nothing, nearest the span's start first, and SHALL keep the first window whose lines, each stripped of surrounding white space, match the proposition's lines: the window's first line ends with the proposition's first line, its last line starts with the proposition's last line, and every other line, blank lines included, is equal. A line normalizes to nothing when it does so as a line that ends with a newline, so a trailing comment (`\[ % start`) does not count. Whether a matched delimiter is real is read from one left-to-right pass over the manuscript file, as TeX reads it: text from an unescaped `%` to the end of the line is a comment; `\\`, `\$` and `\%` are control symbols, and a `\` at the end of a line does not take the line end, which still counts toward a blank line; spaces after a control word are skipped before its argument; the arguments of `\verb` and `\lstinline` (for `\lstinline` after an optional `[…]` argument; up to the next copy of the delimiter on that line, or a braced argument), of `\url` and `\path` (a braced argument, or up to the next copy of another delimiter on that line), the first argument of `\href`, and the body of a verbatim-like environment (`verbatim`, `Verbatim`, `BVerbatim`, `lstlisting`, `minted`, `comment`, `filecontents`, each with or without `*`, up to its exact `\end{…}`, on the same line or a later one) are literal text, and a braced argument ends at its matching `}`, escaped `\{` and `\}` not counting; outside them a `$` opens inline math unless the next character is `$`, which opens a display, a `$` in inline math closes it, a `$$` in a display closes it, a `$` inside `\[…\]` or `\(…\)` does not change the mode, and a blank line ends any math mode. These are the only literal commands and environments. When a side whose own line normalizes to nothing is matched this way, the matched delimiter SHALL be live in that pass: a control sequence starts at it, or, when that line without its comment is `$$`, a display opens there (on the first side) or closes there (on the last side). When no window matches, or the proposition has more than `MAX_SPAN` lines, the span SHALL stay as the locator returned it. The line reporting an update SHALL show the stored location before the update, as it was, and the location after it.
 
 #### Scenario: A proposition ending in a display-math block
 
@@ -149,7 +149,7 @@ When `refresh-prop-locations.py` locates a proposition whose text begins or ends
 
 ##### Example: literal text of other commands and one-line environments does not change the count
 
-- **GIVEN** a manuscript whose first line is one of `Use \lstinline!$$! here.`, `See \path|x$$y|.`, `See \href{http://x/$$}{t}.`, `See \url|http://x/$$|.`, `\begin{verbatim} $$ \end{verbatim}`, or the two lines `\begin{verbatim}` and `\end{verbatimExtra} $$` followed later by `\end{verbatim}`, then a blank line and `Let`, `$$`, `x=1.`, `$$`, and a proposition whose text is those four lines with its stored location on them
+- **GIVEN** a manuscript whose first line is one of `Use \lstinline!$$! here.`, `Use \lstinline[language=C]{$$} here.`, `Use \verb{$$} here.`, `See \path|x$$y|.`, `See \href{http://x/$$}{t}.`, `See \href{http://x/{y}$$}{t}.`, `See \href {http://x/$$}{t}.`, `See \url|http://x/$$|.`, `\begin{verbatim} $$ \end{verbatim}`, `\begin {verbatim} $$ \end{verbatim}`, or the two lines `\begin{verbatim}` and `\end{verbatimExtra} $$` followed later by `\end{verbatim}`, then `Let`, `$$`, `x=1.`, `$$` on the next lines, and a proposition whose text is those four lines with its stored location on them
 - **WHEN** the script runs on it
 - **THEN** the location is unchanged, and the run reports 0 updated
 
@@ -158,6 +158,18 @@ When `refresh-prop-locations.py` locates a proposition whose text begins or ends
 - **GIVEN** a `main.tex` whose lines are `Inline $p$$q$ here.`, `$$`, `a`, `$$`, `b`, `$$`, `c`, `$$`, and a proposition whose text is `$$`, `b`, `$$` with location `main.tex:L5`
 - **WHEN** the script runs on it
 - **THEN** the location stays `main.tex:L5`
+
+##### Example: a backslash at the end of a line does not keep math mode open
+
+- **GIVEN** a `main.tex` whose lines are `Text $p\`, a blank line, `Let`, `$$`, `x=1.` and `$$`, and a proposition whose text is the last four lines with location `main.tex:L3-L6`
+- **WHEN** the script runs on it
+- **THEN** the location stays `main.tex:L3-L6`, and the run reports 0 updated
+
+##### Example: an optional argument of \lstinline is not its delimiter
+
+- **GIVEN** a `main.tex` whose lines are `Code \lstinline[language=C]{x} and $$`, `a`, `$$`, `b`, `$$`, `c`, `$$`, and a proposition whose text is `$$`, `b`, `$$` with location `main.tex:L4`
+- **WHEN** the script runs on it
+- **THEN** the location stays `main.tex:L4`
 
 <!-- @trace
 source: idd-110-delimiter-lines
@@ -213,6 +225,14 @@ tests:
 -->
 <!-- @trace
 source: idd-110-fix6
+updated: 2026-11-28
+code:
+  - plugins/propositions/scripts/refresh-prop-locations.py
+tests:
+  - tests/test_refresh_prop_locations.py
+-->
+<!-- @trace
+source: idd-110-fix7
 updated: 2026-11-28
 code:
   - plugins/propositions/scripts/refresh-prop-locations.py

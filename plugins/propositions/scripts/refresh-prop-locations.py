@@ -204,10 +204,53 @@ def _count_token(text: str, token: str) -> int:
     return count
 
 
+_VERBATIM_ENVS = ("verbatim", "Verbatim", "BVerbatim", "lstlisting", "minted", "comment", "filecontents")
+_BEGIN_VERBATIM = re.compile(r"\\begin\{(" + "|".join(_VERBATIM_ENVS) + r")\*?\}")
+_LITERAL_ARG = re.compile(r"\\verb\*?([^A-Za-z\s*]).*?\1|\\url\{[^}]*\}")
+
+# Masked lines and prefix counts of `$$`, per manuscript file (one list object
+# per file in `refresh_jsonl`'s locator cache); computed once per run.
+_DOLLAR_INDEX: dict[int, tuple[list[str], list[str], list[int]]] = {}
+
+
+def _masked_lines(tex_lines: list[str]) -> list[str]:
+    """Each line with its comment, `\\verb` and `\\url` arguments and verbatim-like
+    environments blanked out, keeping its length so that columns still line up."""
+    out: list[str] = []
+    env: str | None = None
+    for line in tex_lines:
+        if env is not None:
+            out.append(" " * len(line))
+            if "\\end{" + env in line:
+                env = None
+            continue
+        code = _code(line)
+        begin = _BEGIN_VERBATIM.search(code)
+        if begin is not None:
+            env = begin.group(1)
+            code = code[: begin.start()]
+        code = _LITERAL_ARG.sub(lambda m: " " * len(m.group(0)), code)
+        out.append(code + " " * (len(line) - len(code)))
+    return out
+
+
+def _dollar_index(tex_lines: list[str]) -> tuple[list[str], list[int]]:
+    hit = _DOLLAR_INDEX.get(id(tex_lines))
+    if hit is not None and hit[0] is tex_lines:
+        return hit[1], hit[2]
+    masked = _masked_lines(tex_lines)
+    before = [0]
+    for line in masked:
+        before.append(before[-1] + _count_token(line, "$$"))
+    _DOLLAR_INDEX[id(tex_lines)] = (tex_lines, masked, before)
+    return masked, before
+
+
 def _dollars_before(tex_lines: list[str], line_no: int, col: int) -> int:
-    """`$$` outside comments and not escaped, before column `col` of line `line_no`."""
-    before = sum(_count_token(_code(line), "$$") for line in tex_lines[: line_no - 1])
-    return before + _count_token(_code(tex_lines[line_no - 1][:col]), "$$")
+    """`$$` before column `col` of line `line_no`, leaving out comments, escaped
+    dollars, `\\verb` and `\\url` arguments and verbatim-like environments."""
+    masked, before = _dollar_index(tex_lines)
+    return before[line_no - 1] + _count_token(masked[line_no - 1][:col], "$$")
 
 
 def _window_matches(window: list[str], own: list[str], first_silent: bool, last_silent: bool) -> bool:
@@ -215,12 +258,11 @@ def _window_matches(window: list[str], own: list[str], first_silent: bool, last_
 
     The first line may begin with other text (a sentence starts partway
     through a line) and the last may end with other text; every other line,
-    blank lines included, is equal. On a side whose own line is a lone
-    delimiter, that delimiter must be a real one (not after a TeX comment, not
-    preceded by an odd number of backslashes, as in `\\\\[2pt]`), and the
-    rest of the manuscript line, outside a comment, must not hold the same
-    delimiter again: such a delimiter belongs to other text (verify rounds 3
-    and 4 of issue 110).
+    blank lines included, is equal. On the opening side, when the prop's own
+    line is a lone delimiter, that delimiter must be a real one: not after a
+    TeX comment, not preceded by an odd number of backslashes (`\\\\[2pt]` is a
+    line break). Whether a `$$` opens or closes is `_dollar_roles_hold`'s
+    question (verify rounds 3 to 5 of issue 110).
     """
     lines = [line.strip() for line in window]
     if lines[1:-1] != own[1:-1]:
@@ -228,12 +270,7 @@ def _window_matches(window: list[str], own: list[str], first_silent: bool, last_
     if not lines[0].endswith(own[0]) or not lines[-1].startswith(own[-1]):
         return False
     head = lines[0][: len(lines[0]) - len(own[0])]
-    if first_silent and head and (
-        _TEX_COMMENT.search(head) or _escaped(lines[0], len(head)) or _count_token(head, own[0])
-    ):
-        return False
-    tail = lines[-1][len(own[-1]):]
-    if last_silent and tail and _count_token(_code(tail), own[-1]):
+    if first_silent and head and (_TEX_COMMENT.search(head) or _escaped(lines[0], len(head))):
         return False
     return True
 
@@ -242,14 +279,14 @@ def _dollar_roles_hold(tex_lines: list[str], first: int, last: int, own: list[st
     """A `$$` side opens (even count before it) or closes (odd count) a display.
 
     `$$` opens and closes with the same token, so a window whose first `$$`
-    closes the previous display looks, line by line, like a proposition's own
+    closes the previous display looks, line by line, like a prop's own
     display (verify round 4 of issue 110).
     """
-    if own[0] == "$$":
+    if _code(own[0]).strip() == "$$":
         line = tex_lines[first - 1].rstrip()
-        if _dollars_before(tex_lines, first, len(line) - 2) % 2 != 0:
+        if _dollars_before(tex_lines, first, len(line) - len(own[0])) % 2 != 0:
             return False
-    if own[-1] == "$$":
+    if _code(own[-1]).strip() == "$$":
         line = tex_lines[last - 1]
         if _dollars_before(tex_lines, last, len(line) - len(line.lstrip())) % 2 != 1:
             return False
@@ -283,8 +320,10 @@ def widen_to_text(
     count = len(own)
     if count == 0 or count > MAX_SPAN or end - start + 1 >= count:
         return span
-    first_silent = not normalize_fn(own[0]).strip()
-    last_silent = not normalize_fn(own[-1]).strip()
+    # Judged as a line that ends with a newline: normalization strips a
+    # comment only up to one, so `\\[ % start` alone would not count as silent.
+    first_silent = not normalize_fn(own[0] + "\n").strip()
+    last_silent = not normalize_fn(own[-1] + "\n").strip()
     for first in range(start, end - count, -1):
         last = first + count - 1
         if first < 1 or last < end or last > len(tex_lines):

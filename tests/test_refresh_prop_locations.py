@@ -654,3 +654,41 @@ def test_line_break_with_an_optional_argument_is_not_a_delimiter(tmp_path: Path)
     result = _run(jsonl, tex_path)
     assert result.returncode == 0, result.stderr
     assert _read_props(jsonl)[0]["location"] == "main.tex:L1-L3", result.stderr
+
+
+def test_delimiter_line_with_a_trailing_comment_keeps_its_side(tmp_path: Path):
+    # spec-example: location-refresh / a delimiter line with a trailing comment keeps its side
+    lines = ["Before.", "\\[ % start", "x=1.", "\\]", "After."]
+    prop = _prop("36", "\n".join(lines[1:4]), "main.tex:L2-L4")
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == "main.tex:L2-L4", result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+@pytest.mark.parametrize(
+    "literal",
+    [
+        ["Use \\verb!$$! here."],
+        ["\\begin{verbatim}", "a $$ b", "\\end{verbatim}"],
+        ["See \\url{http://x/$$}."],
+    ],
+)
+def test_dollars_in_verbatim_text_do_not_change_the_count(tmp_path: Path, literal):
+    # spec-example: location-refresh / a $$ in verbatim text does not change the count
+    display = ["Let", "$$", "x=1.", "$$"]
+    lines = literal + [""] + display
+    first = len(literal) + 2
+    location = f"main.tex:L{first}-L{first + 3}"
+    prop = _prop("37", "\n".join(display), location)
+    jsonl, tex_path = _write_pair(tmp_path, [prop], "\n".join(lines) + "\n")
+    result = _run(jsonl, tex_path)
+    assert result.returncode == 0, result.stderr
+    assert _read_props(jsonl)[0]["location"] == location, result.stderr
+    assert "updated: 0" in result.stderr, result.stderr
+
+
+def test_second_display_on_the_closing_line_does_not_block(tmp_path: Path):
+    # spec-example: location-refresh / a second display on the closing line does not block
+    _closing_case(tmp_path, "\\] Then \\[ y=2. \\]")
